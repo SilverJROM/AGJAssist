@@ -7,6 +7,7 @@ import {
   DEFAULT_BOTTOM_NAV_TAB_IDS,
   addBottomNavTab,
   buildOvermindWsUrl,
+  buildTmuxWsUrl,
   countDoneTasks,
   currentElapsedMs,
   formatElapsed,
@@ -26,6 +27,7 @@ import {
 } from './overmind-helpers.js';
 
 const html = htm.bind(h);
+const OVM_TMUX_TARGET = 'OVM:0.0';
 
 // Telegram Mini App detection
 const isTgMiniApp = !!(window.Telegram?.WebApp?.initData);
@@ -506,6 +508,239 @@ function Dashboard() {
   `;
 }
 
+function OvmConsole() {
+  const [ovmStatus, setOvmStatus] = useState({ open: false, status: 'closed' });
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [action, setAction] = useState('');
+  const [error, setError] = useState('');
+  const [streamStatus, setStreamStatus] = useState('idle');
+  const [snapshot, setSnapshot] = useState('');
+  const [entries, setEntries] = useState([]);
+  const [input, setInput] = useState('');
+  const [streamKey, setStreamKey] = useState(0);
+  const transcriptRef = useRef(null);
+  const wsRef = useRef(null);
+  const snapshotRef = useRef('');
+  const open = !!ovmStatus?.open;
+
+  const loadStatus = useCallback(async () => {
+    try {
+      const data = await api('/api/overmind/ovm/status');
+      setOvmStatus(data);
+      setError('');
+      return data;
+    } catch (e) {
+      setError(e.message || 'Failed to load OVM status.');
+      return null;
+    } finally {
+      setStatusLoading(false);
+    }
+  }, []);
+
+  function appendEntry(role, label, content) {
+    const trimmed = normalizeTerminalOutput(content);
+    if (!trimmed) return;
+    setEntries(prev => [...prev.slice(-40), {
+      id: `${role}-${Date.now()}-${prev.length}`,
+      role,
+      label,
+      content: trimmed,
+      timestamp: new Date().toLocaleTimeString()
+    }]);
+  }
+
+  async function runAction(nextAction) {
+    if (action) return;
+    setAction(nextAction);
+    setError('');
+    try {
+      const data = await api(`/api/overmind/ovm/${nextAction}`, { method: 'POST' });
+      setOvmStatus(data);
+      setStreamKey(key => key + 1);
+      if (nextAction === 'close') {
+        wsRef.current?.close();
+        wsRef.current = null;
+        snapshotRef.current = '';
+        setSnapshot('');
+        setEntries([]);
+        setStreamStatus('idle');
+      }
+    } catch (e) {
+      setError(e.message || `Failed to ${nextAction} OVM.`);
+    } finally {
+      setAction('');
+      await loadStatus();
+    }
+  }
+
+  function sendMessage() {
+    const message = input.trim();
+    const ws = wsRef.current;
+    if (!message || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+    ws.send(JSON.stringify({ type: 'input', data: `${message}\r` }));
+    appendEntry('user', 'You', message);
+    setInput('');
+  }
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
+
+  useEffect(() => {
+    const timer = setInterval(loadStatus, 10000);
+    return () => clearInterval(timer);
+  }, [loadStatus]);
+
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const wsUrl = buildTmuxWsUrl(OVM_TMUX_TARGET, authToken);
+    if (!wsUrl) {
+      setStreamStatus('error');
+      setError('Missing authentication token for OVM stream.');
+      return;
+    }
+
+    const ws = new WebSocket(wsUrl);
+    let closed = false;
+    wsRef.current = ws;
+    setStreamStatus('connecting');
+
+    ws.onopen = () => {
+      setStreamStatus('connected');
+      setError('');
+    };
+    ws.onerror = () => setStreamStatus('error');
+    ws.onclose = () => {
+      if (!closed) setStreamStatus('disconnected');
+    };
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'snapshot' || msg.type === 'output') {
+          const latest = capTerminalOutput(normalizeTerminalOutput(msg.data), 200);
+          const previous = snapshotRef.current;
+          const appended = msg.type === 'output' ? latest : diffTerminalOutput(previous, latest);
+          snapshotRef.current = latest;
+          setSnapshot(latest);
+          if (appended) appendEntry('terminal', 'OVM', appended);
+        } else if (msg.type === 'safety_block') {
+          appendEntry('error', 'Safety', `Command blocked: ${msg.pattern || msg.command || 'safety rule'}`);
+        } else if (msg.type === 'closed') {
+          setStreamStatus('disconnected');
+          appendEntry('system', 'Session', msg.reason || 'OVM pane closed.');
+          loadStatus();
+        } else if (msg.type === 'error') {
+          setStreamStatus('error');
+          appendEntry('error', 'Stream error', msg.message || 'OVM stream error.');
+        }
+      } catch {}
+    };
+
+    return () => {
+      closed = true;
+      ws.close();
+      if (wsRef.current === ws) wsRef.current = null;
+    };
+  }, [open, streamKey, loadStatus]);
+
+  useEffect(() => {
+    const node = transcriptRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, [entries, snapshot]);
+
+  const statusText = statusLoading ? 'checking' : (ovmStatus?.status || (open ? 'open' : 'closed'));
+  const busy = !!action;
+  const canSend = open && streamStatus === 'connected' && input.trim();
+
+  return html`
+    <section class="ovm-console">
+      <div class="ovm-console-header">
+        <div class="ovm-console-title">
+          <span class=${'ovm-status-dot ' + (open ? 'open' : 'closed')} aria-hidden="true"></span>
+          <div>
+            <h3>OVM</h3>
+            <div>${OVM_TMUX_TARGET} · ${statusText}${ovmStatus?.since ? ` · opened ${new Date(ovmStatus.since).toLocaleTimeString()}` : ''}</div>
+          </div>
+        </div>
+        <div class="ovm-console-actions">
+          <button class="btn btn-sm" onclick=${() => runAction('open')} disabled=${busy || open}>
+            ${action === 'open' ? 'Opening...' : 'Open'}
+          </button>
+          <button class="btn btn-sm" onclick=${() => runAction('restart')} disabled=${busy}>
+            ${action === 'restart' ? 'Restarting...' : 'Restart'}
+          </button>
+          <button class="btn btn-sm btn-danger" onclick=${() => runAction('close')} disabled=${busy || !open}>
+            ${action === 'close' ? 'Closing...' : 'Close'}
+          </button>
+        </div>
+      </div>
+
+      ${error && html`<div class="overmind-alert">${error}</div>`}
+
+      ${!open ? html`
+        <div class="ovm-open-prompt">
+          <h3>OVM is closed</h3>
+          <p>Open the OVM session to start the live operator console.</p>
+          <button class="btn btn-primary" onclick=${() => runAction('open')} disabled=${busy}>
+            ${action === 'open' ? 'Opening OVM...' : 'Open OVM'}
+          </button>
+        </div>
+      ` : html`
+        <div class="ovm-live-shell">
+          <div class="ovm-stream-meta">
+            <span class=${'badge badge-' + (streamStatus === 'connected' ? 'active' : streamStatus === 'connecting' ? 'pending' : 'failed')}>${streamStatus}</span>
+            <span>${OVM_TMUX_TARGET}</span>
+          </div>
+          <div class="ovm-transcript" ref=${transcriptRef}>
+            ${entries.length === 0 ? html`
+              <div class="terminal-chat-card terminal-chat-single-output ovm-output-card">
+                <div class="terminal-chat-meta">
+                  <span>Current output · OVM</span>
+                  <span>${streamStatus}</span>
+                </div>
+                <div class="terminal-chat-content">
+                  ${formatFriendlyTerminalOutput(snapshot, 80) || (streamStatus === 'connecting' ? 'Connecting to OVM...' : 'Waiting for OVM output...')}
+                </div>
+              </div>
+            ` : entries.map(entry => html`
+              <div class=${'terminal-chat-entry terminal-chat-entry-' + entry.role} key=${entry.id}>
+                <div class="terminal-chat-card">
+                  <div class="terminal-chat-meta">
+                    <span>${entry.label}</span>
+                    <span>${entry.timestamp}</span>
+                  </div>
+                  <div class="terminal-chat-content">${formatFriendlyTerminalOutput(entry.content, 80)}</div>
+                </div>
+              </div>
+            `)}
+          </div>
+          <div class="terminal-chat-composer ovm-composer">
+            <textarea
+              value=${input}
+              rows="2"
+              placeholder="Message OVM..."
+              onInput=${e => setInput(e.target.value)}
+              onKeyDown=${e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+            ></textarea>
+            <button class="btn btn-primary" onclick=${sendMessage} disabled=${!canSend}>Send</button>
+          </div>
+        </div>
+      `}
+    </section>
+  `;
+}
+
 function OvermindWorkflows() {
   const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -683,9 +918,20 @@ function OvermindWorkflows() {
         >
           History (${history.length})
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected=${workflowTab === 'ovm'}
+          class=${'overmind-tab ' + (workflowTab === 'ovm' ? 'active' : '')}
+          onclick=${() => setWorkflowTab('ovm')}
+        >
+          OVM
+        </button>
       </div>
 
-      ${workflowTab === 'history' ? html`
+      ${workflowTab === 'ovm' ? html`
+        <${OvmConsole} />
+      ` : workflowTab === 'history' ? html`
         ${historyLoading ? html`
           <div class="loading">Loading workflow history...</div>
         ` : historyGroups.length === 0 ? html`

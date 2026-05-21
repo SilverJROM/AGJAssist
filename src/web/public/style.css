@@ -430,6 +430,119 @@ body {
   background: var(--bg);
   color: var(--text);
 }
+.ovm-console {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ovm-console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.ovm-console-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.ovm-console-title h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+.ovm-console-title div div {
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.ovm-console-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.ovm-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: var(--text-secondary);
+  box-shadow: 0 0 0 3px rgba(139,148,158,0.14);
+}
+.ovm-status-dot.open {
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(63,185,80,0.16);
+}
+.ovm-status-dot.closed {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px rgba(248,81,73,0.14);
+}
+.ovm-open-prompt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 32px;
+  text-align: center;
+}
+.ovm-open-prompt h3 {
+  margin: 0;
+  font-size: 18px;
+}
+.ovm-open-prompt p {
+  margin: 0;
+  color: var(--text-secondary);
+  max-width: 420px;
+}
+.ovm-live-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ovm-stream-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.ovm-transcript {
+  --terminal-fg: #e6edf3;
+  --terminal-muted: #9aa4b2;
+  flex: 1;
+  min-height: 360px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  color: var(--terminal-fg);
+  background: linear-gradient(180deg, rgba(10,14,20,0.98), rgba(13,17,23,0.99));
+}
+.ovm-transcript div,
+.ovm-transcript span {
+  color: inherit;
+}
+.ovm-output-card {
+  max-width: 100%;
+}
+.ovm-composer {
+  flex: 0 0 auto;
+}
 .overmind-list {
   gap: 12px;
 }
@@ -968,6 +1081,12 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
   .terminal-chat-content { font-size: 15px; line-height: 1.5; }
   .terminal-chat-composer { padding: 10px; }
   .terminal-chat-composer textarea { min-height: 56px; }
+  .overmind-tabs { display: flex; flex-wrap: wrap; align-self: stretch; }
+  .overmind-tab { flex: 1 1 auto; }
+  .ovm-console { min-height: 480px; }
+  .ovm-console-header { align-items: flex-start; flex-direction: column; }
+  .ovm-console-actions { width: 100%; justify-content: flex-start; }
+  .ovm-transcript { min-height: 300px; padding: 12px; }
   .kanban { grid-template-columns: 1fr; }
   .code-container { flex-direction: column; height: auto; }
   .file-tree { width: 100%; max-height: 200px; border-right: none; border-bottom: 1px solid var(--border); }

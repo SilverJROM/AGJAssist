@@ -252,6 +252,12 @@ export function buildOvermindWsUrl(token, loc = globalThis.location) {
   return `${protocol}//${loc.host}/ws/overmind?token=${encodeURIComponent(token)}`;
 }
 
+export function buildTmuxWsUrl(target, token, loc = globalThis.location) {
+  if (!target || !token || !loc?.host) return null;
+  const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${loc.host}/ws/tmux/${encodeURIComponent(target)}?token=${encodeURIComponent(token)}`;
+}
+
 function parseTimestampMs(value) {
   if (typeof value === 'number') return value;
   if (!value) return NaN;

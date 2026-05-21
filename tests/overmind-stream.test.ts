@@ -8,6 +8,7 @@ import { OvermindWatcher, hashPane } from "../src/services/overmind-watcher.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 import {
   buildOvermindWsUrl,
+  buildTmuxWsUrl,
   countDoneTasks,
   currentElapsedMs,
   elapsedMs,
@@ -285,6 +286,8 @@ describe("Overmind public helpers", () => {
     expect(formatElapsed(8040000)).toBe("2h 14m");
     expect(formatElapsed(59000)).toBe("<1m");
     expect(buildOvermindWsUrl("a b", { protocol: "https:", host: "example.test" })).toBe("wss://example.test/ws/overmind?token=a%20b");
+    expect(buildTmuxWsUrl("OVM:0.0", "a b", { protocol: "https:", host: "example.test" })).toBe("wss://example.test/ws/tmux/OVM%3A0.0?token=a%20b");
+    expect(buildTmuxWsUrl("", "token", { protocol: "http:", host: "example.test" })).toBeNull();
   });
 
   it("maps workflow statuses to overmind color classes", () => {
