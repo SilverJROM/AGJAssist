@@ -10,6 +10,7 @@ import {
   buildOvermindWsUrl,
   countDoneTasks,
   formatStuckDuration,
+  statusColor,
   statusIcon,
   taskGlyph
 } from "../src/web/public/overmind-helpers.js";
@@ -170,5 +171,17 @@ describe("Overmind public helpers", () => {
     ])).toBe(1);
     expect(formatStuckDuration("2026-05-21T00:00:00.000Z", Date.parse("2026-05-21T01:02:03.000Z"))).toBe("1h 2m");
     expect(buildOvermindWsUrl("a b", { protocol: "https:", host: "example.test" })).toBe("wss://example.test/ws/overmind?token=a%20b");
+  });
+
+  it("maps workflow statuses to overmind color classes", () => {
+    expect(statusColor("working")).toBe("ovm-yellow");
+    expect(statusColor("waiting_human")).toBe("ovm-green");
+    expect(statusColor("awaiting_decision")).toBe("ovm-green");
+    expect(statusColor("stuck")).toBe("ovm-red");
+    expect(statusColor("failed")).toBe("ovm-red");
+    expect(statusColor("completed")).toBe("ovm-grey");
+    expect(statusColor("paused")).toBe("ovm-grey");
+    expect(statusColor("active")).toBe("ovm-neutral");
+    expect(statusColor("unknown")).toBe("ovm-neutral");
   });
 });

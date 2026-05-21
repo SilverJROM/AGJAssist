@@ -15,8 +15,23 @@ export const OVERMIND_TASK_GLYPHS = {
   pending: '○'
 };
 
+export const OVERMIND_STATUS_COLORS = {
+  active: 'ovm-neutral',
+  working: 'ovm-yellow',
+  stuck: 'ovm-red',
+  waiting_human: 'ovm-green',
+  awaiting_decision: 'ovm-green',
+  paused: 'ovm-grey',
+  completed: 'ovm-grey',
+  failed: 'ovm-red'
+};
+
 export function statusIcon(status) {
   return OVERMIND_STATUS_ICONS[status] || '•';
+}
+
+export function statusColor(status) {
+  return OVERMIND_STATUS_COLORS[status] || 'ovm-neutral';
 }
 
 export function taskGlyph(state) {

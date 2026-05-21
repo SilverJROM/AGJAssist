@@ -409,7 +409,44 @@ body {
 .overmind-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
+  border-left: 3px solid var(--ovm-accent, var(--border));
+}
+.ovm-yellow {
+  --ovm-accent: #d29922;
+  --ovm-bg: rgba(210,153,34,0.16);
+  --ovm-border: rgba(210,153,34,0.34);
+}
+.ovm-green {
+  --ovm-accent: #3fb950;
+  --ovm-bg: rgba(63,185,80,0.15);
+  --ovm-border: rgba(63,185,80,0.32);
+}
+.ovm-red {
+  --ovm-accent: #f85149;
+  --ovm-bg: rgba(248,81,73,0.14);
+  --ovm-border: rgba(248,81,73,0.32);
+}
+.ovm-grey {
+  --ovm-accent: var(--text-secondary);
+  --ovm-bg: rgba(139,148,158,0.13);
+  --ovm-border: rgba(139,148,158,0.28);
+}
+.ovm-neutral {
+  --ovm-accent: var(--accent);
+  --ovm-bg: rgba(88,166,255,0.12);
+  --ovm-border: rgba(88,166,255,0.28);
+}
+.overmind-card-toggle {
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
 }
 .overmind-card-header {
   display: flex;
@@ -417,14 +454,32 @@ body {
   align-items: flex-start;
   gap: 12px;
 }
+.overmind-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.overmind-title > div {
+  min-width: 0;
+}
+.overmind-chevron {
+  color: var(--ovm-accent, var(--text-secondary));
+  flex: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.35;
+  margin-top: 1px;
+}
 .overmind-card h3 {
   font-size: 15px;
   line-height: 1.3;
   margin: 0 0 4px;
+  overflow-wrap: anywhere;
 }
 .overmind-current {
   color: var(--text-secondary);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .overmind-status {
   display: flex;
@@ -442,14 +497,21 @@ body {
   border: 1px solid var(--border);
   font-size: 13px;
 }
-.overmind-status-working,
-.overmind-status-active,
-.overmind-status-completed { color: var(--success); }
-.overmind-status-stuck,
-.overmind-status-awaiting_decision { color: var(--warning); }
-.overmind-status-waiting_human,
-.overmind-status-paused { color: var(--text-secondary); }
-.overmind-status-failed { color: var(--danger); }
+.overmind-status-icon {
+  background: var(--ovm-bg, transparent);
+  border-color: var(--ovm-border, var(--border));
+  color: var(--ovm-accent, var(--text-secondary));
+}
+.overmind-status-badge {
+  background: var(--ovm-bg, rgba(139,148,158,0.15));
+  border: 1px solid var(--ovm-border, var(--border));
+  color: var(--ovm-accent, var(--text-secondary));
+}
+.overmind-expanded {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+}
 .overmind-meta-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

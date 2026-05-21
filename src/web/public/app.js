@@ -2,7 +2,7 @@ import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
 import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput } from './terminal-chat-state.js';
-import { buildOvermindWsUrl, countDoneTasks, formatStuckDuration, statusIcon, taskGlyph } from './overmind-helpers.js';
+import { buildOvermindWsUrl, countDoneTasks, formatStuckDuration, statusColor, statusIcon, taskGlyph } from './overmind-helpers.js';
 
 const html = htm.bind(h);
 
@@ -453,6 +453,7 @@ function OvermindWorkflows() {
   const [error, setError] = useState('');
   const [streamStatus, setStreamStatus] = useState('connecting');
   const [now, setNow] = useState(Date.now());
+  const [expandedWorkflows, setExpandedWorkflows] = useState({});
   const streamStatusRef = useRef(streamStatus);
 
   useEffect(() => {
@@ -474,6 +475,10 @@ function OvermindWorkflows() {
   useEffect(() => {
     loadWorkflows();
   }, [loadWorkflows]);
+
+  const toggleWorkflow = useCallback((workflowId) => {
+    setExpandedWorkflows(prev => ({ ...prev, [workflowId]: !prev[workflowId] }));
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30000);
@@ -546,48 +551,64 @@ function OvermindWorkflows() {
             const tasks = Array.isArray(workflow.tasks) ? workflow.tasks : [];
             const doneCount = countDoneTasks(tasks);
             const childSessions = Array.isArray(workflow.child_sessions) ? workflow.child_sessions : [];
+            const colorClass = statusColor(workflow.status);
+            const isExpanded = !!expandedWorkflows[workflow.id];
             return html`
-              <section class="item-card overmind-card" key=${workflow.id}>
-                <div class="overmind-card-header">
-                  <div>
-                    <h3>${workflow.label}</h3>
-                    <div class="overmind-current">${workflow.current_task || 'No current task'}</div>
+              <section class=${'item-card overmind-card ' + colorClass} key=${workflow.id}>
+                <button
+                  type="button"
+                  class="overmind-card-toggle"
+                  aria-expanded=${isExpanded}
+                  onclick=${() => toggleWorkflow(workflow.id)}
+                >
+                  <div class="overmind-card-header">
+                    <div class="overmind-title">
+                      <span class="overmind-chevron" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
+                      <div>
+                        <h3>${workflow.label}</h3>
+                        <div class="overmind-current">${workflow.current_task || '—'}</div>
+                      </div>
+                    </div>
+                    <div class="overmind-status">
+                      <span class=${'overmind-status-icon ' + colorClass}>${statusIcon(workflow.status)}</span>
+                      <span class=${'badge overmind-status-badge ' + colorClass}>${workflow.status}</span>
+                    </div>
                   </div>
-                  <div class="overmind-status">
-                    <span class=${'overmind-status-icon overmind-status-' + workflow.status}>${statusIcon(workflow.status)}</span>
-                    <span class="badge badge-${workflow.status === 'completed' ? 'completed' : workflow.status === 'failed' ? 'failed' : workflow.status === 'stuck' || workflow.status === 'awaiting_decision' ? 'pending' : 'active'}">${workflow.status}</span>
-                  </div>
-                </div>
+                </button>
 
-                ${workflow.status === 'awaiting_decision' && workflow.pending_decision && html`
-                  <div class="overmind-decision">
-                    <strong>Pending decision</strong>
-                    <pre>${workflow.pending_decision}</pre>
+                ${isExpanded && html`
+                  <div class="overmind-expanded">
+                    ${workflow.status === 'awaiting_decision' && workflow.pending_decision && html`
+                      <div class="overmind-decision">
+                        <strong>Pending decision</strong>
+                        <pre>${workflow.pending_decision}</pre>
+                      </div>
+                    `}
+
+                    <div class="overmind-meta-grid">
+                      <div><span>Tier</span><strong>${workflow.tier ?? 0}</strong></div>
+                      <div><span>Stuck</span><strong>${workflow.stuck_since ? formatStuckDuration(workflow.stuck_since, now) : '—'}</strong></div>
+                      <div><span>Coordinator</span><strong>${workflow.coordinator_session}</strong></div>
+                      <div><span>Children</span><strong>${childSessions.length ? childSessions.join(', ') : '—'}</strong></div>
+                    </div>
+
+                    <details class="overmind-tasklist" open=${tasks.length <= 6}>
+                      <summary>Tasks ${doneCount}/${tasks.length}</summary>
+                      ${tasks.length === 0 ? html`
+                        <div class="overmind-task-empty">No tasklist published.</div>
+                      ` : html`
+                        <div class="overmind-tasks">
+                          ${tasks.map(task => html`
+                            <div class=${'overmind-task overmind-task-' + task.state} key=${task.id || task.label}>
+                              <span class="overmind-task-glyph">${taskGlyph(task.state)}</span>
+                              <span>${task.label}</span>
+                            </div>
+                          `)}
+                        </div>
+                      `}
+                    </details>
                   </div>
                 `}
-
-                <div class="overmind-meta-grid">
-                  <div><span>Tier</span><strong>${workflow.tier ?? 0}</strong></div>
-                  <div><span>Stuck</span><strong>${workflow.stuck_since ? formatStuckDuration(workflow.stuck_since, now) : '—'}</strong></div>
-                  <div><span>Coordinator</span><strong>${workflow.coordinator_session}</strong></div>
-                  <div><span>Children</span><strong>${childSessions.length ? childSessions.join(', ') : '—'}</strong></div>
-                </div>
-
-                <details class="overmind-tasklist" open=${tasks.length <= 6}>
-                  <summary>Tasks ${doneCount}/${tasks.length}</summary>
-                  ${tasks.length === 0 ? html`
-                    <div class="overmind-task-empty">No tasklist published.</div>
-                  ` : html`
-                    <div class="overmind-tasks">
-                      ${tasks.map(task => html`
-                        <div class=${'overmind-task overmind-task-' + task.state} key=${task.id || task.label}>
-                          <span class="overmind-task-glyph">${taskGlyph(task.state)}</span>
-                          <span>${task.label}</span>
-                        </div>
-                      `)}
-                    </div>
-                  `}
-                </details>
               </section>
             `;
           })}
