@@ -15,8 +15,8 @@
 | R11 | OvermindStreamManager WS /ws/overmind live updates | A7 | — | UNASSIGNED |
 | R12 | projcore.md register/complete curl wiring | B | — | UNASSIGNED |
 | R14 | Tasklist ingestion (POST /tasks) + done/processing/pending display | A2,A4,A7,B | endpoint live-verified A2; display pending | IN-PROGRESS |
-| R15 | Decision interception + Sonnet answer-from-northstar / escalate guardrail | A3,A6 | — | UNASSIGNED |
-| R16 | Projcore frontload-correction (log + coordinator reminder) | A6,B | — | UNASSIGNED |
+| R15 | Decision interception + Sonnet answer-from-northstar / escalate guardrail | A3,A6b | validation/batch-A6b.md (live answer + guardrail test) | VERIFIED |
+| R16 | Projcore frontload-correction (log + coordinator reminder) | A6b,B | validation/batch-A6b.md (correction note + log) | VERIFIED |
 | R13 | Onboard 3 live workflows visible on dashboard | C | — | UNASSIGNED |
 
 **Final acceptance:** every row VERIFIED. None may remain UNASSIGNED/IN-PROGRESS/CLAIMED/FAIL at run-complete.

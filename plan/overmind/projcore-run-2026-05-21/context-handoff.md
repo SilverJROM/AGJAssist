@@ -1,18 +1,17 @@
-## Accepted: A1-A5, A6a all PASS (A4, A5 needed iter1)
+## Accepted: A1-A6b all PASS (A4, A5 needed iter1). Stage A nearly done — only A7 (UI) left.
 Branch: feat/overmind (no master merge until JROM review).
-Implemented: A1 schema+CRUD; A2 endpoints; A3 classifier; A4 Telegram cmds + live watcher; A5 nudge ladder Tier1-2 coordinator-only; A6a Sonnet brain (src/services/overmind-brain.ts: OvermindBrain interface + SonnetOvermindBrain, ClaudeCliProvider sonnet) + Tier-3 stuck-escalation + BLOCKED→waiting_human halt. Brain live-verified (real Sonnet verdict parsed).
-Req#s VERIFIED: R1,R2,R3,R4,R5,R6,R7,R8*,R9. IN-PROGRESS: R14 (UI=A7), R15 (detect built; answer=A6b). Open: R10,R11,R12,R13,R16.
+Implemented: schema+CRUD (A1), endpoints (A2), classifier (A3), Telegram cmds + live watcher (A4), nudge ladder coordinator-only (A5), Sonnet brain Tier-3 + BLOCKED/waiting_human (A6a), decision interception + ALWAYS-ESCALATE guardrail + R16 correction (A6b). Brain + decisions live-verified.
+Req#s VERIFIED: R1,R2,R3,R4,R5,R6,R7,R8*,R9,R15,R16. IN-PROGRESS: R14 (UI display). Open: R10,R11 (A7), R12 (B), R13 (C).
 
-## Next: Batch-A6b — decision interception (R15) + projcore frontload-correction (R16)
-Reuse the A6a brain abstraction (src/services/overmind-brain.ts). Add a second brain method, e.g. `answerDecision(input: DecisionInput): Promise<DecisionVerdict>`.
-Behavior when classifier status === 'awaiting_decision' (pending_decision already captured by A3):
-- DecisionInput = { label, pendingDecision (the captured menu/question text), northStar (contents of run_dir/north-star.md), trustDefaults (contents of ~/.claude/JROM/style/trust-defaults.md) }.
-- DecisionVerdict = { action: 'answer'|'escalate', answerText?: string, reason: string }.
-- The brain's system prompt: answer ONLY if the north-star/trust-defaults clearly cover the decision; otherwise escalate.
-- **Deterministic guardrail BEFORE auto-answering (NS-11, defense in depth):** even if the brain says 'answer', run a deterministic ALWAYS-ESCALATE keyword check on pendingDecision (merge to master|merge|deploy|qa|prod|production|delete|drop|force push|auth|rbac|password|secret|money|billing|payment). If any hit → force ESCALATE, do NOT auto-answer. Only truly safe, north-star-covered decisions get auto-answered.
-  - action 'answer' → sendCommand(coordinator_session, answerText, true, true) [COORDINATOR ONLY], persist post-nudge hash (same A5 pattern). Then R16: also send a brief coordinator note like "Overmind: this decision should have been frontloaded at intake (projcore §1.4a) — please surface such decisions in the north-star next time." AND log a correction entry (a decisions/ file or a dedicated overmind correction log).
-  - action 'escalate' → notify JROM (verdict-led, ❓/🛑) with the verbatim pendingDecision + the brain's reason; leave the coordinator waiting (do NOT auto-answer). Set/keep status so it isn't nudged.
-- Guard: answer/escalate a given awaiting_decision episode ONCE (don't re-answer every tick). Track via a flag (e.g. reuse pending_decision: once answered/escalated, clear or mark it).
-- Token efficiency: brain fires only on awaiting_decision (rare), tiny context (decision text + north-star excerpt + trust-defaults). NO outside API. Coordinator-only sends.
-- Tests: FAKE brain — assert: north-star-covered safe decision → answer sent to coordinator + correction note + logged; ALWAYS-ESCALATE keyword (e.g. "merge to master") → forced escalate even if brain says answer; uncovered → escalate to JROM; answered once (not per tick); never sends to child.
-- LIVE: projcore will do a minimal live check (a throwaway awaiting_decision pane) — keep the deterministic guardrail testable without real Sonnet.
+## Next: Batch-A7 — UI panel /overmind + OvermindStreamManager WS (R10, R11, completes R14)
+Key facts:
+- Frontend: src/web/public/app.js — Preact + HTM (no build step), hash routing `useRoute()`/`navigate()`, `api(path)` helper (sends JWT). index.html loads app.js. app.css for styles.
+- GET /api/overmind/workflows (A2, JWT-auth) returns {workflows:[...]} with all fields incl status, current_task, tasks (JSON array {id,label,state}), pending_decision, coordinator_session, child_sessions, tier, stuck_since, nudge_count.
+- R10: add a 'Workflows' nav link + a `/overmind` route + component rendering each workflow: label, status (icon), current_task, tier, stuck-time, coordinator + child sessions, and an expandable tasklist (done/processing/pending glyphs from tasks JSON), plus pending_decision text when awaiting_decision.
+- R11: OvermindStreamManager — clone the pattern of src/tmux/tmux-stream-manager.ts (Map<key,Set<WebSocket>>, broadcast JSON). Register a WS route /ws/overmind in a route module (see tmux-routes.ts ws pattern: app.get('/ws/...', {websocket:true}, handler)). The watcher (OvermindWatcher) should broadcast a status snapshot after each tick (inject an optional onUpdate/broadcast callback into the watcher from index.ts, wired to the stream manager). The UI panel subscribes for live updates (fallback to polling GET if WS not connected).
+- Keep it consistent with existing panels (Preact/HTM, app.css classes). Density-light per JROM style.
+- Auth: WS uses the token query pattern like /ws/tmux (token in query). GET uses Bearer.
+- LIVE SMOKE: projcore will register a throwaway workflow and load the dashboard (#/overmind) to confirm it renders + updates. (May be limited by not having a browser; projcore will at minimum verify GET returns the data the panel needs + the WS route exists + broadcasts. A static render check via the component code.)
+- Test: a focused test for any pure formatting helper (status icon, task glyph, stuck-duration) + that the WS route + stream manager broadcast wiring exists. Avoid brittle DOM tests if no jsdom configured (check vitest env — it's 'node'); test pure helpers + the stream manager logic.
+
+After A7: Stage A complete. Then Stage B (edit ~/.claude/agents/projcore.md — register/tasks/complete curls + frontload reinforcement, R12), then Stage C (onboard 3 live workflows — STOP & CONFIRM with JROM per NS-7 before any keystroke into hris-d-22/lkcamp-12/lkvc-38).
