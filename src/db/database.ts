@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -281,6 +281,27 @@ CREATE TABLE IF NOT EXISTS reminder_alerts (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ra_reminder ON reminder_alerts(reminder_id);
+
+CREATE TABLE IF NOT EXISTS overmind_workflows (
+  id INTEGER PRIMARY KEY,
+  label TEXT NOT NULL,
+  coordinator_session TEXT NOT NULL UNIQUE,
+  child_sessions TEXT NOT NULL DEFAULT '[]',
+  run_dir TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'working', 'waiting_human', 'awaiting_decision', 'stuck', 'paused', 'completed', 'failed')),
+  current_task TEXT,
+  tasks TEXT NOT NULL DEFAULT '[]',
+  pending_decision TEXT,
+  last_pane_hash TEXT,
+  last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
+  stuck_since TEXT,
+  nudge_count INTEGER NOT NULL DEFAULT 0,
+  tier INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_overmind_workflows_coordinator_session ON overmind_workflows(coordinator_session);
+CREATE INDEX IF NOT EXISTS idx_overmind_workflows_status ON overmind_workflows(status);
 `;
 
 const DEFAULT_SAFETY_PATTERNS = [
@@ -483,6 +504,11 @@ export class DatabaseService {
           CREATE INDEX IF NOT EXISTS idx_notes_created_by ON notes(created_by);
         `);
         this.db.exec("PRAGMA foreign_keys = ON");
+      }
+
+      // Migration: v10 → v11: add overmind_workflows table
+      if (current && current.version < 11) {
+        this.db.exec(SCHEMA_SQL);
       }
 
       this.db
