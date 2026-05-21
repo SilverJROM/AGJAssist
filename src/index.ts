@@ -27,6 +27,7 @@ import { createApiServer } from "./api/server.js";
 import { ClaudeCliProvider } from "./llm/claude-cli-provider.js";
 import { CodexCliProvider } from "./llm/codex-cli-provider.js";
 import { OvermindService } from "./services/overmind-service.js";
+import { OvermindWatcher, POLL_MS } from "./services/overmind-watcher.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -92,6 +93,7 @@ async function main(): Promise<void> {
   const reminderService = new ReminderService(db, auditService);
   const chatSettingsService = new ChatSettingsService(db);
   const overmindService = new OvermindService(db);
+  const overmindWatcher = new OvermindWatcher(overmindService, tmuxService);
 
   // Seed default soul.md and context.md if not set
   if (!chatSettingsService.get("soul_md")) {
@@ -121,6 +123,7 @@ async function main(): Promise<void> {
   const claudeCliProvider = new ClaudeCliProvider("sonnet", 180_000);
   const codexCliProvider = new CodexCliProvider(180_000);
   core.setChatServices(conversationService, chatSettingsService, claudeCliProvider, codexCliProvider);
+  core.setOvermindService(overmindService);
 
   // Tmux streaming
   const tmuxStreamManager = new TmuxStreamManager(
@@ -163,6 +166,8 @@ async function main(): Promise<void> {
 
   await apiServer.listen({ port: config.api.port, host: config.api.host });
   console.log(`AGJAssist API server listening on ${config.api.host}:${config.api.port}`);
+  overmindWatcher.start();
+  console.log(`Overmind watcher started (${Math.round(POLL_MS / 1000)}s)`);
 
   // Reminder scheduler — check every 60 seconds for due reminders
   setInterval(async () => {

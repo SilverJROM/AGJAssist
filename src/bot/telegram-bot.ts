@@ -33,6 +33,11 @@ export class TelegramAssistant {
       { command: "llm", description: "Show LLM status" },
       { command: "timeout", description: "Show/set timeout minutes" },
       { command: "ommodel", description: "Show/set OM Ollama model" },
+      { command: "overmind", description: "Show active Overmind workflows" },
+      { command: "om_tasks", description: "Show Overmind tasklist" },
+      { command: "om_pause", description: "Pause Overmind workflow" },
+      { command: "om_resume", description: "Resume Overmind workflow" },
+      { command: "om_drop", description: "Drop Overmind workflow" },
       { command: "app", description: "Open the web app" }
     ]);
 

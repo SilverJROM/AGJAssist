@@ -13,9 +13,33 @@ import { NoteService } from "../services/note-service.js";
 import { ConversationService } from "../services/conversation-service.js";
 import { ChatSettingsService } from "../services/chat-settings-service.js";
 import { AuthService } from "../auth/auth-service.js";
+import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "../services/overmind-service.js";
 
 const ALLOWED_OM_MODELS = new Set(["qwek32k:latest", "granite4:64k"]);
 const WEBSITES_ROOT = "/home/agjrom/websites";
+const OVERMIND_ACTIVE_STATUSES: OvermindWorkflowStatus[] = [
+  "active",
+  "working",
+  "waiting_human",
+  "awaiting_decision",
+  "stuck",
+  "paused"
+];
+const OVERMIND_STATUS_ICONS: Record<OvermindWorkflowStatus, string> = {
+  active: "•",
+  working: "▶",
+  waiting_human: "⏸",
+  awaiting_decision: "❓",
+  stuck: "⚠",
+  paused: "⏯",
+  completed: "•",
+  failed: "•"
+};
+const OVERMIND_TASK_GLYPHS = {
+  done: "[x]",
+  processing: "[~]",
+  pending: "[ ]"
+} as const;
 
 interface UserState {
   cwd: string;
@@ -33,6 +57,7 @@ export class AssistantCore {
   private chatSettingsService: ChatSettingsService | null = null;
   private claudeCliProvider: ClaudeCliProvider | null = null;
   private codexCliProvider: CodexCliProvider | null = null;
+  private overmindService: OvermindService | null = null;
 
   // Per-user state for TG conversations
   private userState: Map<number, UserState> = new Map();
@@ -65,6 +90,10 @@ export class AssistantCore {
     this.chatSettingsService = chatSettingsService;
     this.claudeCliProvider = claudeCliProvider;
     this.codexCliProvider = codexCliProvider;
+  }
+
+  setOvermindService(overmindService: OvermindService): void {
+    this.overmindService = overmindService;
   }
 
   private getState(userId: number): UserState {
@@ -109,6 +138,11 @@ export class AssistantCore {
           "/llm - show LLM routing info",
           "/timeout [minutes] - show or set command timeout (default 60)",
           "/ommodel [qwek32k:latest|granite4:64k] - show or set OM model",
+          "/overmind - show active Overmind workflows",
+          "/om_tasks <id> - show an Overmind workflow tasklist",
+          "/om_pause <id> - pause an Overmind workflow",
+          "/om_resume <id> - resume an Overmind workflow",
+          "/om_drop <id> - drop an Overmind workflow",
           "",
           "Chat commands:",
           "new haiku|sonnet|opus|codex <prompt> - start new conversation",
@@ -209,6 +243,21 @@ export class AssistantCore {
         return `OM model updated to: ${requested}`;
       }
 
+      case "/overmind":
+        return this.handleOvermindStatusCommand();
+
+      case "/om_tasks":
+        return this.handleOvermindTasksCommand(parts[1]);
+
+      case "/om_pause":
+        return this.handleOvermindStatusMutation(parts[1], "paused", "Paused");
+
+      case "/om_resume":
+        return this.handleOvermindStatusMutation(parts[1], "active", "Resumed");
+
+      case "/om_drop":
+        return this.handleOvermindDropCommand(parts[1]);
+
       case "/tmux_create": {
         const projectName = parts[1];
         if (!projectName) return "Usage: /tmux_create <project> [name]";
@@ -292,6 +341,70 @@ export class AssistantCore {
       default:
         return "Unknown command. Use /help.";
     }
+  }
+
+  private handleOvermindStatusCommand(): string {
+    if (!this.overmindService) return "Overmind service not available.";
+    const workflows = this.overmindService
+      .list()
+      .filter((workflow) => OVERMIND_ACTIVE_STATUSES.includes(workflow.status));
+    if (!workflows.length) return "No active workflows.";
+    return workflows.map((workflow) => this.formatOvermindWorkflowLine(workflow)).join("\n");
+  }
+
+  private handleOvermindTasksCommand(rawId: string | undefined): string {
+    const id = this.parseOvermindId(rawId, "/om_tasks <id>");
+    if (typeof id === "string") return id;
+    if (!this.overmindService) return "Overmind service not available.";
+    const workflow = this.overmindService.get(id);
+    if (!workflow) return `Workflow not found: ${id}`;
+
+    const lines = [`${workflow.label} ${OVERMIND_STATUS_ICONS[workflow.status]} ${workflow.status}`];
+    if (!workflow.tasks.length) {
+      lines.push("No tasks.");
+      return lines.join("\n");
+    }
+
+    lines.push(
+      ...workflow.tasks.map((task) => `${OVERMIND_TASK_GLYPHS[task.state]} ${task.label}`)
+    );
+    return lines.join("\n");
+  }
+
+  private handleOvermindStatusMutation(
+    rawId: string | undefined,
+    status: OvermindWorkflowStatus,
+    action: string
+  ): string {
+    const id = this.parseOvermindId(rawId, status === "paused" ? "/om_pause <id>" : "/om_resume <id>");
+    if (typeof id === "string") return id;
+    if (!this.overmindService) return "Overmind service not available.";
+    const workflow = this.overmindService.setStatus(id, status);
+    if (!workflow) return `Workflow not found: ${id}`;
+    return `${action} workflow ${id}: ${workflow.label}`;
+  }
+
+  private handleOvermindDropCommand(rawId: string | undefined): string {
+    const id = this.parseOvermindId(rawId, "/om_drop <id>");
+    if (typeof id === "string") return id;
+    if (!this.overmindService) return "Overmind service not available.";
+    const workflow = this.overmindService.get(id);
+    if (!workflow) return `Workflow not found: ${id}`;
+    this.overmindService.delete(id);
+    return `Dropped workflow ${id}: ${workflow.label}`;
+  }
+
+  private formatOvermindWorkflowLine(workflow: OvermindWorkflow): string {
+    const doneCount = workflow.tasks.filter((task) => task.state === "done").length;
+    const currentTask = workflow.current_task || "—";
+    return `${workflow.label} ${OVERMIND_STATUS_ICONS[workflow.status]} ${workflow.status} · "${currentTask}" · ${doneCount}/${workflow.tasks.length}`;
+  }
+
+  private parseOvermindId(rawId: string | undefined, usage: string): number | string {
+    if (!rawId) return `Usage: ${usage}`;
+    const id = Number(rawId);
+    if (!Number.isInteger(id) || id < 1) return `Usage: ${usage}`;
+    return id;
   }
 
   async handleText(input: string, userId?: number): Promise<string> {

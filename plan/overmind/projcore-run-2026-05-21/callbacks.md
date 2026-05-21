@@ -7,3 +7,6 @@
 [projcore callback] A3 PROPOSED Detection-only watcher/classifier plan proposed; awaiting APPROVED-PLAN before code changes.
 [projcore callback] A3 APPROVED-PLAN Approved plan received; implementation starting on feat/overmind.
 [projcore callback] A3 DONE Detection-only watcher/classifier implemented; tsc and targeted classifier Vitest gates passed.
+[projcore callback] A4 PROPOSED Telegram commands and watcher-start plan proposed; awaiting APPROVED-PLAN before code changes.
+[projcore callback] A4 APPROVED-PLAN Approved plan received; implementation starting on feat/overmind.
+[projcore callback] A4 DONE Telegram commands and watcher startup implemented; targeted Vitest and tsc gates passed.
