@@ -30,6 +30,7 @@ import { OvermindService } from "./services/overmind-service.js";
 import { OvermindWatcher, POLL_MS } from "./services/overmind-watcher.js";
 import { SonnetOvermindBrain } from "./services/overmind-brain.js";
 import { OvermindStreamManager } from "./api/websocket/overmind-stream-manager.js";
+import { OvmSessionService } from "./services/ovm-session.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -95,6 +96,9 @@ async function main(): Promise<void> {
   const reminderService = new ReminderService(db, auditService);
   const chatSettingsService = new ChatSettingsService(db);
   const overmindService = new OvermindService(db);
+  const ovmSessionService = new OvmSessionService(tmuxService, {
+    overmindToken: config.overmind.token
+  });
 
   // Seed default soul.md and context.md if not set
   if (!chatSettingsService.get("soul_md")) {
@@ -180,7 +184,8 @@ async function main(): Promise<void> {
     codexCliProvider,
     overmindService,
     overmindNotify,
-    overmindStreamManager
+    overmindStreamManager,
+    ovmSessionService
   });
 
   await apiServer.listen({ port: config.api.port, host: config.api.host });

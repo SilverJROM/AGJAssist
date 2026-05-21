@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import Fastify, { FastifyInstance } from "fastify";
 import { DatabaseService } from "../src/db/database.js";
 import { AuthService } from "../src/auth/auth-service.js";
 import { OvermindService } from "../src/services/overmind-service.js";
 import { registerOvermindRoutes } from "../src/api/routes/overmind-routes.js";
 import { AppConfig } from "../src/config/config.js";
+import { OvmSessionManager } from "../src/services/ovm-session.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -97,6 +98,14 @@ let app: FastifyInstance;
 let db: DatabaseService;
 let authService: AuthService;
 let overmindService: OvermindService;
+let ovmSession: OvmSessionManager;
+
+function authHeader(): { authorization: string } {
+  const loginCode = authService.generateLoginCode(111222);
+  const auth = authService.authenticateWithCode(loginCode);
+  expect(auth).not.toBeNull();
+  return { authorization: `Bearer ${auth!.token}` };
+}
 
 beforeEach(async () => {
   cleanup();
@@ -104,8 +113,14 @@ beforeEach(async () => {
   db.ensureOwner(111222);
   authService = new AuthService(db, BOT_TOKEN, JWT_SECRET, 24);
   overmindService = new OvermindService(db);
+  ovmSession = {
+    status: vi.fn(async () => ({ open: true, status: "open", since: "2026-05-21T00:00:00.000Z" })),
+    open: vi.fn(async () => ({ open: true, status: "open", opened: true, since: "2026-05-21T00:00:00.000Z" })),
+    restart: vi.fn(async () => ({ open: true, status: "open", opened: true, restarted: true, since: "2026-05-21T00:00:01.000Z" })),
+    close: vi.fn(async () => ({ open: false, status: "closed", closed: true }))
+  };
   app = Fastify({ logger: false });
-  registerOvermindRoutes(app, testConfig(), authService, overmindService);
+  registerOvermindRoutes(app, testConfig(), authService, overmindService, undefined, undefined, ovmSession);
   await app.ready();
 });
 
@@ -440,5 +455,56 @@ describe("Overmind routes", () => {
       payload: { name: "Nope" }
     });
     expect(missing.statusCode).toBe(404);
+  });
+
+  it("requires JWT auth for OVM session manager endpoints and delegates to the manager", async () => {
+    const unauthenticated = await app.inject({
+      method: "GET",
+      url: "/api/overmind/ovm/status"
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const headers = authHeader();
+
+    const status = await app.inject({
+      method: "GET",
+      url: "/api/overmind/ovm/status",
+      headers
+    });
+    expect(status.statusCode).toBe(200);
+    expect(status.json()).toEqual({
+      open: true,
+      status: "open",
+      since: "2026-05-21T00:00:00.000Z"
+    });
+
+    const opened = await app.inject({
+      method: "POST",
+      url: "/api/overmind/ovm/open",
+      headers
+    });
+    expect(opened.statusCode).toBe(200);
+    expect(opened.json()).toMatchObject({ open: true, status: "open", opened: true });
+
+    const restarted = await app.inject({
+      method: "POST",
+      url: "/api/overmind/ovm/restart",
+      headers
+    });
+    expect(restarted.statusCode).toBe(200);
+    expect(restarted.json()).toMatchObject({ open: true, status: "open", restarted: true });
+
+    const closed = await app.inject({
+      method: "POST",
+      url: "/api/overmind/ovm/close",
+      headers
+    });
+    expect(closed.statusCode).toBe(200);
+    expect(closed.json()).toEqual({ open: false, status: "closed", closed: true });
+
+    expect(ovmSession.status).toHaveBeenCalledOnce();
+    expect(ovmSession.open).toHaveBeenCalledOnce();
+    expect(ovmSession.restart).toHaveBeenCalledOnce();
+    expect(ovmSession.close).toHaveBeenCalledOnce();
   });
 });

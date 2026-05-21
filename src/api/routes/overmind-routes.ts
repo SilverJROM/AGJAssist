@@ -10,6 +10,7 @@ import {
 import type { OvermindNotify } from "../../services/overmind-watcher.js";
 import { buildDoneNotification } from "../../services/overmind-notifications.js";
 import { OvermindStreamManager } from "../websocket/overmind-stream-manager.js";
+import type { OvmSessionManager } from "../../services/ovm-session.js";
 
 interface TokenBody {
   token?: string;
@@ -86,7 +87,8 @@ export function registerOvermindRoutes(
   authService: AuthService,
   overmindService: OvermindService,
   notify?: OvermindNotify,
-  streamManager?: OvermindStreamManager
+  streamManager?: OvermindStreamManager,
+  ovmSession?: OvmSessionManager
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
 
@@ -259,6 +261,54 @@ export function registerOvermindRoutes(
       }
 
       return { workflow };
+    }
+  );
+
+  app.post(
+    "/api/overmind/ovm/open",
+    { preHandler: authMiddleware },
+    async (_request, reply) => {
+      if (!ovmSession) {
+        return reply.code(503).send({ error: "OVM session manager is not configured" });
+      }
+
+      return ovmSession.open();
+    }
+  );
+
+  app.post(
+    "/api/overmind/ovm/restart",
+    { preHandler: authMiddleware },
+    async (_request, reply) => {
+      if (!ovmSession) {
+        return reply.code(503).send({ error: "OVM session manager is not configured" });
+      }
+
+      return ovmSession.restart();
+    }
+  );
+
+  app.post(
+    "/api/overmind/ovm/close",
+    { preHandler: authMiddleware },
+    async (_request, reply) => {
+      if (!ovmSession) {
+        return reply.code(503).send({ error: "OVM session manager is not configured" });
+      }
+
+      return ovmSession.close();
+    }
+  );
+
+  app.get(
+    "/api/overmind/ovm/status",
+    { preHandler: authMiddleware },
+    async (_request, reply) => {
+      if (!ovmSession) {
+        return reply.code(503).send({ error: "OVM session manager is not configured" });
+      }
+
+      return ovmSession.status();
     }
   );
 
