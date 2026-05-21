@@ -5,7 +5,7 @@
 | WU1 | Brain-gated notifications (resolve-first via decisions; protocol format) | W1 | 17 tests; live escalate cited prior-decision | VERIFIED |
 | WU2 | Expanded-detail 2-col table | W2 | tsc clean, table classes deployed | VERIFIED |
 | WU3 | Rename workflow (display_name, persistent across re-register) | W3 | live: rename survived re-register, v16 | VERIFIED |
-| WU4 | History tab (Active/Completed/History) + persistent archive grouped by workflow | W4 | — | UNASSIGNED |
+| WU4 | History tab (Active/Completed/History) + persistent archive | W4 | live: history survived delete, v17 | VERIFIED |
 
 | WU5 | Per-run elapsed reset + accumulated total | W5 | live: reset+rollup verified, v15 | VERIFIED |
 
