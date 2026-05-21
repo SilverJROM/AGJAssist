@@ -11,3 +11,4 @@
 [projcore callback] O7 DONE normalizePaneForActivity now strips timer/spinner/chrome noise before activity hashing; HRIS timer-only child delta regresses to stuck; classifier/nudge/brain/decision/stream tests, tsc, and build passed.
 [projcore callback] O8 PROPOSED Plan ready for deterministic body-hash plus active-turn idle detection; awaiting APPROVED-PLAN before implementation.
 [projcore callback] O8 DONE Implemented extractBody/body hashing plus esc-to-interrupt active-turn detection; focused tests, non-live suite, npx tsc, and npm run build passed.
+[projcore callback] O8 DONE Correction iter1 fixed hasActiveTurn status-bar false positive; targeted classifier test, npx tsc, and npm run build passed.
