@@ -24,3 +24,11 @@ Follow-on to the completed overmind build (R1-R16). All in AGJAssist, branch `fe
 *Acceptance:* a fresh projcore run registers itself on overmind without manual intervention (demonstrated or code-traced + the §2.11 protocol validated).
 
 **Constraints:** match Preact/HTM no-build conventions; pure helpers in overmind-helpers.js (testable in node); density-light; coordinator-only rules unchanged; deploy with `npm run build`. Commit per batch. Live-smoke UI/functionality (esp. RU3 watcher change).
+
+## Injected 2026-05-21 (round-2 dynamic queue §1.4b)
+
+**RU8 — Elapsed-time stat (frozen on completion).** Each workflow shows "elapsed since started" = (ended_at ?? now) − created_at, ticking live while in play. When ALL tasks in the tasklist reach state `done` (or status becomes completed), stamp `ended_at` once and FREEZE the elapsed clock there. For audit. (schema: add `ended_at TEXT`.)
+*Acceptance:* a running workflow shows a live-ticking elapsed time; once all its tasks are done, elapsed stops at the completion moment and no longer increases.
+
+**RU9 — Task history log.** Keep a per-workflow log of previous tasks/transitions (timestamped) so JROM can review what was worked on. Append an entry whenever the tasklist/current_task changes (e.g. {at, current_task, done/total, note}). Show it in the expanded card as a "History" list. (schema: add `task_log TEXT` JSON array; appended in setTasks.)
+*Acceptance:* as a workflow's tasks progress, the history log accrues timestamped entries; the expanded card shows them for review.

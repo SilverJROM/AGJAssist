@@ -7,3 +7,4 @@
 5. **V5** — Verify/harden projcore auto-register (RU7) — SHORT — PENDING
 
 One batch at a time, plan-handshake, gate + live-smoke per batch.
+6. **V6** — Workflow audit: elapsed-time (freezes on all-done) + task history log (RU8, RU9), schema v13 — SHORT* — PENDING
