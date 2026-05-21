@@ -2,7 +2,7 @@ import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
 import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput } from './terminal-chat-state.js';
-import { buildOvermindWsUrl, countDoneTasks, formatActiveSessionAttribution, formatStuckDuration, statusColor, statusIcon, taskGlyph } from './overmind-helpers.js';
+import { buildOvermindWsUrl, countDoneTasks, formatActiveSessionAttribution, formatStuckDuration, isActiveStatus, statusColor, statusIcon, taskGlyph } from './overmind-helpers.js';
 
 const html = htm.bind(h);
 
@@ -454,6 +454,7 @@ function OvermindWorkflows() {
   const [streamStatus, setStreamStatus] = useState('connecting');
   const [now, setNow] = useState(Date.now());
   const [expandedWorkflows, setExpandedWorkflows] = useState({});
+  const [workflowTab, setWorkflowTab] = useState('active');
   const streamStatusRef = useRef(streamStatus);
 
   useEffect(() => {
@@ -531,6 +532,11 @@ function OvermindWorkflows() {
 
   if (loading) return html`<div class="loading">Loading workflows...</div>`;
 
+  const activeWorkflows = workflows.filter(workflow => isActiveStatus(workflow.status));
+  const doneWorkflows = workflows.filter(workflow => workflow.status === 'completed' || workflow.status === 'paused');
+  const visibleWorkflows = workflowTab === 'done' ? doneWorkflows : activeWorkflows;
+  const tabEmptyText = workflowTab === 'done' ? 'No done workflows' : 'No active workflows';
+
   return html`
     <div class="overmind-page">
       <div class="action-bar">
@@ -543,11 +549,34 @@ function OvermindWorkflows() {
 
       ${error && html`<div class="overmind-alert">${error}</div>`}
 
+      <div class="overmind-tabs" role="tablist" aria-label="Workflow status filters">
+        <button
+          type="button"
+          role="tab"
+          aria-selected=${workflowTab === 'active'}
+          class=${'overmind-tab ' + (workflowTab === 'active' ? 'active' : '')}
+          onclick=${() => setWorkflowTab('active')}
+        >
+          Active (${activeWorkflows.length})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected=${workflowTab === 'done'}
+          class=${'overmind-tab ' + (workflowTab === 'done' ? 'active' : '')}
+          onclick=${() => setWorkflowTab('done')}
+        >
+          Done (${doneWorkflows.length})
+        </button>
+      </div>
+
       ${workflows.length === 0 ? html`
         <div class="empty-state">No workflows registered.</div>
+      ` : visibleWorkflows.length === 0 ? html`
+        <div class="empty-state">${tabEmptyText}</div>
       ` : html`
         <div class="item-list overmind-list">
-          ${workflows.map(workflow => {
+          ${visibleWorkflows.map(workflow => {
             const tasks = Array.isArray(workflow.tasks) ? workflow.tasks : [];
             const doneCount = countDoneTasks(tasks);
             const childSessions = Array.isArray(workflow.child_sessions) ? workflow.child_sessions : [];

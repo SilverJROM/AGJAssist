@@ -34,6 +34,10 @@ export function statusColor(status) {
   return OVERMIND_STATUS_COLORS[status] || 'ovm-neutral';
 }
 
+export function isActiveStatus(status) {
+  return ['active', 'working', 'waiting_human', 'awaiting_decision', 'stuck'].includes(status);
+}
+
 export function taskGlyph(state) {
   return OVERMIND_TASK_GLYPHS[state] || '○';
 }

@@ -403,6 +403,33 @@ body {
   padding: 10px 12px;
   font-size: 13px;
 }
+.overmind-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+}
+.overmind-tab {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  min-height: 30px;
+  padding: 6px 10px;
+}
+.overmind-tab.active {
+  border-color: var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
 .overmind-list {
   gap: 12px;
 }

@@ -11,6 +11,7 @@ import {
   countDoneTasks,
   formatActiveSessionAttribution,
   formatStuckDuration,
+  isActiveStatus,
   statusColor,
   statusIcon,
   taskGlyph
@@ -204,5 +205,15 @@ describe("Overmind public helpers", () => {
     expect(statusColor("paused")).toBe("ovm-grey");
     expect(statusColor("active")).toBe("ovm-neutral");
     expect(statusColor("unknown")).toBe("ovm-neutral");
+  });
+
+  it("classifies active dashboard workflow statuses", () => {
+    expect(isActiveStatus("working")).toBe(true);
+    expect(isActiveStatus("active")).toBe(true);
+    expect(isActiveStatus("waiting_human")).toBe(true);
+    expect(isActiveStatus("awaiting_decision")).toBe(true);
+    expect(isActiveStatus("stuck")).toBe(true);
+    expect(isActiveStatus("completed")).toBe(false);
+    expect(isActiveStatus("paused")).toBe(false);
   });
 });
