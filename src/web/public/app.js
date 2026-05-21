@@ -761,30 +761,26 @@ function OvermindWorkflows() {
                         <tr>
                           <th scope="row">Coordinator</th>
                           <td>${workflow.coordinator_session || '—'}</td>
-                        </tr>
-                        <tr>
                           <th scope="row">Children</th>
                           <td>${childSessions.length ? childSessions.join(', ') : '—'}</td>
                         </tr>
                         <tr>
                           <th scope="row">Active</th>
                           <td>${activeSession}</td>
-                        </tr>
-                        <tr>
                           <th scope="row">Tier</th>
                           <td>${workflow.tier ?? 0}</td>
                         </tr>
                         <tr>
                           <th scope="row">Elapsed</th>
                           <td>${currentElapsed}${workflow.ended_at ? ' (done)' : ''}</td>
-                        </tr>
-                        <tr>
                           <th scope="row">Total</th>
                           <td>${totalElapsed}</td>
                         </tr>
                         <tr>
                           <th scope="row">Stuck</th>
                           <td>${workflow.stuck_since ? formatStuckDuration(workflow.stuck_since, now) : '—'}</td>
+                          <th></th>
+                          <td></td>
                         </tr>
                       </tbody>
                     </table>

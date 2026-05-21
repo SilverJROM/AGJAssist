@@ -579,38 +579,30 @@ body {
 .overmind-detail-table tr:last-child td {
   border-bottom: 0;
 }
+/* 4-column layout: header1 | data1 | header2 | data2 */
 .overmind-detail-table th {
-  width: 34%;
+  width: 19%;
   color: var(--text-secondary);
   font-weight: 600;
 }
 .overmind-detail-table td {
+  width: 31%;
   color: var(--text);
   font-weight: 600;
 }
+.overmind-detail-table th + td {
+  border-right: 1px solid var(--border);
+}
+.overmind-detail-table th:last-child,
+.overmind-detail-table td:last-child {
+  border-right: 0;
+}
 @media (max-width: 420px) {
-  .overmind-detail-table,
-  .overmind-detail-table tbody,
-  .overmind-detail-table tr,
+  /* stay 4-col on narrow Telegram webview — just tighten */
   .overmind-detail-table th,
   .overmind-detail-table td {
-    display: block;
-    width: 100%;
-  }
-  .overmind-detail-table tr {
-    border-bottom: 1px solid var(--border);
-    padding: 7px 9px;
-  }
-  .overmind-detail-table tr:last-child {
-    border-bottom: 0;
-  }
-  .overmind-detail-table th,
-  .overmind-detail-table td {
-    border-bottom: 0;
-    padding: 0;
-  }
-  .overmind-detail-table td {
-    margin-top: 2px;
+    padding: 6px 6px;
+    font-size: 11px;
   }
 }
 .overmind-decision {
