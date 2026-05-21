@@ -7,6 +7,9 @@ import { TmuxService } from "../tmux/tmux-service.js";
 export const POLL_MS = 45_000;
 export const STUCK_THRESHOLD_MS = 90_000;
 export const CAPTURE_LINES = 200;
+export const MAX_CANNED_NUDGES = 2;
+export const CANNED_NUDGE =
+  "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS.";
 
 const BUSY_MARKER_RE = /esc to interrupt|Working \(|Waiting for|Compacting|Thinking/i;
 const NUMBERED_OPTION_RE = /^\s*\d+\.\s+\S+/m;
@@ -14,6 +17,8 @@ const DECISION_FOOTER_RE = /Enter to select|Tab\/Arrow keys to navigate|Type som
 const HUMAN_WAIT_RE = /\bNEEDS-INFO\b|needs info|waiting for (human|user|input)|blocked on (human|user|input)|\bquestion\b|\bplease (confirm|choose|provide|advise)\b/i;
 const RUN_DIR_ACTIVITY_FILES = ["callbacks.md", "progress.md", "queue.md"] as const;
 const TERMINAL_STATUSES: OvermindWorkflowStatus[] = ["paused", "completed", "failed"];
+
+export type OvermindNotify = (text: string) => Promise<void>;
 
 export interface ClassifyWorkflowInput {
   coordinatorPane: string;
@@ -88,7 +93,8 @@ export class OvermindWatcher {
 
   constructor(
     private readonly overmindService: OvermindService,
-    private readonly tmuxService: TmuxService
+    private readonly tmuxService: TmuxService,
+    private readonly notify?: OvermindNotify
   ) {}
 
   async tick(): Promise<void> {
@@ -129,13 +135,55 @@ export class OvermindWatcher {
       now
     });
 
+    const nudgeFields = await this.applyNudgeLadder(workflow, result.status);
+
     this.overmindService.update(workflow.id, {
       status: result.status,
       pending_decision: result.pendingDecision,
       last_pane_hash: result.coordinatorHash,
       stuck_since: result.stuckSince,
+      ...nudgeFields,
       ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
     });
+  }
+
+  private async applyNudgeLadder(
+    workflow: OvermindWorkflow,
+    status: ClassifyResult["status"]
+  ): Promise<Pick<OvermindWorkflow, "nudge_count" | "tier">> {
+    if (status === "working") {
+      return { nudge_count: 0, tier: 0 };
+    }
+
+    if (status !== "stuck") {
+      return { nudge_count: workflow.nudge_count, tier: workflow.tier };
+    }
+
+    if (workflow.nudge_count >= MAX_CANNED_NUDGES) {
+      // A6: Tier 3 Sonnet brain here.
+      return { nudge_count: workflow.nudge_count, tier: workflow.tier };
+    }
+
+    const nextNudgeCount = workflow.nudge_count + 1;
+    await this.tmuxService.sendCommand(workflow.coordinator_session, CANNED_NUDGE, true, true);
+    return { nudge_count: nextNudgeCount, tier: nextNudgeCount };
+  }
+
+  async notifyDone(workflow: OvermindWorkflow): Promise<void> {
+    await this.notifyBestEffort(`DONE · overmind · ${workflow.label}\n${workflow.label} completed.`);
+  }
+
+  async notifyBlocked(workflow: OvermindWorkflow, reason: string): Promise<void> {
+    await this.notifyBestEffort(`BLOCKED · overmind · ${workflow.label}\n${reason}`);
+  }
+
+  private async notifyBestEffort(text: string): Promise<void> {
+    if (!this.notify) return;
+    try {
+      await this.notify(text);
+    } catch (error) {
+      console.error("Overmind notify failed:", error);
+    }
   }
 
   private async capturePaneSafe(target: string): Promise<string> {

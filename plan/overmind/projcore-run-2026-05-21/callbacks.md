@@ -11,3 +11,6 @@
 [projcore callback] A4 APPROVED-PLAN Approved plan received; implementation starting on feat/overmind.
 [projcore callback] A4 DONE Telegram commands and watcher startup implemented; targeted Vitest and tsc gates passed.
 [projcore callback] A4 DONE Correction iter 1: tmux target validation now accepts safe bare session names; tmux-service test and tsc gates passed.
+[projcore callback] A5 PROPOSED Nudge ladder Tier 1-2 and DONE/BLOCKED notification plan proposed; awaiting APPROVED-PLAN before code changes.
+[projcore callback] A5 APPROVED-PLAN Approved plan received; implementing coordinator-only Tier 1-2 nudges and DONE notify from /complete route.
+[projcore callback] A5 DONE Coordinator-only Tier 1-2 nudges and authoritative /complete DONE notify implemented; tsc and targeted/regression gates passed.

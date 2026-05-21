@@ -7,6 +7,7 @@ import {
   OvermindTask,
   OvermindWorkflowStatus
 } from "../../services/overmind-service.js";
+import type { OvermindNotify } from "../../services/overmind-watcher.js";
 
 interface TokenBody {
   token?: string;
@@ -62,7 +63,8 @@ export function registerOvermindRoutes(
   app: FastifyInstance,
   config: AppConfig,
   authService: AuthService,
-  overmindService: OvermindService
+  overmindService: OvermindService,
+  notify?: OvermindNotify
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
 
@@ -104,7 +106,16 @@ export function registerOvermindRoutes(
         return reply.code(404).send({ error: "Workflow not found" });
       }
 
-      return { workflow: overmindService.setStatus(workflow.id, "completed") };
+      const completed = overmindService.setStatus(workflow.id, "completed");
+      if (workflow.status !== "completed" && completed) {
+        try {
+          await notify?.(`DONE · overmind · ${completed.label}\n${completed.label} completed.`);
+        } catch (error) {
+          console.error("Overmind DONE notify failed:", error);
+        }
+      }
+
+      return { workflow: completed };
     }
   );
 

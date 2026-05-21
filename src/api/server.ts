@@ -48,6 +48,7 @@ import { ClaudeCliProvider } from "../llm/claude-cli-provider.js";
 import { CodexCliProvider } from "../llm/codex-cli-provider.js";
 import { OvermindService } from "../services/overmind-service.js";
 import { registerOvermindRoutes } from "./routes/overmind-routes.js";
+import type { OvermindNotify } from "../services/overmind-watcher.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -78,6 +79,7 @@ export interface ApiServices {
   claudeCliProvider: ClaudeCliProvider;
   codexCliProvider: CodexCliProvider;
   overmindService: OvermindService;
+  overmindNotify?: OvermindNotify;
 }
 
 export async function createApiServer(
@@ -143,7 +145,7 @@ export async function createApiServer(
   registerChatRoutes(app, services.authService, services.ollama, services.openRouter, services.conversationService, services.chatSettingsService, services.ollamaAgent, services.openRouterAgent, services.claudeCliProvider, services.codexCliProvider, services.tools, services.maxToolIterations);
   registerAgentRoutes(app, services.authService);
   registerLocalLlmRoutes(app, services.authService, services.conversationService, services.chatSettingsService, services.tools, services.maxToolIterations);
-  registerOvermindRoutes(app, config, services.authService, services.overmindService);
+  registerOvermindRoutes(app, config, services.authService, services.overmindService, services.overmindNotify);
 
   return app;
 }

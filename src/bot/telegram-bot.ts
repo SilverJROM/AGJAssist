@@ -14,7 +14,7 @@ export class TelegramAssistant {
   private readonly bot: TelegramBot;
 
   constructor(botToken: string, private readonly core: AssistantCore) {
-    this.bot = new TelegramBot(botToken, { polling: true });
+    this.bot = new TelegramBot(botToken, { polling: false });
   }
 
   async start(): Promise<void> {
@@ -100,5 +100,11 @@ export class TelegramAssistant {
         await this.bot.sendMessage(chatId, `Error: ${msg}`);
       }
     });
+
+    await this.bot.startPolling();
+  }
+
+  async sendMessage(chatId: number | string, text: string): Promise<void> {
+    await this.bot.sendMessage(chatId, text);
   }
 }

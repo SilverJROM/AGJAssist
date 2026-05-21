@@ -93,7 +93,6 @@ async function main(): Promise<void> {
   const reminderService = new ReminderService(db, auditService);
   const chatSettingsService = new ChatSettingsService(db);
   const overmindService = new OvermindService(db);
-  const overmindWatcher = new OvermindWatcher(overmindService, tmuxService);
 
   // Seed default soul.md and context.md if not set
   if (!chatSettingsService.get("soul_md")) {
@@ -124,6 +123,14 @@ async function main(): Promise<void> {
   const codexCliProvider = new CodexCliProvider(180_000);
   core.setChatServices(conversationService, chatSettingsService, claudeCliProvider, codexCliProvider);
   core.setOvermindService(overmindService);
+  const telegramAssistant = config.telegram.testMode
+    ? null
+    : new TelegramAssistant(config.telegram.botToken, core);
+  const overmindNotify = async (text: string): Promise<void> => {
+    if (!telegramAssistant) return;
+    await telegramAssistant.sendMessage(config.telegram.authorizedUserId, text);
+  };
+  const overmindWatcher = new OvermindWatcher(overmindService, tmuxService, overmindNotify);
 
   // Tmux streaming
   const tmuxStreamManager = new TmuxStreamManager(
@@ -161,7 +168,8 @@ async function main(): Promise<void> {
     maxToolIterations: config.runtime.maxToolIterations,
     claudeCliProvider,
     codexCliProvider,
-    overmindService
+    overmindService,
+    overmindNotify
   });
 
   await apiServer.listen({ port: config.api.port, host: config.api.host });
@@ -271,14 +279,13 @@ async function main(): Promise<void> {
     }
   }, 60_000);
 
-  if (config.telegram.testMode) {
+  if (!telegramAssistant) {
     console.log("AGJAssist booted in TEST_MODE=true (Telegram polling not started)");
     return;
   }
 
   // Telegram bot
-  const bot = new TelegramAssistant(config.telegram.botToken, core);
-  await bot.start();
+  await telegramAssistant.start();
   console.log("AGJAssist Telegram bot started");
 }
 
