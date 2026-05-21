@@ -4,3 +4,4 @@
 [projcore callback] O2 DONE Primer and OVM session manager endpoints implemented, tested, built, live-smoked, and ready for gate.
 [projcore callback] O5 PROPOSED Plan ready for Telegram startup/polling resilience; awaiting APPROVED-PLAN before implementation.
 [projcore callback] O5 DONE Telegram startup and polling failures are non-fatal; API/dashboard/Overmind stay up; test, tsc, build, and live smoke passed.
+[projcore callback] O6 PROPOSED Plan ready for activity classifier fix; awaiting APPROVED-PLAN before implementation.
