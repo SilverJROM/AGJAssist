@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 18;
+const SCHEMA_VERSION = 19;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -306,6 +306,8 @@ CREATE TABLE IF NOT EXISTS overmind_workflows (
   run_started_at TEXT,
   accumulated_ms INTEGER NOT NULL DEFAULT 0,
   completion_check TEXT,
+  parent_status TEXT,
+  child_statuses TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -597,6 +599,18 @@ export class DatabaseService {
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("completion_check")) {
           this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN completion_check TEXT");
+        }
+      }
+
+      // Migration: v18 → v19: persist independent parent/child session statuses
+      if (current && current.version < 19) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("parent_status")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN parent_status TEXT");
+        }
+        if (!colNames.has("child_statuses")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN child_statuses TEXT NOT NULL DEFAULT '[]'");
         }
       }
 

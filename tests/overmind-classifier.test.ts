@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  classifyChildSessionStatus,
+  classifyParentSession,
   classifyWorkflow,
   determineActiveSessionAttribution,
   hashPane
@@ -131,6 +133,77 @@ describe("classifyWorkflow", () => {
     expect(result.status).toBe("stuck");
     expect(result.stuckSince).toBe("2026-05-21T11:58:29.000Z");
     expect(result.lastActivityAt).toBeNull();
+  });
+});
+
+describe("per-session classifiers", () => {
+  it("classifies a busy parent pane as working", () => {
+    expect(classifyParentSession({
+      coordinatorPane: "Working (12s)\nesc to interrupt",
+      coordinatorHashPrev: hashPane("Working (12s)\nesc to interrupt"),
+      stuckSincePrev: null,
+      now: NOW
+    })).toBe("working");
+  });
+
+  it("classifies a quiet parent pane as idle before the stuck threshold", () => {
+    const pane = "same quiet coordinator pane";
+    expect(classifyParentSession({
+      coordinatorPane: pane,
+      coordinatorHashPrev: hashPane(pane),
+      stuckSincePrev: "2026-05-21T11:59:30.000Z",
+      now: NOW
+    })).toBe("idle");
+  });
+
+  it("classifies a parent human wait as waiting_human", () => {
+    const pane = "NEEDS-INFO: please confirm whether QA should run the slow suite.";
+    expect(classifyParentSession({
+      coordinatorPane: pane,
+      coordinatorHashPrev: hashPane(pane),
+      stuckSincePrev: null,
+      now: NOW
+    })).toBe("waiting_human");
+  });
+
+  it("classifies a parent decision menu as awaiting_decision", () => {
+    const pane = [
+      "Pick the next action",
+      "1. Run targeted tests",
+      "2. Merge the branch",
+      "Enter to select"
+    ].join("\n");
+    expect(classifyParentSession({
+      coordinatorPane: pane,
+      coordinatorHashPrev: hashPane(pane),
+      stuckSincePrev: null,
+      now: NOW
+    })).toBe("awaiting_decision");
+  });
+
+  it("classifies a parent frozen past threshold as stuck", () => {
+    const pane = "same quiet coordinator pane";
+    expect(classifyParentSession({
+      coordinatorPane: pane,
+      coordinatorHashPrev: hashPane(pane),
+      stuckSincePrev: "2026-05-21T11:58:29.000Z",
+      now: NOW
+    })).toBe("stuck");
+  });
+
+  it("classifies child panes as working, idle, or closed", () => {
+    expect(classifyChildSessionStatus({
+      pane: "Thinking\nesc to interrupt",
+      exists: true
+    })).toBe("working");
+    expect(classifyChildSessionStatus({
+      pane: "quiet child pane",
+      exists: true
+    })).toBe("idle");
+    expect(classifyChildSessionStatus({
+      pane: "",
+      exists: false
+    })).toBe("closed");
   });
 });
 

@@ -76,6 +76,17 @@ export class TmuxService {
     return stdout.trim() || "<empty pane output>";
   }
 
+  async sessionExists(target: string): Promise<boolean> {
+    this.ensureValidTarget(target);
+    const sessionName = target.split(":")[0];
+    try {
+      await execFileAsync("tmux", ["has-session", "-t", sessionName]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async sendCommand(
     target: string,
     command: string,

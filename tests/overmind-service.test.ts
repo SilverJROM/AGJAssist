@@ -28,9 +28,9 @@ afterEach(() => {
 });
 
 describe("OvermindService", () => {
-  it("creates the schema v18 tables, display name, active attribution, history, notification, elapsed, and completion-check columns", () => {
+  it("creates the schema v19 tables, display name, active attribution, history, notification, elapsed, completion-check, and per-session status columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(18);
+    expect(version.version).toBe(19);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -63,6 +63,8 @@ describe("OvermindService", () => {
     expect(colNames).toContain("last_notified_transition");
     expect(colNames).toContain("run_started_at");
     expect(colNames).toContain("accumulated_ms");
+    expect(colNames).toContain("parent_status");
+    expect(colNames).toContain("child_statuses");
 
     const historyCols = db.raw.pragma("table_info(overmind_task_history)") as { name: string }[];
     expect(historyCols.map((col) => col.name)).toEqual([
@@ -99,6 +101,8 @@ describe("OvermindService", () => {
     expect(created.ended_at).toBeNull();
     expect(created.run_started_at).toBeTruthy();
     expect(created.accumulated_ms).toBe(0);
+    expect(created.parent_status).toBeNull();
+    expect(created.child_statuses).toEqual([]);
     expect(created.task_log).toEqual([]);
 
     expect(service.list()).toHaveLength(1);
@@ -112,6 +116,11 @@ describe("OvermindService", () => {
       active_session: "lkcdx-extra",
       active_role: "child",
       last_pane_hash: "abc123",
+      parent_status: "idle",
+      child_statuses: [
+        { session: "lkcdx-may20", status: "working" },
+        { session: "lkcdx-extra", status: "closed" }
+      ],
       nudge_count: 2,
       tier: 1
     });
@@ -122,6 +131,11 @@ describe("OvermindService", () => {
     expect(updated?.active_session).toBe("lkcdx-extra");
     expect(updated?.active_role).toBe("child");
     expect(updated?.last_pane_hash).toBe("abc123");
+    expect(updated?.parent_status).toBe("idle");
+    expect(updated?.child_statuses).toEqual([
+      { session: "lkcdx-may20", status: "working" },
+      { session: "lkcdx-extra", status: "closed" }
+    ]);
     expect(updated?.nudge_count).toBe(2);
     expect(updated?.tier).toBe(1);
 
@@ -531,7 +545,7 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(18);
+    expect(version.version).toBe(19);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("display_name");
@@ -543,6 +557,8 @@ describe("OvermindService", () => {
     expect(cols.map((col) => col.name)).toContain("run_started_at");
     expect(cols.map((col) => col.name)).toContain("accumulated_ms");
     expect(cols.map((col) => col.name)).toContain("completion_check");
+    expect(cols.map((col) => col.name)).toContain("parent_status");
+    expect(cols.map((col) => col.name)).toContain("child_statuses");
     expect(service.getBySession("legacy-parent")?.active_session).toBeNull();
     expect(service.getBySession("legacy-parent")?.ended_at).toBeNull();
     expect(service.getBySession("legacy-parent")?.task_log).toEqual([]);
@@ -551,6 +567,8 @@ describe("OvermindService", () => {
     expect(service.getBySession("legacy-parent")?.run_started_at).toBe(service.getBySession("legacy-parent")?.created_at);
     expect(service.getBySession("legacy-parent")?.accumulated_ms).toBe(0);
     expect(service.getBySession("legacy-parent")?.display_name).toBeNull();
+    expect(service.getBySession("legacy-parent")?.parent_status).toBeNull();
+    expect(service.getBySession("legacy-parent")?.child_statuses).toEqual([]);
     expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_task_history'").all()).toHaveLength(1);
 
     db.close();
@@ -566,6 +584,8 @@ describe("OvermindService", () => {
     expect(cols.filter((col) => col.name === "run_started_at")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "accumulated_ms")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "completion_check")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "parent_status")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "child_statuses")).toHaveLength(1);
     expect(historyCols.filter((col) => col.name === "coordinator_session")).toHaveLength(1);
   });
 });

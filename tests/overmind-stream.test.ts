@@ -4,7 +4,7 @@ import { WebSocket } from "ws";
 import { OvermindStreamManager } from "../src/api/websocket/overmind-stream-manager.js";
 import { AuthService } from "../src/auth/auth-service.js";
 import { OvermindService, OvermindWorkflow } from "../src/services/overmind-service.js";
-import { OvermindWatcher } from "../src/services/overmind-watcher.js";
+import { OvermindWatcher, hashPane } from "../src/services/overmind-watcher.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 import {
   buildOvermindWsUrl,
@@ -64,8 +64,12 @@ function workflow(overrides: Partial<OvermindWorkflow> = {}): OvermindWorkflow {
     stuck_since: null,
     nudge_count: 0,
     tier: 0,
+    last_notified_transition: null,
     run_started_at: "2026-05-21T00:00:00.000Z",
     accumulated_ms: 0,
+    completion_check: null,
+    parent_status: null,
+    child_statuses: [],
     created_at: "2026-05-21T00:00:00.000Z",
     updated_at: "2026-05-21T00:00:00.000Z",
     ...overrides
@@ -159,7 +163,8 @@ describe("Overmind watcher stream callback", () => {
       })
     } as unknown as OvermindService;
     const tmuxService = {
-      capturePane: vi.fn(async () => "quiet pane")
+      capturePane: vi.fn(async () => "quiet pane"),
+      sessionExists: vi.fn(async () => true)
     } as unknown as TmuxService;
     const onUpdate = vi.fn();
     const watcher = new OvermindWatcher(overmindService, tmuxService, undefined, undefined, onUpdate);
@@ -169,6 +174,39 @@ describe("Overmind watcher stream callback", () => {
     expect(overmindService.update).toHaveBeenCalledOnce();
     expect(onUpdate).toHaveBeenCalledOnce();
     expect(onUpdate.mock.calls[0][0][0].last_pane_hash).toBeTruthy();
+  });
+
+  it("persists independent parent and child statuses, including closed child sessions", async () => {
+    let rows = [workflow({
+      child_sessions: ["child-working", "child-closed"],
+      last_pane_hash: hashPane("quiet parent")
+    })];
+    const overmindService = {
+      list: vi.fn(() => rows),
+      update: vi.fn((id: number, fields: Partial<OvermindWorkflow>) => {
+        rows = rows.map(row => row.id === id ? { ...row, ...fields } : row);
+        return rows.find(row => row.id === id) || null;
+      })
+    } as unknown as OvermindService;
+    const tmuxService = {
+      capturePane: vi.fn(async (target: string) => {
+        if (target === "coord-1") return "quiet parent";
+        if (target === "child-working") return "Working (8s)\nesc to interrupt";
+        return "";
+      }),
+      sessionExists: vi.fn(async (target: string) => target !== "child-closed")
+    } as unknown as TmuxService;
+    const watcher = new OvermindWatcher(overmindService, tmuxService);
+
+    await watcher.tick();
+
+    expect(overmindService.update).toHaveBeenCalledOnce();
+    expect(rows[0].parent_status).toBe("idle");
+    expect(rows[0].child_statuses).toEqual([
+      { session: "child-working", status: "working" },
+      { session: "child-closed", status: "closed" }
+    ]);
+    expect(rows[0].status).toBe("working");
   });
 });
 

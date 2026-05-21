@@ -2,7 +2,13 @@ import { createHash } from "node:crypto";
 import { appendFile, mkdir, readFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "./overmind-service.js";
+import {
+  OvermindChildSessionStatus,
+  OvermindParentStatus,
+  OvermindService,
+  OvermindWorkflow,
+  OvermindWorkflowStatus
+} from "./overmind-service.js";
 import { TmuxService } from "../tmux/tmux-service.js";
 import {
   BrainVerdict,
@@ -59,6 +65,13 @@ export interface ClassifyResult {
   pendingDecision: string | null;
   stuckSince: string | null;
   lastActivityAt: string | null;
+}
+
+export interface ClassifyParentSessionInput {
+  coordinatorPane: string;
+  coordinatorHashPrev: string | null;
+  stuckSincePrev: string | null;
+  now: string;
 }
 
 export interface ActiveSessionAttribution {
@@ -157,6 +170,39 @@ export function classifyWorkflow(input: ClassifyWorkflowInput): ClassifyResult {
   };
 }
 
+export function classifyParentSession(input: ClassifyParentSessionInput): OvermindParentStatus {
+  const coordinatorHash = hashPane(input.coordinatorPane);
+  const coordinatorHashChanged =
+    input.coordinatorHashPrev !== null && coordinatorHash !== input.coordinatorHashPrev;
+
+  if (BUSY_MARKER_RE.test(input.coordinatorPane)) {
+    return "working";
+  }
+
+  if (isDecisionPrompt(input.coordinatorPane)) {
+    return "awaiting_decision";
+  }
+
+  if (HUMAN_WAIT_RE.test(input.coordinatorPane)) {
+    return "waiting_human";
+  }
+
+  if (coordinatorHashChanged) {
+    return "working";
+  }
+
+  if (input.stuckSincePrev && isPastStuckThreshold(input.stuckSincePrev, input.now)) {
+    return "stuck";
+  }
+
+  return "idle";
+}
+
+export function classifyChildSessionStatus(input: { pane: string; exists: boolean }): OvermindChildSessionStatus["status"] {
+  if (!input.exists) return "closed";
+  return BUSY_MARKER_RE.test(input.pane) ? "working" : "idle";
+}
+
 export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
 
@@ -192,11 +238,19 @@ export class OvermindWatcher {
 
   private async tickWorkflow(workflow: OvermindWorkflow): Promise<void> {
     const now = new Date().toISOString();
-    const [coordinatorPane, childPanes, mtimeAdvanced] = await Promise.all([
+    const [coordinatorPane, childSnapshots, mtimeAdvanced] = await Promise.all([
       this.capturePaneSafe(workflow.coordinator_session),
-      Promise.all(workflow.child_sessions.map((target) => this.capturePaneSafe(target))),
+      Promise.all(workflow.child_sessions.map((target) => this.captureChildSession(target))),
       runDirMtimeAdvanced(workflow.run_dir, workflow.last_activity_at)
     ]);
+    const childPanes = childSnapshots.map((child) => child.pane);
+    const childStatuses = childSnapshots.map(({ session, status }) => ({ session, status }));
+    const parentStatus = classifyParentSession({
+      coordinatorPane,
+      coordinatorHashPrev: workflow.last_pane_hash,
+      stuckSincePrev: workflow.stuck_since,
+      now
+    });
 
     const result = classifyWorkflow({
       coordinatorPane,
@@ -219,7 +273,14 @@ export class OvermindWatcher {
     // ONCE per distinct all-done signature (token-gated via completion_check), then
     // consults projcore — projcore's own /complete remains where the buck stops.
     if (allTasksComplete(workflow.tasks)) {
-      await this.handleAllTasksDone(workflow, coordinatorPane, result.coordinatorHash, activeAttribution);
+      await this.handleAllTasksDone(
+        workflow,
+        coordinatorPane,
+        result.coordinatorHash,
+        activeAttribution,
+        parentStatus,
+        childStatuses
+      );
       return;
     }
 
@@ -236,6 +297,8 @@ export class OvermindWatcher {
       stuck_since: nudgeFields.stuck_since !== undefined ? nudgeFields.stuck_since : result.stuckSince,
       active_session: activeAttribution.active_session,
       active_role: activeAttribution.active_role,
+      parent_status: parentStatus,
+      child_statuses: childStatuses,
       ...nudgeFields,
       ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
     });
@@ -245,7 +308,9 @@ export class OvermindWatcher {
     workflow: OvermindWorkflow,
     coordinatorPane: string,
     coordinatorHash: string,
-    attribution: ActiveSessionAttribution
+    attribution: ActiveSessionAttribution,
+    parentStatus: OvermindParentStatus,
+    childStatuses: OvermindChildSessionStatus[]
   ): Promise<void> {
     const doneCount = workflow.tasks.filter((task) => task.state === "done").length;
     const signature = `${doneCount}/${workflow.tasks.length}`;
@@ -261,7 +326,9 @@ export class OvermindWatcher {
         nudge_count: 0,
         tier: 0,
         active_session: attribution.active_session,
-        active_role: attribution.active_role
+        active_role: attribution.active_role,
+        parent_status: parentStatus,
+        child_statuses: childStatuses
       });
       return;
     }
@@ -279,7 +346,9 @@ export class OvermindWatcher {
         tier: 0,
         completion_check: signature,
         active_session: attribution.active_session,
-        active_role: attribution.active_role
+        active_role: attribution.active_role,
+        parent_status: parentStatus,
+        child_statuses: childStatuses
       });
       return;
     }
@@ -302,7 +371,9 @@ export class OvermindWatcher {
       tier: 0,
       completion_check: signature,
       active_session: attribution.active_session,
-      active_role: attribution.active_role
+      active_role: attribution.active_role,
+      parent_status: parentStatus,
+      child_statuses: childStatuses
     });
   }
 
@@ -561,6 +632,27 @@ export class OvermindWatcher {
       return await this.tmuxService.capturePane(target, CAPTURE_LINES);
     } catch {
       return "";
+    }
+  }
+
+  private async captureChildSession(
+    target: string
+  ): Promise<{ session: string; pane: string; status: OvermindChildSessionStatus["status"] }> {
+    const exists = await this.sessionExistsSafe(target);
+    const pane = exists ? await this.capturePaneSafe(target) : "";
+    return {
+      session: target,
+      pane,
+      status: classifyChildSessionStatus({ pane, exists })
+    };
+  }
+
+  private async sessionExistsSafe(target: string): Promise<boolean> {
+    try {
+      if (typeof this.tmuxService.sessionExists !== "function") return true;
+      return await this.tmuxService.sessionExists(target);
+    } catch {
+      return false;
     }
   }
 }

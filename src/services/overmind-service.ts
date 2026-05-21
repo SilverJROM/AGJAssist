@@ -11,6 +11,13 @@ export type OvermindWorkflowStatus =
   | "failed";
 
 export type OvermindTaskState = "done" | "processing" | "pending";
+export type OvermindParentStatus = "working" | "idle" | "waiting_human" | "awaiting_decision" | "stuck";
+export type OvermindChildStatus = "working" | "idle" | "closed";
+
+export interface OvermindChildSessionStatus {
+  session: string;
+  status: OvermindChildStatus;
+}
 
 export interface OvermindTask {
   id: string;
@@ -60,6 +67,8 @@ export interface OvermindWorkflow {
   run_started_at: string | null;
   accumulated_ms: number;
   completion_check: string | null;
+  parent_status: OvermindParentStatus | null;
+  child_statuses: OvermindChildSessionStatus[];
   created_at: string;
   updated_at: string;
 }
@@ -91,6 +100,8 @@ export interface UpdateOvermindWorkflowInput {
   tier?: number;
   last_notified_transition?: string | null;
   completion_check?: string | null;
+  parent_status?: OvermindParentStatus | null;
+  child_statuses?: OvermindChildSessionStatus[];
 }
 
 interface OvermindWorkflowRow {
@@ -117,6 +128,8 @@ interface OvermindWorkflowRow {
   run_started_at: string | null;
   accumulated_ms: number;
   completion_check: string | null;
+  parent_status: OvermindParentStatus | null;
+  child_statuses: string;
   created_at: string;
   updated_at: string;
 }
@@ -270,7 +283,9 @@ export class OvermindService {
         : existing.last_notified_transition,
       completion_check: fields.completion_check !== undefined
         ? fields.completion_check
-        : existing.completion_check
+        : existing.completion_check,
+      parent_status: fields.parent_status !== undefined ? fields.parent_status : existing.parent_status,
+      child_statuses: fields.child_statuses ?? existing.child_statuses
     };
 
     this.db
@@ -293,6 +308,8 @@ export class OvermindService {
             tier = ?,
             last_notified_transition = ?,
             completion_check = ?,
+            parent_status = ?,
+            child_statuses = ?,
             updated_at = datetime('now')
         WHERE id = ?`
       )
@@ -314,6 +331,8 @@ export class OvermindService {
         next.tier,
         next.last_notified_transition,
         next.completion_check,
+        next.parent_status,
+        JSON.stringify(next.child_statuses),
         id
       );
 
@@ -415,7 +434,8 @@ export class OvermindService {
       ...row,
       child_sessions: this.parseJsonArray<string>(row.child_sessions),
       tasks: this.parseJsonArray<OvermindTask>(row.tasks),
-      task_log: this.parseJsonArray<OvermindTaskLogEntry>(row.task_log)
+      task_log: this.parseJsonArray<OvermindTaskLogEntry>(row.task_log),
+      child_statuses: this.parseJsonArray<OvermindChildSessionStatus>(row.child_statuses)
     };
   }
 

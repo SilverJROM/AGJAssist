@@ -9,3 +9,5 @@
 [projcore callback] W4 PROPOSED Proposed W4 as split W4a archive table/service/route tests and W4b History tab/grouped UI/tests; waiting for APPROVED-PLAN.
 [projcore callback] W4a DONE Schema v17 archive, setTasks history insert, authenticated /api/overmind/history, and delete-survival tests are committed in 149d793.
 [projcore callback] W4b DONE Active/Completed/History tabs, grouped persistent History tab UI, helper test, and W4b gates are committed in bcc2433.
+
+- 2026-05-21 W6 implementer handshake: STATUS: PROPOSED requested; plan read pending; awaiting APPROVED-PLAN before code changes.
