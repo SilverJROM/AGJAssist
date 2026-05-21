@@ -254,14 +254,16 @@ describe("Overmind public helpers", () => {
   });
 
   it("maps workflow statuses to overmind color classes", () => {
-    expect(statusColor("working")).toBe("ovm-yellow");
-    expect(statusColor("waiting_human")).toBe("ovm-green");
-    expect(statusColor("awaiting_decision")).toBe("ovm-green");
+    expect(statusColor("working")).toBe("ovm-green");
+    expect(statusColor("idle")).toBe("ovm-yellow");
+    expect(statusColor("active")).toBe("ovm-yellow");
+    expect(statusColor("waiting_human")).toBe("ovm-blue");
+    expect(statusColor("awaiting_decision")).toBe("ovm-blue");
     expect(statusColor("stuck")).toBe("ovm-red");
     expect(statusColor("failed")).toBe("ovm-red");
     expect(statusColor("completed")).toBe("ovm-grey");
     expect(statusColor("paused")).toBe("ovm-grey");
-    expect(statusColor("active")).toBe("ovm-neutral");
+    expect(statusColor("closed")).toBe("ovm-grey");
     expect(statusColor("unknown")).toBe("ovm-neutral");
   });
 

@@ -13,3 +13,5 @@
 - 2026-05-21 W6 implementer handshake: STATUS: PROPOSED requested; plan read pending; awaiting APPROVED-PLAN before code changes.
 
 [projcore callback] W6 DONE Per-session parent_status + child_statuses persisted in schema v19; targeted W6 tests, npx tsc, and npm run build passed; commit 3ed3da6. Full npm test only failed unrelated missing Ollama model qwek32k:latest.
+[projcore callback] W7 PROPOSED Read W7 brief, WU7 requirements, current overmind card/helper/CSS/tests; proposing UI-only card restructure and color remap.
+[projcore callback] W7 DONE UI card restructured, unified colors applied, inline card history removed, tests/tsc/build passed, W7 artifacts written.

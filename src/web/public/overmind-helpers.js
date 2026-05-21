@@ -16,13 +16,15 @@ export const OVERMIND_TASK_GLYPHS = {
 };
 
 export const OVERMIND_STATUS_COLORS = {
-  active: 'ovm-neutral',
-  working: 'ovm-yellow',
+  active: 'ovm-yellow',
+  idle: 'ovm-yellow',
+  working: 'ovm-green',
   stuck: 'ovm-red',
-  waiting_human: 'ovm-green',
-  awaiting_decision: 'ovm-green',
+  waiting_human: 'ovm-blue',
+  awaiting_decision: 'ovm-blue',
   paused: 'ovm-grey',
   completed: 'ovm-grey',
+  closed: 'ovm-grey',
   failed: 'ovm-red'
 };
 

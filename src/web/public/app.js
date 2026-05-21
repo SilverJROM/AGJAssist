@@ -10,7 +10,6 @@ import {
   countDoneTasks,
   currentElapsedMs,
   formatElapsed,
-  formatActiveSessionAttribution,
   formatStuckDuration,
   getBottomNavTabs,
   groupOvermindHistoryByWorkflow,
@@ -258,6 +257,36 @@ function sleep(ms) {
 
 function workflowDisplayName(workflow) {
   return workflow.display_name || workflow.label;
+}
+
+function currentWorkflowTask(tasks, currentTask) {
+  const rows = Array.isArray(tasks) ? tasks : [];
+  const processingTask = rows.find(task => task?.state === 'processing');
+  if (processingTask) {
+    return {
+      id: processingTask.id || rows.indexOf(processingTask) + 1,
+      description: processingTask.label || currentTask || '—'
+    };
+  }
+
+  const matchedTask = currentTask
+    ? rows.find(task => task?.id === currentTask || task?.label === currentTask || (task?.id && currentTask.includes(task.id)))
+    : null;
+  return {
+    id: matchedTask?.id || (matchedTask ? rows.indexOf(matchedTask) + 1 : '—'),
+    description: matchedTask?.label || currentTask || '—'
+  };
+}
+
+function childSessionStatus(workflow, session) {
+  const childStatuses = Array.isArray(workflow.child_statuses) ? workflow.child_statuses : [];
+  return childStatuses.find(child => child?.session === session)?.status || null;
+}
+
+function renderOvermindStatusValue(status, fallback = '—') {
+  const label = status || fallback;
+  const colorClass = status ? statusColor(status) : 'ovm-neutral';
+  return html`<span class=${'overmind-session-status ' + colorClass}>${label}</span>`;
 }
 
 // Auth
@@ -707,31 +736,34 @@ function OvermindWorkflows() {
         <div class="item-list overmind-list">
           ${visibleWorkflows.map(workflow => {
             const tasks = Array.isArray(workflow.tasks) ? workflow.tasks : [];
-            const taskLog = Array.isArray(workflow.task_log) ? workflow.task_log : [];
             const doneCount = countDoneTasks(tasks);
             const childSessions = Array.isArray(workflow.child_sessions) ? workflow.child_sessions : [];
+            const firstChildSession = childSessions[0] || null;
+            const extraChildSessions = childSessions.slice(1);
+            const extraChildStatuses = extraChildSessions.map(session => ({
+              session,
+              status: childSessionStatus(workflow, session)
+            }));
             const colorClass = statusColor(workflow.status);
             const isExpanded = !!expandedWorkflows[workflow.id];
             const runStartedAt = workflow.run_started_at || workflow.created_at;
             const currentElapsed = formatElapsed(currentElapsedMs(runStartedAt, workflow.ended_at, now));
             const totalElapsed = formatElapsed(totalElapsedMs(workflow.accumulated_ms, runStartedAt, workflow.ended_at, now));
-            const activeSession = formatActiveSessionAttribution(workflow);
             const displayName = workflowDisplayName(workflow);
+            const currentTask = currentWorkflowTask(tasks, workflow.current_task);
+            const parentStatus = workflow.parent_status || workflow.status;
+            const firstChildStatus = firstChildSession ? childSessionStatus(workflow, firstChildSession) : null;
             return html`
               <section class=${'item-card overmind-card ' + colorClass} key=${workflow.id}>
                 <div class="overmind-card-header">
                   <button
                     type="button"
-                    class="overmind-card-toggle"
+                    class="overmind-card-toggle overmind-title-toggle"
                     aria-expanded=${isExpanded}
                     onclick=${() => toggleWorkflow(workflow.id)}
                   >
                     <div class="overmind-title">
-                      <span class="overmind-chevron" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
-                      <div>
-                        <h3>${displayName}</h3>
-                        <div class="overmind-current">${workflow.current_task || '—'}</div>
-                      </div>
+                      <h3>${displayName}</h3>
                     </div>
                   </button>
                   <div class="overmind-status">
@@ -742,9 +774,21 @@ function OvermindWorkflows() {
                       aria-label=${'Rename workflow ' + displayName}
                       onclick=${() => renameWorkflow(workflow)}
                     >✎</button>
-                    <span class=${'overmind-status-icon ' + colorClass}>${statusIcon(workflow.status)}</span>
-                    <span class=${'badge overmind-status-badge ' + colorClass}>${workflow.status}</span>
+                    <button
+                      type="button"
+                      class="overmind-chevron-button"
+                      aria-label=${isExpanded ? 'Collapse workflow ' + displayName : 'Expand workflow ' + displayName}
+                      aria-expanded=${isExpanded}
+                      onclick=${() => toggleWorkflow(workflow.id)}
+                    >
+                      <span class="overmind-chevron" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
+                    </button>
+                    <span class=${'badge overmind-status-badge ' + colorClass}>${statusIcon(workflow.status)} ${workflow.status}</span>
                   </div>
+                </div>
+                <div class="overmind-substatus">
+                  <div><strong>task#${currentTask.id}:</strong> ${workflow.current_task || '—'}</div>
+                  <div>${currentTask.description}</div>
                 </div>
 
                 ${isExpanded && html`
@@ -759,16 +803,32 @@ function OvermindWorkflows() {
                     <table class="overmind-detail-table">
                       <tbody>
                         <tr>
-                          <th scope="row">Coordinator</th>
+                          <th scope="row">parent</th>
                           <td>${workflow.coordinator_session || '—'}</td>
-                          <th scope="row">Children</th>
-                          <td>${childSessions.length ? childSessions.join(', ') : '—'}</td>
+                          <th scope="row">child</th>
+                          <td>
+                            ${firstChildSession || 'n/a'}
+                            ${extraChildSessions.length > 0 && html`<div class="overmind-extra-children">${extraChildSessions.join(', ')}</div>`}
+                          </td>
                         </tr>
                         <tr>
-                          <th scope="row">Active</th>
-                          <td>${activeSession}</td>
-                          <th scope="row">Tier</th>
-                          <td>${workflow.tier ?? 0}</td>
+                          <th scope="row">status</th>
+                          <td>${renderOvermindStatusValue(parentStatus)}</td>
+                          <th scope="row">status</th>
+                          <td>
+                            ${firstChildSession
+                              ? renderOvermindStatusValue(firstChildStatus, '—')
+                              : html`<span class="overmind-session-status ovm-neutral">n/a</span>`}
+                            ${extraChildSessions.length > 0 && html`
+                              <div class="overmind-extra-children">
+                                ${extraChildStatuses.map(child => html`
+                                  <span class=${'overmind-session-status overmind-extra-child-status ' + statusColor(child.status)} key=${child.session}>
+                                    ${child.session}: ${child.status || '—'}
+                                  </span>
+                                `)}
+                              </div>
+                            `}
+                          </td>
                         </tr>
                         <tr>
                           <th scope="row">Elapsed</th>
@@ -777,10 +837,10 @@ function OvermindWorkflows() {
                           <td>${totalElapsed}</td>
                         </tr>
                         <tr>
+                          <th scope="row">Tier</th>
+                          <td>${workflow.tier ?? 0}</td>
                           <th scope="row">Stuck</th>
                           <td>${workflow.stuck_since ? formatStuckDuration(workflow.stuck_since, now) : '—'}</td>
-                          <th></th>
-                          <td></td>
                         </tr>
                       </tbody>
                     </table>
@@ -795,23 +855,6 @@ function OvermindWorkflows() {
                             <div class=${'overmind-task overmind-task-' + task.state} key=${task.id || task.label}>
                               <span class="overmind-task-glyph">${taskGlyph(task.state)}</span>
                               <span>${task.label}</span>
-                            </div>
-                          `)}
-                        </div>
-                      `}
-                    </details>
-
-                    <details class="overmind-history" open=${taskLog.length > 0 && taskLog.length <= 6}>
-                      <summary>History</summary>
-                      ${taskLog.length === 0 ? html`
-                        <div class="overmind-history-empty">No task history yet.</div>
-                      ` : html`
-                        <div class="overmind-history-list">
-                          ${[...taskLog].reverse().map(entry => html`
-                            <div class="overmind-history-entry" key=${entry.at + '-' + entry.done + '-' + entry.total}>
-                              <time>${entry.at ? new Date(entry.at).toLocaleString() : '—'}</time>
-                              <span>${entry.current_task || '—'}</span>
-                              <strong>${entry.done ?? 0}/${entry.total ?? 0}</strong>
                             </div>
                           `)}
                         </div>

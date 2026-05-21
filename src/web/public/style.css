@@ -449,6 +449,11 @@ body {
   --ovm-bg: rgba(63,185,80,0.15);
   --ovm-border: rgba(63,185,80,0.32);
 }
+.ovm-blue {
+  --ovm-accent: #58a6ff;
+  --ovm-bg: rgba(88,166,255,0.13);
+  --ovm-border: rgba(88,166,255,0.32);
+}
 .ovm-red {
   --ovm-accent: #f85149;
   --ovm-bg: rgba(248,81,73,0.14);
@@ -488,6 +493,9 @@ body {
   gap: 8px;
   min-width: 0;
 }
+.overmind-title-toggle {
+  align-self: center;
+}
 .overmind-title > div {
   min-width: 0;
 }
@@ -496,18 +504,30 @@ body {
   flex: 0 0 14px;
   font-size: 13px;
   line-height: 1.35;
-  margin-top: 1px;
 }
 .overmind-card h3 {
   font-size: 15px;
   line-height: 1.3;
-  margin: 0 0 4px;
+  margin: 0;
   overflow-wrap: anywhere;
 }
 .overmind-current {
   color: var(--text-secondary);
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+.overmind-substatus {
+  color: var(--text-secondary);
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.overmind-substatus strong {
+  color: var(--text);
+  font-weight: 600;
 }
 .overmind-status {
   display: flex;
@@ -530,6 +550,24 @@ body {
   border-color: var(--ovm-border, var(--border));
   color: var(--text);
   background: var(--ovm-bg, transparent);
+}
+.overmind-chevron-button {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--ovm-accent, var(--text-secondary));
+  cursor: pointer;
+  display: inline-flex;
+  height: 26px;
+  justify-content: center;
+  padding: 0;
+  width: 26px;
+}
+.overmind-chevron-button:hover {
+  background: var(--ovm-bg, transparent);
+  border-color: var(--ovm-border, var(--border));
 }
 .overmind-status-icon {
   display: inline-flex;
@@ -590,6 +628,29 @@ body {
   color: var(--text);
   font-weight: 600;
 }
+.overmind-session-status {
+  color: var(--ovm-accent, var(--text-secondary));
+  font-weight: 700;
+}
+.overmind-session-status::before {
+  content: "●";
+  font-size: 8px;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+.overmind-extra-children {
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+.overmind-extra-child-status {
+  display: inline-flex;
+  align-items: center;
+}
 .overmind-detail-table th + td {
   border-right: 1px solid var(--border);
 }
@@ -603,6 +664,12 @@ body {
   .overmind-detail-table td {
     padding: 6px 6px;
     font-size: 11px;
+  }
+  .overmind-status {
+    gap: 6px;
+  }
+  .overmind-status-badge {
+    padding-inline: 6px;
   }
 }
 .overmind-decision {
