@@ -8,6 +8,7 @@ import { AppConfig } from "../src/config/config.js";
 import { registerOvermindRoutes } from "../src/api/routes/overmind-routes.js";
 import { OvermindService } from "../src/services/overmind-service.js";
 import {
+  ALL_DONE_CONFIRM_NUDGE,
   CANNED_NUDGE,
   OvermindWatcher,
   hashPane
@@ -136,6 +137,38 @@ describe("Overmind watcher nudge ladder", () => {
     expect(updated?.tier).toBe(2);
     expect(tmux.sendCommand).toHaveBeenCalledTimes(2);
     expect(tmux.sendCommand.mock.calls.every((call) => call[0] === "coord-1")).toBe(true);
+  });
+
+  it("fail-safe: when all tasks are done but completion was never reported, nudges the coordinator once and flips off 'working'", async () => {
+    const workflow = service.register({
+      label: "lkvc",
+      coordinator_session: "coord-done",
+      child_sessions: ["child-done"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.setTasks(workflow.id, "all batches done — idle", [
+      { id: "b1", label: "B1", state: "done" },
+      { id: "b2", label: "B2", state: "done" }
+    ]);
+
+    // Pane keeps churning (idle recap chatter) — would normally pin status to "working".
+    const tmux = makeTmuxMock({
+      "coord-done": "✻ Cooked for 2m · recap: queue empty",
+      "child-done": "child idle"
+    });
+    const watcher = new OvermindWatcher(service, tmux);
+
+    await watcher.tick();
+    let updated = service.get(workflow.id);
+    expect(updated?.status).toBe("waiting_human");
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+    expect(tmux.sendCommand).toHaveBeenLastCalledWith("coord-done", ALL_DONE_CONFIRM_NUDGE, true, true);
+
+    // Subsequent ticks must NOT re-nudge (once per transition) and stay off "working".
+    await watcher.tick();
+    updated = service.get(workflow.id);
+    expect(updated?.status).toBe("waiting_human");
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
   });
 
   it("resets nudge count and tier when the workflow returns to working", async () => {

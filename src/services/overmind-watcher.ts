@@ -27,6 +27,8 @@ export const PRIOR_DECISION_FILE_CHAR_LIMIT = 1000;
 export const PRIOR_DECISION_MAX_FILES = 5;
 export const CANNED_NUDGE =
   "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS.";
+export const ALL_DONE_CONFIRM_NUDGE =
+  "Overmind: every task on your list is marked done but you haven't reported completion. If the run is finished, POST /api/overmind/complete (projcore §2.11) NOW — even if you're keeping the session alive for field-testing. If work remains, update your tasklist with the open items.";
 export const FRONTLOAD_CORRECTION_NOTE =
   "Overmind: that decision should have been frontloaded at intake (projcore §1.4a) — please put such decisions in the north-star next time.";
 
@@ -73,6 +75,10 @@ interface NudgeLadderFields {
 
 export function hashPane(pane: string): string {
   return createHash("sha256").update(pane).digest("hex");
+}
+
+export function allTasksComplete(tasks: { state: string }[]): boolean {
+  return tasks.length > 0 && tasks.every((task) => task.state === "done");
 }
 
 export function determineActiveSessionAttribution(input: {
@@ -205,6 +211,24 @@ export class OvermindWatcher {
       childPanes
     });
 
+    // Fail-safe (zero-token, deterministic): all tasks are done but the coordinator
+    // never reported completion (e.g. parked the session alive for a field test).
+    // Ask projcore once to confirm + call /complete, and stop showing "working".
+    if (allTasksComplete(workflow.tasks)) {
+      await this.confirmAllTasksDone(workflow);
+      this.overmindService.update(workflow.id, {
+        status: "waiting_human",
+        pending_decision: null,
+        last_pane_hash: result.coordinatorHash,
+        stuck_since: null,
+        nudge_count: 0,
+        tier: 0,
+        active_session: activeAttribution.active_session,
+        active_role: activeAttribution.active_role
+      });
+      return;
+    }
+
     const nudgeFields = result.status === "awaiting_decision"
       ? await this.applyDecisionInterception(workflow, result.pendingDecision)
       : await this.applyNudgeLadder(workflow, result.status, coordinatorPane);
@@ -221,6 +245,22 @@ export class OvermindWatcher {
       ...nudgeFields,
       ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
     });
+  }
+
+  private async confirmAllTasksDone(workflow: OvermindWorkflow): Promise<void> {
+    // Only nudge on the transition into the all-done state — once we've flipped the
+    // row to waiting_human, subsequent ticks skip the nudge (no repeat every 45s).
+    if (workflow.status === "waiting_human") return;
+    try {
+      await this.tmuxService.sendCommand(
+        workflow.coordinator_session,
+        ALL_DONE_CONFIRM_NUDGE,
+        true,
+        true
+      );
+    } catch (error) {
+      console.error("Overmind all-done confirmation nudge failed:", error);
+    }
   }
 
   private async applyNudgeLadder(
