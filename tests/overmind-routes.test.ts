@@ -73,6 +73,26 @@ function lifecyclePost(url: string, body: Record<string, unknown>) {
   });
 }
 
+function lifecycleDelete(url: string, body: Record<string, unknown>) {
+  return app.inject({
+    method: "DELETE",
+    url,
+    remoteAddress: "127.0.0.1",
+    payload: body
+  });
+}
+
+function lifecycleDeleteWithTokenHeader(url: string) {
+  return app.inject({
+    method: "DELETE",
+    url,
+    remoteAddress: "127.0.0.1",
+    headers: {
+      "x-overmind-token": OVERMIND_TOKEN
+    }
+  });
+}
+
 let app: FastifyInstance;
 let db: DatabaseService;
 let authService: AuthService;
@@ -200,6 +220,75 @@ describe("Overmind routes", () => {
     expect(missing.statusCode).toBe(404);
   });
 
+  it("pauses, resumes, and drops workflows from localhost with the shared token", async () => {
+    const registered = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "operator controls",
+      session: "ovm-controls-parent",
+      run_dir: "/tmp/ovm-controls"
+    });
+    const workflowId = registered.json().workflow.id;
+
+    const paused = await lifecyclePost(`/api/overmind/workflows/${workflowId}/pause`, {
+      token: OVERMIND_TOKEN
+    });
+    expect(paused.statusCode).toBe(200);
+    expect(paused.json().workflow.status).toBe("paused");
+    expect(overmindService.get(workflowId)?.status).toBe("paused");
+
+    const resumed = await lifecyclePost(`/api/overmind/workflows/${workflowId}/resume`, {
+      token: OVERMIND_TOKEN
+    });
+    expect(resumed.statusCode).toBe(200);
+    expect(resumed.json().workflow.status).toBe("active");
+    expect(overmindService.get(workflowId)?.status).toBe("active");
+
+    const dropped = await lifecycleDeleteWithTokenHeader(`/api/overmind/workflows/${workflowId}`);
+    expect(dropped.statusCode).toBe(200);
+    expect(dropped.json()).toEqual({ ok: true });
+    expect(overmindService.get(workflowId)).toBeNull();
+  });
+
+  it("rejects operator control requests with missing or invalid token", async () => {
+    const registered = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "guarded controls",
+      session: "guarded-controls-parent",
+      run_dir: "/tmp/guarded-controls"
+    });
+    const workflowId = registered.json().workflow.id;
+
+    const pauseMissingToken = await lifecyclePost(`/api/overmind/workflows/${workflowId}/pause`, {});
+    expect(pauseMissingToken.statusCode).toBe(401);
+
+    const resumeBadToken = await lifecyclePost(`/api/overmind/workflows/${workflowId}/resume`, {
+      token: "wrong"
+    });
+    expect(resumeBadToken.statusCode).toBe(401);
+
+    const dropMissingToken = await lifecycleDelete(`/api/overmind/workflows/${workflowId}`, {});
+    expect(dropMissingToken.statusCode).toBe(401);
+
+    expect(overmindService.get(workflowId)?.status).toBe("active");
+  });
+
+  it("returns 404 for operator control requests against unknown workflows", async () => {
+    const pause = await lifecyclePost("/api/overmind/workflows/999/pause", {
+      token: OVERMIND_TOKEN
+    });
+    expect(pause.statusCode).toBe(404);
+
+    const resume = await lifecyclePost("/api/overmind/workflows/999/resume", {
+      token: OVERMIND_TOKEN
+    });
+    expect(resume.statusCode).toBe(404);
+
+    const drop = await lifecycleDelete("/api/overmind/workflows/999", {
+      token: OVERMIND_TOKEN
+    });
+    expect(drop.statusCode).toBe(404);
+  });
+
   it("requires JWT auth for workflow reads and returns registered rows", async () => {
     await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
@@ -277,7 +366,11 @@ describe("Overmind routes", () => {
       total: 1
     });
 
-    expect(overmindService.delete(workflowId)).toBe(true);
+    const drop = await lifecycleDelete(`/api/overmind/workflows/${workflowId}`, {
+      token: OVERMIND_TOKEN
+    });
+    expect(drop.statusCode).toBe(200);
+    expect(drop.json()).toEqual({ ok: true });
 
     const afterDrop = await app.inject({
       method: "GET",

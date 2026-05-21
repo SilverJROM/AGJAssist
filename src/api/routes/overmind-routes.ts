@@ -34,6 +34,10 @@ interface TasksBody extends TokenBody {
   tasks?: OvermindTask[];
 }
 
+interface WorkflowParams {
+  id: string;
+}
+
 interface RenameParams {
   id: string;
 }
@@ -61,12 +65,19 @@ function requireLoopbackAndToken(
     return false;
   }
 
-  if (!request.body?.token || request.body.token !== expectedToken) {
+  const headerToken = request.headers["x-overmind-token"];
+  const token = request.body?.token || (Array.isArray(headerToken) ? headerToken[0] : headerToken);
+  if (!token || token !== expectedToken) {
     reply.code(401).send({ error: "Missing or invalid overmind token" });
     return false;
   }
 
   return true;
+}
+
+function parseWorkflowId(id: string): number | null {
+  const workflowId = Number(id);
+  return Number.isInteger(workflowId) && workflowId >= 1 ? workflowId : null;
 }
 
 export function registerOvermindRoutes(
@@ -166,6 +177,65 @@ export function registerOvermindRoutes(
     { preHandler: authMiddleware },
     async () => {
       return { history: overmindService.listHistory() };
+    }
+  );
+
+  app.post<{ Params: WorkflowParams; Body: TokenBody }>(
+    "/api/overmind/workflows/:id/pause",
+    async (request, reply) => {
+      if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
+
+      const id = parseWorkflowId(request.params.id);
+      if (id === null) {
+        return reply.code(400).send({ error: "Invalid workflow id" });
+      }
+
+      const workflow = overmindService.setStatus(id, "paused");
+      if (!workflow) {
+        return reply.code(404).send({ error: "Workflow not found" });
+      }
+
+      streamManager?.broadcast();
+      return { workflow };
+    }
+  );
+
+  app.post<{ Params: WorkflowParams; Body: TokenBody }>(
+    "/api/overmind/workflows/:id/resume",
+    async (request, reply) => {
+      if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
+
+      const id = parseWorkflowId(request.params.id);
+      if (id === null) {
+        return reply.code(400).send({ error: "Invalid workflow id" });
+      }
+
+      const workflow = overmindService.setStatus(id, "active");
+      if (!workflow) {
+        return reply.code(404).send({ error: "Workflow not found" });
+      }
+
+      streamManager?.broadcast();
+      return { workflow };
+    }
+  );
+
+  app.delete<{ Params: WorkflowParams; Body: TokenBody }>(
+    "/api/overmind/workflows/:id",
+    async (request, reply) => {
+      if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
+
+      const id = parseWorkflowId(request.params.id);
+      if (id === null) {
+        return reply.code(400).send({ error: "Invalid workflow id" });
+      }
+
+      if (!overmindService.delete(id)) {
+        return reply.code(404).send({ error: "Workflow not found" });
+      }
+
+      streamManager?.broadcast();
+      return { ok: true };
     }
   );
 
