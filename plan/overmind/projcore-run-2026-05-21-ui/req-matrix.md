@@ -10,7 +10,7 @@
 | RU6 | Customizable bottom nav (reorder/delete/add, localStorage) | V4b | 6/6 nav helper tests | VERIFIED |
 | RU7 | Verify/harden projcore auto-register | V5 | hris-d self-registered live; §2.11 hardened | VERIFIED |
 
-| RU8 | Elapsed-time stat (frozen on all-tasks-done) | V6 | — | UNASSIGNED |
-| RU9 | Task history log (review past tasks) | V6 | — | UNASSIGNED |
+| RU8 | Elapsed-time stat (frozen on all-tasks-done) | V6 | live: stamp on all-done, clear on resume | VERIFIED |
+| RU9 | Task history log (review past tasks) | V6 | task_log append/no-op/cap tested | VERIFIED |
 
 Final acceptance: every row VERIFIED.

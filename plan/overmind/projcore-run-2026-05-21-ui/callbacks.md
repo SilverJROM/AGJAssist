@@ -9,3 +9,4 @@
 [projcore callback] V4b DONE Customizable localStorage bottom nav implemented with move buttons, remove guard, add picker including Workflows, reset default, targeted helper test, npx tsc, and npm run build passed; commit 9fc5942.
 [projcore callback] V6 PROPOSED Plan proposed after reading V6 brief, v12 migration pattern, OvermindService setTasks/setStatus, Overmind expanded card UI, helpers, and targeted tests; awaiting APPROVED-PLAN before code.
 [projcore callback] V6 DONE Schema v13, ended_at freeze/resume, task_log append/no-op/cap, elapsed UI/history, artifacts, targeted tests, npx tsc, and npm run build complete.
+[projcore callback] V6 DONE Correction iter 1 applied: register now computes ended_at for already-all-done tasklists via shared helper; register pending path remains null; targeted service tests, npx tsc, and npm run build passed.
