@@ -1,20 +1,16 @@
-## Accepted: A1, A2, A3 — all PASS
+## Accepted: A1, A2, A3, A4 — all PASS (A4 needed iter1: tmux bare-session fix)
 Branch: feat/overmind (no master merge until JROM review).
 Implemented:
-- A1: schema v11 + OvermindService CRUD.
-- A2: HTTP endpoints (register/complete/tasks token-guarded, GET workflows JWT) + service threaded in index.ts/server.ts. Live-verified.
-- A3: src/services/overmind-watcher.ts — pure `classifyWorkflow(input)` (working|stuck|waiting_human|awaiting_decision) + `OvermindWatcher` class with `tick()` (capturePane coordinator+children → classify → overmindService.update) and `start()/stop()` (POLL_MS=45000). NOT started yet. Consts: STUCK_THRESHOLD_MS=90000.
-Req#s: R1,R2,R3,R5 VERIFIED. R14 IN-PROGRESS (endpoint done). R4,R15 IN-PROGRESS (loop+decision built, not live).
-Open: R6,R7,R8,R9,R10,R11,R12,R13,R16.
+- A1 schema+CRUD; A2 endpoints (token-guarded register/complete/tasks + JWT GET workflows); A3 watcher classifier (pure); A4 Telegram commands (/overmind,/om_tasks,/om_pause,/om_resume,/om_drop) + watcher started live in index.ts.
+- A4 iter1: `tmuxService.ensureValidTarget` now accepts BARE session names (e.g. hris-d-22) in addition to session:window.pane. Verified live: watcher reads real pane content + classifies.
+Req#s VERIFIED: R1,R2,R3,R4,R5,R9. IN-PROGRESS: R14 (UI display pending). R15 (decision-detect built; answering=A6). Open: R6,R7,R8,R10,R11,R12,R13,R16.
 
-## Next: Batch-A4 — Telegram commands + START the watcher loop
-Key facts for A4:
-- OvermindWatcher exists (src/services/overmind-watcher.ts) with start()/stop(). A4 instantiates it in index.ts (needs OvermindService + TmuxService — both already constructed in index.ts; check how tmuxService is built there) and calls start() so the 45s loop runs live. This makes R4 observable.
-- Telegram: src/bot/telegram-bot.ts `setMyCommands([...])` array; src/bot/assistant-core.ts `handleCommand(input)` switch. Add commands:
-  - /overmind → pure DB read: one line per workflow: `<label> <statusIcon> <status> · "<current_task>" · <doneCount>/<totalCount>`. (doneCount = tasks where state=done.)
-  - /om_tasks <id> → full tasklist: each task `[x] done / [~] processing / [ ] pending`.
-  - /om_pause <id> → setStatus(id,'paused'); /om_resume <id> → setStatus(id,'active'); /om_drop <id> → delete(id).
-  - assistant-core needs access to OvermindService — see how it gets other services (constructor/setters). Thread OvermindService in like the chat services (`setChatServices` pattern) or constructor.
-- NO nudging, NO LLM, NO UI panel in A4. (Nudge=A5, brain=A6, UI=A7.)
-- The watcher's start() must be safe even with zero registered workflows (loop over empty list = no-op). And paused/completed workflows are skipped.
-- After A4, projcore will live-smoke: register a throwaway workflow pointing at a REAL tmux session (e.g. ovm-build itself) and confirm the loop classifies it (status flips to working while codex runs) + /overmind shows it.
+## Next: Batch-A5 — Nudge ladder Tier 1-2 (coordinator-ONLY) + DONE/BLOCKED Telegram push
+Key facts:
+- NS-3 HARD RULE: nudges go ONLY to the coordinator_session, NEVER a child session. The watcher already separates coordinator vs child_sessions.
+- Nudge mechanism: `tmuxService.sendCommand(coordinator_session, "<msg>", true, true)` — pressEnter=true, skipSafetyCheck=true (canned overmind nudge). sendCommand now accepts bare session names (A4 fix). It does send-keys -l + C-m.
+- Tier ladder on status==='stuck': use the existing `nudge_count`/`tier` columns. Tier 1 → first canned nudge (e.g. "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS."); increment nudge_count; record on the row. Tier 2 → repeat (max ~2 canned nudges) with backoff across ticks. Busy markers / hash change reset nudge_count+tier+stuck (handled in classifier path — ensure a working transition clears them). Do NOT escalate to Sonnet yet (that's A6 Tier 3) — but leave a clear hook where Tier 3 will plug in.
+- DONE/BLOCKED Telegram push (R8): when a workflow becomes 'completed' (set by /complete endpoint) → push a DONE message; when it hits a real BLOCKED/escalation condition → push BLOCKED. Use the bot's sendMessage. Per NOTIFICATION_PROTOCOL: ONLY DONE/BLOCKED, verdict-led, no progress chatter. The bot instance / chat id: see how telegram-bot.ts sends (AUTHORIZED_USER_ID from .env is the chat id). Thread a notifier into the watcher (a callback or the bot's sendMessage) — keep it decoupled (e.g. OvermindWatcher takes an optional `notify(text)` fn).
+- NOTE the live environment: the TG bot has chronic polling EFATAL (network) — sendMessage may also fail intermittently; make the push best-effort (try/catch, log on failure), do not crash the loop.
+- LIVE SMOKE REQUIRED (per decision 2026-05-21-...-live-smoke): after impl, projcore will register a throwaway at a real IDLE session, force/await stuck, and confirm exactly ONE nudge per tier lands in the COORDINATOR pane (and NEVER in a child). So make tiers observable (nudge_count/tier on the row).
+- Constants: define NUDGE thresholds/max tier as named consts.
