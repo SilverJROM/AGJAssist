@@ -9,3 +9,5 @@
 [projcore callback] O3 PROPOSED Plan ready for OVM dashboard tab UI reusing existing OVM endpoints and tmux WS input/output; awaiting APPROVED-PLAN before implementation.
 [projcore callback] O7 PROPOSED Plan ready to normalize pane output before activity hashing for coordinator and child change detection; awaiting APPROVED-PLAN before implementation.
 [projcore callback] O7 DONE normalizePaneForActivity now strips timer/spinner/chrome noise before activity hashing; HRIS timer-only child delta regresses to stuck; classifier/nudge/brain/decision/stream tests, tsc, and build passed.
+[projcore callback] O8 PROPOSED Plan ready for deterministic body-hash plus active-turn idle detection; awaiting APPROVED-PLAN before implementation.
+[projcore callback] O8 DONE Implemented extractBody/body hashing plus esc-to-interrupt active-turn detection; focused tests, non-live suite, npx tsc, and npm run build passed.

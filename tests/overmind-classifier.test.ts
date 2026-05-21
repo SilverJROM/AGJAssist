@@ -4,30 +4,50 @@ import {
   classifyParentSession,
   classifyWorkflow,
   determineActiveSessionAttribution,
+  extractBody,
   hashPane,
-  normalizePaneForActivity
+  hasActiveTurn
 } from "../src/services/overmind-watcher.js";
 
 const NOW = "2026-05-21T12:00:00.000Z";
 
-describe("normalizePaneForActivity", () => {
-  it("normalizes HRIS child timer and spinner-only deltas identically", () => {
-    const first = "◦ Waiting for background terminal (11m 13s • esc to interrupt) · 2 background terminals running · /ps to view";
-    const second = "• Waiting for background terminal (11m 16s • esc to interrupt) · 2 background terminals running · /ps to view";
+describe("extractBody", () => {
+  it("strips chrome-only monitor and timer drift from the activity body", () => {
+    const first = [
+      "Coordinator output",
+      "────────────",
+      "◦ Waiting for background terminal (11m 13s) · 3 monitors · /ps to view",
+      "› Type a message",
+      "gpt-5.3-codex · ~/TGBOTS/AGJAssist"
+    ].join("\n");
+    const second = [
+      "Coordinator output",
+      "────────────",
+      "• Waiting for background terminal (11m 16s) · 5 monitors · /ps to view",
+      "› Type a message",
+      "gpt-5.3-codex · ~/TGBOTS/AGJAssist"
+    ].join("\n");
 
-    expect(normalizePaneForActivity(first)).toBe(normalizePaneForActivity(second));
+    expect(extractBody(first)).toBe("Coordinator output");
+    expect(extractBody(second)).toBe("Coordinator output");
     expect(hashPane(first)).toBe(hashPane(second));
   });
 
-  it("keeps substantive pane content distinct after stripping activity chrome", () => {
-    const timerOnly = "◦ Waiting for background terminal (11m 13s • esc to interrupt) · 2 background terminals running · /ps to view";
+  it("keeps substantive pane body content distinct after stripping chrome", () => {
+    const timerOnly = "◦ Waiting for background terminal (11m 13s) · 2 background terminals running · /ps to view";
     const realOutput = [
       timerOnly,
       "Created migration file src/db/migrations/004_add_jobs.sql"
     ].join("\n");
 
-    expect(normalizePaneForActivity(realOutput)).not.toBe(normalizePaneForActivity(timerOnly));
+    expect(extractBody(timerOnly)).toBe("");
+    expect(extractBody(realOutput)).toBe("Created migration file src/db/migrations/004_add_jobs.sql");
     expect(hashPane(realOutput)).not.toBe(hashPane(timerOnly));
+  });
+
+  it("detects active turns independently from body changes", () => {
+    expect(hasActiveTurn("◦ Waiting for background terminal (11m 13s • esc to interrupt)")).toBe(true);
+    expect(hasActiveTurn("◦ Waiting for background terminal (11m 13s)")).toBe(false);
   });
 });
 
@@ -46,6 +66,27 @@ describe("classifyWorkflow", () => {
     expect(result.status).toBe("working");
     expect(result.stuckSince).toBeNull();
     expect(result.pendingDecision).toBeNull();
+    expect(result.lastActivityAt).toBe(NOW);
+  });
+
+  it("classifies an active-turn pane as working even when the body hash is unchanged", () => {
+    const coordinatorPane = [
+      "same quiet coordinator pane",
+      "◦ Waiting for background terminal (11m 13s • esc to interrupt) · 2 monitors · /ps to view"
+    ].join("\n");
+
+    const result = classifyWorkflow({
+      coordinatorPane,
+      childPanes: [],
+      childPaneHashChanged: false,
+      coordinatorHashPrev: hashPane(coordinatorPane),
+      mtimeAdvanced: false,
+      stuckSincePrev: "2026-05-21T11:58:29.000Z",
+      now: NOW
+    });
+
+    expect(result.status).toBe("working");
+    expect(result.stuckSince).toBeNull();
     expect(result.lastActivityAt).toBe(NOW);
   });
 
@@ -105,10 +146,10 @@ describe("classifyWorkflow", () => {
     expect(result.lastActivityAt).toBe(NOW);
   });
 
-  it("does not treat an HRIS child timer-only delta as working past the stuck threshold", () => {
+  it("does not treat child timer-only chrome drift as working past the stuck threshold", () => {
     const coordinatorPane = "same quiet coordinator pane";
-    const firstChildPane = "◦ Waiting for background terminal (11m 13s • esc to interrupt) · 2 background terminals running · /ps to view";
-    const secondChildPane = "• Waiting for background terminal (11m 16s • esc to interrupt) · 2 background terminals running · /ps to view";
+    const firstChildPane = "◦ Waiting for background terminal (11m 13s) · 3 monitors · /ps to view";
+    const secondChildPane = "• Waiting for background terminal (11m 16s) · 5 monitors · /ps to view";
 
     const result = classifyWorkflow({
       coordinatorPane,
@@ -316,10 +357,10 @@ describe("per-session classifiers", () => {
     expect(classifyChildSessionStatus({
       pane: "Thinking\nesc to interrupt",
       exists: true,
-      paneHashChanged: true
+      paneHashChanged: false
     })).toBe("working");
     expect(classifyChildSessionStatus({
-      pane: "Thinking\nesc to interrupt",
+      pane: "Thinking",
       exists: true,
       paneHashChanged: false
     })).toBe("idle");

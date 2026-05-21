@@ -203,7 +203,7 @@ describe("Overmind watcher stream callback", () => {
     expect(overmindService.update).toHaveBeenCalledOnce();
     expect(rows[0].parent_status).toBe("idle");
     expect(rows[0].child_statuses).toEqual([
-      { session: "child-working", status: "idle" },
+      { session: "child-working", status: "working" },
       { session: "child-closed", status: "closed" }
     ]);
     expect(rows[0].status).toBe("working");

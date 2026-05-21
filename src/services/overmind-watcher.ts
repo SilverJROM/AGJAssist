@@ -40,7 +40,6 @@ export const ALL_DONE_CONFIRM_NUDGE = DEFAULT_COMPLETION_CONSULT_TEXT;
 export const FRONTLOAD_CORRECTION_NOTE =
   "Overmind: that decision should have been frontloaded at intake (projcore §1.4a) — please put such decisions in the north-star next time.";
 
-const BUSY_MARKER_RE = /esc to interrupt|Working \(|Compacting|Thinking/i;
 const NUMBERED_OPTION_RE = /^\s*\d+\.\s+\S+/m;
 const DECISION_FOOTER_RE = /Enter to select|Tab\/Arrow keys to navigate|Type something|Chat about this/i;
 const HUMAN_WAIT_RE = /\bNEEDS-INFO\b|needs info|waiting for (human|user|input)|blocked on (human|user|input)|\bquestion\b|\bplease (confirm|choose|provide|advise)\b/i;
@@ -90,38 +89,44 @@ interface NudgeLadderFields {
 }
 
 export function hashPane(pane: string): string {
-  return createHash("sha256").update(normalizePaneForActivity(pane)).digest("hex");
+  return createHash("sha256").update(extractBody(pane)).digest("hex");
 }
 
-export function normalizePaneForActivity(text: string): string {
-  const spinnerGlyphs = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷";
-  const leadingSpinnerRe = new RegExp(`^\\s*[${spinnerGlyphs}]+\\s*`, "u");
-  const chromeLineRe = /bypass permissions|ctrl\+t to hide|(?:left|right|up|down|[←→↑↓])\s+to manage|[←→↑↓]\s+for agents|\/ps to view|\/stop|^\s*esc to interrupt\s*$|\b\d{1,2}:\d{2}:\d{2}\b/i;
+export function hasActiveTurn(pane: string): boolean {
+  return /esc to interrupt/i.test(pane);
+}
 
-  return text
+export function extractBody(pane: string): string {
+  const lines = pane
     .replace(/\r\n/g, "\n")
     .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
     .split("\n")
-    .map((line) => line.replace(leadingSpinnerRe, "").trim())
-    .filter((line) => line && !chromeLineRe.test(line))
-    .map((line) => line
-      .replace(/[([{]\s*(?=\d+\s*[hms]\b)/gi, " ")
-      .replace(/\b\d+\s*h\b|\b\d+\s*m\b|\b\d+\s*s\b/gi, " ")
-      .replace(/[•·]\s*(?=(?:esc to interrupt|\/ps to view)\b)/gi, " ")
-      .replace(/\besc to interrupt\b/gi, " ")
-      .replace(/\b\d+\s+background terminals? running\b/gi, "background terminal running")
-      .replace(/\b\d+\s+shells?\b/gi, "shells")
-      .replace(/\b\d+\s+monitors?\b/gi, "monitors")
-      .replace(/↑\s*\d+\s+tokens?\b/gi, "tokens")
-      .replace(/\b\d+\s+tokens?\b/gi, "tokens")
-      .replace(/[()[\]{}]/g, " ")
-      .replace(/\s*[•·]\s*/g, " ")
-      .replace(/\s+/g, " ")
-      .trim())
-    .filter(Boolean)
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .filter((line) => !isPaneChromeLine(line));
+
+  while (lines.length > 0 && lines[lines.length - 1].trim() === "") {
+    lines.pop();
+  }
+
+  return lines.join("\n");
+}
+
+function isPaneChromeLine(line: string): boolean {
+  const trimmed = line.trim();
+  const spinnerGlyphs = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷";
+  const leadingSpinnerRe = new RegExp(`^\\s*[${spinnerGlyphs}]`, "u");
+  const statusChromeRe = /bypass permissions|ctrl\+t|to manage|for agents|\/ps to view|\/stop|\bshells?\b|\bmonitors?\b|\/model/i;
+  const modelFooterRe = /^\s*(gpt-5|sonnet|opus|haiku)\b/i;
+  const cwdFooterRe = /[·•]\s*~\/\S*\s*$/;
+  const turnChromeRe = /esc to interrupt|Working \(|Waiting for|Compacting|Thinking/i;
+
+  return trimmed === "" ? false
+    : /^[❯›]/u.test(trimmed)
+      || /^[─=]{3,}$/.test(trimmed)
+      || leadingSpinnerRe.test(line)
+      || statusChromeRe.test(line)
+      || modelFooterRe.test(line)
+      || cwdFooterRe.test(line)
+      || turnChromeRe.test(line);
 }
 
 export function allTasksComplete(tasks: { state: string }[]): boolean {
@@ -134,14 +139,14 @@ export function determineActiveSessionAttribution(input: {
   childSessions: string[];
   childPanes: string[];
 }): ActiveSessionAttribution {
-  if (BUSY_MARKER_RE.test(input.coordinatorPane)) {
+  if (hasActiveTurn(input.coordinatorPane)) {
     return {
       active_session: input.coordinatorSession,
       active_role: "parent"
     };
   }
 
-  const activeChildIndex = input.childPanes.findIndex((pane) => BUSY_MARKER_RE.test(pane));
+  const activeChildIndex = input.childPanes.findIndex((pane) => hasActiveTurn(pane));
   if (activeChildIndex >= 0) {
     return {
       active_session: input.childSessions[activeChildIndex] ?? null,
@@ -160,8 +165,9 @@ export function classifyWorkflow(input: ClassifyWorkflowInput): ClassifyResult {
   const coordinatorHashChanged =
     input.coordinatorHashPrev !== null && coordinatorHash !== input.coordinatorHashPrev;
   const childPaneHashChanged = input.childPaneHashChanged === true;
+  const activeTurn = hasActiveTurn(input.coordinatorPane) || input.childPanes.some((pane) => hasActiveTurn(pane));
 
-  if (coordinatorHashChanged || input.mtimeAdvanced || childPaneHashChanged) {
+  if (activeTurn || coordinatorHashChanged || input.mtimeAdvanced || childPaneHashChanged) {
     return {
       status: "working",
       coordinatorHash,
@@ -206,7 +212,7 @@ export function classifyParentSession(input: ClassifyParentSessionInput): Overmi
   const coordinatorHashChanged =
     input.coordinatorHashPrev !== null && coordinatorHash !== input.coordinatorHashPrev;
 
-  if (coordinatorHashChanged) {
+  if (hasActiveTurn(input.coordinatorPane) || coordinatorHashChanged) {
     return "working";
   }
 
@@ -231,7 +237,7 @@ export function classifyChildSessionStatus(input: {
   paneHashChanged?: boolean;
 }): OvermindChildSessionStatus["status"] {
   if (!input.exists) return "closed";
-  return input.paneHashChanged === true ? "working" : "idle";
+  return hasActiveTurn(input.pane) || input.paneHashChanged === true ? "working" : "idle";
 }
 
 export class OvermindWatcher {
