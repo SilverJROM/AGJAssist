@@ -48,6 +48,12 @@ function cleanupDb(): void {
 
 function makeRunDir(): string {
   const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "overmind-brain-"));
+  fs.mkdirSync(path.join(runDir, "decisions"));
+  fs.writeFileSync(
+    path.join(runDir, "decisions/quiet-coordinator.md"),
+    "JROM decision: if a quiet coordinator is only missing a callback check, nudge the coordinator first."
+  );
+  fs.writeFileSync(path.join(runDir, "north-star.md"), "Resolve quiet coordinator stalls before escalating.");
   fs.writeFileSync(
     path.join(runDir, "progress.md"),
     Array.from({ length: 90 }, (_, i) => `progress line ${i + 1}`).join("\n")
@@ -129,7 +135,8 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
       { "coord-1": QUIET_PANE, "child-1": CHILD_PANE },
       POST_BRAIN_NUDGE_PANE
     );
-    const watcher = new OvermindWatcher(service, tmux, undefined, brain);
+    const notify = vi.fn(async () => {});
+    const watcher = new OvermindWatcher(service, tmux, notify, brain);
 
     await watcher.tick();
     const updated = service.get(workflow.id);
@@ -139,6 +146,8 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     expect(brain.calls[0].coordinatorPaneTail.split("\n")[0]).toBe("quiet coordinator line 6");
     expect(brain.calls[0].progressTail).toContain("progress line 90");
     expect(brain.calls[0].callbacksTail).toContain("callback line 90");
+    expect(brain.calls[0].northStar).toContain("Resolve quiet coordinator stalls");
+    expect(brain.calls[0].priorDecisions).toContain("quiet coordinator");
     expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
     expect(tmux.sendCommand).toHaveBeenCalledWith(
       "coord-1",
@@ -151,6 +160,7 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     expect(updated?.nudge_count).toBe(2);
     expect(updated?.tier).toBe(3);
     expect(updated?.last_pane_hash).toBe(hashPane(POST_BRAIN_NUDGE_PANE));
+    expect(notify).not.toHaveBeenCalled();
 
     await watcher.tick();
     expect(brain.calls).toHaveLength(1);
@@ -170,12 +180,14 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     const updated = service.get(workflow.id);
 
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify).toHaveBeenCalledWith(
-      "BLOCKED · overmind · projcore A6a\nCoordinator is blocked on a human decision."
-    );
+    expect(notify.mock.calls[0][0]).toContain("🛑 BLOCKED · AGJAssist · overmind");
+    expect(notify.mock.calls[0][0]).toContain("⛔ projcore A6a is stopped and needs you.");
+    expect(notify.mock.calls[0][0]).toContain("Checked: workflow north-star.md, trust-defaults.md, and relevance-filtered prior decisions");
+    expect(notify.mock.calls[0][0]).toContain("Coordinator is blocked on a human decision.");
     expect(updated?.status).toBe("waiting_human");
     expect(updated?.stuck_since).toBeNull();
     expect(updated?.tier).toBe(3);
+    expect(updated?.last_notified_transition).toMatch(/^blocked:/);
     expect(tmux.sendCommand).not.toHaveBeenCalled();
 
     await watcher.tick();
@@ -213,14 +225,14 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     const updated = service.get(workflow.id);
 
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify.mock.calls[0][0]).toContain("BLOCKED · overmind · projcore A6a");
+    expect(notify.mock.calls[0][0]).toContain("🛑 BLOCKED · AGJAssist · overmind");
     expect(notify.mock.calls[0][0]).toContain("Tier-3 Sonnet brain failed");
     expect(updated?.status).toBe("waiting_human");
     expect(updated?.tier).toBe(3);
     expect(tmux.sendCommand).not.toHaveBeenCalled();
   });
 
-  it("does not nudge waiting_human or awaiting_decision workflows", async () => {
+  it("brain-gates waiting_human workflows and leaves awaiting_decision to decision interception", async () => {
     const waitingPane = "NEEDS-INFO: please confirm the next step.";
     const decisionPane = ["Which option?", "1. Continue", "2. Stop", "Enter to select"].join("\n");
     const waitingWorkflow = registerTier3Workflow(waitingPane);
@@ -241,7 +253,7 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
 
     const brain = new FakeBrain({
       action: "nudge",
-      nudgeText: "This should not be sent.",
+      nudgeText: "Coordinator: resolve the human-waiting state from north-star context.",
       reason: "test"
     });
     const tmux = makeTmuxMock({
@@ -255,8 +267,16 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     await watcher.tick();
 
     expect(service.get(waitingWorkflow.id)?.status).toBe("waiting_human");
+    expect(service.get(waitingWorkflow.id)?.tier).toBe(3);
     expect(service.get(decisionWorkflow.id)?.status).toBe("awaiting_decision");
-    expect(brain.calls).toHaveLength(0);
-    expect(tmux.sendCommand).not.toHaveBeenCalled();
+    expect(brain.calls).toHaveLength(1);
+    expect(brain.decisionCalls).toHaveLength(1);
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+    expect(tmux.sendCommand).toHaveBeenCalledWith(
+      "coord-1",
+      "Coordinator: resolve the human-waiting state from north-star context.",
+      true,
+      true
+    );
   });
 });

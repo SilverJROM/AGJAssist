@@ -8,6 +8,7 @@ import {
   OvermindWorkflowStatus
 } from "../../services/overmind-service.js";
 import type { OvermindNotify } from "../../services/overmind-watcher.js";
+import { buildDoneNotification } from "../../services/overmind-notifications.js";
 import { OvermindStreamManager } from "../websocket/overmind-stream-manager.js";
 
 interface TokenBody {
@@ -109,9 +110,13 @@ export function registerOvermindRoutes(
       }
 
       const completed = overmindService.setStatus(workflow.id, "completed");
-      if (workflow.status !== "completed" && completed) {
+      if (
+        workflow.status !== "completed" &&
+        completed &&
+        overmindService.markNotificationTransition(completed.id, "done:completed")
+      ) {
         try {
-          await notify?.(`DONE · overmind · ${completed.label}\n${completed.label} completed.`);
+          await notify?.(buildDoneNotification(completed));
         } catch (error) {
           console.error("Overmind DONE notify failed:", error);
         }

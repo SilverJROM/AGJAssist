@@ -330,6 +330,9 @@ describe("Overmind completion notifications", () => {
     expect(first.statusCode).toBe(200);
     expect(second.statusCode).toBe(200);
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify).toHaveBeenCalledWith("DONE · overmind · projcore A5\nprojcore A5 completed.");
+    expect(notify.mock.calls[0][0]).toContain("🎉 DONE · AGJAssist · overmind");
+    expect(notify.mock.calls[0][0]).toContain("✅ projcore A5 completed.");
+    expect(notify.mock.calls[0][0]).toContain("➡️ Next: none");
+    expect(service.getBySession("coord-3")?.last_notified_transition).toBe("done:completed");
   });
 });

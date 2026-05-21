@@ -28,9 +28,9 @@ afterEach(() => {
 });
 
 describe("OvermindService", () => {
-  it("creates the schema v13 table, active attribution columns, history columns, and indexes", () => {
+  it("creates the schema v14 table, active attribution, history, and notification columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(13);
+    expect(version.version).toBe(14);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -49,6 +49,7 @@ describe("OvermindService", () => {
     expect(colNames).toContain("active_role");
     expect(colNames).toContain("ended_at");
     expect(colNames).toContain("task_log");
+    expect(colNames).toContain("last_notified_transition");
   });
 
   it("round-trips register, list, get, getBySession, updates, status, tasks, and delete", () => {
@@ -116,6 +117,37 @@ describe("OvermindService", () => {
 
     expect(service.delete(created.id)).toBe(true);
     expect(service.get(created.id)).toBeNull();
+  });
+
+  it("stamps ended_at when a workflow is registered with all tasks done", () => {
+    const created = service.register({
+      label: "v6-register-done",
+      coordinator_session: "v6-register-done-parent",
+      run_dir: "/tmp/overmind/v6-register-done",
+      current_task: "Complete",
+      tasks: [
+        { id: "A1", label: "First", state: "done" },
+        { id: "A2", label: "Second", state: "done" }
+      ]
+    });
+
+    expect(created.ended_at).toBeTruthy();
+    expect(Date.parse(created.ended_at || "")).not.toBeNaN();
+  });
+
+  it("keeps ended_at null when a workflow is registered with a pending task", () => {
+    const created = service.register({
+      label: "v6-register-pending",
+      coordinator_session: "v6-register-pending-parent",
+      run_dir: "/tmp/overmind/v6-register-pending",
+      current_task: "In flight",
+      tasks: [
+        { id: "A1", label: "First", state: "done" },
+        { id: "A2", label: "Second", state: "pending" }
+      ]
+    });
+
+    expect(created.ended_at).toBeNull();
   });
 
   it("freezes ended_at when all tasks are done and clears it when a not-done task appears", () => {
@@ -262,6 +294,7 @@ describe("OvermindService", () => {
     expect(upserted.stuck_since).toBeNull();
     expect(upserted.nudge_count).toBe(0);
     expect(upserted.tier).toBe(0);
+    expect(upserted.last_notified_transition).toBeNull();
     expect(service.list()).toHaveLength(1);
   });
 
@@ -306,16 +339,18 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(13);
+    expect(version.version).toBe(14);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("active_session");
     expect(cols.map((col) => col.name)).toContain("active_role");
     expect(cols.map((col) => col.name)).toContain("ended_at");
     expect(cols.map((col) => col.name)).toContain("task_log");
+    expect(cols.map((col) => col.name)).toContain("last_notified_transition");
     expect(service.getBySession("legacy-parent")?.active_session).toBeNull();
     expect(service.getBySession("legacy-parent")?.ended_at).toBeNull();
     expect(service.getBySession("legacy-parent")?.task_log).toEqual([]);
+    expect(service.getBySession("legacy-parent")?.last_notified_transition).toBeNull();
 
     db.close();
     db = new DatabaseService(TEST_DB);
@@ -324,5 +359,6 @@ describe("OvermindService", () => {
     expect(cols.filter((col) => col.name === "active_role")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "ended_at")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "task_log")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "last_notified_transition")).toHaveLength(1);
   });
 });

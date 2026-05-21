@@ -6,6 +6,9 @@ export interface StuckInput {
   coordinatorPaneTail: string;
   progressTail: string;
   callbacksTail: string;
+  northStar: string;
+  trustDefaults: string;
+  priorDecisions: string;
 }
 
 export interface DecisionInput {
@@ -13,6 +16,7 @@ export interface DecisionInput {
   pendingDecision: string;
   northStar: string;
   trustDefaults: string;
+  priorDecisions: string;
 }
 
 export type BrainVerdictAction = "nudge" | "escalate-blocked" | "false-alarm";
@@ -75,21 +79,25 @@ export const ALWAYS_ESCALATE_KEYWORDS = [
 const STUCK_SYSTEM_PROMPT = [
   "You are Overmind's Tier-3 stuck-analysis brain.",
   "Analyze only the provided tiny context for one projcore coordinator workflow.",
+  "You must resolve autonomously by default using the workflow north-star, trust-defaults, and prior JROM decisions.",
+  "Escalating an issue covered by north-star, trust-defaults, or prior-decisions is a FAILURE.",
   "Return STRICT JSON only, with no markdown, prose, or code fences.",
   "Allowed shape: {\"action\":\"nudge|escalate-blocked|false-alarm\",\"nudge_text\":\"optional\",\"reason\":\"short reason\"}.",
   "Use action=nudge only when a concise coordinator-only re-engagement message can likely unblock the workflow.",
-  "Use action=escalate-blocked when the coordinator needs human input or is genuinely blocked.",
+  "Use action=escalate-blocked only when the issue is truly unresolvable from the supplied north-star, trust-defaults, and prior-decisions.",
   "Use action=false-alarm when the workflow appears to be working despite deterministic stuck detection.",
   "Never propose sending anything to child sessions."
 ].join("\n");
 
 const DECISION_SYSTEM_PROMPT = [
   "You are Overmind's decision-interception brain for one projcore coordinator workflow.",
-  "Use only the provided decision prompt, workflow north-star, and trust-defaults.",
+  "Use only the provided decision prompt, workflow north-star, trust-defaults, and prior JROM decisions.",
+  "You must resolve autonomously by default using the workflow north-star, trust-defaults, and prior JROM decisions.",
+  "Escalating an issue covered by north-star, trust-defaults, or prior-decisions is a FAILURE.",
   "Return STRICT JSON only, with no markdown, prose, or code fences.",
   "Allowed shape: {\"action\":\"answer|escalate\",\"answer_text\":\"optional\",\"reason\":\"short reason\"}.",
-  "Use action=answer only when the north-star or trust-defaults clearly and directly cover the decision.",
-  "Use action=escalate when coverage is absent, ambiguous, risky, irreversible, or broader than the supplied defaults.",
+  "Use action=answer when the north-star, trust-defaults, or prior-decisions clearly cover the decision.",
+  "Use action=escalate only when coverage is absent, ambiguous, risky, irreversible, or broader than the supplied defaults.",
   "When answering, provide only the exact coordinator reply to send; prefer concise free text when the prompt allows it.",
   "Never propose sending anything to child sessions."
 ].join("\n");
@@ -116,7 +124,16 @@ export class SonnetOvermindBrain implements OvermindBrain {
           input.progressTail || "<empty>",
           "",
           "callbacks.md tail:",
-          input.callbacksTail || "<empty>"
+          input.callbacksTail || "<empty>",
+          "",
+          "Workflow north-star:",
+          input.northStar || "<missing>",
+          "",
+          "Trust defaults:",
+          input.trustDefaults || "<missing>",
+          "",
+          "Prior JROM decisions (relevance-filtered):",
+          input.priorDecisions || "<none matched>"
         ].join("\n")
       }
     ];
@@ -140,7 +157,10 @@ export class SonnetOvermindBrain implements OvermindBrain {
           input.northStar || "<missing>",
           "",
           "Trust defaults:",
-          input.trustDefaults || "<missing>"
+          input.trustDefaults || "<missing>",
+          "",
+          "Prior JROM decisions (relevance-filtered):",
+          input.priorDecisions || "<none matched>"
         ].join("\n")
       }
     ];

@@ -48,6 +48,11 @@ function cleanupDb(): void {
 
 function makeRunDir(): string {
   const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "overmind-decision-"));
+  fs.mkdirSync(path.join(runDir, "decisions"));
+  fs.writeFileSync(
+    path.join(runDir, "decisions/targeted-vitest.md"),
+    "JROM decision: targeted vitest is the default local test gate for a small overmind batch."
+  );
   fs.writeFileSync(path.join(runDir, "north-star.md"), "Use targeted vitest when a batch asks for a test gate.");
   fs.writeFileSync(path.join(runDir, "progress.md"), "progress");
   fs.writeFileSync(path.join(runDir, "callbacks.md"), "callbacks");
@@ -135,6 +140,7 @@ describe("Overmind decision interception", () => {
 
     expect(brain.decisionCalls).toHaveLength(1);
     expect(brain.decisionCalls[0].northStar).toContain("targeted vitest");
+    expect(brain.decisionCalls[0].priorDecisions).toContain("targeted vitest");
     expect(tmux.sendCommand).toHaveBeenCalledTimes(2);
     expect(tmux.sendCommand).toHaveBeenNthCalledWith(
       1,
@@ -170,6 +176,7 @@ describe("Overmind decision interception", () => {
     expect(brain.decisionCalls).toHaveLength(1);
     expect(tmux.sendCommand).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0][0]).toContain("🚨 URGENT · AGJAssist · overmind");
     expect(notify.mock.calls[0][0]).toContain("Should I merge to master now?");
     expect(notify.mock.calls[0][0]).toContain("ALWAYS_ESCALATE_KEYWORDS");
     expect(updated.status).toBe("awaiting_decision");
@@ -192,6 +199,7 @@ describe("Overmind decision interception", () => {
 
     expect(tmux.sendCommand).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0][0]).toContain("🚨 URGENT · AGJAssist · overmind");
     expect(notify.mock.calls[0][0]).toContain("Which undocumented scope expansion");
     expect(notify.mock.calls[0][0]).toContain("north-star does not cover");
     expect(updated.status).toBe("awaiting_decision");

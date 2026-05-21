@@ -45,6 +45,7 @@ export interface OvermindWorkflow {
   stuck_since: string | null;
   nudge_count: number;
   tier: number;
+  last_notified_transition: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -74,6 +75,7 @@ export interface UpdateOvermindWorkflowInput {
   stuck_since?: string | null;
   nudge_count?: number;
   tier?: number;
+  last_notified_transition?: string | null;
 }
 
 interface OvermindWorkflowRow {
@@ -95,6 +97,7 @@ interface OvermindWorkflowRow {
   stuck_since: string | null;
   nudge_count: number;
   tier: number;
+  last_notified_transition: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -103,6 +106,8 @@ export class OvermindService {
   constructor(private readonly db: DatabaseService) {}
 
   register(input: RegisterOvermindWorkflowInput): OvermindWorkflow {
+    const tasks = input.tasks ?? [];
+    const endedAt = this.computeEndedAt(tasks, "active", null);
     const row = this.db
       .prepare(
         `INSERT INTO overmind_workflows (
@@ -121,8 +126,9 @@ export class OvermindService {
           stuck_since,
           nudge_count,
           tier,
+          last_notified_transition,
           updated_at
-        ) VALUES (?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, NULL, '[]', NULL, 0, 0, datetime('now'))
+        ) VALUES (?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, ?, '[]', NULL, 0, 0, NULL, datetime('now'))
         ON CONFLICT(coordinator_session) DO UPDATE SET
           label = excluded.label,
           child_sessions = excluded.child_sessions,
@@ -133,11 +139,12 @@ export class OvermindService {
           pending_decision = NULL,
           active_session = NULL,
           active_role = NULL,
-          ended_at = NULL,
+          ended_at = excluded.ended_at,
           task_log = '[]',
           stuck_since = NULL,
           nudge_count = 0,
           tier = 0,
+          last_notified_transition = NULL,
           updated_at = datetime('now')
         RETURNING *`
       )
@@ -147,7 +154,8 @@ export class OvermindService {
         JSON.stringify(input.child_sessions ?? []),
         input.run_dir,
         input.current_task ?? null,
-        JSON.stringify(input.tasks ?? [])
+        JSON.stringify(tasks),
+        endedAt
       ) as OvermindWorkflowRow;
 
     return this.mapRow(row);
@@ -198,7 +206,10 @@ export class OvermindService {
       last_activity_at: fields.last_activity_at !== undefined ? fields.last_activity_at : existing.last_activity_at,
       stuck_since: fields.stuck_since !== undefined ? fields.stuck_since : existing.stuck_since,
       nudge_count: fields.nudge_count ?? existing.nudge_count,
-      tier: fields.tier ?? existing.tier
+      tier: fields.tier ?? existing.tier,
+      last_notified_transition: fields.last_notified_transition !== undefined
+        ? fields.last_notified_transition
+        : existing.last_notified_transition
     };
 
     this.db
@@ -219,6 +230,7 @@ export class OvermindService {
             stuck_since = ?,
             nudge_count = ?,
             tier = ?,
+            last_notified_transition = ?,
             updated_at = datetime('now')
         WHERE id = ?`
       )
@@ -238,16 +250,29 @@ export class OvermindService {
         next.stuck_since,
         next.nudge_count,
         next.tier,
+        next.last_notified_transition,
         id
       );
 
     return this.get(id);
   }
 
+  markNotificationTransition(id: number, transition: string): boolean {
+    const result = this.db
+      .prepare(
+        `UPDATE overmind_workflows
+        SET last_notified_transition = ?, updated_at = datetime('now')
+        WHERE id = ?
+          AND (last_notified_transition IS NULL OR last_notified_transition != ?)`
+      )
+      .run(transition, id, transition);
+    return result.changes > 0;
+  }
+
   setStatus(id: number, status: OvermindWorkflowStatus): OvermindWorkflow | null {
     const existing = this.get(id);
     if (!existing) return null;
-    const endedAt = status === "completed" && !existing.ended_at ? this.isoNow() : existing.ended_at;
+    const endedAt = this.computeEndedAt(existing.tasks, status, existing.ended_at);
 
     this.db
       .prepare("UPDATE overmind_workflows SET status = ?, ended_at = ?, updated_at = datetime('now') WHERE id = ?")
@@ -274,13 +299,7 @@ export class OvermindService {
           }
         ].slice(-50)
       : existing.task_log;
-    const allDone = tasks.length > 0 && tasks.every((task) => task.state === "done");
-    const hasNotDoneTask = tasks.some((task) => task.state !== "done");
-    const endedAt = allDone
-      ? existing.ended_at ?? now
-      : hasNotDoneTask
-        ? null
-        : existing.ended_at;
+    const endedAt = this.computeEndedAt(tasks, existing.status, existing.ended_at, now);
 
     this.db
       .prepare("UPDATE overmind_workflows SET current_task = ?, tasks = ?, ended_at = ?, task_log = ?, updated_at = datetime('now') WHERE id = ?")
@@ -315,6 +334,19 @@ export class OvermindService {
     if (previousTask !== currentTask && previousDone !== done) return "current task and progress changed";
     if (previousTask !== currentTask) return "current task changed";
     return "progress changed";
+  }
+
+  private computeEndedAt(
+    tasks: OvermindTask[],
+    status: OvermindWorkflowStatus,
+    previousEndedAt: string | null,
+    now = this.isoNow()
+  ): string | null {
+    if (tasks.some((task) => task.state !== "done")) return null;
+    if ((tasks.length > 0 && tasks.every((task) => task.state === "done")) || status === "completed") {
+      return previousEndedAt ?? now;
+    }
+    return previousEndedAt;
   }
 
   private isoNow(): string {

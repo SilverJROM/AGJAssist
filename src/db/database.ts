@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 13;
+const SCHEMA_VERSION = 14;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -301,6 +301,7 @@ CREATE TABLE IF NOT EXISTS overmind_workflows (
   stuck_since TEXT,
   nudge_count INTEGER NOT NULL DEFAULT 0,
   tier INTEGER NOT NULL DEFAULT 0,
+  last_notified_transition TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -536,6 +537,15 @@ export class DatabaseService {
         }
         if (!colNames.has("task_log")) {
           this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN task_log TEXT NOT NULL DEFAULT '[]'");
+        }
+      }
+
+      // Migration: v13 → v14: persist once-per-transition overmind notifications
+      if (current && current.version < 14) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("last_notified_transition")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN last_notified_transition TEXT");
         }
       }
 

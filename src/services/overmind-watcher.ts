@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "./overmind-service.js";
@@ -10,6 +10,10 @@ import {
   OvermindBrain,
   hasAlwaysEscalateKeyword
 } from "./overmind-brain.js";
+import {
+  buildBlockedNotification,
+  buildNeedsInputNotification
+} from "./overmind-notifications.js";
 
 export const POLL_MS = 45_000;
 export const STUCK_THRESHOLD_MS = 90_000;
@@ -18,6 +22,9 @@ export const MAX_CANNED_NUDGES = 2;
 export const BRAIN_COORDINATOR_TAIL_LINES = 40;
 export const BRAIN_RUN_FILE_TAIL_LINES = 80;
 export const DECISION_HANDLED_TIER = 4;
+export const PRIOR_DECISION_CONTEXT_CHAR_LIMIT = 6000;
+export const PRIOR_DECISION_FILE_CHAR_LIMIT = 1000;
+export const PRIOR_DECISION_MAX_FILES = 5;
 export const CANNED_NUDGE =
   "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS.";
 export const FRONTLOAD_CORRECTION_NOTE =
@@ -225,6 +232,13 @@ export class OvermindWatcher {
       return { nudge_count: 0, tier: 0 };
     }
 
+    if (status === "waiting_human") {
+      if (!this.brain || workflow.tier >= 3) {
+        return { nudge_count: workflow.nudge_count, tier: workflow.tier };
+      }
+      return this.applyTier3Brain(workflow, coordinatorPane);
+    }
+
     if (status !== "stuck") {
       return { nudge_count: workflow.nudge_count, tier: workflow.tier };
     }
@@ -271,7 +285,8 @@ export class OvermindWatcher {
         label: workflow.label,
         pendingDecision,
         northStar: await readFileBestEffort(path.join(workflow.run_dir, "north-star.md")),
-        trustDefaults: await readFileBestEffort(path.join(homedir(), ".claude/JROM/style/trust-defaults.md"))
+        trustDefaults: await readFileBestEffort(path.join(homedir(), ".claude/JROM/style/trust-defaults.md")),
+        priorDecisions: await collectPriorDecisions(workflow.run_dir, `${workflow.label}\n${pendingDecision}`)
       });
     } catch (error) {
       console.error("Overmind decision brain failed:", error);
@@ -316,7 +331,10 @@ export class OvermindWatcher {
         label: workflow.label,
         coordinatorPaneTail: tailLines(coordinatorPane, BRAIN_COORDINATOR_TAIL_LINES),
         progressTail: await readRunFileTail(workflow.run_dir, "progress.md", BRAIN_RUN_FILE_TAIL_LINES),
-        callbacksTail: await readRunFileTail(workflow.run_dir, "callbacks.md", BRAIN_RUN_FILE_TAIL_LINES)
+        callbacksTail: await readRunFileTail(workflow.run_dir, "callbacks.md", BRAIN_RUN_FILE_TAIL_LINES),
+        northStar: await readFileBestEffort(path.join(workflow.run_dir, "north-star.md")),
+        trustDefaults: await readFileBestEffort(path.join(homedir(), ".claude/JROM/style/trust-defaults.md")),
+        priorDecisions: await collectPriorDecisions(workflow.run_dir, `${workflow.label}\n${coordinatorPane}`)
       });
     } catch (error) {
       console.error("Overmind Tier-3 brain failed:", error);
@@ -340,7 +358,7 @@ export class OvermindWatcher {
       };
     }
 
-    await this.notifyBlocked(workflow, verdict.reason);
+    await this.notifyBlocked(workflow, tailLines(coordinatorPane, 12), verdict.reason);
     return {
       nudge_count: workflow.nudge_count,
       tier: 3,
@@ -349,12 +367,17 @@ export class OvermindWatcher {
     };
   }
 
-  async notifyDone(workflow: OvermindWorkflow): Promise<void> {
-    await this.notifyBestEffort(`DONE · overmind · ${workflow.label}\n${workflow.label} completed.`);
-  }
-
-  async notifyBlocked(workflow: OvermindWorkflow, reason: string): Promise<void> {
-    await this.notifyBestEffort(`BLOCKED · overmind · ${workflow.label}\n${reason}`);
+  async notifyBlocked(workflow: OvermindWorkflow, issue: string, reason: string): Promise<void> {
+    await this.notifyTransition(
+      workflow,
+      `blocked:${hashShort(`${issue}\n${reason}`)}`,
+      buildBlockedNotification({
+        workflow,
+        issue,
+        checked: checkedContextLine(),
+        reason
+      })
+    );
   }
 
   async notifyDecisionEscalation(
@@ -362,15 +385,16 @@ export class OvermindWatcher {
     pendingDecision: string,
     reason: string
   ): Promise<void> {
-    await this.notifyBestEffort([
-      `BLOCKED · overmind · ${workflow.label}`,
-      "❓ Awaiting decision escalated to JROM.",
-      "",
-      "Decision:",
-      pendingDecision,
-      "",
-      `Reason: ${reason}`
-    ].join("\n"));
+    await this.notifyTransition(
+      workflow,
+      `decision:${hashShort(`${pendingDecision}\n${reason}`)}`,
+      buildNeedsInputNotification({
+        workflow,
+        issue: pendingDecision,
+        checked: checkedContextLine(),
+        reason
+      })
+    );
   }
 
   private async logDecisionCorrection(
@@ -412,6 +436,11 @@ export class OvermindWatcher {
     }
   }
 
+  private async notifyTransition(workflow: OvermindWorkflow, transition: string, text: string): Promise<void> {
+    if (!this.overmindService.markNotificationTransition(workflow.id, transition)) return;
+    await this.notifyBestEffort(text);
+  }
+
   private async capturePaneSafe(target: string): Promise<string> {
     try {
       return await this.tmuxService.capturePane(target, CAPTURE_LINES);
@@ -450,6 +479,184 @@ function applyAlwaysEscalateGuardrail(
     action: "escalate",
     reason: `Deterministic ALWAYS_ESCALATE_KEYWORDS guardrail matched the pending decision; overriding brain action=${verdict.action}.`
   };
+}
+
+interface PriorDecisionMatch {
+  filePath: string;
+  score: number;
+  matchedTerms: string[];
+  snippet: string;
+  mtimeMs: number;
+}
+
+export async function collectPriorDecisions(runDir: string, topic: string): Promise<string> {
+  const terms = extractDecisionTerms(topic);
+  const files = await listDecisionFiles([
+    path.join(runDir, "decisions"),
+    path.join(homedir(), ".claude/JROM/decisions")
+  ]);
+  const matches: PriorDecisionMatch[] = [];
+
+  for (const filePath of files) {
+    const raw = await readFileBestEffort(filePath);
+    if (!raw) continue;
+    const lowerPath = filePath.toLowerCase();
+    const lowerRaw = raw.toLowerCase();
+    const matchedTerms = terms.filter((term) => lowerPath.includes(term) || lowerRaw.includes(term));
+    if (matchedTerms.length === 0 && terms.length > 0) continue;
+    const fileStat = await statBestEffort(filePath);
+    matches.push({
+      filePath,
+      score: matchedTerms.reduce((score, term) => {
+        const inPath = lowerPath.includes(term) ? 3 : 0;
+        const inBody = countOccurrences(lowerRaw, term);
+        return score + inPath + inBody;
+      }, terms.length === 0 ? 1 : 0),
+      matchedTerms,
+      snippet: selectDecisionSnippet(raw, matchedTerms),
+      mtimeMs: fileStat?.mtimeMs ?? 0
+    });
+  }
+
+  if (matches.length === 0) {
+    const recentFiles = await Promise.all(
+      files.slice(-PRIOR_DECISION_MAX_FILES).map(async (filePath) => ({
+        filePath,
+        raw: await readFileBestEffort(filePath),
+        fileStat: await statBestEffort(filePath)
+      }))
+    );
+    for (const recent of recentFiles) {
+      if (!recent.raw) continue;
+      matches.push({
+        filePath: recent.filePath,
+        score: 0,
+        matchedTerms: [],
+        snippet: recent.raw.slice(0, PRIOR_DECISION_FILE_CHAR_LIMIT),
+        mtimeMs: recent.fileStat?.mtimeMs ?? 0
+      });
+    }
+  }
+
+  const selected = matches
+    .sort((a, b) => b.score - a.score || b.mtimeMs - a.mtimeMs)
+    .slice(0, PRIOR_DECISION_MAX_FILES);
+
+  let output = "";
+  for (const match of selected) {
+    const entry = [
+      `Source: ${match.filePath}`,
+      `Matched terms: ${match.matchedTerms.length ? match.matchedTerms.join(", ") : "<recent fallback>"}`,
+      match.snippet.trim()
+    ].join("\n");
+    const next = output ? `${output}\n\n---\n${entry}` : entry;
+    if (next.length > PRIOR_DECISION_CONTEXT_CHAR_LIMIT) {
+      const remaining = PRIOR_DECISION_CONTEXT_CHAR_LIMIT - output.length;
+      if (remaining > 200) output += `\n\n---\n${entry.slice(0, remaining)}`;
+      break;
+    }
+    output = next;
+  }
+
+  return output.slice(0, PRIOR_DECISION_CONTEXT_CHAR_LIMIT);
+}
+
+function extractDecisionTerms(text: string): string[] {
+  const stop = new Set([
+    "about",
+    "after",
+    "before",
+    "blocked",
+    "choose",
+    "confirm",
+    "continue",
+    "could",
+    "decision",
+    "default",
+    "enter",
+    "human",
+    "input",
+    "jrom",
+    "needs",
+    "option",
+    "please",
+    "projcore",
+    "question",
+    "should",
+    "status",
+    "stuck",
+    "their",
+    "there",
+    "these",
+    "thing",
+    "which",
+    "workflow",
+    "would"
+  ]);
+  return Array.from(
+    new Set(
+      text
+        .toLowerCase()
+        .match(/[a-z0-9][a-z0-9_-]{3,}/g)
+        ?.filter((term) => !stop.has(term) && !/^\d+$/.test(term))
+        .slice(0, 24) ?? []
+    )
+  );
+}
+
+async function listDecisionFiles(dirs: string[]): Promise<string[]> {
+  const files: string[] = [];
+  for (const dir of dirs) {
+    try {
+      const entries = await readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith(".md")) {
+          files.push(path.join(dir, entry.name));
+        }
+      }
+    } catch {
+      // Missing decisions directories are expected for some workflows.
+    }
+  }
+  return files;
+}
+
+function selectDecisionSnippet(raw: string, matchedTerms: string[]): string {
+  const normalized = raw.replace(/\r\n/g, "\n");
+  const lower = normalized.toLowerCase();
+  const firstIndex = matchedTerms
+    .map((term) => lower.indexOf(term))
+    .filter((index) => index >= 0)
+    .sort((a, b) => a - b)[0] ?? 0;
+  const start = Math.max(0, firstIndex - 300);
+  return normalized.slice(start, start + PRIOR_DECISION_FILE_CHAR_LIMIT);
+}
+
+function countOccurrences(text: string, term: string): number {
+  if (!term) return 0;
+  let count = 0;
+  let index = text.indexOf(term);
+  while (index >= 0) {
+    count += 1;
+    index = text.indexOf(term, index + term.length);
+  }
+  return count;
+}
+
+async function statBestEffort(filePath: string): Promise<{ mtimeMs: number } | null> {
+  try {
+    return await stat(filePath);
+  } catch {
+    return null;
+  }
+}
+
+function checkedContextLine(): string {
+  return "workflow north-star.md, trust-defaults.md, and relevance-filtered prior decisions";
+}
+
+function hashShort(text: string): string {
+  return createHash("sha256").update(text).digest("hex").slice(0, 16);
 }
 
 function isDecisionPrompt(pane: string): boolean {
