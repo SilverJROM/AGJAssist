@@ -17,6 +17,6 @@
 | R14 | Tasklist ingestion (POST /tasks) + done/processing/pending display | A2,A4,A7,B | endpoint(A2)+TG(A4)+UI(A7)+projcore submit(B §2.11) | VERIFIED |
 | R15 | Decision interception + Sonnet answer-from-northstar / escalate guardrail | A3,A6b | validation/batch-A6b.md (live answer + guardrail test) | VERIFIED |
 | R16 | Projcore frontload-correction (log + coordinator reminder) | A6b,B | validation/batch-A6b.md (correction note + log) | VERIFIED |
-| R13 | Onboard 3 live workflows visible on dashboard | C | — | UNASSIGNED |
+| R13 | Onboard 3 live workflows visible on dashboard | C | hris-d active + lkcamp/lkvc paused, all on dashboard | VERIFIED |
 
 **Final acceptance:** every row VERIFIED. None may remain UNASSIGNED/IN-PROGRESS/CLAIMED/FAIL at run-complete.
