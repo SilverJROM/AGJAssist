@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 15;
+const SCHEMA_VERSION = 16;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -285,6 +285,7 @@ CREATE INDEX IF NOT EXISTS idx_ra_reminder ON reminder_alerts(reminder_id);
 CREATE TABLE IF NOT EXISTS overmind_workflows (
   id INTEGER PRIMARY KEY,
   label TEXT NOT NULL,
+  display_name TEXT,
   coordinator_session TEXT NOT NULL UNIQUE,
   child_sessions TEXT NOT NULL DEFAULT '[]',
   run_dir TEXT NOT NULL,
@@ -562,6 +563,15 @@ export class DatabaseService {
           this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN accumulated_ms INTEGER NOT NULL DEFAULT 0");
         }
         this.db.exec("UPDATE overmind_workflows SET run_started_at = created_at WHERE run_started_at IS NULL");
+      }
+
+      // Migration: v15 → v16: add user-controlled overmind workflow display name
+      if (current && current.version < 16) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("display_name")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN display_name TEXT");
+        }
       }
 
       this.db

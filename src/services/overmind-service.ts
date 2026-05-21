@@ -29,6 +29,7 @@ export interface OvermindTaskLogEntry {
 export interface OvermindWorkflow {
   id: number;
   label: string;
+  display_name: string | null;
   coordinator_session: string;
   child_sessions: string[];
   run_dir: string;
@@ -83,6 +84,7 @@ export interface UpdateOvermindWorkflowInput {
 interface OvermindWorkflowRow {
   id: number;
   label: string;
+  display_name: string | null;
   coordinator_session: string;
   child_sessions: string;
   run_dir: string;
@@ -279,6 +281,16 @@ export class OvermindService {
       )
       .run(transition, id, transition);
     return result.changes > 0;
+  }
+
+  setDisplayName(id: number, name: string | null): OvermindWorkflow | null {
+    const normalized = name === null ? null : name.trim();
+    const displayName = normalized ? normalized : null;
+    const result = this.db
+      .prepare("UPDATE overmind_workflows SET display_name = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(displayName, id);
+    if (result.changes === 0) return null;
+    return this.get(id);
   }
 
   setStatus(id: number, status: OvermindWorkflowStatus): OvermindWorkflow | null {

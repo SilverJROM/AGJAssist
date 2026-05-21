@@ -465,7 +465,7 @@ body {
   --ovm-border: rgba(88,166,255,0.28);
 }
 .overmind-card-toggle {
-  width: 100%;
+  flex: 1 1 auto;
   appearance: none;
   border: 0;
   background: transparent;
@@ -474,6 +474,7 @@ body {
   font: inherit;
   padding: 0;
   text-align: left;
+  min-width: 0;
 }
 .overmind-card-header {
   display: flex;
@@ -513,6 +514,22 @@ body {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+.overmind-rename-button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.overmind-rename-button:hover {
+  border-color: var(--ovm-border, var(--border));
+  color: var(--text);
+  background: var(--ovm-bg, transparent);
 }
 .overmind-status-icon {
   display: inline-flex;

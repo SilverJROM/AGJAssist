@@ -230,4 +230,58 @@ describe("Overmind routes", () => {
     expect(authenticated.json().workflows).toHaveLength(1);
     expect(authenticated.json().workflows[0].coordinator_session).toBe("lkvc-38");
   });
+
+  it("requires JWT auth to rename workflows and sets or clears display_name", async () => {
+    const registered = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "agjassist",
+      session: "agjassist-51",
+      run_dir: "/tmp/agjassist"
+    });
+    const workflowId = registered.json().workflow.id;
+
+    const unauthenticated = await app.inject({
+      method: "POST",
+      url: `/api/overmind/workflows/${workflowId}/name`,
+      payload: { name: "Custom Workflow" }
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const loginCode = authService.generateLoginCode(111222);
+    const auth = authService.authenticateWithCode(loginCode);
+    expect(auth).not.toBeNull();
+
+    const renamed = await app.inject({
+      method: "POST",
+      url: `/api/overmind/workflows/${workflowId}/name`,
+      headers: {
+        authorization: `Bearer ${auth!.token}`
+      },
+      payload: { name: "  Custom Workflow  " }
+    });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json().workflow.display_name).toBe("Custom Workflow");
+    expect(overmindService.get(workflowId)?.display_name).toBe("Custom Workflow");
+
+    const cleared = await app.inject({
+      method: "POST",
+      url: `/api/overmind/workflows/${workflowId}/name`,
+      headers: {
+        authorization: `Bearer ${auth!.token}`
+      },
+      payload: { name: "" }
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json().workflow.display_name).toBeNull();
+
+    const missing = await app.inject({
+      method: "POST",
+      url: "/api/overmind/workflows/999/name",
+      headers: {
+        authorization: `Bearer ${auth!.token}`
+      },
+      payload: { name: "Nope" }
+    });
+    expect(missing.statusCode).toBe(404);
+  });
 });

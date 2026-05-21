@@ -34,6 +34,14 @@ interface TasksBody extends TokenBody {
   tasks?: OvermindTask[];
 }
 
+interface RenameParams {
+  id: string;
+}
+
+interface RenameBody {
+  name?: string | null;
+}
+
 export function isLoopbackAddress(address: string | undefined): boolean {
   if (!address) return false;
   const normalized = address.toLowerCase();
@@ -150,6 +158,29 @@ export function registerOvermindRoutes(
     { preHandler: authMiddleware },
     async (request) => {
       return { workflows: overmindService.list(request.query.status) };
+    }
+  );
+
+  app.post<{ Params: RenameParams; Body: RenameBody }>(
+    "/api/overmind/workflows/:id/name",
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      const id = Number(request.params.id);
+      if (!Number.isInteger(id) || id < 1) {
+        return reply.code(400).send({ error: "Invalid workflow id" });
+      }
+
+      const { name } = request.body || {};
+      if (name !== undefined && name !== null && typeof name !== "string") {
+        return reply.code(400).send({ error: "name must be a string or null" });
+      }
+
+      const workflow = overmindService.setDisplayName(id, name ?? null);
+      if (!workflow) {
+        return reply.code(404).send({ error: "Workflow not found" });
+      }
+
+      return { workflow };
     }
   );
 

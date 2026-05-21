@@ -28,9 +28,9 @@ afterEach(() => {
 });
 
 describe("OvermindService", () => {
-  it("creates the schema v15 table, active attribution, history, notification, and elapsed columns", () => {
+  it("creates the schema v16 table, display name, active attribution, history, notification, and elapsed columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(15);
+    expect(version.version).toBe(16);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -45,6 +45,7 @@ describe("OvermindService", () => {
 
     const cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     const colNames = cols.map((col) => col.name);
+    expect(colNames).toContain("display_name");
     expect(colNames).toContain("active_session");
     expect(colNames).toContain("active_role");
     expect(colNames).toContain("ended_at");
@@ -69,6 +70,7 @@ describe("OvermindService", () => {
 
     expect(created.id).toBeGreaterThan(0);
     expect(created.status).toBe("active");
+    expect(created.display_name).toBeNull();
     expect(created.child_sessions).toEqual(["lkcdx-may20"]);
     expect(created.tasks[0]).toEqual({ id: "A1", label: "Schema", state: "processing" });
     expect(created.active_session).toBeNull();
@@ -302,6 +304,58 @@ describe("OvermindService", () => {
     expect(service.list()).toHaveLength(1);
   });
 
+  it("sets, trims, and clears display_name", () => {
+    const created = service.register({
+      label: "projcore",
+      coordinator_session: "projcore-parent",
+      run_dir: "/tmp/overmind/projcore"
+    });
+
+    const renamed = service.setDisplayName(created.id, "  W3 Rename Slice  ");
+    expect(renamed?.display_name).toBe("W3 Rename Slice");
+
+    const clearedByEmpty = service.setDisplayName(created.id, "   ");
+    expect(clearedByEmpty?.display_name).toBeNull();
+
+    const renamedAgain = service.setDisplayName(created.id, "Custom Name");
+    expect(renamedAgain?.display_name).toBe("Custom Name");
+
+    const clearedByNull = service.setDisplayName(created.id, null);
+    expect(clearedByNull?.display_name).toBeNull();
+  });
+
+  it("preserves display_name across re-register and setTasks updates", () => {
+    const created = service.register({
+      label: "projcore label",
+      coordinator_session: "projcore-preserve-parent",
+      run_dir: "/tmp/overmind/projcore-preserve",
+      current_task: "Original task",
+      tasks: [{ id: "A1", label: "Original", state: "processing" }]
+    });
+
+    const renamed = service.setDisplayName(created.id, "JROM custom name");
+    expect(renamed?.display_name).toBe("JROM custom name");
+
+    const reRegistered = service.register({
+      label: "projcore updated label",
+      coordinator_session: "projcore-preserve-parent",
+      child_sessions: ["child-a"],
+      run_dir: "/tmp/overmind/projcore-preserve-rerun",
+      current_task: "Rerun task",
+      tasks: [{ id: "A2", label: "Rerun", state: "processing" }]
+    });
+    expect(reRegistered.id).toBe(created.id);
+    expect(reRegistered.label).toBe("projcore updated label");
+    expect(reRegistered.display_name).toBe("JROM custom name");
+
+    const taskUpdated = service.setTasks(reRegistered.id, "Task update", [
+      { id: "A2", label: "Rerun", state: "done" },
+      { id: "A3", label: "Next", state: "pending" }
+    ]);
+    expect(taskUpdated?.display_name).toBe("JROM custom name");
+    expect(taskUpdated?.current_task).toBe("Task update");
+  });
+
   it("resets run_started_at and rolls the prior current-run elapsed into accumulated_ms on re-register", () => {
     const created = service.register({
       label: "elapsed",
@@ -403,9 +457,10 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(15);
+    expect(version.version).toBe(16);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
+    expect(cols.map((col) => col.name)).toContain("display_name");
     expect(cols.map((col) => col.name)).toContain("active_session");
     expect(cols.map((col) => col.name)).toContain("active_role");
     expect(cols.map((col) => col.name)).toContain("ended_at");
@@ -420,10 +475,12 @@ describe("OvermindService", () => {
     expect(service.getBySession("legacy-parent")?.run_started_at).toBeTruthy();
     expect(service.getBySession("legacy-parent")?.run_started_at).toBe(service.getBySession("legacy-parent")?.created_at);
     expect(service.getBySession("legacy-parent")?.accumulated_ms).toBe(0);
+    expect(service.getBySession("legacy-parent")?.display_name).toBeNull();
 
     db.close();
     db = new DatabaseService(TEST_DB);
     cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
+    expect(cols.filter((col) => col.name === "display_name")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "active_session")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "active_role")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "ended_at")).toHaveLength(1);

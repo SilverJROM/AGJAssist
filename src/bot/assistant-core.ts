@@ -359,7 +359,7 @@ export class AssistantCore {
     const workflow = this.overmindService.get(id);
     if (!workflow) return `Workflow not found: ${id}`;
 
-    const lines = [`${workflow.label} ${OVERMIND_STATUS_ICONS[workflow.status]} ${workflow.status}`];
+    const lines = [`${this.overmindDisplayName(workflow)} ${OVERMIND_STATUS_ICONS[workflow.status]} ${workflow.status}`];
     if (!workflow.tasks.length) {
       lines.push("No tasks.");
       return lines.join("\n");
@@ -381,7 +381,7 @@ export class AssistantCore {
     if (!this.overmindService) return "Overmind service not available.";
     const workflow = this.overmindService.setStatus(id, status);
     if (!workflow) return `Workflow not found: ${id}`;
-    return `${action} workflow ${id}: ${workflow.label}`;
+    return `${action} workflow ${id}: ${this.overmindDisplayName(workflow)}`;
   }
 
   private handleOvermindDropCommand(rawId: string | undefined): string {
@@ -391,13 +391,17 @@ export class AssistantCore {
     const workflow = this.overmindService.get(id);
     if (!workflow) return `Workflow not found: ${id}`;
     this.overmindService.delete(id);
-    return `Dropped workflow ${id}: ${workflow.label}`;
+    return `Dropped workflow ${id}: ${this.overmindDisplayName(workflow)}`;
   }
 
   private formatOvermindWorkflowLine(workflow: OvermindWorkflow): string {
     const doneCount = workflow.tasks.filter((task) => task.state === "done").length;
     const currentTask = workflow.current_task || "—";
-    return `${workflow.label} ${OVERMIND_STATUS_ICONS[workflow.status]} ${workflow.status} · "${currentTask}" · ${doneCount}/${workflow.tasks.length}`;
+    return `${this.overmindDisplayName(workflow)} ${OVERMIND_STATUS_ICONS[workflow.status]} ${workflow.status} · "${currentTask}" · ${doneCount}/${workflow.tasks.length}`;
+  }
+
+  private overmindDisplayName(workflow: OvermindWorkflow): string {
+    return workflow.display_name || workflow.label;
   }
 
   private parseOvermindId(rawId: string | undefined, usage: string): number | string {

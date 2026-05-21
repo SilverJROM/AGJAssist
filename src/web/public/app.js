@@ -255,6 +255,10 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function workflowDisplayName(workflow) {
+  return workflow.display_name || workflow.label;
+}
+
 // Auth
 function Login() {
   const [error, setError] = useState('');
@@ -506,6 +510,24 @@ function OvermindWorkflows() {
     setExpandedWorkflows(prev => ({ ...prev, [workflowId]: !prev[workflowId] }));
   }, []);
 
+  const renameWorkflow = useCallback(async (workflow) => {
+    const nextName = window.prompt('Rename workflow', workflow.display_name || workflow.label);
+    if (nextName === null) return;
+
+    try {
+      const data = await api(`/api/overmind/workflows/${workflow.id}/name`, {
+        method: 'POST',
+        body: JSON.stringify({ name: nextName })
+      });
+      if (data.workflow) {
+        setWorkflows(prev => prev.map(item => item.id === data.workflow.id ? data.workflow : item));
+      }
+      setError('');
+    } catch (e) {
+      setError(e.message || 'Failed to rename workflow.');
+    }
+  }, []);
+
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(timer);
@@ -612,28 +634,36 @@ function OvermindWorkflows() {
             const currentElapsed = formatElapsed(currentElapsedMs(runStartedAt, workflow.ended_at, now));
             const totalElapsed = formatElapsed(totalElapsedMs(workflow.accumulated_ms, runStartedAt, workflow.ended_at, now));
             const activeSession = formatActiveSessionAttribution(workflow);
+            const displayName = workflowDisplayName(workflow);
             return html`
               <section class=${'item-card overmind-card ' + colorClass} key=${workflow.id}>
-                <button
-                  type="button"
-                  class="overmind-card-toggle"
-                  aria-expanded=${isExpanded}
-                  onclick=${() => toggleWorkflow(workflow.id)}
-                >
-                  <div class="overmind-card-header">
+                <div class="overmind-card-header">
+                  <button
+                    type="button"
+                    class="overmind-card-toggle"
+                    aria-expanded=${isExpanded}
+                    onclick=${() => toggleWorkflow(workflow.id)}
+                  >
                     <div class="overmind-title">
                       <span class="overmind-chevron" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
                       <div>
-                        <h3>${workflow.label}</h3>
+                        <h3>${displayName}</h3>
                         <div class="overmind-current">${workflow.current_task || '—'}</div>
                       </div>
                     </div>
-                    <div class="overmind-status">
-                      <span class=${'overmind-status-icon ' + colorClass}>${statusIcon(workflow.status)}</span>
-                      <span class=${'badge overmind-status-badge ' + colorClass}>${workflow.status}</span>
-                    </div>
+                  </button>
+                  <div class="overmind-status">
+                    <button
+                      type="button"
+                      class="overmind-rename-button"
+                      title="Rename workflow"
+                      aria-label=${'Rename workflow ' + displayName}
+                      onclick=${() => renameWorkflow(workflow)}
+                    >✎</button>
+                    <span class=${'overmind-status-icon ' + colorClass}>${statusIcon(workflow.status)}</span>
+                    <span class=${'badge overmind-status-badge ' + colorClass}>${workflow.status}</span>
                   </div>
-                </button>
+                </div>
 
                 ${isExpanded && html`
                   <div class="overmind-expanded">

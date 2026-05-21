@@ -21,6 +21,27 @@ describe("overmind notification formatting", () => {
     expect(message).toContain("➡️ Next:");
   });
 
+  it("uses display_name when a workflow has a custom name", () => {
+    const renamedWorkflow = {
+      ...workflow,
+      display_name: "JROM Rename"
+    };
+
+    expect(buildDoneNotification(renamedWorkflow)).toContain("✅ JROM Rename completed.");
+    expect(buildBlockedNotification({
+      workflow: renamedWorkflow,
+      issue: "Coordinator says NEEDS-INFO from JROM.",
+      checked: "workflow north-star.md",
+      reason: "No supplied context covers the missing credential."
+    })).toContain("⛔ JROM Rename is stopped and needs you.");
+    expect(buildNeedsInputNotification({
+      workflow: renamedWorkflow,
+      issue: "Which undocumented scope expansion should be accepted?",
+      checked: "workflow north-star.md",
+      reason: "No prior decision covers this expansion."
+    })).toContain("❓ JROM Rename needs a decision before it can continue.");
+  });
+
   it("builds verdict-led BLOCKED messages", () => {
     const message = buildBlockedNotification({
       workflow,
