@@ -1,0 +1,131 @@
+import { describe, expect, it } from "vitest";
+import { classifyWorkflow, hashPane } from "../src/services/overmind-watcher.js";
+
+const NOW = "2026-05-21T12:00:00.000Z";
+
+describe("classifyWorkflow", () => {
+  it("classifies busy markers in any pane as working and resets stuck state", () => {
+    const result = classifyWorkflow({
+      coordinatorPane: "idle coordinator",
+      childPanes: ["Working (12s)\nesc to interrupt"],
+      coordinatorHashPrev: null,
+      mtimeAdvanced: false,
+      stuckSincePrev: "2026-05-21T11:59:00.000Z",
+      now: NOW
+    });
+
+    expect(result.status).toBe("working");
+    expect(result.stuckSince).toBeNull();
+    expect(result.pendingDecision).toBeNull();
+    expect(result.lastActivityAt).toBe(NOW);
+  });
+
+  it("classifies coordinator pane hash changes as working", () => {
+    const coordinatorPane = "new coordinator output";
+    const result = classifyWorkflow({
+      coordinatorPane,
+      childPanes: [],
+      coordinatorHashPrev: hashPane("previous coordinator output"),
+      mtimeAdvanced: false,
+      stuckSincePrev: null,
+      now: NOW
+    });
+
+    expect(result.status).toBe("working");
+    expect(result.coordinatorHash).toBe(hashPane(coordinatorPane));
+    expect(result.lastActivityAt).toBe(NOW);
+  });
+
+  it("classifies run directory mtime advancement as working", () => {
+    const coordinatorPane = "same coordinator output";
+    const result = classifyWorkflow({
+      coordinatorPane,
+      childPanes: [],
+      coordinatorHashPrev: hashPane(coordinatorPane),
+      mtimeAdvanced: true,
+      stuckSincePrev: null,
+      now: NOW
+    });
+
+    expect(result.status).toBe("working");
+    expect(result.lastActivityAt).toBe(NOW);
+  });
+
+  it("classifies coordinator decision menus as awaiting_decision with captured prompt text", () => {
+    const coordinatorPane = [
+      "Merge / test choice",
+      "Pick the next action",
+      "1. Run targeted tests",
+      "2. Merge the branch",
+      "Enter to select · Tab/Arrow keys to navigate",
+      "Type something"
+    ].join("\n");
+
+    const result = classifyWorkflow({
+      coordinatorPane,
+      childPanes: [],
+      coordinatorHashPrev: hashPane(coordinatorPane),
+      mtimeAdvanced: false,
+      stuckSincePrev: null,
+      now: NOW
+    });
+
+    expect(result.status).toBe("awaiting_decision");
+    expect(result.pendingDecision).toContain("Pick the next action");
+    expect(result.pendingDecision).toContain("1. Run targeted tests");
+    expect(result.pendingDecision).toContain("Enter to select");
+    expect(result.lastActivityAt).toBeNull();
+  });
+
+  it("classifies plain pending human questions as waiting_human", () => {
+    const coordinatorPane = "NEEDS-INFO: please confirm whether QA should run the slow suite.";
+
+    const result = classifyWorkflow({
+      coordinatorPane,
+      childPanes: [],
+      coordinatorHashPrev: hashPane(coordinatorPane),
+      mtimeAdvanced: false,
+      stuckSincePrev: null,
+      now: NOW
+    });
+
+    expect(result.status).toBe("waiting_human");
+    expect(result.pendingDecision).toBeNull();
+    expect(result.stuckSince).toBeNull();
+    expect(result.lastActivityAt).toBeNull();
+  });
+
+  it("keeps sub-threshold frozen panes working while preserving last activity", () => {
+    const coordinatorPane = "same quiet pane";
+
+    const result = classifyWorkflow({
+      coordinatorPane,
+      childPanes: [],
+      coordinatorHashPrev: hashPane(coordinatorPane),
+      mtimeAdvanced: false,
+      stuckSincePrev: "2026-05-21T11:59:30.000Z",
+      now: NOW
+    });
+
+    expect(result.status).toBe("working");
+    expect(result.stuckSince).toBe("2026-05-21T11:59:30.000Z");
+    expect(result.lastActivityAt).toBeNull();
+  });
+
+  it("classifies frozen panes past the threshold as stuck", () => {
+    const coordinatorPane = "same quiet pane";
+
+    const result = classifyWorkflow({
+      coordinatorPane,
+      childPanes: [],
+      coordinatorHashPrev: hashPane(coordinatorPane),
+      mtimeAdvanced: false,
+      stuckSincePrev: "2026-05-21T11:58:29.000Z",
+      now: NOW
+    });
+
+    expect(result.status).toBe("stuck");
+    expect(result.stuckSince).toBe("2026-05-21T11:58:29.000Z");
+    expect(result.lastActivityAt).toBeNull();
+  });
+});
