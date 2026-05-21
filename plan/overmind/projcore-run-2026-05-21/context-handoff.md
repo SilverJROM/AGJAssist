@@ -1,16 +1,29 @@
-## Accepted: A1, A2, A3, A4 — all PASS (A4 needed iter1: tmux bare-session fix)
+## Accepted: A1-A5 all PASS (A4 + A5 each needed iter1, both live-verified)
 Branch: feat/overmind (no master merge until JROM review).
 Implemented:
-- A1 schema+CRUD; A2 endpoints (token-guarded register/complete/tasks + JWT GET workflows); A3 watcher classifier (pure); A4 Telegram commands (/overmind,/om_tasks,/om_pause,/om_resume,/om_drop) + watcher started live in index.ts.
-- A4 iter1: `tmuxService.ensureValidTarget` now accepts BARE session names (e.g. hris-d-22) in addition to session:window.pane. Verified live: watcher reads real pane content + classifies.
-Req#s VERIFIED: R1,R2,R3,R4,R5,R9. IN-PROGRESS: R14 (UI display pending). R15 (decision-detect built; answering=A6). Open: R6,R7,R8,R10,R11,R12,R13,R16.
+- A1 schema+CRUD; A2 endpoints; A3 classifier; A4 Telegram cmds + live watcher (tmux bare-session fix); A5 nudge ladder Tier1-2 coordinator-only (post-nudge-hash fix, live: Tier1→2→stop, child clean) + DONE notify from /complete route.
+Req#s VERIFIED: R1,R2,R3,R4,R5,R6,R9. IN-PROGRESS: R8 (DONE wired; BLOCKED+live=A6a), R14 (UI=A7), R15 (detect built; answer=A6b). Open: R7,R10,R11,R12,R13,R16.
 
-## Next: Batch-A5 — Nudge ladder Tier 1-2 (coordinator-ONLY) + DONE/BLOCKED Telegram push
+A6 SPLIT into A6a + A6b (both SHORT). Do A6a first.
+
+## Next: Batch-A6a — Sonnet brain plumbing + Tier-3 stuck escalation + BLOCKED push + waiting_human
 Key facts:
-- NS-3 HARD RULE: nudges go ONLY to the coordinator_session, NEVER a child session. The watcher already separates coordinator vs child_sessions.
-- Nudge mechanism: `tmuxService.sendCommand(coordinator_session, "<msg>", true, true)` — pressEnter=true, skipSafetyCheck=true (canned overmind nudge). sendCommand now accepts bare session names (A4 fix). It does send-keys -l + C-m.
-- Tier ladder on status==='stuck': use the existing `nudge_count`/`tier` columns. Tier 1 → first canned nudge (e.g. "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS."); increment nudge_count; record on the row. Tier 2 → repeat (max ~2 canned nudges) with backoff across ticks. Busy markers / hash change reset nudge_count+tier+stuck (handled in classifier path — ensure a working transition clears them). Do NOT escalate to Sonnet yet (that's A6 Tier 3) — but leave a clear hook where Tier 3 will plug in.
-- DONE/BLOCKED Telegram push (R8): when a workflow becomes 'completed' (set by /complete endpoint) → push a DONE message; when it hits a real BLOCKED/escalation condition → push BLOCKED. Use the bot's sendMessage. Per NOTIFICATION_PROTOCOL: ONLY DONE/BLOCKED, verdict-led, no progress chatter. The bot instance / chat id: see how telegram-bot.ts sends (AUTHORIZED_USER_ID from .env is the chat id). Thread a notifier into the watcher (a callback or the bot's sendMessage) — keep it decoupled (e.g. OvermindWatcher takes an optional `notify(text)` fn).
-- NOTE the live environment: the TG bot has chronic polling EFATAL (network) — sendMessage may also fail intermittently; make the push best-effort (try/catch, log on failure), do not crash the loop.
-- LIVE SMOKE REQUIRED (per decision 2026-05-21-...-live-smoke): after impl, projcore will register a throwaway at a real IDLE session, force/await stuck, and confirm exactly ONE nudge per tier lands in the COORDINATOR pane (and NEVER in a child). So make tiers observable (nudge_count/tier on the row).
-- Constants: define NUDGE thresholds/max tier as named consts.
+- Brain model: `new ClaudeCliProvider("sonnet", <timeout>)` then `.chat(messages, ...)`. NS-4: NO outside API (no OpenRouter/Ollama for the brain). This is the user's Claude subscription.
+- Tier-3 hook is at the `// A6: Tier 3 Sonnet brain here` comment in overmind-watcher.ts applyNudgeLadder (after nudge_count >= MAX_CANNED_NUDGES and still stuck).
+- A6a behavior: when canned Tier1-2 exhausted AND still stuck, call the Sonnet brain ONCE with TINY context: last ~40 lines of the coordinator pane + tail of run_dir/progress.md + run_dir/callbacks.md. Brain returns a small JSON: {action: 'nudge'|'escalate-blocked'|'false-alarm', nudge_text?, reason}. 
+  - nudge → sendCommand(coordinator, nudge_text, true, true) (coordinator only!), persist post-nudge hash (same fix as A5), mark tier=3.
+  - escalate-blocked → notify BLOCKED (verdict-led per NOTIFICATION_PROTOCOL), set status='waiting_human', STOP nudging until JROM acts (paused-like: a waiting_human / blocked workflow is not re-nudged).
+  - false-alarm → treat as working (reset ladder).
+- waiting_human halt (R8): a workflow in waiting_human OR awaiting_decision is NOT nudged (the classifier already yields these; ensure the nudge ladder skips them — only 'stuck' nudges).
+- Token efficiency (NS-8): brain fires ONLY at Tier-3 (rare) with tiny context. NOT every tick. Guard: only call once per stuck-episode (e.g. when tier transitions 2→3); don't re-call Sonnet every tick.
+- Best-effort: brain call wrapped in try/catch; on failure, fall back to escalate-blocked (surface to JROM) rather than crash/spin.
+- Decoupling: inject the brain as an interface (e.g. `OvermindBrain { analyzeStuck(input): Promise<{action,...}> }`) so A6b can reuse it for decisions and so it's mockable in tests (do NOT call real Sonnet in unit tests).
+- LIVE SMOKE (per live-smoke lesson): projcore will verify Tier3 fires after Tier1-2 on a stuck throwaway — but to avoid real Sonnet cost/latency in the gate, the brain interface lets us inject a fake in a focused integration check; the REAL Sonnet call will be sanity-checked once, minimally.
+
+## Then: Batch-A6b — decision interception (R15, R16)
+- On status==='awaiting_decision' (classifier already detects + captures pending_decision): call the brain's `answerDecision(input)` where input includes pending_decision + the workflow's run_dir/north-star.md content + ~/.claude/JROM/style/trust-defaults.md.
+- Brain returns {action:'answer'|'escalate', answer_text?, reason, should_have_been_frontloaded:bool}.
+  - answer → ONLY if north-star clearly covers AND not ALWAYS-ESCALATE class (irreversible/merge-to-master/QA-PROD-deploy/auth/money/hardened/scope-creep). sendCommand the answer to the COORDINATOR. 
+  - escalate → notify JROM (verdict-led) with the verbatim decision; leave coordinator waiting.
+  - R16: log a correction + send a brief coordinator note that this should have been frontloaded (§1.4a).
+- Guardrail (NS-11) is the brain's system prompt + a deterministic ALWAYS-ESCALATE keyword check BEFORE auto-answering (defense in depth: even if the brain says 'answer', a deterministic check blocks merge/deploy/auth/money words → force escalate).
