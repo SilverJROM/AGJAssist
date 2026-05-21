@@ -19,6 +19,7 @@ const BOT_TOKEN = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11";
 const JWT_SECRET = "test-secret";
 const OVERMIND_TOKEN = "ovm-test-token";
 const QUIET_PANE = "same quiet pane";
+const NUDGED_PANE = `${QUIET_PANE}\n${CANNED_NUDGE}\n-bash: Overmind:: command not found`;
 
 function cleanup(): void {
   for (const f of [TEST_DB, `${TEST_DB}-wal`, `${TEST_DB}-shm`]) {
@@ -165,6 +166,51 @@ describe("Overmind watcher nudge ladder", () => {
     expect(updated?.nudge_count).toBe(0);
     expect(updated?.tier).toBe(0);
     expect(tmux.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it("treats Overmind's own nudge text as the stuck baseline so the next tick escalates", async () => {
+    const workflow = service.register({
+      label: "self-nudge",
+      coordinator_session: "coord-4",
+      child_sessions: ["child-4"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.update(workflow.id, {
+      last_pane_hash: hashPane(QUIET_PANE),
+      stuck_since: "2000-01-01T00:00:00.000Z"
+    });
+
+    let coordinatorCaptures = 0;
+    const tmux = {
+      capturePane: vi.fn(async (target: string) => {
+        if (target === "child-4") return "child quiet pane";
+        coordinatorCaptures += 1;
+        if (coordinatorCaptures === 1) return QUIET_PANE;
+        return NUDGED_PANE;
+      }),
+      sendCommand: vi.fn(async () => ({ message: "sent", blocked: false }))
+    } as unknown as TmuxService & {
+      capturePane: ReturnType<typeof vi.fn>;
+      sendCommand: ReturnType<typeof vi.fn>;
+    };
+    const watcher = new OvermindWatcher(service, tmux);
+
+    await watcher.tick();
+    let updated = service.get(workflow.id);
+    expect(updated?.status).toBe("stuck");
+    expect(updated?.stuck_since).toBe("2000-01-01T00:00:00.000Z");
+    expect(updated?.nudge_count).toBe(1);
+    expect(updated?.tier).toBe(1);
+    expect(updated?.last_pane_hash).toBe(hashPane(NUDGED_PANE));
+
+    await watcher.tick();
+    updated = service.get(workflow.id);
+    expect(updated?.status).toBe("stuck");
+    expect(updated?.stuck_since).toBe("2000-01-01T00:00:00.000Z");
+    expect(updated?.nudge_count).toBe(2);
+    expect(updated?.tier).toBe(2);
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(2);
+    expect(tmux.sendCommand.mock.calls.every((call) => call[0] === "coord-4")).toBe(true);
   });
 });
 

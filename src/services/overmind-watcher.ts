@@ -1,13 +1,16 @@
 import { createHash } from "node:crypto";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "./overmind-service.js";
 import { TmuxService } from "../tmux/tmux-service.js";
+import { BrainVerdict, OvermindBrain } from "./overmind-brain.js";
 
 export const POLL_MS = 45_000;
 export const STUCK_THRESHOLD_MS = 90_000;
 export const CAPTURE_LINES = 200;
 export const MAX_CANNED_NUDGES = 2;
+export const BRAIN_COORDINATOR_TAIL_LINES = 40;
+export const BRAIN_RUN_FILE_TAIL_LINES = 80;
 export const CANNED_NUDGE =
   "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS.";
 
@@ -35,6 +38,14 @@ export interface ClassifyResult {
   pendingDecision: string | null;
   stuckSince: string | null;
   lastActivityAt: string | null;
+}
+
+interface NudgeLadderFields {
+  nudge_count: number;
+  tier: number;
+  status?: OvermindWorkflowStatus;
+  last_pane_hash?: string;
+  stuck_since?: string | null;
 }
 
 export function hashPane(pane: string): string {
@@ -94,7 +105,8 @@ export class OvermindWatcher {
   constructor(
     private readonly overmindService: OvermindService,
     private readonly tmuxService: TmuxService,
-    private readonly notify?: OvermindNotify
+    private readonly notify?: OvermindNotify,
+    private readonly brain?: OvermindBrain
   ) {}
 
   async tick(): Promise<void> {
@@ -135,13 +147,13 @@ export class OvermindWatcher {
       now
     });
 
-    const nudgeFields = await this.applyNudgeLadder(workflow, result.status);
+    const nudgeFields = await this.applyNudgeLadder(workflow, result.status, coordinatorPane);
 
     this.overmindService.update(workflow.id, {
-      status: result.status,
+      status: nudgeFields.status ?? result.status,
       pending_decision: result.pendingDecision,
-      last_pane_hash: result.coordinatorHash,
-      stuck_since: result.stuckSince,
+      last_pane_hash: nudgeFields.last_pane_hash ?? result.coordinatorHash,
+      stuck_since: nudgeFields.stuck_since !== undefined ? nudgeFields.stuck_since : result.stuckSince,
       ...nudgeFields,
       ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
     });
@@ -149,8 +161,9 @@ export class OvermindWatcher {
 
   private async applyNudgeLadder(
     workflow: OvermindWorkflow,
-    status: ClassifyResult["status"]
-  ): Promise<Pick<OvermindWorkflow, "nudge_count" | "tier">> {
+    status: ClassifyResult["status"],
+    coordinatorPane: string
+  ): Promise<NudgeLadderFields> {
     if (status === "working") {
       return { nudge_count: 0, tier: 0 };
     }
@@ -160,13 +173,67 @@ export class OvermindWatcher {
     }
 
     if (workflow.nudge_count >= MAX_CANNED_NUDGES) {
-      // A6: Tier 3 Sonnet brain here.
+      if (!this.brain || workflow.tier >= 3) {
+        return { nudge_count: workflow.nudge_count, tier: workflow.tier };
+      }
+      return this.applyTier3Brain(workflow, coordinatorPane);
+    }
+
+    if (workflow.tier >= 3) {
       return { nudge_count: workflow.nudge_count, tier: workflow.tier };
     }
 
     const nextNudgeCount = workflow.nudge_count + 1;
     await this.tmuxService.sendCommand(workflow.coordinator_session, CANNED_NUDGE, true, true);
-    return { nudge_count: nextNudgeCount, tier: nextNudgeCount };
+    const postNudgePane = await this.capturePaneSafe(workflow.coordinator_session);
+    return {
+      nudge_count: nextNudgeCount,
+      tier: nextNudgeCount,
+      last_pane_hash: hashPane(postNudgePane)
+    };
+  }
+
+  private async applyTier3Brain(
+    workflow: OvermindWorkflow,
+    coordinatorPane: string
+  ): Promise<NudgeLadderFields> {
+    let verdict: BrainVerdict;
+    try {
+      verdict = await this.brain!.analyzeStuck({
+        label: workflow.label,
+        coordinatorPaneTail: tailLines(coordinatorPane, BRAIN_COORDINATOR_TAIL_LINES),
+        progressTail: await readRunFileTail(workflow.run_dir, "progress.md", BRAIN_RUN_FILE_TAIL_LINES),
+        callbacksTail: await readRunFileTail(workflow.run_dir, "callbacks.md", BRAIN_RUN_FILE_TAIL_LINES)
+      });
+    } catch (error) {
+      console.error("Overmind Tier-3 brain failed:", error);
+      verdict = {
+        action: "escalate-blocked",
+        reason: "Tier-3 Sonnet brain failed; escalating to JROM instead of retrying."
+      };
+    }
+
+    if (verdict.action === "false-alarm") {
+      return { nudge_count: 0, tier: 0, status: "working", stuck_since: null };
+    }
+
+    if (verdict.action === "nudge") {
+      await this.tmuxService.sendCommand(workflow.coordinator_session, verdict.nudgeText!, true, true);
+      const postNudgePane = await this.capturePaneSafe(workflow.coordinator_session);
+      return {
+        nudge_count: workflow.nudge_count,
+        tier: 3,
+        last_pane_hash: hashPane(postNudgePane)
+      };
+    }
+
+    await this.notifyBlocked(workflow, verdict.reason);
+    return {
+      nudge_count: workflow.nudge_count,
+      tier: 3,
+      status: "waiting_human",
+      stuck_since: null
+    };
   }
 
   async notifyDone(workflow: OvermindWorkflow): Promise<void> {
@@ -226,6 +293,20 @@ function capturePendingDecision(pane: string): string {
   const firstOptionIndex = lines.findIndex((line) => /^\d+\.\s+\S+/.test(line));
   const start = firstOptionIndex === -1 ? Math.max(0, lines.length - 12) : Math.max(0, firstOptionIndex - 3);
   return lines.slice(start, start + 14).join("\n").slice(0, 2000);
+}
+
+function tailLines(text: string, maxLines: number): string {
+  const normalized = text.replace(/\r\n/g, "\n");
+  const lines = normalized.split("\n");
+  return lines.slice(-maxLines).join("\n");
+}
+
+async function readRunFileTail(runDir: string, file: string, maxLines: number): Promise<string> {
+  try {
+    return tailLines(await readFile(path.join(runDir, file), "utf-8"), maxLines);
+  } catch {
+    return "";
+  }
 }
 
 function isPastStuckThreshold(stuckSince: string, now: string): boolean {

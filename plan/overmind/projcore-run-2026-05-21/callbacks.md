@@ -15,3 +15,6 @@
 [projcore callback] A5 APPROVED-PLAN Approved plan received; implementing coordinator-only Tier 1-2 nudges and DONE notify from /complete route.
 [projcore callback] A5 DONE Coordinator-only Tier 1-2 nudges and authoritative /complete DONE notify implemented; tsc and targeted/regression gates passed.
 [projcore callback] A5 DONE Correction iter 1: post-nudge coordinator pane hash is persisted so self-nudge text does not reset the ladder; targeted/regression gates and tsc passed.
+[projcore callback] A6a PROPOSED Sonnet brain interface, Tier-3 once-per-stuck-episode wiring, BLOCKED waiting_human halt, and fake-brain tests proposed; awaiting APPROVED-PLAN before code changes.
+[projcore callback] A6a APPROVED-PLAN Approved plan received; implementing Sonnet brain Tier-3 plumbing with fake-brain tests on feat/overmind.
+[projcore callback] A6a DONE Sonnet brain Tier-3 plumbing, BLOCKED waiting_human halt, and fake-brain tests implemented; tsc and targeted overmind gates passed.

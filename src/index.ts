@@ -28,6 +28,7 @@ import { ClaudeCliProvider } from "./llm/claude-cli-provider.js";
 import { CodexCliProvider } from "./llm/codex-cli-provider.js";
 import { OvermindService } from "./services/overmind-service.js";
 import { OvermindWatcher, POLL_MS } from "./services/overmind-watcher.js";
+import { SonnetOvermindBrain } from "./services/overmind-brain.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -130,7 +131,8 @@ async function main(): Promise<void> {
     if (!telegramAssistant) return;
     await telegramAssistant.sendMessage(config.telegram.authorizedUserId, text);
   };
-  const overmindWatcher = new OvermindWatcher(overmindService, tmuxService, overmindNotify);
+  const overmindBrain = new SonnetOvermindBrain();
+  const overmindWatcher = new OvermindWatcher(overmindService, tmuxService, overmindNotify, overmindBrain);
 
   // Tmux streaming
   const tmuxStreamManager = new TmuxStreamManager(
