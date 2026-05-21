@@ -1,17 +1,20 @@
-## Accepted: Batch-A2 — STATUS: PASS (prev: A1 PASS)
-Branch: feat/overmind (all batches commit here; NO master merge until JROM reviews).
-Implemented so far:
-- A1: schema v11 `overmind_workflows` + `OvermindService` CRUD (register/upsert, list, get, getBySession, update, setStatus, setTasks, delete). Types OvermindWorkflow, OvermindTask{id,label,state}, OvermindWorkflowStatus (active|working|waiting_human|awaiting_decision|stuck|paused|completed|failed).
-- A2: HTTP — POST /api/overmind/register, /complete, /tasks (localhost + OVERMIND_TOKEN guard via config.overmind.token), GET /api/overmind/workflows (JWT auth). OvermindService instantiated in index.ts (~line 35 area / services block) and threaded into createApiServer → registerOvermindRoutes(app, config, authService, overmindService). Route module: src/api/routes/overmind-routes.ts. Verified live (201/401/200/404).
-Req#s closed: R1, R2, R3 VERIFIED. R14 IN-PROGRESS (endpoint done; display pending A4/A7).
-Open: R4,R5,R6,R7,R8,R9,R10,R11,R12,R13,R15,R16.
+## Accepted: A1, A2, A3 — all PASS
+Branch: feat/overmind (no master merge until JROM review).
+Implemented:
+- A1: schema v11 + OvermindService CRUD.
+- A2: HTTP endpoints (register/complete/tasks token-guarded, GET workflows JWT) + service threaded in index.ts/server.ts. Live-verified.
+- A3: src/services/overmind-watcher.ts — pure `classifyWorkflow(input)` (working|stuck|waiting_human|awaiting_decision) + `OvermindWatcher` class with `tick()` (capturePane coordinator+children → classify → overmindService.update) and `start()/stop()` (POLL_MS=45000). NOT started yet. Consts: STUCK_THRESHOLD_MS=90000.
+Req#s: R1,R2,R3,R5 VERIFIED. R14 IN-PROGRESS (endpoint done). R4,R15 IN-PROGRESS (loop+decision built, not live).
+Open: R6,R7,R8,R9,R10,R11,R12,R13,R16.
 
-## Next: Batch-A3 — watcher loop + classifier (detection only, NO nudge/LLM)
-Key facts for A3:
-- tmuxService exists: `capturePane(target, lines)` (src/tmux/tmux-service.ts) — use to read coordinator + child panes. Do NOT use sendCommand in A3 (no nudging until A5).
-- Busy markers (port from ~/.claude/agents/watchers/projcore-watcher.sh): "esc to interrupt", "Working (", "Waiting for", "Compacting", "Thinking".
-- Decision-prompt markers (from a real coordinator AskUserQuestion menu): numbered options ("1.", "2." ...), "Enter to select", "Tab/Arrow keys to navigate", "Type something". → status `awaiting_decision`, capture the prompt text into pending_decision.
-- run_dir files to stat for mtime advance: callbacks.md, progress.md, queue.md.
-- Authoritative `completed` is set by projcore's POST /complete (A2) — the deterministic classifier does NOT need to infer completed; it classifies the action-relevant live states: working / stuck / waiting_human / awaiting_decision. (Scoping decision — keeps A3 atomic, avoids fragile queue-drained heuristics.)
-- The classifier should be a PURE function (testable without tmux): classify(inputs, prevRow) → {status, current_task?, pending_decision?, last_pane_hash, stuck_since?, last_activity_at}. tick() wires capturePane + mtimes → classify → overmindService.update. start()/stop() manage the interval but A3 does NOT start it (A4 starts it in index.ts).
-- NO LLM, NO Telegram, NO sendCommand in A3.
+## Next: Batch-A4 — Telegram commands + START the watcher loop
+Key facts for A4:
+- OvermindWatcher exists (src/services/overmind-watcher.ts) with start()/stop(). A4 instantiates it in index.ts (needs OvermindService + TmuxService — both already constructed in index.ts; check how tmuxService is built there) and calls start() so the 45s loop runs live. This makes R4 observable.
+- Telegram: src/bot/telegram-bot.ts `setMyCommands([...])` array; src/bot/assistant-core.ts `handleCommand(input)` switch. Add commands:
+  - /overmind → pure DB read: one line per workflow: `<label> <statusIcon> <status> · "<current_task>" · <doneCount>/<totalCount>`. (doneCount = tasks where state=done.)
+  - /om_tasks <id> → full tasklist: each task `[x] done / [~] processing / [ ] pending`.
+  - /om_pause <id> → setStatus(id,'paused'); /om_resume <id> → setStatus(id,'active'); /om_drop <id> → delete(id).
+  - assistant-core needs access to OvermindService — see how it gets other services (constructor/setters). Thread OvermindService in like the chat services (`setChatServices` pattern) or constructor.
+- NO nudging, NO LLM, NO UI panel in A4. (Nudge=A5, brain=A6, UI=A7.)
+- The watcher's start() must be safe even with zero registered workflows (loop over empty list = no-op). And paused/completed workflows are skipped.
+- After A4, projcore will live-smoke: register a throwaway workflow pointing at a REAL tmux session (e.g. ovm-build itself) and confirm the loop classifies it (status flips to working while codex runs) + /overmind shows it.
