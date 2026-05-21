@@ -11,8 +11,8 @@
 | R7 | Sonnet brain Tier 3, tiny context, no outside API | A6a | validation/batch-A6a.md (live Sonnet verdict parsed) | VERIFIED |
 | R8 | Tier 4 + DONE/BLOCKED Telegram push, waiting_human halt | A5,A6a | DONE(A5)+BLOCKED→waiting_human(A6a) logic verified; live TG delivery blocked by env polling issue | VERIFIED* |
 | R9 | Telegram /overmind /om_tasks /om_pause /om_resume /om_drop | A4 | validation/batch-A4.md (3/3 command tests) | VERIFIED |
-| R10 | UI /overmind Preact panel | A7 | — | UNASSIGNED |
-| R11 | OvermindStreamManager WS /ws/overmind live updates | A7 | — | UNASSIGNED |
+| R10 | UI /overmind Preact panel | A7 | validation/batch-A7.md (live: app.js+helpers 200) | VERIFIED |
+| R11 | OvermindStreamManager WS /ws/overmind live updates | A7 | validation/batch-A7.md (6/6 stream tests, route live) | VERIFIED |
 | R12 | projcore.md register/complete curl wiring | B | — | UNASSIGNED |
 | R14 | Tasklist ingestion (POST /tasks) + done/processing/pending display | A2,A4,A7,B | endpoint live-verified A2; display pending | IN-PROGRESS |
 | R15 | Decision interception + Sonnet answer-from-northstar / escalate guardrail | A3,A6b | validation/batch-A6b.md (live answer + guardrail test) | VERIFIED |
