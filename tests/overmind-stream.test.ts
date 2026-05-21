@@ -203,10 +203,44 @@ describe("Overmind watcher stream callback", () => {
     expect(overmindService.update).toHaveBeenCalledOnce();
     expect(rows[0].parent_status).toBe("idle");
     expect(rows[0].child_statuses).toEqual([
-      { session: "child-working", status: "working" },
+      { session: "child-working", status: "idle" },
       { session: "child-closed", status: "closed" }
     ]);
     expect(rows[0].status).toBe("working");
+  });
+
+  it("keeps a frozen coordinator working when an observed child pane changes", async () => {
+    let childPane = "child initial output";
+    let rows = [workflow({
+      child_sessions: ["child-active"],
+      last_pane_hash: null
+    })];
+    const overmindService = {
+      list: vi.fn(() => rows),
+      update: vi.fn((id: number, fields: Partial<OvermindWorkflow>) => {
+        rows = rows.map(row => row.id === id ? { ...row, ...fields } : row);
+        return rows.find(row => row.id === id) || null;
+      })
+    } as unknown as OvermindService;
+    const tmuxService = {
+      capturePane: vi.fn(async (target: string) => {
+        if (target === "coord-1") return "quiet parent";
+        if (target === "child-active") return childPane;
+        return "";
+      }),
+      sessionExists: vi.fn(async () => true)
+    } as unknown as TmuxService;
+    const watcher = new OvermindWatcher(overmindService, tmuxService);
+
+    await watcher.tick();
+    childPane = "child changed output";
+    await watcher.tick();
+
+    expect(rows[0].status).toBe("working");
+    expect(rows[0].stuck_since).toBeNull();
+    expect(rows[0].child_statuses).toEqual([
+      { session: "child-active", status: "working" }
+    ]);
   });
 });
 

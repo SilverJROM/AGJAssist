@@ -10,10 +10,11 @@ import {
 const NOW = "2026-05-21T12:00:00.000Z";
 
 describe("classifyWorkflow", () => {
-  it("classifies busy markers in any pane as working and resets stuck state", () => {
+  it("classifies changed child panes as working and resets stuck state", () => {
     const result = classifyWorkflow({
       coordinatorPane: "idle coordinator",
       childPanes: ["Working (12s)\nesc to interrupt"],
+      childPaneHashChanged: true,
       coordinatorHashPrev: null,
       mtimeAdvanced: false,
       stuckSincePrev: "2026-05-21T11:59:00.000Z",
@@ -26,11 +27,34 @@ describe("classifyWorkflow", () => {
     expect(result.lastActivityAt).toBe(NOW);
   });
 
+  it("classifies frozen Waiting for recap text past the threshold as stuck", () => {
+    const coordinatorPane = [
+      "Recap:",
+      "Waiting for codex proposal review from earlier.",
+      "No composer activity."
+    ].join("\n");
+
+    const result = classifyWorkflow({
+      coordinatorPane,
+      childPanes: ["quiet child pane"],
+      childPaneHashChanged: false,
+      coordinatorHashPrev: hashPane(coordinatorPane),
+      mtimeAdvanced: false,
+      stuckSincePrev: "2026-05-21T11:58:29.000Z",
+      now: NOW
+    });
+
+    expect(result.status).toBe("stuck");
+    expect(result.stuckSince).toBe("2026-05-21T11:58:29.000Z");
+    expect(result.lastActivityAt).toBeNull();
+  });
+
   it("classifies coordinator pane hash changes as working", () => {
     const coordinatorPane = "new coordinator output";
     const result = classifyWorkflow({
       coordinatorPane,
       childPanes: [],
+      childPaneHashChanged: false,
       coordinatorHashPrev: hashPane("previous coordinator output"),
       mtimeAdvanced: false,
       stuckSincePrev: null,
@@ -42,11 +66,29 @@ describe("classifyWorkflow", () => {
     expect(result.lastActivityAt).toBe(NOW);
   });
 
+  it("classifies a frozen coordinator with a changed child pane as working", () => {
+    const coordinatorPane = "same quiet coordinator pane";
+    const result = classifyWorkflow({
+      coordinatorPane,
+      childPanes: ["new child output"],
+      childPaneHashChanged: true,
+      coordinatorHashPrev: hashPane(coordinatorPane),
+      mtimeAdvanced: false,
+      stuckSincePrev: "2026-05-21T11:58:29.000Z",
+      now: NOW
+    });
+
+    expect(result.status).toBe("working");
+    expect(result.stuckSince).toBeNull();
+    expect(result.lastActivityAt).toBe(NOW);
+  });
+
   it("classifies run directory mtime advancement as working", () => {
     const coordinatorPane = "same coordinator output";
     const result = classifyWorkflow({
       coordinatorPane,
       childPanes: [],
+      childPaneHashChanged: false,
       coordinatorHashPrev: hashPane(coordinatorPane),
       mtimeAdvanced: true,
       stuckSincePrev: null,
@@ -70,6 +112,7 @@ describe("classifyWorkflow", () => {
     const result = classifyWorkflow({
       coordinatorPane,
       childPanes: [],
+      childPaneHashChanged: false,
       coordinatorHashPrev: hashPane(coordinatorPane),
       mtimeAdvanced: false,
       stuckSincePrev: null,
@@ -89,6 +132,7 @@ describe("classifyWorkflow", () => {
     const result = classifyWorkflow({
       coordinatorPane,
       childPanes: [],
+      childPaneHashChanged: false,
       coordinatorHashPrev: hashPane(coordinatorPane),
       mtimeAdvanced: false,
       stuckSincePrev: null,
@@ -107,6 +151,7 @@ describe("classifyWorkflow", () => {
     const result = classifyWorkflow({
       coordinatorPane,
       childPanes: [],
+      childPaneHashChanged: false,
       coordinatorHashPrev: hashPane(coordinatorPane),
       mtimeAdvanced: false,
       stuckSincePrev: "2026-05-21T11:59:30.000Z",
@@ -124,6 +169,7 @@ describe("classifyWorkflow", () => {
     const result = classifyWorkflow({
       coordinatorPane,
       childPanes: [],
+      childPaneHashChanged: false,
       coordinatorHashPrev: hashPane(coordinatorPane),
       mtimeAdvanced: false,
       stuckSincePrev: "2026-05-21T11:58:29.000Z",
@@ -137,13 +183,23 @@ describe("classifyWorkflow", () => {
 });
 
 describe("per-session classifiers", () => {
-  it("classifies a busy parent pane as working", () => {
+  it("classifies a changed parent pane as working", () => {
     expect(classifyParentSession({
       coordinatorPane: "Working (12s)\nesc to interrupt",
-      coordinatorHashPrev: hashPane("Working (12s)\nesc to interrupt"),
+      coordinatorHashPrev: hashPane("previous pane"),
       stuckSincePrev: null,
       now: NOW
     })).toBe("working");
+  });
+
+  it("does not classify a frozen parent pane with marker text as working", () => {
+    const pane = "Waiting for codex proposal review from earlier.";
+    expect(classifyParentSession({
+      coordinatorPane: pane,
+      coordinatorHashPrev: hashPane(pane),
+      stuckSincePrev: null,
+      now: NOW
+    })).toBe("idle");
   });
 
   it("classifies a quiet parent pane as idle before the stuck threshold", () => {
@@ -191,14 +247,16 @@ describe("per-session classifiers", () => {
     })).toBe("stuck");
   });
 
-  it("classifies child panes as working, idle, or closed", () => {
+  it("classifies child panes by pane change, idle, or closed", () => {
     expect(classifyChildSessionStatus({
       pane: "Thinking\nesc to interrupt",
-      exists: true
+      exists: true,
+      paneHashChanged: true
     })).toBe("working");
     expect(classifyChildSessionStatus({
-      pane: "quiet child pane",
-      exists: true
+      pane: "Thinking\nesc to interrupt",
+      exists: true,
+      paneHashChanged: false
     })).toBe("idle");
     expect(classifyChildSessionStatus({
       pane: "",

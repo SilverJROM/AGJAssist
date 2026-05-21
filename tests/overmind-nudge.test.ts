@@ -273,6 +273,39 @@ describe("Overmind watcher nudge ladder", () => {
     expect(updated?.status).toBe("working");
   });
 
+  it("nudges a frozen coordinator with stale Waiting for recap text after the stuck threshold", async () => {
+    const staleWaitingPane = [
+      "Recap:",
+      "Waiting for codex proposal review from earlier.",
+      "Composer is empty."
+    ].join("\n");
+    const workflow = service.register({
+      label: "lkcamp",
+      coordinator_session: "coord-lkcamp",
+      child_sessions: ["child-lkcamp"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.update(workflow.id, {
+      last_pane_hash: hashPane(staleWaitingPane),
+      stuck_since: "2000-01-01T00:00:00.000Z"
+    });
+
+    const tmux = makeTmuxMock({
+      "coord-lkcamp": staleWaitingPane,
+      "child-lkcamp": "child quiet pane"
+    });
+    const watcher = new OvermindWatcher(service, tmux);
+
+    await watcher.tick();
+
+    const updated = service.get(workflow.id);
+    expect(updated?.status).toBe("stuck");
+    expect(updated?.nudge_count).toBe(1);
+    expect(updated?.tier).toBe(1);
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+    expect(tmux.sendCommand).toHaveBeenLastCalledWith("coord-lkcamp", CANNED_NUDGE, true, true);
+  });
+
   it("treats Overmind's own nudge text as the stuck baseline so the next tick escalates", async () => {
     const workflow = service.register({
       label: "self-nudge",

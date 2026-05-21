@@ -40,7 +40,7 @@ export const ALL_DONE_CONFIRM_NUDGE = DEFAULT_COMPLETION_CONSULT_TEXT;
 export const FRONTLOAD_CORRECTION_NOTE =
   "Overmind: that decision should have been frontloaded at intake (projcore §1.4a) — please put such decisions in the north-star next time.";
 
-const BUSY_MARKER_RE = /esc to interrupt|Working \(|Waiting for|Compacting|Thinking/i;
+const BUSY_MARKER_RE = /esc to interrupt|Working \(|Compacting|Thinking/i;
 const NUMBERED_OPTION_RE = /^\s*\d+\.\s+\S+/m;
 const DECISION_FOOTER_RE = /Enter to select|Tab\/Arrow keys to navigate|Type something|Chat about this/i;
 const HUMAN_WAIT_RE = /\bNEEDS-INFO\b|needs info|waiting for (human|user|input)|blocked on (human|user|input)|\bquestion\b|\bplease (confirm|choose|provide|advise)\b/i;
@@ -53,6 +53,7 @@ export type OvermindUpdate = (workflows: OvermindWorkflow[]) => void | Promise<v
 export interface ClassifyWorkflowInput {
   coordinatorPane: string;
   childPanes: string[];
+  childPaneHashChanged?: boolean;
   coordinatorHashPrev: string | null;
   mtimeAdvanced: boolean;
   stuckSincePrev: string | null;
@@ -125,12 +126,11 @@ export function determineActiveSessionAttribution(input: {
 
 export function classifyWorkflow(input: ClassifyWorkflowInput): ClassifyResult {
   const coordinatorHash = hashPane(input.coordinatorPane);
-  const panes = [input.coordinatorPane, ...input.childPanes];
-  const hasBusyMarker = panes.some((pane) => BUSY_MARKER_RE.test(pane));
   const coordinatorHashChanged =
     input.coordinatorHashPrev !== null && coordinatorHash !== input.coordinatorHashPrev;
+  const childPaneHashChanged = input.childPaneHashChanged === true;
 
-  if (hasBusyMarker || coordinatorHashChanged || input.mtimeAdvanced) {
+  if (coordinatorHashChanged || input.mtimeAdvanced || childPaneHashChanged) {
     return {
       status: "working",
       coordinatorHash,
@@ -175,7 +175,7 @@ export function classifyParentSession(input: ClassifyParentSessionInput): Overmi
   const coordinatorHashChanged =
     input.coordinatorHashPrev !== null && coordinatorHash !== input.coordinatorHashPrev;
 
-  if (BUSY_MARKER_RE.test(input.coordinatorPane)) {
+  if (coordinatorHashChanged) {
     return "working";
   }
 
@@ -187,10 +187,6 @@ export function classifyParentSession(input: ClassifyParentSessionInput): Overmi
     return "waiting_human";
   }
 
-  if (coordinatorHashChanged) {
-    return "working";
-  }
-
   if (input.stuckSincePrev && isPastStuckThreshold(input.stuckSincePrev, input.now)) {
     return "stuck";
   }
@@ -198,13 +194,18 @@ export function classifyParentSession(input: ClassifyParentSessionInput): Overmi
   return "idle";
 }
 
-export function classifyChildSessionStatus(input: { pane: string; exists: boolean }): OvermindChildSessionStatus["status"] {
+export function classifyChildSessionStatus(input: {
+  pane: string;
+  exists: boolean;
+  paneHashChanged?: boolean;
+}): OvermindChildSessionStatus["status"] {
   if (!input.exists) return "closed";
-  return BUSY_MARKER_RE.test(input.pane) ? "working" : "idle";
+  return input.paneHashChanged === true ? "working" : "idle";
 }
 
 export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
+  private readonly childPaneHashes = new Map<number, Map<string, string>>();
 
   constructor(
     private readonly overmindService: OvermindService,
@@ -244,7 +245,19 @@ export class OvermindWatcher {
       runDirMtimeAdvanced(workflow.run_dir, workflow.last_activity_at)
     ]);
     const childPanes = childSnapshots.map((child) => child.pane);
-    const childStatuses = childSnapshots.map(({ session, status }) => ({ session, status }));
+    const childHashChanges = this.updateChildPaneHashes(
+      workflow.id,
+      childSnapshots,
+      workflow.last_pane_hash === null
+    );
+    const childStatuses = childSnapshots.map(({ session, pane, exists }) => ({
+      session,
+      status: classifyChildSessionStatus({
+        pane,
+        exists,
+        paneHashChanged: childHashChanges.get(session) === true
+      })
+    }));
     const parentStatus = classifyParentSession({
       coordinatorPane,
       coordinatorHashPrev: workflow.last_pane_hash,
@@ -255,6 +268,7 @@ export class OvermindWatcher {
     const result = classifyWorkflow({
       coordinatorPane,
       childPanes,
+      childPaneHashChanged: Array.from(childHashChanges.values()).some(Boolean),
       coordinatorHashPrev: workflow.last_pane_hash,
       mtimeAdvanced,
       stuckSincePrev: workflow.stuck_since,
@@ -637,14 +651,41 @@ export class OvermindWatcher {
 
   private async captureChildSession(
     target: string
-  ): Promise<{ session: string; pane: string; status: OvermindChildSessionStatus["status"] }> {
+  ): Promise<{ session: string; pane: string; exists: boolean }> {
     const exists = await this.sessionExistsSafe(target);
     const pane = exists ? await this.capturePaneSafe(target) : "";
     return {
       session: target,
       pane,
-      status: classifyChildSessionStatus({ pane, exists })
+      exists
     };
+  }
+
+  private updateChildPaneHashes(
+    workflowId: number,
+    snapshots: { session: string; pane: string; exists: boolean }[],
+    countInitialObservationAsChanged: boolean
+  ): Map<string, boolean> {
+    const previous = this.childPaneHashes.get(workflowId) ?? new Map<string, string>();
+    const next = new Map<string, string>();
+    const changes = new Map<string, boolean>();
+
+    for (const snapshot of snapshots) {
+      if (!snapshot.exists) {
+        changes.set(snapshot.session, false);
+        continue;
+      }
+
+      const currentHash = hashPane(snapshot.pane);
+      const previousHash = previous.get(snapshot.session);
+      changes.set(snapshot.session, previousHash === undefined
+        ? countInitialObservationAsChanged
+        : previousHash !== currentHash);
+      next.set(snapshot.session, currentHash);
+    }
+
+    this.childPaneHashes.set(workflowId, next);
+    return changes;
   }
 
   private async sessionExistsSafe(target: string): Promise<boolean> {
