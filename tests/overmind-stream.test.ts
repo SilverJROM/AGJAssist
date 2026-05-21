@@ -14,6 +14,7 @@ import {
   isActiveStatus,
   statusColor,
   statusIcon,
+  summarizeWorkflows,
   taskGlyph
 } from "../src/web/public/overmind-helpers.js";
 
@@ -215,5 +216,15 @@ describe("Overmind public helpers", () => {
     expect(isActiveStatus("stuck")).toBe(true);
     expect(isActiveStatus("completed")).toBe(false);
     expect(isActiveStatus("paused")).toBe(false);
+  });
+
+  it("summarizes workflows for the home quick-view card", () => {
+    expect(summarizeWorkflows([
+      { status: "working" },
+      { status: "waiting_human" },
+      { status: "completed" },
+      { status: "paused" }
+    ])).toEqual({ total: 4, active: 2 });
+    expect(summarizeWorkflows(null)).toEqual({ total: 0, active: 0 });
   });
 });

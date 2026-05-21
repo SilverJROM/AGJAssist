@@ -2,7 +2,7 @@ import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
 import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput } from './terminal-chat-state.js';
-import { buildOvermindWsUrl, countDoneTasks, formatActiveSessionAttribution, formatStuckDuration, isActiveStatus, statusColor, statusIcon, taskGlyph } from './overmind-helpers.js';
+import { buildOvermindWsUrl, countDoneTasks, formatActiveSessionAttribution, formatStuckDuration, isActiveStatus, statusColor, statusIcon, summarizeWorkflows, taskGlyph } from './overmind-helpers.js';
 
 const html = htm.bind(h);
 
@@ -395,7 +395,7 @@ function Header({ user }) {
 
 // Dashboard (hub with section cards)
 function Dashboard() {
-  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, conversations: 0, notes: 0 });
+  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, conversations: 0, notes: 0, workflows: 0, activeWorkflows: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -404,14 +404,18 @@ function Dashboard() {
       api('/api/personal-tasks').catch(() => ({ tasks: [] })),
       api('/api/reminders').catch(() => ({ reminders: [] })),
       api('/api/conversations').catch(() => ({ conversations: [] })),
-      api('/api/notes?status=open').catch(() => ({ notes: [] }))
-    ]).then(([p, t, r, c, n]) => {
+      api('/api/notes?status=open').catch(() => ({ notes: [] })),
+      api('/api/overmind/workflows').catch(() => ({ workflows: [] }))
+    ]).then(([p, t, r, c, n, w]) => {
+      const workflowSummary = summarizeWorkflows(w.workflows);
       setStats({
         projects: p.projects?.length || 0,
         tasks: t.tasks?.length || 0,
         reminders: r.reminders?.length || 0,
         conversations: c.conversations?.length || 0,
-        notes: n.notes?.length || 0
+        notes: n.notes?.length || 0,
+        workflows: workflowSummary.total,
+        activeWorkflows: workflowSummary.active
       });
       setLoading(false);
     });
@@ -422,7 +426,7 @@ function Dashboard() {
   const cards = [
     { label: 'Projects', count: stats.projects, route: '/projects', desc: 'Manage your development projects' },
     { label: 'Terminals', count: null, route: '/terminals', desc: 'Tmux terminal sessions' },
-    { label: 'Workflows', count: null, route: '/overmind', desc: 'Overmind live workflow dashboard' },
+    { label: 'Workflows', count: stats.workflows, route: '/overmind', desc: `${stats.workflows} workflows · ${stats.activeWorkflows} active` },
     { label: 'Tasks', count: stats.tasks, route: '/tasks', desc: 'Daily & weekly tasks, reminders' },
     { label: 'Notes', count: stats.notes, route: '/notes', desc: 'Quick notes, attach to any project' },
     { label: 'Conversations', count: stats.conversations, route: '/conversations', desc: 'Chat with LLMs' },
@@ -5050,7 +5054,7 @@ function Settings() {
 // ========== Telegram Mini App Components ==========
 
 function TgDashboard() {
-  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, conversations: 0, notes: 0 });
+  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, conversations: 0, notes: 0, workflows: 0, activeWorkflows: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -5059,14 +5063,18 @@ function TgDashboard() {
       api('/api/personal-tasks').catch(() => ({ tasks: [] })),
       api('/api/reminders').catch(() => ({ reminders: [] })),
       api('/api/conversations').catch(() => ({ conversations: [] })),
-      api('/api/notes?status=open').catch(() => ({ notes: [] }))
-    ]).then(([p, t, r, c, n]) => {
+      api('/api/notes?status=open').catch(() => ({ notes: [] })),
+      api('/api/overmind/workflows').catch(() => ({ workflows: [] }))
+    ]).then(([p, t, r, c, n, w]) => {
+      const workflowSummary = summarizeWorkflows(w.workflows);
       setStats({
         projects: p.projects?.length || 0,
         tasks: t.tasks?.length || 0,
         reminders: r.reminders?.length || 0,
         conversations: c.conversations?.length || 0,
-        notes: n.notes?.length || 0
+        notes: n.notes?.length || 0,
+        workflows: workflowSummary.total,
+        activeWorkflows: workflowSummary.active
       });
       setLoading(false);
     });
@@ -5079,7 +5087,7 @@ function TgDashboard() {
     { icon: '\u{1F4DD}', label: 'Notes', count: stats.notes, route: '/notes', desc: 'Quick notes' },
     { icon: '\u{1F4AC}', label: 'Chat', count: stats.conversations, route: '/conversations', desc: 'LLM conversations' },
     { icon: '\u{1F5A5}', label: 'Terminals', count: null, route: '/terminals', desc: 'Tmux sessions' },
-    { icon: '\u{25B6}', label: 'Workflows', count: null, route: '/overmind', desc: 'Overmind status' },
+    { icon: '\u{25B6}', label: 'Workflows', count: stats.workflows, route: '/overmind', desc: `${stats.workflows} workflows · ${stats.activeWorkflows} active` },
     { icon: '\u{1F4C1}', label: 'Projects', count: stats.projects, route: '/projects', desc: 'Dev projects' },
     { icon: '\u{23F0}', label: 'Reminders', count: stats.reminders, route: '/tasks', desc: 'Upcoming events' },
     { icon: '\u{2699}', label: 'Settings', count: null, route: '/settings', desc: 'Config & templates' }

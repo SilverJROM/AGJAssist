@@ -38,6 +38,14 @@ export function isActiveStatus(status) {
   return ['active', 'working', 'waiting_human', 'awaiting_decision', 'stuck'].includes(status);
 }
 
+export function summarizeWorkflows(workflows) {
+  const rows = Array.isArray(workflows) ? workflows : [];
+  return {
+    total: rows.length,
+    active: rows.filter(workflow => isActiveStatus(workflow?.status)).length
+  };
+}
+
 export function taskGlyph(state) {
   return OVERMIND_TASK_GLYPHS[state] || '○';
 }
