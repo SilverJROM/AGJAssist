@@ -7,3 +7,5 @@
 [projcore callback] V4 PROPOSED Proposing split into V4a home Workflows card and V4b customizable bottom nav; awaiting APPROVED-PLAN before code.
 [projcore callback] V4a DONE Home Workflows quick-view summary implemented on web and Telegram home cards; targeted helper test, npx tsc, and npm run build passed; commit bf7e128.
 [projcore callback] V4b DONE Customizable localStorage bottom nav implemented with move buttons, remove guard, add picker including Workflows, reset default, targeted helper test, npx tsc, and npm run build passed; commit 9fc5942.
+[projcore callback] V6 PROPOSED Plan proposed after reading V6 brief, v12 migration pattern, OvermindService setTasks/setStatus, Overmind expanded card UI, helpers, and targeted tests; awaiting APPROVED-PLAN before code.
+[projcore callback] V6 DONE Schema v13, ended_at freeze/resume, task_log append/no-op/cap, elapsed UI/history, artifacts, targeted tests, npx tsc, and npm run build complete.

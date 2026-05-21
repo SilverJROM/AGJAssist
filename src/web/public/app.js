@@ -8,6 +8,8 @@ import {
   addBottomNavTab,
   buildOvermindWsUrl,
   countDoneTasks,
+  elapsedMs,
+  formatElapsed,
   formatActiveSessionAttribution,
   formatStuckDuration,
   getBottomNavTabs,
@@ -600,10 +602,12 @@ function OvermindWorkflows() {
         <div class="item-list overmind-list">
           ${visibleWorkflows.map(workflow => {
             const tasks = Array.isArray(workflow.tasks) ? workflow.tasks : [];
+            const taskLog = Array.isArray(workflow.task_log) ? workflow.task_log : [];
             const doneCount = countDoneTasks(tasks);
             const childSessions = Array.isArray(workflow.child_sessions) ? workflow.child_sessions : [];
             const colorClass = statusColor(workflow.status);
             const isExpanded = !!expandedWorkflows[workflow.id];
+            const elapsed = formatElapsed(elapsedMs(workflow.created_at, workflow.ended_at, now));
             return html`
               <section class=${'item-card overmind-card ' + colorClass} key=${workflow.id}>
                 <button
@@ -640,6 +644,7 @@ function OvermindWorkflows() {
 
                     <div class="overmind-meta-grid">
                       <div><span>Tier</span><strong>${workflow.tier ?? 0}</strong></div>
+                      <div><span>Elapsed</span><strong>${elapsed}${workflow.ended_at ? ' (done)' : ''}</strong></div>
                       <div><span>Stuck</span><strong>${workflow.stuck_since ? formatStuckDuration(workflow.stuck_since, now) : '—'}</strong></div>
                       <div><span>Coordinator</span><strong>${workflow.coordinator_session}</strong></div>
                       <div><span>Children</span><strong>${childSessions.length ? childSessions.join(', ') : '—'}</strong></div>
@@ -655,6 +660,23 @@ function OvermindWorkflows() {
                             <div class=${'overmind-task overmind-task-' + task.state} key=${task.id || task.label}>
                               <span class="overmind-task-glyph">${taskGlyph(task.state)}</span>
                               <span>${task.label}</span>
+                            </div>
+                          `)}
+                        </div>
+                      `}
+                    </details>
+
+                    <details class="overmind-history" open=${taskLog.length > 0 && taskLog.length <= 6}>
+                      <summary>History</summary>
+                      ${taskLog.length === 0 ? html`
+                        <div class="overmind-history-empty">No task history yet.</div>
+                      ` : html`
+                        <div class="overmind-history-list">
+                          ${[...taskLog].reverse().map(entry => html`
+                            <div class="overmind-history-entry" key=${entry.at + '-' + entry.done + '-' + entry.total}>
+                              <time>${entry.at ? new Date(entry.at).toLocaleString() : '—'}</time>
+                              <span>${entry.current_task || '—'}</span>
+                              <strong>${entry.done ?? 0}/${entry.total ?? 0}</strong>
                             </div>
                           `)}
                         </div>

@@ -9,7 +9,9 @@ import { TmuxService } from "../src/tmux/tmux-service.js";
 import {
   buildOvermindWsUrl,
   countDoneTasks,
+  elapsedMs,
   formatActiveSessionAttribution,
+  formatElapsed,
   formatStuckDuration,
   isActiveStatus,
   statusColor,
@@ -52,6 +54,8 @@ function workflow(overrides: Partial<OvermindWorkflow> = {}): OvermindWorkflow {
     pending_decision: null,
     active_session: null,
     active_role: null,
+    ended_at: null,
+    task_log: [],
     last_pane_hash: null,
     last_activity_at: "2026-05-21T00:00:00.000Z",
     stuck_since: null,
@@ -193,6 +197,11 @@ describe("Overmind public helpers", () => {
       active_role: null
     })).toBe("— no session active");
     expect(formatStuckDuration("2026-05-21T00:00:00.000Z", Date.parse("2026-05-21T01:02:03.000Z"))).toBe("1h 2m");
+    expect(elapsedMs("2026-05-21T00:00:00.000Z", null, Date.parse("2026-05-21T01:02:03.000Z"))).toBe(3723000);
+    expect(elapsedMs("2026-05-21T00:00:00.000Z", "2026-05-21T02:14:00.000Z", Date.parse("2026-05-21T04:00:00.000Z"))).toBe(8040000);
+    expect(elapsedMs("2026-05-21 00:00:00", null, Date.parse("2026-05-21T00:00:30.000Z"))).toBe(30000);
+    expect(formatElapsed(8040000)).toBe("2h 14m");
+    expect(formatElapsed(59000)).toBe("<1m");
     expect(buildOvermindWsUrl("a b", { protocol: "https:", host: "example.test" })).toBe("wss://example.test/ws/overmind?token=a%20b");
   });
 

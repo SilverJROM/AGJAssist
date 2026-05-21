@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 12;
+const SCHEMA_VERSION = 13;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -294,6 +294,8 @@ CREATE TABLE IF NOT EXISTS overmind_workflows (
   pending_decision TEXT,
   active_session TEXT,
   active_role TEXT CHECK(active_role IN ('parent', 'child') OR active_role IS NULL),
+  ended_at TEXT,
+  task_log TEXT NOT NULL DEFAULT '[]',
   last_pane_hash TEXT,
   last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
   stuck_since TEXT,
@@ -522,6 +524,18 @@ export class DatabaseService {
         }
         if (!colNames.has("active_role")) {
           this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN active_role TEXT CHECK(active_role IN ('parent', 'child') OR active_role IS NULL)");
+        }
+      }
+
+      // Migration: v12 → v13: add workflow completion timestamp and task history log
+      if (current && current.version < 13) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("ended_at")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN ended_at TEXT");
+        }
+        if (!colNames.has("task_log")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN task_log TEXT NOT NULL DEFAULT '[]'");
         }
       }
 

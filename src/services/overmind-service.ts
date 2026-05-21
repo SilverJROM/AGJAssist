@@ -18,6 +18,14 @@ export interface OvermindTask {
   state: OvermindTaskState;
 }
 
+export interface OvermindTaskLogEntry {
+  at: string;
+  current_task: string | null;
+  done: number;
+  total: number;
+  note?: string;
+}
+
 export interface OvermindWorkflow {
   id: number;
   label: string;
@@ -30,6 +38,8 @@ export interface OvermindWorkflow {
   pending_decision: string | null;
   active_session: string | null;
   active_role: "parent" | "child" | null;
+  ended_at: string | null;
+  task_log: OvermindTaskLogEntry[];
   last_pane_hash: string | null;
   last_activity_at: string;
   stuck_since: string | null;
@@ -78,6 +88,8 @@ interface OvermindWorkflowRow {
   pending_decision: string | null;
   active_session: string | null;
   active_role: "parent" | "child" | null;
+  ended_at: string | null;
+  task_log: string;
   last_pane_hash: string | null;
   last_activity_at: string;
   stuck_since: string | null;
@@ -104,11 +116,13 @@ export class OvermindService {
           pending_decision,
           active_session,
           active_role,
+          ended_at,
+          task_log,
           stuck_since,
           nudge_count,
           tier,
           updated_at
-        ) VALUES (?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, NULL, 0, 0, datetime('now'))
+        ) VALUES (?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, NULL, '[]', NULL, 0, 0, datetime('now'))
         ON CONFLICT(coordinator_session) DO UPDATE SET
           label = excluded.label,
           child_sessions = excluded.child_sessions,
@@ -119,6 +133,8 @@ export class OvermindService {
           pending_decision = NULL,
           active_session = NULL,
           active_role = NULL,
+          ended_at = NULL,
+          task_log = '[]',
           stuck_since = NULL,
           nudge_count = 0,
           tier = 0,
@@ -229,16 +245,46 @@ export class OvermindService {
   }
 
   setStatus(id: number, status: OvermindWorkflowStatus): OvermindWorkflow | null {
+    const existing = this.get(id);
+    if (!existing) return null;
+    const endedAt = status === "completed" && !existing.ended_at ? this.isoNow() : existing.ended_at;
+
     this.db
-      .prepare("UPDATE overmind_workflows SET status = ?, updated_at = datetime('now') WHERE id = ?")
-      .run(status, id);
+      .prepare("UPDATE overmind_workflows SET status = ?, ended_at = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(status, endedAt, id);
     return this.get(id);
   }
 
   setTasks(id: number, currentTask: string | null, tasks: OvermindTask[]): OvermindWorkflow | null {
+    const existing = this.get(id);
+    if (!existing) return null;
+    const now = this.isoNow();
+    const doneCount = this.countDoneTasks(tasks);
+    const existingDoneCount = this.countDoneTasks(existing.tasks);
+    const shouldLog = currentTask !== existing.current_task || doneCount !== existingDoneCount;
+    const taskLog = shouldLog
+      ? [
+          ...existing.task_log,
+          {
+            at: now,
+            current_task: currentTask,
+            done: doneCount,
+            total: tasks.length,
+            note: this.taskLogNote(existing.current_task, currentTask, existingDoneCount, doneCount)
+          }
+        ].slice(-50)
+      : existing.task_log;
+    const allDone = tasks.length > 0 && tasks.every((task) => task.state === "done");
+    const hasNotDoneTask = tasks.some((task) => task.state !== "done");
+    const endedAt = allDone
+      ? existing.ended_at ?? now
+      : hasNotDoneTask
+        ? null
+        : existing.ended_at;
+
     this.db
-      .prepare("UPDATE overmind_workflows SET current_task = ?, tasks = ?, updated_at = datetime('now') WHERE id = ?")
-      .run(currentTask, JSON.stringify(tasks), id);
+      .prepare("UPDATE overmind_workflows SET current_task = ?, tasks = ?, ended_at = ?, task_log = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(currentTask, JSON.stringify(tasks), endedAt, JSON.stringify(taskLog), id);
     return this.get(id);
   }
 
@@ -251,12 +297,27 @@ export class OvermindService {
     return {
       ...row,
       child_sessions: this.parseJsonArray<string>(row.child_sessions),
-      tasks: this.parseJsonArray<OvermindTask>(row.tasks)
+      tasks: this.parseJsonArray<OvermindTask>(row.tasks),
+      task_log: this.parseJsonArray<OvermindTaskLogEntry>(row.task_log)
     };
   }
 
   private parseJsonArray<T>(value: string): T[] {
     const parsed = JSON.parse(value) as unknown;
     return Array.isArray(parsed) ? (parsed as T[]) : [];
+  }
+
+  private countDoneTasks(tasks: OvermindTask[]): number {
+    return tasks.filter((task) => task.state === "done").length;
+  }
+
+  private taskLogNote(previousTask: string | null, currentTask: string | null, previousDone: number, done: number): string {
+    if (previousTask !== currentTask && previousDone !== done) return "current task and progress changed";
+    if (previousTask !== currentTask) return "current task changed";
+    return "progress changed";
+  }
+
+  private isoNow(): string {
+    return new Date().toISOString();
   }
 }

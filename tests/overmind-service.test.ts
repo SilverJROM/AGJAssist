@@ -28,9 +28,9 @@ afterEach(() => {
 });
 
 describe("OvermindService", () => {
-  it("creates the schema v12 table, active attribution columns, and indexes", () => {
+  it("creates the schema v13 table, active attribution columns, history columns, and indexes", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(12);
+    expect(version.version).toBe(13);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -47,6 +47,8 @@ describe("OvermindService", () => {
     const colNames = cols.map((col) => col.name);
     expect(colNames).toContain("active_session");
     expect(colNames).toContain("active_role");
+    expect(colNames).toContain("ended_at");
+    expect(colNames).toContain("task_log");
   });
 
   it("round-trips register, list, get, getBySession, updates, status, tasks, and delete", () => {
@@ -68,6 +70,8 @@ describe("OvermindService", () => {
     expect(created.tasks[0]).toEqual({ id: "A1", label: "Schema", state: "processing" });
     expect(created.active_session).toBeNull();
     expect(created.active_role).toBeNull();
+    expect(created.ended_at).toBeNull();
+    expect(created.task_log).toEqual([]);
 
     expect(service.list()).toHaveLength(1);
     expect(service.get(created.id)?.coordinator_session).toBe("lkcamp-12");
@@ -107,9 +111,115 @@ describe("OvermindService", () => {
       { id: "A1", label: "Schema", state: "done" },
       { id: "A2", label: "Endpoints", state: "pending" }
     ]);
+    expect(tasks?.task_log).toHaveLength(1);
+    expect(tasks?.task_log[0]).toMatchObject({ current_task: "A1 verify", done: 1, total: 2 });
 
     expect(service.delete(created.id)).toBe(true);
     expect(service.get(created.id)).toBeNull();
+  });
+
+  it("freezes ended_at when all tasks are done and clears it when a not-done task appears", () => {
+    const created = service.register({
+      label: "v6",
+      coordinator_session: "v6-parent",
+      run_dir: "/tmp/overmind/v6",
+      current_task: "A1",
+      tasks: [{ id: "A1", label: "First", state: "processing" }]
+    });
+
+    const frozen = service.setTasks(created.id, "All done", [
+      { id: "A1", label: "First", state: "done" },
+      { id: "A2", label: "Second", state: "done" }
+    ]);
+
+    expect(frozen?.ended_at).toBeTruthy();
+    expect(Date.parse(frozen?.ended_at || "")).not.toBeNaN();
+
+    const frozenAgain = service.setTasks(created.id, "All done", [
+      { id: "A1", label: "First", state: "done" },
+      { id: "A2", label: "Second", state: "done" }
+    ]);
+    expect(frozenAgain?.ended_at).toBe(frozen?.ended_at);
+
+    const resumed = service.setTasks(created.id, "A3 injected", [
+      { id: "A1", label: "First", state: "done" },
+      { id: "A2", label: "Second", state: "done" },
+      { id: "A3", label: "Injected", state: "pending" }
+    ]);
+
+    expect(resumed?.ended_at).toBeNull();
+  });
+
+  it("stamps ended_at when status is set to completed", () => {
+    const created = service.register({
+      label: "v6-status",
+      coordinator_session: "v6-status-parent",
+      run_dir: "/tmp/overmind/v6-status"
+    });
+
+    const completed = service.setStatus(created.id, "completed");
+
+    expect(completed?.status).toBe("completed");
+    expect(completed?.ended_at).toBeTruthy();
+    expect(Date.parse(completed?.ended_at || "")).not.toBeNaN();
+  });
+
+  it("appends task_log on current task or done-count changes, skips no-ops, and caps at 50 entries", () => {
+    const created = service.register({
+      label: "v6-log",
+      coordinator_session: "v6-log-parent",
+      run_dir: "/tmp/overmind/v6-log",
+      current_task: "A1",
+      tasks: [
+        { id: "A1", label: "First", state: "processing" },
+        { id: "A2", label: "Second", state: "pending" }
+      ]
+    });
+
+    const noOp = service.setTasks(created.id, "A1", [
+      { id: "A1", label: "First", state: "processing" },
+      { id: "A2", label: "Second", state: "pending" }
+    ]);
+    expect(noOp?.task_log).toEqual([]);
+
+    const currentTaskChanged = service.setTasks(created.id, "A2", [
+      { id: "A1", label: "First", state: "processing" },
+      { id: "A2", label: "Second", state: "pending" }
+    ]);
+    expect(currentTaskChanged?.task_log).toHaveLength(1);
+    expect(currentTaskChanged?.task_log[0]).toMatchObject({ current_task: "A2", done: 0, total: 2 });
+
+    const doneChanged = service.setTasks(created.id, "A2", [
+      { id: "A1", label: "First", state: "done" },
+      { id: "A2", label: "Second", state: "pending" }
+    ]);
+    expect(doneChanged?.task_log).toHaveLength(2);
+    expect(doneChanged?.task_log[1]).toMatchObject({ current_task: "A2", done: 1, total: 2 });
+
+    const repeated = service.setTasks(created.id, "A2", [
+      { id: "A1", label: "First", state: "done" },
+      { id: "A2", label: "Second", state: "pending" }
+    ]);
+    expect(repeated?.task_log).toHaveLength(2);
+
+    const capped = service.register({
+      label: "v6-cap",
+      coordinator_session: "v6-cap-parent",
+      run_dir: "/tmp/overmind/v6-cap",
+      current_task: "Seed",
+      tasks: [{ id: "A1", label: "First", state: "pending" }]
+    });
+
+    let latest = capped;
+    for (let i = 0; i < 60; i += 1) {
+      latest = service.setTasks(capped.id, `Task ${i}`, [
+        { id: "A1", label: "First", state: i % 2 === 0 ? "pending" : "processing" }
+      ])!;
+    }
+
+    expect(latest.task_log).toHaveLength(50);
+    expect(latest.task_log[0].current_task).toBe("Task 10");
+    expect(latest.task_log[49].current_task).toBe("Task 59");
   });
 
   it("upserts by coordinator_session and resets the workflow to active", () => {
@@ -196,17 +306,23 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(12);
+    expect(version.version).toBe(13);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("active_session");
     expect(cols.map((col) => col.name)).toContain("active_role");
+    expect(cols.map((col) => col.name)).toContain("ended_at");
+    expect(cols.map((col) => col.name)).toContain("task_log");
     expect(service.getBySession("legacy-parent")?.active_session).toBeNull();
+    expect(service.getBySession("legacy-parent")?.ended_at).toBeNull();
+    expect(service.getBySession("legacy-parent")?.task_log).toEqual([]);
 
     db.close();
     db = new DatabaseService(TEST_DB);
     cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.filter((col) => col.name === "active_session")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "active_role")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "ended_at")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "task_log")).toHaveLength(1);
   });
 });

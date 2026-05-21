@@ -617,6 +617,42 @@ body {
   flex: 0 0 18px;
   text-align: center;
 }
+.overmind-history {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.overmind-history summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.overmind-history-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+.overmind-history-entry,
+.overmind-history-empty {
+  display: grid;
+  grid-template-columns: minmax(118px, 0.9fr) minmax(0, 1.5fr) auto;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.overmind-history-empty {
+  display: block;
+}
+.overmind-history-entry time,
+.overmind-history-entry span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.overmind-history-entry strong {
+  color: var(--text);
+  font-size: 12px;
+}
 
 /* Status badges */
 .badge {

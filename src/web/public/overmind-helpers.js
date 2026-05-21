@@ -162,9 +162,7 @@ export function formatActiveSessionAttribution(workflow) {
 
 export function formatStuckDuration(stuckSince, now = Date.now()) {
   if (!stuckSince) return '—';
-  const start = Date.parse(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(stuckSince)
-    ? `${stuckSince.replace(' ', 'T')}Z`
-    : stuckSince);
+  const start = parseTimestampMs(stuckSince);
   const end = typeof now === 'number' ? now : Date.parse(now);
   if (Number.isNaN(start) || Number.isNaN(end) || end < start) return '—';
 
@@ -177,8 +175,32 @@ export function formatStuckDuration(stuckSince, now = Date.now()) {
   return `${seconds}s`;
 }
 
+export function elapsedMs(createdAt, endedAt = null, now = Date.now()) {
+  const start = parseTimestampMs(createdAt);
+  const end = endedAt ? parseTimestampMs(endedAt) : (typeof now === 'number' ? now : parseTimestampMs(now));
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return 0;
+  return end - start;
+}
+
+export function formatElapsed(ms) {
+  const totalMinutes = Math.floor(Math.max(0, ms) / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return '<1m';
+}
+
 export function buildOvermindWsUrl(token, loc = globalThis.location) {
   if (!token || !loc?.host) return null;
   const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${loc.host}/ws/overmind?token=${encodeURIComponent(token)}`;
+}
+
+function parseTimestampMs(value) {
+  if (typeof value === 'number') return value;
+  if (!value) return NaN;
+  return Date.parse(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
+    ? `${value.replace(' ', 'T')}Z`
+    : value);
 }
