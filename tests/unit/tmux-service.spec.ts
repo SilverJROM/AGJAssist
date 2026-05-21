@@ -53,4 +53,17 @@ describe("TmuxService sendCommand", () => {
       "C-m"
     ]);
   });
+
+  it("accepts bare session names and full pane targets only", () => {
+    const service = new TmuxService();
+
+    expect(() => service.ensureValidTarget("ovm-build")).not.toThrow();
+    expect(() => service.ensureValidTarget("hris-d-22")).not.toThrow();
+    expect(() => service.ensureValidTarget("sess:0.1")).not.toThrow();
+
+    expect(() => service.ensureValidTarget("")).toThrow("Invalid tmux target");
+    expect(() => service.ensureValidTarget("ovm build")).toThrow("Invalid tmux target");
+    expect(() => service.ensureValidTarget("ovm-build;rm")).toThrow("Invalid tmux target");
+    expect(() => service.ensureValidTarget("sess:0.1;rm")).toThrow("Invalid tmux target");
+  });
 });

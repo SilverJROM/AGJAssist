@@ -179,8 +179,10 @@ export class TmuxService {
   }
 
   ensureValidTarget(target: string): void {
-    if (!/^[a-zA-Z0-9_.-]+:[0-9]+\.[0-9]+$/.test(target)) {
-      throw new Error("Invalid tmux target. Use format session:window.pane");
+    const bareSession = /^[a-zA-Z0-9_.-]+$/.test(target);
+    const paneTarget = /^[a-zA-Z0-9_.-]+:[0-9]+\.[0-9]+$/.test(target);
+    if (!bareSession && !paneTarget) {
+      throw new Error("Invalid tmux target. Use format session or session:window.pane");
     }
   }
 

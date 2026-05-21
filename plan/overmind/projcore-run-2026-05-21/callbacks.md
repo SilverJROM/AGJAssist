@@ -10,3 +10,4 @@
 [projcore callback] A4 PROPOSED Telegram commands and watcher-start plan proposed; awaiting APPROVED-PLAN before code changes.
 [projcore callback] A4 APPROVED-PLAN Approved plan received; implementation starting on feat/overmind.
 [projcore callback] A4 DONE Telegram commands and watcher startup implemented; targeted Vitest and tsc gates passed.
+[projcore callback] A4 DONE Correction iter 1: tmux target validation now accepts safe bare session names; tmux-service test and tsc gates passed.
