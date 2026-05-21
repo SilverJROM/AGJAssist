@@ -1,0 +1,5 @@
+- web/tg (miniapp) access to project folder /home/agjrom/websites
+- basically authentication for the web and miniapp would be done via telegram and only authenticated people are able to access the web/miniapp
+- tmux jobs (create/view/delete?)
+- project notes -> plans -> implementation on projects
+- converse with agents (ollama/openrouter/claude/codex)
