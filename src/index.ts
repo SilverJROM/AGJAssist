@@ -26,6 +26,7 @@ import { ChatSettingsService } from "./services/chat-settings-service.js";
 import { createApiServer } from "./api/server.js";
 import { ClaudeCliProvider } from "./llm/claude-cli-provider.js";
 import { CodexCliProvider } from "./llm/codex-cli-provider.js";
+import { OvermindService } from "./services/overmind-service.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -90,6 +91,7 @@ async function main(): Promise<void> {
   const personalTaskService = new PersonalTaskService(db, auditService);
   const reminderService = new ReminderService(db, auditService);
   const chatSettingsService = new ChatSettingsService(db);
+  const overmindService = new OvermindService(db);
 
   // Seed default soul.md and context.md if not set
   if (!chatSettingsService.get("soul_md")) {
@@ -155,7 +157,8 @@ async function main(): Promise<void> {
     tools,
     maxToolIterations: config.runtime.maxToolIterations,
     claudeCliProvider,
-    codexCliProvider
+    codexCliProvider,
+    overmindService
   });
 
   await apiServer.listen({ port: config.api.port, host: config.api.host });

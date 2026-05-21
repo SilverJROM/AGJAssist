@@ -74,6 +74,9 @@ export interface AppConfig {
     outputBufferLines: number;
     streamIntervalMs: number;
   };
+  overmind: {
+    token: string;
+  };
 }
 
 export function loadConfig(): AppConfig {
@@ -123,6 +126,9 @@ export function loadConfig(): AppConfig {
       historyRetentionDays: optionalNumber("TMUX_HISTORY_RETENTION_DAYS", 7),
       outputBufferLines: optionalNumber("TMUX_OUTPUT_BUFFER_LINES", 5000),
       streamIntervalMs: optionalNumber("TMUX_STREAM_INTERVAL_MS", 100)
+    },
+    overmind: {
+      token: optional("OVERMIND_TOKEN", "REDACTED_OVERMIND_TOKEN")
     }
   };
 }
