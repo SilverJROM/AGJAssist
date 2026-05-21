@@ -1371,3 +1371,26 @@ body.tg-miniapp {
 .pagination .page-info { font-size: 12px; color: var(--text-secondary); }
 .tg-miniapp .pagination button { background: var(--surface); color: var(--text); border-color: var(--border); }
 .tg-miniapp .pagination button.active { background: var(--tg-theme-button-color, var(--accent)); color: var(--tg-theme-button-text-color, #fff); }
+
+/* OVM: workflow % complete + task count/total */
+.overmind-pct {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  min-width: 34px;
+  text-align: right;
+}
+.overmind-task-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.overmind-task-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  white-space: nowrap;
+}

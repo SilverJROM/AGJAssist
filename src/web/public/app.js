@@ -753,6 +753,9 @@ function OvermindWorkflows() {
             const currentTask = currentWorkflowTask(tasks, workflow.current_task);
             const parentStatus = workflow.parent_status || workflow.status;
             const firstChildStatus = firstChildSession ? childSessionStatus(workflow, firstChildSession) : null;
+            const totalTasks = tasks.length;
+            const doneTasks = tasks.filter(t => t && t.state === 'done').length;
+            const pctComplete = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
             return html`
               <section class=${'item-card overmind-card ' + colorClass} key=${workflow.id}>
                 <div class="overmind-card-header">
@@ -767,6 +770,7 @@ function OvermindWorkflows() {
                     </div>
                   </button>
                   <div class="overmind-status">
+                    <span class="overmind-pct" title=${doneTasks + '/' + totalTasks + ' tasks complete'}>${pctComplete}%</span>
                     <button
                       type="button"
                       class="overmind-rename-button"
@@ -787,7 +791,7 @@ function OvermindWorkflows() {
                   </div>
                 </div>
                 <div class="overmind-substatus">
-                  <div><strong>task#${currentTask.id}:</strong> ${workflow.current_task || '—'}</div>
+                  <div class="overmind-task-line"><span><strong>task#${currentTask.id}:</strong> ${workflow.current_task || '—'}</span><span class="overmind-task-count">${doneTasks}/${totalTasks}</span></div>
                   <div>${currentTask.description}</div>
                 </div>
 
