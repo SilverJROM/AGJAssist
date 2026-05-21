@@ -1,2 +1,4 @@
 [projcore callback] W1 PROPOSED Read notification protocol, WU1/R3 north-star, W1 brief, brain/watcher/routes; proposed brain-gated notification implementation pending approval.
 [projcore callback] W1 DONE Brain-gated notifications implemented: prior-decisions context, resolve-first prompts, persisted once-per-transition gates, protocol messages, targeted tests/tsc/build pass.
+[projcore callback] W5 PROPOSED Read W5 brief; proposed v15 run_started_at/accumulated_ms migration, register roll-up/reset logic, UI current/total elapsed helpers, targeted tests, tsc/build gate.
+[projcore callback] W5 DONE Per-run elapsed reset implemented: schema v15 with backfill, register roll-up/reset, current/total UI helpers, artifacts written, targeted vitest/tsc/build pass.

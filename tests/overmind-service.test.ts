@@ -28,9 +28,9 @@ afterEach(() => {
 });
 
 describe("OvermindService", () => {
-  it("creates the schema v14 table, active attribution, history, and notification columns", () => {
+  it("creates the schema v15 table, active attribution, history, notification, and elapsed columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(14);
+    expect(version.version).toBe(15);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -50,6 +50,8 @@ describe("OvermindService", () => {
     expect(colNames).toContain("ended_at");
     expect(colNames).toContain("task_log");
     expect(colNames).toContain("last_notified_transition");
+    expect(colNames).toContain("run_started_at");
+    expect(colNames).toContain("accumulated_ms");
   });
 
   it("round-trips register, list, get, getBySession, updates, status, tasks, and delete", () => {
@@ -72,6 +74,8 @@ describe("OvermindService", () => {
     expect(created.active_session).toBeNull();
     expect(created.active_role).toBeNull();
     expect(created.ended_at).toBeNull();
+    expect(created.run_started_at).toBeTruthy();
+    expect(created.accumulated_ms).toBe(0);
     expect(created.task_log).toEqual([]);
 
     expect(service.list()).toHaveLength(1);
@@ -298,6 +302,66 @@ describe("OvermindService", () => {
     expect(service.list()).toHaveLength(1);
   });
 
+  it("resets run_started_at and rolls the prior current-run elapsed into accumulated_ms on re-register", () => {
+    const created = service.register({
+      label: "elapsed",
+      coordinator_session: "elapsed-parent",
+      run_dir: "/tmp/overmind/elapsed",
+      current_task: "First run",
+      tasks: [{ id: "A1", label: "First", state: "processing" }]
+    });
+    expect(created.accumulated_ms).toBe(0);
+    expect(created.run_started_at).toBeTruthy();
+
+    const previousRunStart = new Date(Date.now() - 120_000).toISOString();
+    db.prepare(
+      "UPDATE overmind_workflows SET run_started_at = ?, accumulated_ms = ? WHERE id = ?"
+    ).run(previousRunStart, 5_000, created.id);
+
+    const beforeRegister = Date.now();
+    const upserted = service.register({
+      label: "elapsed rerun",
+      coordinator_session: "elapsed-parent",
+      run_dir: "/tmp/overmind/elapsed-rerun",
+      current_task: "Second run",
+      tasks: [{ id: "A1", label: "First", state: "processing" }]
+    });
+    const afterRegister = Date.now();
+    const runStartedAt = Date.parse(upserted.run_started_at || "");
+
+    expect(upserted.id).toBe(created.id);
+    expect(runStartedAt).toBeGreaterThanOrEqual(beforeRegister);
+    expect(runStartedAt).toBeLessThanOrEqual(afterRegister);
+    expect(upserted.accumulated_ms).toBeGreaterThanOrEqual(5_000 + beforeRegister - Date.parse(previousRunStart));
+    expect(upserted.accumulated_ms).toBeLessThanOrEqual(5_000 + afterRegister - Date.parse(previousRunStart) + 50);
+    expect(upserted.ended_at).toBeNull();
+  });
+
+  it("rolls mixed SQLite and ISO timestamps exactly and recomputes ended_at from the new tasklist", () => {
+    const created = service.register({
+      label: "elapsed done",
+      coordinator_session: "elapsed-done-parent",
+      run_dir: "/tmp/overmind/elapsed-done"
+    });
+
+    db.prepare(
+      "UPDATE overmind_workflows SET run_started_at = ?, ended_at = ?, accumulated_ms = ? WHERE id = ?"
+    ).run("2026-05-21 00:00:00", "2026-05-21T00:10:00.000Z", 1_000, created.id);
+
+    const upserted = service.register({
+      label: "elapsed done rerun",
+      coordinator_session: "elapsed-done-parent",
+      run_dir: "/tmp/overmind/elapsed-done-rerun",
+      current_task: "Complete",
+      tasks: [{ id: "A1", label: "First", state: "done" }]
+    });
+
+    expect(upserted.accumulated_ms).toBe(601_000);
+    expect(upserted.ended_at).toBeTruthy();
+    expect(Date.parse(upserted.ended_at || "")).not.toBeNaN();
+    expect(Date.parse(upserted.ended_at || "")).toBeGreaterThanOrEqual(Date.parse(upserted.run_started_at || ""));
+  });
+
   it("migrates an existing v11 overmind table with guarded v12 ALTER columns", () => {
     db.close();
     cleanup();
@@ -339,7 +403,7 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(14);
+    expect(version.version).toBe(15);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("active_session");
@@ -347,10 +411,15 @@ describe("OvermindService", () => {
     expect(cols.map((col) => col.name)).toContain("ended_at");
     expect(cols.map((col) => col.name)).toContain("task_log");
     expect(cols.map((col) => col.name)).toContain("last_notified_transition");
+    expect(cols.map((col) => col.name)).toContain("run_started_at");
+    expect(cols.map((col) => col.name)).toContain("accumulated_ms");
     expect(service.getBySession("legacy-parent")?.active_session).toBeNull();
     expect(service.getBySession("legacy-parent")?.ended_at).toBeNull();
     expect(service.getBySession("legacy-parent")?.task_log).toEqual([]);
     expect(service.getBySession("legacy-parent")?.last_notified_transition).toBeNull();
+    expect(service.getBySession("legacy-parent")?.run_started_at).toBeTruthy();
+    expect(service.getBySession("legacy-parent")?.run_started_at).toBe(service.getBySession("legacy-parent")?.created_at);
+    expect(service.getBySession("legacy-parent")?.accumulated_ms).toBe(0);
 
     db.close();
     db = new DatabaseService(TEST_DB);
@@ -360,5 +429,7 @@ describe("OvermindService", () => {
     expect(cols.filter((col) => col.name === "ended_at")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "task_log")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "last_notified_transition")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "run_started_at")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "accumulated_ms")).toHaveLength(1);
   });
 });

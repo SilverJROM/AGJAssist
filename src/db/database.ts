@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -302,6 +302,8 @@ CREATE TABLE IF NOT EXISTS overmind_workflows (
   nudge_count INTEGER NOT NULL DEFAULT 0,
   tier INTEGER NOT NULL DEFAULT 0,
   last_notified_transition TEXT,
+  run_started_at TEXT,
+  accumulated_ms INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -547,6 +549,19 @@ export class DatabaseService {
         if (!colNames.has("last_notified_transition")) {
           this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN last_notified_transition TEXT");
         }
+      }
+
+      // Migration: v14 → v15: track current overmind run start and accumulated elapsed time
+      if (current && current.version < 15) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("run_started_at")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN run_started_at TEXT");
+        }
+        if (!colNames.has("accumulated_ms")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN accumulated_ms INTEGER NOT NULL DEFAULT 0");
+        }
+        this.db.exec("UPDATE overmind_workflows SET run_started_at = created_at WHERE run_started_at IS NULL");
       }
 
       this.db

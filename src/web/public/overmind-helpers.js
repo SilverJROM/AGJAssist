@@ -175,11 +175,20 @@ export function formatStuckDuration(stuckSince, now = Date.now()) {
   return `${seconds}s`;
 }
 
-export function elapsedMs(createdAt, endedAt = null, now = Date.now()) {
-  const start = parseTimestampMs(createdAt);
+export function currentElapsedMs(runStartedAt, endedAt = null, now = Date.now()) {
+  const start = parseTimestampMs(runStartedAt);
   const end = endedAt ? parseTimestampMs(endedAt) : (typeof now === 'number' ? now : parseTimestampMs(now));
   if (Number.isNaN(start) || Number.isNaN(end) || end < start) return 0;
   return end - start;
+}
+
+export function totalElapsedMs(accumulatedMs = 0, runStartedAt, endedAt = null, now = Date.now()) {
+  const accumulated = Number.isFinite(Number(accumulatedMs)) ? Number(accumulatedMs) : 0;
+  return Math.max(0, accumulated) + currentElapsedMs(runStartedAt, endedAt, now);
+}
+
+export function elapsedMs(createdAt, endedAt = null, now = Date.now()) {
+  return currentElapsedMs(createdAt, endedAt, now);
 }
 
 export function formatElapsed(ms) {

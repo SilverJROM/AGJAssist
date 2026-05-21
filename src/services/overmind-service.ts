@@ -46,6 +46,8 @@ export interface OvermindWorkflow {
   nudge_count: number;
   tier: number;
   last_notified_transition: string | null;
+  run_started_at: string | null;
+  accumulated_ms: number;
   created_at: string;
   updated_at: string;
 }
@@ -98,6 +100,8 @@ interface OvermindWorkflowRow {
   nudge_count: number;
   tier: number;
   last_notified_transition: string | null;
+  run_started_at: string | null;
+  accumulated_ms: number;
   created_at: string;
   updated_at: string;
 }
@@ -107,7 +111,8 @@ export class OvermindService {
 
   register(input: RegisterOvermindWorkflowInput): OvermindWorkflow {
     const tasks = input.tasks ?? [];
-    const endedAt = this.computeEndedAt(tasks, "active", null);
+    const now = this.isoNow();
+    const endedAt = this.computeEndedAt(tasks, "active", null, now);
     const row = this.db
       .prepare(
         `INSERT INTO overmind_workflows (
@@ -127,8 +132,10 @@ export class OvermindService {
           nudge_count,
           tier,
           last_notified_transition,
+          run_started_at,
+          accumulated_ms,
           updated_at
-        ) VALUES (?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, ?, '[]', NULL, 0, 0, NULL, datetime('now'))
+        ) VALUES (?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, ?, '[]', NULL, 0, 0, NULL, ?, 0, ?)
         ON CONFLICT(coordinator_session) DO UPDATE SET
           label = excluded.label,
           child_sessions = excluded.child_sessions,
@@ -145,7 +152,9 @@ export class OvermindService {
           nudge_count = 0,
           tier = 0,
           last_notified_transition = NULL,
-          updated_at = datetime('now')
+          accumulated_ms = overmind_workflows.accumulated_ms + ?,
+          run_started_at = excluded.run_started_at,
+          updated_at = excluded.updated_at
         RETURNING *`
       )
       .get(
@@ -155,7 +164,10 @@ export class OvermindService {
         input.run_dir,
         input.current_task ?? null,
         JSON.stringify(tasks),
-        endedAt
+        endedAt,
+        now,
+        now,
+        this.priorRunElapsedMs(input.coordinator_session, now)
       ) as OvermindWorkflowRow;
 
     return this.mapRow(row);
@@ -347,6 +359,29 @@ export class OvermindService {
       return previousEndedAt ?? now;
     }
     return previousEndedAt;
+  }
+
+  private priorRunElapsedMs(coordinatorSession: string, now: string): number {
+    const existing = this.db
+      .prepare(
+        "SELECT run_started_at, created_at, ended_at FROM overmind_workflows WHERE coordinator_session = ?"
+      )
+      .get(coordinatorSession) as
+      | { run_started_at: string | null; created_at: string | null; ended_at: string | null }
+      | undefined;
+    if (!existing) return 0;
+
+    const start = this.parseTimestampMs(existing.run_started_at ?? existing.created_at);
+    const end = this.parseTimestampMs(existing.ended_at ?? now);
+    if (Number.isNaN(start) || Number.isNaN(end) || end < start) return 0;
+    return end - start;
+  }
+
+  private parseTimestampMs(value: string | null): number {
+    if (!value) return NaN;
+    return Date.parse(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
+      ? `${value.replace(" ", "T")}Z`
+      : value);
   }
 
   private isoNow(): string {

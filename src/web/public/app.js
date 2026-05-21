@@ -8,7 +8,7 @@ import {
   addBottomNavTab,
   buildOvermindWsUrl,
   countDoneTasks,
-  elapsedMs,
+  currentElapsedMs,
   formatElapsed,
   formatActiveSessionAttribution,
   formatStuckDuration,
@@ -21,6 +21,7 @@ import {
   statusIcon,
   summarizeWorkflows,
   taskGlyph,
+  totalElapsedMs,
   writeBottomNavTabIds
 } from './overmind-helpers.js';
 
@@ -607,7 +608,9 @@ function OvermindWorkflows() {
             const childSessions = Array.isArray(workflow.child_sessions) ? workflow.child_sessions : [];
             const colorClass = statusColor(workflow.status);
             const isExpanded = !!expandedWorkflows[workflow.id];
-            const elapsed = formatElapsed(elapsedMs(workflow.created_at, workflow.ended_at, now));
+            const runStartedAt = workflow.run_started_at || workflow.created_at;
+            const currentElapsed = formatElapsed(currentElapsedMs(runStartedAt, workflow.ended_at, now));
+            const totalElapsed = formatElapsed(totalElapsedMs(workflow.accumulated_ms, runStartedAt, workflow.ended_at, now));
             return html`
               <section class=${'item-card overmind-card ' + colorClass} key=${workflow.id}>
                 <button
@@ -644,7 +647,8 @@ function OvermindWorkflows() {
 
                     <div class="overmind-meta-grid">
                       <div><span>Tier</span><strong>${workflow.tier ?? 0}</strong></div>
-                      <div><span>Elapsed</span><strong>${elapsed}${workflow.ended_at ? ' (done)' : ''}</strong></div>
+                      <div><span>Elapsed</span><strong>${currentElapsed}${workflow.ended_at ? ' (done)' : ''}</strong></div>
+                      <div class="overmind-total"><span>Total</span><strong>${totalElapsed}</strong></div>
                       <div><span>Stuck</span><strong>${workflow.stuck_since ? formatStuckDuration(workflow.stuck_since, now) : '—'}</strong></div>
                       <div><span>Coordinator</span><strong>${workflow.coordinator_session}</strong></div>
                       <div><span>Children</span><strong>${childSessions.length ? childSessions.join(', ') : '—'}</strong></div>
