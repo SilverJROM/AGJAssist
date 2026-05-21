@@ -7,6 +7,6 @@
 | WU3 | Rename workflow (display_name, persistent across re-register, auth endpoint + UI) | W3 | — | UNASSIGNED |
 | WU4 | History tab (Active/Completed/History) + persistent archive grouped by workflow | W4 | — | UNASSIGNED |
 
-| WU5 | Per-run elapsed reset (run_started_at) + accumulated total | W5 | — | UNASSIGNED |
+| WU5 | Per-run elapsed reset + accumulated total | W5 | live: reset+rollup verified, v15 | VERIFIED |
 
 Final acceptance: every row VERIFIED.
