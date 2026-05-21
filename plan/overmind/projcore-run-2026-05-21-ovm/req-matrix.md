@@ -8,4 +8,6 @@
 
 | OU5 | Telegram startup/polling non-fatal (app stays up if TG down) | O5 | batch-O5/independent-validation.md | VERIFIED |
 
+| OU6 | Classifier: activity = pane change, not stale marker (frozen→stuck→nudge) | O6 | — | UNASSIGNED |
+
 Final acceptance: every row VERIFIED.
