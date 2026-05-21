@@ -8,8 +8,8 @@
 - 2026-05-21 — Phase 0.5 starting: spawning codex session `ovm-build`, dispatching A1.
 
 ## Batch states
-- A1 dispatched_at: 2026-05-21T01:33:42Z estimate_min: 25 bucket: SHORT
-  - PROPOSED received + reviewed → APPROVED-PLAN sent. Implementing on feat/overmind-a1-schema.
+- A1 dispatched_at: 2026-05-21T01:33:42Z estimate_min: 25 bucket: SHORT — **PASS** (tsc clean, 3/3 vitest). R1 VERIFIED. Branch renamed feat/overmind. /clear sent.
+- A2 dispatched_at: 2026-05-21T01:45Z estimate_min: 25 bucket: SHORT — PROPOSED reviewed → APPROVED-PLAN sent. Implementing (R2,R3,R14-endpoint).
 
 ## Check-in log
 (none yet)
