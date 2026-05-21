@@ -24,3 +24,7 @@ Add an interactive "OVM" operator console to the AGJAssist workflow dashboard: a
 - Per-user "ovm chat mode" flag in assistant-core so plain messages route to OVM while active (and other commands still work).
 - Update telegram-bot.ts setMyCommands to include /ovm_start + /ovm_end (and ensure existing /overmind /om_tasks /om_pause /om_resume /om_drop are listed).
 *Acceptance:* /ovm_start → messages reach OVM + replies come back in TG; /ovm_end → normal mode; commands appear in the bot menu.
+
+## Injected 2026-05-21 (resilience)
+**OU5 — Telegram startup/polling must be non-fatal.** A Telegram network blip currently CRASHES the whole app at startup ("Fatal startup error: RequestError: AggregateError" from the bot's request lib), taking the local API/dashboard/overmind down. Fix: the local server (API + dashboard + overmind watcher) MUST start and stay up regardless of Telegram reachability. Wrap the bot startup (start/polling/setMyCommands) so failures LOG and CONTINUE (with background retry), never throw fatally or exit the process. Add process-level guards (unhandledRejection/uncaughtException from the bot's network lib should be logged, not crash). The dashboard/overmind must work with Telegram fully down.
+*Acceptance:* with Telegram unreachable, the process still boots, /app.js + /api/overmind/* respond, the watcher runs; the bot logs polling errors + retries in the background without crashing.
