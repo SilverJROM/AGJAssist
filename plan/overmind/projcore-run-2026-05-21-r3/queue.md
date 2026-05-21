@@ -7,3 +7,6 @@
 
 One batch at a time, plan-handshake, gate + live-smoke per batch.
 1.5 **W5** — Per-run elapsed reset (run_started_at) + accumulated_ms + UI current/total (WU5), schema bump — SHORT — PENDING (bumped next after W1)
+
+6. **W6** — Per-session status: classify parent + each child independently, persist (schema v18 parent_status+child_statuses) (WU6) — SHORT — PENDING
+7. **W7** — Restructured detail card + unified color scheme (working=green) + remove inline history (WU7) — SHORT — PENDING

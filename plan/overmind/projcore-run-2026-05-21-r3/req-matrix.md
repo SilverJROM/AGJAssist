@@ -9,4 +9,7 @@
 
 | WU5 | Per-run elapsed reset + accumulated total | W5 | live: reset+rollup verified, v15 | VERIFIED |
 
+| WU6 | Per-session status (parent + child, incl closed) | W6 | live: parent/child statuses + closed-child, v19 | VERIFIED |
+| WU7 | Restructured detail card + unified colors + remove inline history | W7 | — | UNASSIGNED |
+
 Final acceptance: every row VERIFIED.

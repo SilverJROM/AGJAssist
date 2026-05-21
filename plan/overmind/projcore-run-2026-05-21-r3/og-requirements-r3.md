@@ -24,3 +24,30 @@ Follow-on to the completed overmind build + UI round. AGJAssist, branch `feat/ov
 
 **WU5 — Per-run elapsed reset + accumulated total.** The "elapsed" currently counts from created_at, so it ACCUMULATES across re-registers (JROM saw 1h7m after restarting). Fix: add `run_started_at TEXT` (set to now on EVERY register — work (re)start) and `accumulated_ms INTEGER NOT NULL DEFAULT 0`. On register: roll the prior run's elapsed ((ended_at ?? now) − run_started_at) into accumulated_ms, then set run_started_at = now (and recompute ended_at from the new tasklist). created_at stays first-creation. Display: **"Elapsed: <current run>" primary** (= (ended_at ?? now) − run_started_at, freezes when done) + **"Total: <accumulated_ms + current>" secondary**. (schema bump.)
 *Acceptance:* re-registering a workflow resets its current Elapsed to ~0 (timing the new run); Total keeps the cumulative across runs; current freezes when all tasks done.
+
+## Injected 2026-05-21 (round-3 §1.4b — detail card restructure)
+
+**WU6 — Per-session status (parent + child classified independently).** The watcher already captures the coordinator + each child pane. Now classify EACH independently and persist: `parent_status` (full classifier on the coordinator pane: working|idle|waiting_human|awaiting_decision|stuck) + `child_statuses` (JSON map/array parallel to child_sessions, each working|idle from its pane busy markers). Keep the overall workflow `status` (for the top badge + Active/Completed/History tabs). Schema bump (v18: parent_status TEXT + child_statuses TEXT JSON default '[]').
+*Acceptance:* when the child codex pane is busy and the coordinator is idle, parent_status=idle + child_statuses shows that child=working; when the coordinator is waiting on JROM, parent_status=waiting_human.
+
+**WU7 — Restructured detail card + unified color scheme + remove inline history.** Re-lay the expanded card to:
+```
+> <display_name ?? label>            ✏️ rename    ▸ [overall status badge]
+  task#<n>: <current_task>
+  <task description / first task detail>
+
+  parent: <coordinator>   |  child: <child session(s)>
+  status: <parent_status> |  status: <child_status>      (each colored)
+  Elapsed: <current>      |  Total: <total>
+  Tier: <n>               |  Stuck: <dur or —>
+
+  ▸ Tasks <done>/<total>     (collapsible)
+```
+- Header: name + ✏️ rename (WU3) + collapse chevron + overall status badge.
+- Sub-status: current task line + description.
+- 4-col grid: parent/child sessions + their INDIVIDUAL statuses (colored per the unified scheme) + Elapsed/Total + Tier/Stuck.
+- **Unified color scheme (replaces RU2):** 🟢 working · 🟡 idle/active · 🔵 waiting_human+awaiting_decision (needs you) · 🔴 stuck/failed · ⚪ completed/paused. Update statusColor() + CSS classes; apply to overall badge AND per-session statuses.
+- **REMOVE the inline per-card History** (the History TAB from WU4 stays — only the in-card history block goes).
+*Acceptance:* expanded card matches the layout; parent/child each show a colored status; working renders green, idle yellow, needs-you blue, stuck red, done grey; no inline history block on the card.
+
+**WU6 addendum (injected 2026-05-21):** child status must also cover the **closed/missing** case — if a child's tmux session no longer exists (closed), its status = `closed` (treat as none/inactive, ⚪ grey). Detect via `tmux has-session` (or capture failure). Display: a closed/absent child shows status "closed"; if there is NO child registered at all, show the child name as "n/a".
