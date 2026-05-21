@@ -90,7 +90,38 @@ interface NudgeLadderFields {
 }
 
 export function hashPane(pane: string): string {
-  return createHash("sha256").update(pane).digest("hex");
+  return createHash("sha256").update(normalizePaneForActivity(pane)).digest("hex");
+}
+
+export function normalizePaneForActivity(text: string): string {
+  const spinnerGlyphs = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷";
+  const leadingSpinnerRe = new RegExp(`^\\s*[${spinnerGlyphs}]+\\s*`, "u");
+  const chromeLineRe = /bypass permissions|ctrl\+t to hide|(?:left|right|up|down|[←→↑↓])\s+to manage|[←→↑↓]\s+for agents|\/ps to view|\/stop|^\s*esc to interrupt\s*$|\b\d{1,2}:\d{2}:\d{2}\b/i;
+
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
+    .split("\n")
+    .map((line) => line.replace(leadingSpinnerRe, "").trim())
+    .filter((line) => line && !chromeLineRe.test(line))
+    .map((line) => line
+      .replace(/[([{]\s*(?=\d+\s*[hms]\b)/gi, " ")
+      .replace(/\b\d+\s*h\b|\b\d+\s*m\b|\b\d+\s*s\b/gi, " ")
+      .replace(/[•·]\s*(?=(?:esc to interrupt|\/ps to view)\b)/gi, " ")
+      .replace(/\besc to interrupt\b/gi, " ")
+      .replace(/\b\d+\s+background terminals? running\b/gi, "background terminal running")
+      .replace(/\b\d+\s+shells?\b/gi, "shells")
+      .replace(/\b\d+\s+monitors?\b/gi, "monitors")
+      .replace(/↑\s*\d+\s+tokens?\b/gi, "tokens")
+      .replace(/\b\d+\s+tokens?\b/gi, "tokens")
+      .replace(/[()[\]{}]/g, " ")
+      .replace(/\s*[•·]\s*/g, " ")
+      .replace(/\s+/g, " ")
+      .trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function allTasksComplete(tasks: { state: string }[]): boolean {
