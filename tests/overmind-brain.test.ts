@@ -6,10 +6,14 @@ import { DatabaseService } from "../src/db/database.js";
 import {
   OvermindBrain,
   BrainVerdict,
+  CompletionInput,
+  CompletionVerdict,
   DecisionInput,
   DecisionVerdict,
+  SonnetOvermindBrain,
   StuckInput
 } from "../src/services/overmind-brain.js";
+import { ChatMessage, LlmProvider } from "../src/llm/base-provider.js";
 import { OvermindService, OvermindWorkflow } from "../src/services/overmind-service.js";
 import { OvermindWatcher, hashPane } from "../src/services/overmind-watcher.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
@@ -22,10 +26,12 @@ const POST_BRAIN_NUDGE_PANE = `${QUIET_PANE}\nOvermind Tier 3 nudge`;
 class FakeBrain implements OvermindBrain {
   readonly calls: StuckInput[] = [];
   readonly decisionCalls: DecisionInput[] = [];
+  readonly completionCalls: CompletionInput[] = [];
 
   constructor(
     private readonly verdict?: BrainVerdict,
-    private readonly error?: Error
+    private readonly error?: Error,
+    private readonly completionVerdict?: CompletionVerdict
   ) {}
 
   async analyzeStuck(input: StuckInput): Promise<BrainVerdict> {
@@ -37,6 +43,15 @@ class FakeBrain implements OvermindBrain {
   async answerDecision(input: DecisionInput): Promise<DecisionVerdict> {
     this.decisionCalls.push(input);
     return { action: "escalate", reason: "test" };
+  }
+
+  async verifyCompletion(input: CompletionInput): Promise<CompletionVerdict> {
+    this.completionCalls.push(input);
+    return this.completionVerdict ?? {
+      action: "consult",
+      consultText: "Confirm done + POST /complete, or tell me what remains.",
+      reason: "test"
+    };
   }
 }
 
@@ -278,5 +293,97 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
       true,
       true
     );
+  });
+});
+
+class FakeLlm implements LlmProvider {
+  readonly messages: ChatMessage[][] = [];
+  constructor(private readonly reply: string) {}
+  async chat(messages: ChatMessage[]): Promise<string> {
+    this.messages.push(messages);
+    return this.reply;
+  }
+}
+
+function registerAllDoneWorkflow(): OvermindWorkflow {
+  const runDir = makeRunDir();
+  runDirs.push(runDir);
+  const workflow = service.register({
+    label: "projcore lkvc",
+    coordinator_session: "coord-1",
+    child_sessions: ["child-1"],
+    run_dir: runDir,
+    current_task: "all batches done — idle"
+  });
+  service.setTasks(workflow.id, "all batches done — idle", [
+    { id: "b1", label: "B1", state: "done" },
+    { id: "b2", label: "B2", state: "done" }
+  ]);
+  return service.get(workflow.id)!;
+}
+
+describe("Overmind completion-edge verification (all tasks done, no /complete)", () => {
+  it("consults projcore once (Sonnet), flips off 'working', and does NOT re-run Sonnet next tick", async () => {
+    registerAllDoneWorkflow();
+    const brain = new FakeBrain(undefined, undefined, {
+      action: "consult",
+      consultText: "Overmind: list shows all done — POST /complete if finished, else update it.",
+      reason: "Unreported all-done."
+    });
+    const tmux = makeTmuxMock(
+      { "coord-1": QUIET_PANE, "child-1": CHILD_PANE },
+      `${QUIET_PANE}\nconsult sent`
+    );
+    const watcher = new OvermindWatcher(service, tmux, undefined, brain);
+
+    await watcher.tick();
+    const after = service.getBySession("coord-1");
+    expect(after?.status).toBe("waiting_human");
+    expect(after?.completion_check).toBe("2/2");
+    expect(brain.completionCalls).toHaveLength(1);
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+    expect(tmux.sendCommand).toHaveBeenCalledWith(
+      "coord-1",
+      "Overmind: list shows all done — POST /complete if finished, else update it.",
+      true,
+      true
+    );
+
+    // Same all-done signature next tick: held quietly, no second Sonnet call, no token spend.
+    await watcher.tick();
+    expect(brain.completionCalls).toHaveLength(1);
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+    expect(service.getBySession("coord-1")?.status).toBe("waiting_human");
+  });
+
+  it("on a 'working' false-alarm verdict it sends no nudge and keeps monitoring", async () => {
+    registerAllDoneWorkflow();
+    const brain = new FakeBrain(undefined, undefined, {
+      action: "working",
+      reason: "Coordinator still actively running the capstone."
+    });
+    const tmux = makeTmuxMock({ "coord-1": QUIET_PANE, "child-1": CHILD_PANE });
+    const watcher = new OvermindWatcher(service, tmux, undefined, brain);
+
+    await watcher.tick();
+    expect(brain.completionCalls).toHaveLength(1);
+    expect(tmux.sendCommand).not.toHaveBeenCalled();
+    expect(service.getBySession("coord-1")?.completion_check).toBe("2/2");
+  });
+
+  it("SonnetOvermindBrain.verifyCompletion parses a consult verdict from JSON", async () => {
+    const llm = new FakeLlm('{"action":"consult","consult_text":"Confirm + POST /complete.","reason":"unreported"}');
+    const brain = new SonnetOvermindBrain(1000, llm);
+    const verdict = await brain.verifyCompletion({
+      label: "x",
+      tasksSummary: "- [done] b1: B1",
+      coordinatorPaneTail: "idle",
+      progressTail: "done",
+      callbacksTail: "done",
+      northStar: "ship it",
+      priorDecisions: "<none matched>"
+    });
+    expect(verdict.action).toBe("consult");
+    expect(verdict.consultText).toBe("Confirm + POST /complete.");
   });
 });

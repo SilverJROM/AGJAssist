@@ -59,6 +59,7 @@ export interface OvermindWorkflow {
   last_notified_transition: string | null;
   run_started_at: string | null;
   accumulated_ms: number;
+  completion_check: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -89,6 +90,7 @@ export interface UpdateOvermindWorkflowInput {
   nudge_count?: number;
   tier?: number;
   last_notified_transition?: string | null;
+  completion_check?: string | null;
 }
 
 interface OvermindWorkflowRow {
@@ -114,6 +116,7 @@ interface OvermindWorkflowRow {
   last_notified_transition: string | null;
   run_started_at: string | null;
   accumulated_ms: number;
+  completion_check: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -174,6 +177,7 @@ export class OvermindService {
           nudge_count = 0,
           tier = 0,
           last_notified_transition = NULL,
+          completion_check = NULL,
           accumulated_ms = overmind_workflows.accumulated_ms + ?,
           run_started_at = excluded.run_started_at,
           updated_at = excluded.updated_at
@@ -263,7 +267,10 @@ export class OvermindService {
       tier: fields.tier ?? existing.tier,
       last_notified_transition: fields.last_notified_transition !== undefined
         ? fields.last_notified_transition
-        : existing.last_notified_transition
+        : existing.last_notified_transition,
+      completion_check: fields.completion_check !== undefined
+        ? fields.completion_check
+        : existing.completion_check
     };
 
     this.db
@@ -285,6 +292,7 @@ export class OvermindService {
             nudge_count = ?,
             tier = ?,
             last_notified_transition = ?,
+            completion_check = ?,
             updated_at = datetime('now')
         WHERE id = ?`
       )
@@ -305,6 +313,7 @@ export class OvermindService {
         next.nudge_count,
         next.tier,
         next.last_notified_transition,
+        next.completion_check,
         id
       );
 

@@ -6,7 +6,9 @@ import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "./ove
 import { TmuxService } from "../tmux/tmux-service.js";
 import {
   BrainVerdict,
+  CompletionVerdict,
   DecisionVerdict,
+  DEFAULT_COMPLETION_CONSULT_TEXT,
   OvermindBrain,
   hasAlwaysEscalateKeyword
 } from "./overmind-brain.js";
@@ -27,8 +29,8 @@ export const PRIOR_DECISION_FILE_CHAR_LIMIT = 1000;
 export const PRIOR_DECISION_MAX_FILES = 5;
 export const CANNED_NUDGE =
   "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS.";
-export const ALL_DONE_CONFIRM_NUDGE =
-  "Overmind: every task on your list is marked done but you haven't reported completion. If the run is finished, POST /api/overmind/complete (projcore §2.11) NOW — even if you're keeping the session alive for field-testing. If work remains, update your tasklist with the open items.";
+// Deterministic fallback consult text when the Sonnet completion brain is unavailable.
+export const ALL_DONE_CONFIRM_NUDGE = DEFAULT_COMPLETION_CONSULT_TEXT;
 export const FRONTLOAD_CORRECTION_NOTE =
   "Overmind: that decision should have been frontloaded at intake (projcore §1.4a) — please put such decisions in the north-star next time.";
 
@@ -211,21 +213,13 @@ export class OvermindWatcher {
       childPanes
     });
 
-    // Fail-safe (zero-token, deterministic): all tasks are done but the coordinator
-    // never reported completion (e.g. parked the session alive for a field test).
-    // Ask projcore once to confirm + call /complete, and stop showing "working".
+    // Edge case (the lkvc-38 situation): the task list shows every task done but the
+    // coordinator never reported /complete. A clean /complete is trusted and never lands
+    // here — this branch ONLY guards the unreported all-done state. Sonnet verifies it
+    // ONCE per distinct all-done signature (token-gated via completion_check), then
+    // consults projcore — projcore's own /complete remains where the buck stops.
     if (allTasksComplete(workflow.tasks)) {
-      await this.confirmAllTasksDone(workflow);
-      this.overmindService.update(workflow.id, {
-        status: "waiting_human",
-        pending_decision: null,
-        last_pane_hash: result.coordinatorHash,
-        stuck_since: null,
-        nudge_count: 0,
-        tier: 0,
-        active_session: activeAttribution.active_session,
-        active_role: activeAttribution.active_role
-      });
+      await this.handleAllTasksDone(workflow, coordinatorPane, result.coordinatorHash, activeAttribution);
       return;
     }
 
@@ -247,19 +241,100 @@ export class OvermindWatcher {
     });
   }
 
-  private async confirmAllTasksDone(workflow: OvermindWorkflow): Promise<void> {
-    // Only nudge on the transition into the all-done state — once we've flipped the
-    // row to waiting_human, subsequent ticks skip the nudge (no repeat every 45s).
-    if (workflow.status === "waiting_human") return;
+  private async handleAllTasksDone(
+    workflow: OvermindWorkflow,
+    coordinatorPane: string,
+    coordinatorHash: string,
+    attribution: ActiveSessionAttribution
+  ): Promise<void> {
+    const doneCount = workflow.tasks.filter((task) => task.state === "done").length;
+    const signature = `${doneCount}/${workflow.tasks.length}`;
+
+    // Already assessed this exact all-done state — hold quietly: no Sonnet, no nudge
+    // ladder, no token spend. Re-armed only when the task list changes (new signature)
+    // or projcore re-registers (completion_check reset to NULL).
+    if (workflow.completion_check === signature) {
+      this.overmindService.update(workflow.id, {
+        pending_decision: null,
+        last_pane_hash: coordinatorHash,
+        stuck_since: null,
+        nudge_count: 0,
+        tier: 0,
+        active_session: attribution.active_session,
+        active_role: attribution.active_role
+      });
+      return;
+    }
+
+    const verdict = await this.assessCompletion(workflow, coordinatorPane);
+
+    if (verdict.action === "working") {
+      // False alarm — Sonnet sees the run is still active despite the all-done list.
+      this.overmindService.update(workflow.id, {
+        status: "working",
+        pending_decision: null,
+        last_pane_hash: coordinatorHash,
+        stuck_since: null,
+        nudge_count: 0,
+        tier: 0,
+        completion_check: signature,
+        active_session: attribution.active_session,
+        active_role: attribution.active_role
+      });
+      return;
+    }
+
+    // consult: ask projcore to confirm + POST /complete (or clarify what remains).
+    let lastPaneHash = coordinatorHash;
     try {
-      await this.tmuxService.sendCommand(
-        workflow.coordinator_session,
-        ALL_DONE_CONFIRM_NUDGE,
-        true,
-        true
-      );
+      await this.tmuxService.sendCommand(workflow.coordinator_session, verdict.consultText!, true, true);
+      lastPaneHash = hashPane(await this.capturePaneSafe(workflow.coordinator_session));
     } catch (error) {
-      console.error("Overmind all-done confirmation nudge failed:", error);
+      console.error("Overmind completion consult nudge failed:", error);
+    }
+
+    this.overmindService.update(workflow.id, {
+      status: "waiting_human",
+      pending_decision: null,
+      last_pane_hash: lastPaneHash,
+      stuck_since: null,
+      nudge_count: 0,
+      tier: 0,
+      completion_check: signature,
+      active_session: attribution.active_session,
+      active_role: attribution.active_role
+    });
+  }
+
+  private async assessCompletion(
+    workflow: OvermindWorkflow,
+    coordinatorPane: string
+  ): Promise<CompletionVerdict> {
+    if (!this.brain?.verifyCompletion) {
+      return {
+        action: "consult",
+        consultText: ALL_DONE_CONFIRM_NUDGE,
+        reason: "No completion brain available; deterministic consult to projcore."
+      };
+    }
+    const tasksSummary = summarizeTasks(workflow.tasks);
+    try {
+      return await this.brain.verifyCompletion({
+        label: workflow.label,
+        tasksSummary,
+        coordinatorPaneTail: tailLines(coordinatorPane, BRAIN_COORDINATOR_TAIL_LINES),
+        progressTail: await readRunFileTail(workflow.run_dir, "progress.md", BRAIN_RUN_FILE_TAIL_LINES),
+        callbacksTail: await readRunFileTail(workflow.run_dir, "callbacks.md", BRAIN_RUN_FILE_TAIL_LINES),
+        northStar: await readFileBestEffort(path.join(workflow.run_dir, "north-star.md")),
+        priorDecisions: await collectPriorDecisions(workflow.run_dir, `${workflow.label}\ncompletion ${tasksSummary}`)
+      });
+    } catch (error) {
+      console.error("Overmind completion brain failed:", error);
+      return {
+        action: "consult",
+        consultText: ALL_DONE_CONFIRM_NUDGE,
+        reason: "Completion brain failed; deterministic consult to projcore."
+      };
     }
   }
 
@@ -712,6 +787,11 @@ function capturePendingDecision(pane: string): string {
   const firstOptionIndex = lines.findIndex((line) => /^\d+\.\s+\S+/.test(line));
   const start = firstOptionIndex === -1 ? Math.max(0, lines.length - 12) : Math.max(0, firstOptionIndex - 3);
   return lines.slice(start, start + 14).join("\n").slice(0, 2000);
+}
+
+function summarizeTasks(tasks: { id: string; label: string; state: string }[]): string {
+  if (tasks.length === 0) return "<no tasks>";
+  return tasks.map((task) => `- [${task.state}] ${task.id}: ${task.label}`).join("\n").slice(0, 2000);
 }
 
 function tailLines(text: string, maxLines: number): string {

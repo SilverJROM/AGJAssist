@@ -28,9 +28,9 @@ afterEach(() => {
 });
 
 describe("OvermindService", () => {
-  it("creates the schema v17 tables, display name, active attribution, history, notification, and elapsed columns", () => {
+  it("creates the schema v18 tables, display name, active attribution, history, notification, elapsed, and completion-check columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(17);
+    expect(version.version).toBe(18);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -531,7 +531,7 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(17);
+    expect(version.version).toBe(18);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("display_name");
@@ -542,6 +542,7 @@ describe("OvermindService", () => {
     expect(cols.map((col) => col.name)).toContain("last_notified_transition");
     expect(cols.map((col) => col.name)).toContain("run_started_at");
     expect(cols.map((col) => col.name)).toContain("accumulated_ms");
+    expect(cols.map((col) => col.name)).toContain("completion_check");
     expect(service.getBySession("legacy-parent")?.active_session).toBeNull();
     expect(service.getBySession("legacy-parent")?.ended_at).toBeNull();
     expect(service.getBySession("legacy-parent")?.task_log).toEqual([]);
@@ -564,6 +565,7 @@ describe("OvermindService", () => {
     expect(cols.filter((col) => col.name === "last_notified_transition")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "run_started_at")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "accumulated_ms")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "completion_check")).toHaveLength(1);
     expect(historyCols.filter((col) => col.name === "coordinator_session")).toHaveLength(1);
   });
 });

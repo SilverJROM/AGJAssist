@@ -35,9 +35,30 @@ export interface DecisionVerdict {
   reason: string;
 }
 
+export interface CompletionInput {
+  label: string;
+  tasksSummary: string;
+  coordinatorPaneTail: string;
+  progressTail: string;
+  callbacksTail: string;
+  northStar: string;
+  priorDecisions: string;
+}
+
+// "consult" => ask the coordinator (projcore) to confirm + POST /complete or clarify.
+// "working" => false alarm; the run is clearly still active, send nothing.
+export type CompletionVerdictAction = "consult" | "working";
+
+export interface CompletionVerdict {
+  action: CompletionVerdictAction;
+  consultText?: string;
+  reason: string;
+}
+
 export interface OvermindBrain {
   analyzeStuck(input: StuckInput): Promise<BrainVerdict>;
   answerDecision(input: DecisionInput): Promise<DecisionVerdict>;
+  verifyCompletion?(input: CompletionInput): Promise<CompletionVerdict>;
 }
 
 interface RawBrainVerdict {
@@ -51,6 +72,13 @@ interface RawDecisionVerdict {
   action?: unknown;
   answer_text?: unknown;
   answerText?: unknown;
+  reason?: unknown;
+}
+
+interface RawCompletionVerdict {
+  action?: unknown;
+  consult_text?: unknown;
+  consultText?: unknown;
   reason?: unknown;
 }
 
@@ -100,6 +128,22 @@ const DECISION_SYSTEM_PROMPT = [
   "Use action=escalate only when coverage is absent, ambiguous, risky, irreversible, or broader than the supplied defaults.",
   "When answering, provide only the exact coordinator reply to send; prefer concise free text when the prompt allows it.",
   "Never propose sending anything to child sessions."
+].join("\n");
+
+export const DEFAULT_COMPLETION_CONSULT_TEXT =
+  "Overmind: every task on your list is marked done but you haven't reported completion. If the run is finished, POST /api/overmind/complete (projcore §2.11) NOW — even if you're keeping the session alive for field-testing. If work remains, update your tasklist with the open items.";
+
+const COMPLETION_SYSTEM_PROMPT = [
+  "You are Overmind's completion-verification brain for one projcore coordinator workflow.",
+  "Context: the workflow's task list shows EVERY task done, but the coordinator has NOT reported completion to Overmind (no /complete call).",
+  "This is the ONLY situation you are asked to judge — projcore explicitly reporting /complete is trusted and never reaches you.",
+  "Decide, from the supplied tiny context, whether the run genuinely finished (and the coordinator merely forgot to report) OR whether there is confusion / remaining work / an open question.",
+  "You do NOT mark anything complete — only the coordinator's own /complete is authoritative. The buck stops with projcore.",
+  "When in doubt, CONSULT the coordinator (projcore). Never message child sessions. Never escalate to the human here.",
+  "Return STRICT JSON only, with no markdown, prose, or code fences.",
+  "Allowed shape: {\"action\":\"consult|working\",\"consult_text\":\"optional\",\"reason\":\"short reason\"}.",
+  "Use action=consult for the normal case: write a concise coordinator message asking it to POST /api/overmind/complete if truly finished, or to update its task list / answer the open point if work remains.",
+  "Use action=working ONLY when the context clearly shows the coordinator is still actively mid-run despite the all-done list (then no message is sent)."
 ].join("\n");
 
 export class SonnetOvermindBrain implements OvermindBrain {
@@ -167,6 +211,39 @@ export class SonnetOvermindBrain implements OvermindBrain {
 
     const raw = await this.llm.chat(messages, 800);
     return normalizeDecisionVerdict(parseJsonObject(raw));
+  }
+
+  async verifyCompletion(input: CompletionInput): Promise<CompletionVerdict> {
+    const messages: ChatMessage[] = [
+      { role: "system", content: COMPLETION_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: [
+          `Workflow label: ${input.label}`,
+          "",
+          "Task list (all marked done):",
+          input.tasksSummary || "<empty>",
+          "",
+          "Coordinator pane tail:",
+          input.coordinatorPaneTail || "<empty>",
+          "",
+          "progress.md tail:",
+          input.progressTail || "<empty>",
+          "",
+          "callbacks.md tail:",
+          input.callbacksTail || "<empty>",
+          "",
+          "Workflow north-star:",
+          input.northStar || "<missing>",
+          "",
+          "Prior JROM decisions (relevance-filtered):",
+          input.priorDecisions || "<none matched>"
+        ].join("\n")
+      }
+    ];
+
+    const raw = await this.llm.chat(messages, 800);
+    return normalizeCompletionVerdict(parseJsonObject(raw));
   }
 }
 
@@ -258,6 +335,42 @@ function normalizeDecisionVerdict(raw: RawDecisionVerdict): DecisionVerdict {
   return {
     action: "escalate",
     reason: `Sonnet brain returned unsupported decision action: ${action || "<missing>"}.`
+  };
+}
+
+function normalizeCompletionVerdict(raw: RawCompletionVerdict): CompletionVerdict {
+  const action = typeof raw.action === "string" ? raw.action : "";
+  const reason = typeof raw.reason === "string" && raw.reason.trim()
+    ? raw.reason.trim().slice(0, 500)
+    : "Sonnet brain did not provide a reason.";
+
+  if (action === "working") {
+    return { action, reason };
+  }
+
+  if (action === "consult") {
+    const consultText = typeof raw.consult_text === "string"
+      ? normalizeCoordinatorLine(raw.consult_text)
+      : typeof raw.consultText === "string"
+        ? normalizeCoordinatorLine(raw.consultText)
+        : "";
+    if (!consultText) {
+      return {
+        action: "consult",
+        consultText: DEFAULT_COMPLETION_CONSULT_TEXT,
+        reason: reason === "Sonnet brain did not provide a reason."
+          ? "Sonnet brain requested a consult without consult_text; using default."
+          : reason
+      };
+    }
+    return { action, consultText, reason };
+  }
+
+  // Unknown / malformed action: safest is to consult projcore, never silently drop.
+  return {
+    action: "consult",
+    consultText: DEFAULT_COMPLETION_CONSULT_TEXT,
+    reason: `Sonnet brain returned unsupported completion action: ${action || "<missing>"}; defaulting to consult.`
   };
 }
 

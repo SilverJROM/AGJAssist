@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 17;
+const SCHEMA_VERSION = 18;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -305,6 +305,7 @@ CREATE TABLE IF NOT EXISTS overmind_workflows (
   last_notified_transition TEXT,
   run_started_at TEXT,
   accumulated_ms INTEGER NOT NULL DEFAULT 0,
+  completion_check TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -588,6 +589,15 @@ export class DatabaseService {
       // Migration: v16 → v17: add persistent overmind task history archive
       if (current && current.version < 17) {
         this.db.exec(SCHEMA_SQL);
+      }
+
+      // Migration: v17 → v18: gate Sonnet completion-edge check once per all-done state
+      if (current && current.version < 18) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("completion_check")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN completion_check TEXT");
+        }
       }
 
       this.db
