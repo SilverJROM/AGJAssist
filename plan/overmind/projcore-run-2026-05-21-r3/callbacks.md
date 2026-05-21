@@ -2,3 +2,5 @@
 [projcore callback] W1 DONE Brain-gated notifications implemented: prior-decisions context, resolve-first prompts, persisted once-per-transition gates, protocol messages, targeted tests/tsc/build pass.
 [projcore callback] W5 PROPOSED Read W5 brief; proposed v15 run_started_at/accumulated_ms migration, register roll-up/reset logic, UI current/total elapsed helpers, targeted tests, tsc/build gate.
 [projcore callback] W5 DONE Per-run elapsed reset implemented: schema v15 with backfill, register roll-up/reset, current/total UI helpers, artifacts written, targeted vitest/tsc/build pass.
+[projcore callback] W2 PROPOSED Read W2 brief plus expanded-card app/CSS; proposed replacing the loose meta grid with compact label/value detail table while keeping tasklist/history outside.
+[projcore callback] W2 DONE Expanded-card detail now renders as compact label/value table with tasklist/history outside; W2 artifacts written; npx tsc and npm run build pass.

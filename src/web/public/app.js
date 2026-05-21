@@ -611,6 +611,7 @@ function OvermindWorkflows() {
             const runStartedAt = workflow.run_started_at || workflow.created_at;
             const currentElapsed = formatElapsed(currentElapsedMs(runStartedAt, workflow.ended_at, now));
             const totalElapsed = formatElapsed(totalElapsedMs(workflow.accumulated_ms, runStartedAt, workflow.ended_at, now));
+            const activeSession = formatActiveSessionAttribution(workflow);
             return html`
               <section class=${'item-card overmind-card ' + colorClass} key=${workflow.id}>
                 <button
@@ -643,16 +644,38 @@ function OvermindWorkflows() {
                       </div>
                     `}
 
-                    <div class="overmind-active-session">${formatActiveSessionAttribution(workflow)}</div>
-
-                    <div class="overmind-meta-grid">
-                      <div><span>Tier</span><strong>${workflow.tier ?? 0}</strong></div>
-                      <div><span>Elapsed</span><strong>${currentElapsed}${workflow.ended_at ? ' (done)' : ''}</strong></div>
-                      <div class="overmind-total"><span>Total</span><strong>${totalElapsed}</strong></div>
-                      <div><span>Stuck</span><strong>${workflow.stuck_since ? formatStuckDuration(workflow.stuck_since, now) : '—'}</strong></div>
-                      <div><span>Coordinator</span><strong>${workflow.coordinator_session}</strong></div>
-                      <div><span>Children</span><strong>${childSessions.length ? childSessions.join(', ') : '—'}</strong></div>
-                    </div>
+                    <table class="overmind-detail-table">
+                      <tbody>
+                        <tr>
+                          <th scope="row">Coordinator</th>
+                          <td>${workflow.coordinator_session || '—'}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Children</th>
+                          <td>${childSessions.length ? childSessions.join(', ') : '—'}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Active</th>
+                          <td>${activeSession}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Tier</th>
+                          <td>${workflow.tier ?? 0}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Elapsed</th>
+                          <td>${currentElapsed}${workflow.ended_at ? ' (done)' : ''}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Total</th>
+                          <td>${totalElapsed}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Stuck</th>
+                          <td>${workflow.stuck_since ? formatStuckDuration(workflow.stuck_since, now) : '—'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
 
                     <details class="overmind-tasklist" open=${tasks.length <= 6}>
                       <summary>Tasks ${doneCount}/${tasks.length}</summary>
