@@ -8,6 +8,7 @@ import {
   OvermindWorkflowStatus
 } from "../../services/overmind-service.js";
 import type { OvermindNotify } from "../../services/overmind-watcher.js";
+import { OvermindStreamManager } from "../websocket/overmind-stream-manager.js";
 
 interface TokenBody {
   token?: string;
@@ -64,7 +65,8 @@ export function registerOvermindRoutes(
   config: AppConfig,
   authService: AuthService,
   overmindService: OvermindService,
-  notify?: OvermindNotify
+  notify?: OvermindNotify,
+  streamManager?: OvermindStreamManager
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
 
@@ -145,4 +147,15 @@ export function registerOvermindRoutes(
       return { workflows: overmindService.list(request.query.status) };
     }
   );
+
+  if (streamManager) {
+    app.get<{ Querystring: { token?: string } }>(
+      "/ws/overmind",
+      { websocket: true },
+      async (socket, request) => {
+        const token = (request.query as Record<string, string>).token || "";
+        await streamManager.handleConnection(socket, token);
+      }
+    );
+  }
 }

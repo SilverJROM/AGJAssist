@@ -20,3 +20,5 @@
 [projcore callback] A6a DONE Sonnet brain Tier-3 plumbing, BLOCKED waiting_human halt, and fake-brain tests implemented; tsc and targeted overmind gates passed.
 [projcore callback] A6b PROPOSED Plan ready: add decision-answer brain method, deterministic always-escalate guardrail, once-per-episode handling, R16 correction log/note, fake-brain tests.
 [projcore callback] A6b DONE Decision interception, deterministic always-escalate guardrail, once-per-decision handling, and R16 correction implemented; tsc and targeted/prior overmind gates passed.
+[projcore callback] A7 PROPOSED Plan prepared; waiting for APPROVED-PLAN before implementation.
+[projcore callback] A7 DONE /overmind dashboard, /ws/overmind stream, watcher broadcast callback, tests, and artifacts complete.

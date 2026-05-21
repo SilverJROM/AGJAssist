@@ -2,6 +2,7 @@ import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
 import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput } from './terminal-chat-state.js';
+import { buildOvermindWsUrl, countDoneTasks, formatStuckDuration, statusIcon, taskGlyph } from './overmind-helpers.js';
 
 const html = htm.bind(h);
 
@@ -371,6 +372,7 @@ function Header({ user }) {
           <a href="#/" class=${route === '/' ? 'active' : ''}>Dashboard</a>
           <a href="#/projects" class=${route === '/projects' || route.startsWith('/project/') ? 'active' : ''}>Projects</a>
           <a href="#/terminals" class=${route === '/terminals' ? 'active' : ''}>Terminals</a>
+          <a href="#/overmind" class=${route === '/overmind' ? 'active' : ''}>Workflows</a>
           <a href="#/tasks" class=${route === '/tasks' ? 'active' : ''}>Tasks</a>
           <a href="#/notes" class=${route === '/notes' ? 'active' : ''}>Notes</a>
           <a href="#/conversations" class=${route === '/conversations' ? 'active' : ''}>Conversations</a>
@@ -420,6 +422,7 @@ function Dashboard() {
   const cards = [
     { label: 'Projects', count: stats.projects, route: '/projects', desc: 'Manage your development projects' },
     { label: 'Terminals', count: null, route: '/terminals', desc: 'Tmux terminal sessions' },
+    { label: 'Workflows', count: null, route: '/overmind', desc: 'Overmind live workflow dashboard' },
     { label: 'Tasks', count: stats.tasks, route: '/tasks', desc: 'Daily & weekly tasks, reminders' },
     { label: 'Notes', count: stats.notes, route: '/notes', desc: 'Quick notes, attach to any project' },
     { label: 'Conversations', count: stats.conversations, route: '/conversations', desc: 'Chat with LLMs' },
@@ -440,6 +443,156 @@ function Dashboard() {
           </div>
         `)}
       </div>
+    </div>
+  `;
+}
+
+function OvermindWorkflows() {
+  const [workflows, setWorkflows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [streamStatus, setStreamStatus] = useState('connecting');
+  const [now, setNow] = useState(Date.now());
+  const streamStatusRef = useRef(streamStatus);
+
+  useEffect(() => {
+    streamStatusRef.current = streamStatus;
+  }, [streamStatus]);
+
+  const loadWorkflows = useCallback(async () => {
+    try {
+      const data = await api('/api/overmind/workflows');
+      setWorkflows(data.workflows || []);
+      setError('');
+    } catch (e) {
+      setError(e.message || 'Failed to load workflows.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadWorkflows();
+  }, [loadWorkflows]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (streamStatusRef.current !== 'connected') {
+        loadWorkflows();
+      }
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [loadWorkflows]);
+
+  useEffect(() => {
+    const wsUrl = buildOvermindWsUrl(authToken);
+    if (!wsUrl) {
+      setStreamStatus('polling');
+      return;
+    }
+
+    const ws = new WebSocket(wsUrl);
+    let closed = false;
+
+    ws.onopen = () => setStreamStatus('connected');
+    ws.onerror = () => setStreamStatus('polling');
+    ws.onclose = () => {
+      if (!closed) setStreamStatus('polling');
+    };
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if ((msg.type === 'snapshot' || msg.type === 'update') && Array.isArray(msg.workflows)) {
+          setWorkflows(msg.workflows);
+          setLoading(false);
+          setError('');
+          setNow(Date.now());
+        } else if (msg.type === 'error') {
+          setError(msg.message || 'Workflow stream error.');
+        }
+      } catch {}
+    };
+
+    return () => {
+      closed = true;
+      ws.close();
+    };
+  }, []);
+
+  if (loading) return html`<div class="loading">Loading workflows...</div>`;
+
+  return html`
+    <div class="overmind-page">
+      <div class="action-bar">
+        <h2>Workflows</h2>
+        <div class="overmind-actions">
+          <span class="badge badge-${streamStatus === 'connected' ? 'active' : 'pending'}">${streamStatus}</span>
+          <button class="btn btn-sm" onclick=${loadWorkflows}>Refresh</button>
+        </div>
+      </div>
+
+      ${error && html`<div class="overmind-alert">${error}</div>`}
+
+      ${workflows.length === 0 ? html`
+        <div class="empty-state">No workflows registered.</div>
+      ` : html`
+        <div class="item-list overmind-list">
+          ${workflows.map(workflow => {
+            const tasks = Array.isArray(workflow.tasks) ? workflow.tasks : [];
+            const doneCount = countDoneTasks(tasks);
+            const childSessions = Array.isArray(workflow.child_sessions) ? workflow.child_sessions : [];
+            return html`
+              <section class="item-card overmind-card" key=${workflow.id}>
+                <div class="overmind-card-header">
+                  <div>
+                    <h3>${workflow.label}</h3>
+                    <div class="overmind-current">${workflow.current_task || 'No current task'}</div>
+                  </div>
+                  <div class="overmind-status">
+                    <span class=${'overmind-status-icon overmind-status-' + workflow.status}>${statusIcon(workflow.status)}</span>
+                    <span class="badge badge-${workflow.status === 'completed' ? 'completed' : workflow.status === 'failed' ? 'failed' : workflow.status === 'stuck' || workflow.status === 'awaiting_decision' ? 'pending' : 'active'}">${workflow.status}</span>
+                  </div>
+                </div>
+
+                ${workflow.status === 'awaiting_decision' && workflow.pending_decision && html`
+                  <div class="overmind-decision">
+                    <strong>Pending decision</strong>
+                    <pre>${workflow.pending_decision}</pre>
+                  </div>
+                `}
+
+                <div class="overmind-meta-grid">
+                  <div><span>Tier</span><strong>${workflow.tier ?? 0}</strong></div>
+                  <div><span>Stuck</span><strong>${workflow.stuck_since ? formatStuckDuration(workflow.stuck_since, now) : '—'}</strong></div>
+                  <div><span>Coordinator</span><strong>${workflow.coordinator_session}</strong></div>
+                  <div><span>Children</span><strong>${childSessions.length ? childSessions.join(', ') : '—'}</strong></div>
+                </div>
+
+                <details class="overmind-tasklist" open=${tasks.length <= 6}>
+                  <summary>Tasks ${doneCount}/${tasks.length}</summary>
+                  ${tasks.length === 0 ? html`
+                    <div class="overmind-task-empty">No tasklist published.</div>
+                  ` : html`
+                    <div class="overmind-tasks">
+                      ${tasks.map(task => html`
+                        <div class=${'overmind-task overmind-task-' + task.state} key=${task.id || task.label}>
+                          <span class="overmind-task-glyph">${taskGlyph(task.state)}</span>
+                          <span>${task.label}</span>
+                        </div>
+                      `)}
+                    </div>
+                  `}
+                </details>
+              </section>
+            `;
+          })}
+        </div>
+      `}
     </div>
   `;
 }
@@ -4874,6 +5027,7 @@ function TgDashboard() {
     { icon: '\u{1F4DD}', label: 'Notes', count: stats.notes, route: '/notes', desc: 'Quick notes' },
     { icon: '\u{1F4AC}', label: 'Chat', count: stats.conversations, route: '/conversations', desc: 'LLM conversations' },
     { icon: '\u{1F5A5}', label: 'Terminals', count: null, route: '/terminals', desc: 'Tmux sessions' },
+    { icon: '\u{25B6}', label: 'Workflows', count: null, route: '/overmind', desc: 'Overmind status' },
     { icon: '\u{1F4C1}', label: 'Projects', count: stats.projects, route: '/projects', desc: 'Dev projects' },
     { icon: '\u{23F0}', label: 'Reminders', count: stats.reminders, route: '/tasks', desc: 'Upcoming events' },
     { icon: '\u{2699}', label: 'Settings', count: null, route: '/settings', desc: 'Config & templates' }
@@ -4921,6 +5075,8 @@ function TgApp() {
     content = html`<${Projects} />`;
   } else if (route === '/terminals') {
     content = html`<${Terminals} />`;
+  } else if (route === '/overmind') {
+    content = html`<${OvermindWorkflows} />`;
   } else if (route === '/tasks') {
     content = html`<${TasksSection} />`;
   } else if (route === '/notes') {
@@ -4971,6 +5127,8 @@ function App() {
     content = html`<${Projects} />`;
   } else if (route === '/terminals') {
     content = html`<${Terminals} />`;
+  } else if (route === '/overmind') {
+    content = html`<${OvermindWorkflows} />`;
   } else if (route === '/tasks') {
     content = html`<${TasksSection} />`;
   } else if (route === '/notes') {

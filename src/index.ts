@@ -29,6 +29,7 @@ import { CodexCliProvider } from "./llm/codex-cli-provider.js";
 import { OvermindService } from "./services/overmind-service.js";
 import { OvermindWatcher, POLL_MS } from "./services/overmind-watcher.js";
 import { SonnetOvermindBrain } from "./services/overmind-brain.js";
+import { OvermindStreamManager } from "./api/websocket/overmind-stream-manager.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -132,7 +133,14 @@ async function main(): Promise<void> {
     await telegramAssistant.sendMessage(config.telegram.authorizedUserId, text);
   };
   const overmindBrain = new SonnetOvermindBrain();
-  const overmindWatcher = new OvermindWatcher(overmindService, tmuxService, overmindNotify, overmindBrain);
+  const overmindStreamManager = new OvermindStreamManager(authService, overmindService);
+  const overmindWatcher = new OvermindWatcher(
+    overmindService,
+    tmuxService,
+    overmindNotify,
+    overmindBrain,
+    (workflows) => overmindStreamManager.broadcast(workflows)
+  );
 
   // Tmux streaming
   const tmuxStreamManager = new TmuxStreamManager(
@@ -171,7 +179,8 @@ async function main(): Promise<void> {
     claudeCliProvider,
     codexCliProvider,
     overmindService,
-    overmindNotify
+    overmindNotify,
+    overmindStreamManager
   });
 
   await apiServer.listen({ port: config.api.port, host: config.api.host });

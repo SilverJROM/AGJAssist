@@ -49,6 +49,7 @@ import { CodexCliProvider } from "../llm/codex-cli-provider.js";
 import { OvermindService } from "../services/overmind-service.js";
 import { registerOvermindRoutes } from "./routes/overmind-routes.js";
 import type { OvermindNotify } from "../services/overmind-watcher.js";
+import { OvermindStreamManager } from "./websocket/overmind-stream-manager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -80,6 +81,7 @@ export interface ApiServices {
   codexCliProvider: CodexCliProvider;
   overmindService: OvermindService;
   overmindNotify?: OvermindNotify;
+  overmindStreamManager?: OvermindStreamManager;
 }
 
 export async function createApiServer(
@@ -145,7 +147,14 @@ export async function createApiServer(
   registerChatRoutes(app, services.authService, services.ollama, services.openRouter, services.conversationService, services.chatSettingsService, services.ollamaAgent, services.openRouterAgent, services.claudeCliProvider, services.codexCliProvider, services.tools, services.maxToolIterations);
   registerAgentRoutes(app, services.authService);
   registerLocalLlmRoutes(app, services.authService, services.conversationService, services.chatSettingsService, services.tools, services.maxToolIterations);
-  registerOvermindRoutes(app, config, services.authService, services.overmindService, services.overmindNotify);
+  registerOvermindRoutes(
+    app,
+    config,
+    services.authService,
+    services.overmindService,
+    services.overmindNotify,
+    services.overmindStreamManager
+  );
 
   return app;
 }

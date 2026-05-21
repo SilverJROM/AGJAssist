@@ -31,6 +31,7 @@ const RUN_DIR_ACTIVITY_FILES = ["callbacks.md", "progress.md", "queue.md"] as co
 const TERMINAL_STATUSES: OvermindWorkflowStatus[] = ["paused", "completed", "failed"];
 
 export type OvermindNotify = (text: string) => Promise<void>;
+export type OvermindUpdate = (workflows: OvermindWorkflow[]) => void | Promise<void>;
 
 export interface ClassifyWorkflowInput {
   coordinatorPane: string;
@@ -116,7 +117,8 @@ export class OvermindWatcher {
     private readonly overmindService: OvermindService,
     private readonly tmuxService: TmuxService,
     private readonly notify?: OvermindNotify,
-    private readonly brain?: OvermindBrain
+    private readonly brain?: OvermindBrain,
+    private readonly onUpdate?: OvermindUpdate
   ) {}
 
   async tick(): Promise<void> {
@@ -125,6 +127,7 @@ export class OvermindWatcher {
       .filter((workflow) => !TERMINAL_STATUSES.includes(workflow.status));
 
     await Promise.all(workflows.map((workflow) => this.tickWorkflow(workflow)));
+    await this.onUpdate?.(this.overmindService.list());
   }
 
   start(): void {
