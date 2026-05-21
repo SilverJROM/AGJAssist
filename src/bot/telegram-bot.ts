@@ -55,6 +55,8 @@ export class TelegramAssistant {
         { command: "om_pause", description: "Pause Overmind workflow" },
         { command: "om_resume", description: "Resume Overmind workflow" },
         { command: "om_drop", description: "Drop Overmind workflow" },
+        { command: "ovm_start", description: "Start OVM chat mode" },
+        { command: "ovm_end", description: "End OVM chat mode" },
         { command: "app", description: "Open the web app" }
       ]);
     } catch (error) {
@@ -123,7 +125,7 @@ export class TelegramAssistant {
 
       try {
         const response = text.startsWith("/")
-          ? await this.core.handleCommand(text)
+          ? await this.core.handleCommand(text, message.from?.id)
           : await this.core.handleText(text, message.from?.id);
 
         for (const chunk of splitMessage(response)) {

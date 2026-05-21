@@ -136,6 +136,7 @@ async function main(): Promise<void> {
   const codexCliProvider = new CodexCliProvider(180_000);
   core.setChatServices(conversationService, chatSettingsService, claudeCliProvider, codexCliProvider);
   core.setOvermindService(overmindService);
+  core.setOvmSessionService(ovmSessionService);
   const telegramAssistant = config.telegram.testMode
     ? null
     : new TelegramAssistant(config.telegram.botToken, core);

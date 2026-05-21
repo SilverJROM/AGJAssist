@@ -13,3 +13,5 @@
 [projcore callback] O8 DONE Implemented extractBody/body hashing plus esc-to-interrupt active-turn detection; focused tests, non-live suite, npx tsc, and npm run build passed.
 [projcore callback] O8 DONE Correction iter1 fixed hasActiveTurn status-bar false positive; targeted classifier test, npx tsc, and npm run build passed.
 [projcore callback] O3 DONE Added OVM dashboard tab with O2 endpoint controls and existing tmux WS stream/input; helper test, npx tsc, and npm run build passed.
+[projcore callback] O4 PROPOSED Plan ready for Telegram /ovm_start, /ovm_end, OVM plain-message relay, and setMyCommands update; awaiting APPROVED-PLAN before implementation.
+[projcore callback] O4 DONE Added Telegram OVM chat mode with reuse/open session, bounded reply relay, /ovm_end persistence, command menu update, artifacts, focused tests, npx tsc, and npm run build passed.

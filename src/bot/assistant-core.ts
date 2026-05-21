@@ -14,6 +14,7 @@ import { ConversationService } from "../services/conversation-service.js";
 import { ChatSettingsService } from "../services/chat-settings-service.js";
 import { AuthService } from "../auth/auth-service.js";
 import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "../services/overmind-service.js";
+import type { OvmSessionManager } from "../services/ovm-session.js";
 
 const ALLOWED_OM_MODELS = new Set(["qwek32k:latest", "granite4:64k"]);
 const WEBSITES_ROOT = "/home/agjrom/websites";
@@ -40,11 +41,17 @@ const OVERMIND_TASK_GLYPHS = {
   processing: "[~]",
   pending: "[ ]"
 } as const;
+const OVM_SESSION_TARGET = "OVM";
+const OVM_RELAY_TIMEOUT_MS = 12_000;
+const OVM_RELAY_POLL_MS = 700;
+const OVM_RELAY_STABLE_READS = 2;
+const OVM_RELAY_FALLBACK = "OVM is taking a while / still working.";
 
 interface UserState {
   cwd: string;
   activeConversationId: number | null;
   activeProvider: string | null;
+  ovmChatMode: boolean;
 }
 
 export class AssistantCore {
@@ -58,6 +65,7 @@ export class AssistantCore {
   private claudeCliProvider: ClaudeCliProvider | null = null;
   private codexCliProvider: CodexCliProvider | null = null;
   private overmindService: OvermindService | null = null;
+  private ovmSessionService: OvmSessionManager | null = null;
 
   // Per-user state for TG conversations
   private userState: Map<number, UserState> = new Map();
@@ -96,9 +104,18 @@ export class AssistantCore {
     this.overmindService = overmindService;
   }
 
+  setOvmSessionService(ovmSessionService: OvmSessionManager): void {
+    this.ovmSessionService = ovmSessionService;
+  }
+
   private getState(userId: number): UserState {
     if (!this.userState.has(userId)) {
-      this.userState.set(userId, { cwd: WEBSITES_ROOT, activeConversationId: null, activeProvider: null });
+      this.userState.set(userId, {
+        cwd: WEBSITES_ROOT,
+        activeConversationId: null,
+        activeProvider: null,
+        ovmChatMode: false
+      });
     }
     return this.userState.get(userId)!;
   }
@@ -116,9 +133,10 @@ export class AssistantCore {
     return Boolean(userId) && userId === this.config.telegram.authorizedUserId;
   }
 
-  async handleCommand(input: string): Promise<string> {
+  async handleCommand(input: string, userId?: number): Promise<string> {
     const parts = input.trim().split(/\s+/);
     const command = (parts[0] || "").toLowerCase();
+    const uid = userId || this.config.telegram.authorizedUserId;
 
     switch (command) {
       case "/start":
@@ -143,6 +161,8 @@ export class AssistantCore {
           "/om_pause <id> - pause an Overmind workflow",
           "/om_resume <id> - resume an Overmind workflow",
           "/om_drop <id> - drop an Overmind workflow",
+          "/ovm_start - enter OVM chat mode",
+          "/ovm_end - exit OVM chat mode",
           "",
           "Chat commands:",
           "new haiku|sonnet|opus|codex <prompt> - start new conversation",
@@ -257,6 +277,12 @@ export class AssistantCore {
 
       case "/om_drop":
         return this.handleOvermindDropCommand(parts[1]);
+
+      case "/ovm_start":
+        return this.handleOvmStartCommand(uid);
+
+      case "/ovm_end":
+        return this.handleOvmEndCommand(uid);
 
       case "/tmux_create": {
         const projectName = parts[1];
@@ -394,6 +420,18 @@ export class AssistantCore {
     return `Dropped workflow ${id}: ${this.overmindDisplayName(workflow)}`;
   }
 
+  private async handleOvmStartCommand(userId: number): Promise<string> {
+    if (!this.ovmSessionService) return "OVM session service not available.";
+    await this.ovmSessionService.open();
+    this.getState(userId).ovmChatMode = true;
+    return "OVM chat on - talk to me; /ovm_end to stop";
+  }
+
+  private handleOvmEndCommand(userId: number): string {
+    this.getState(userId).ovmChatMode = false;
+    return "OVM chat off.";
+  }
+
   private formatOvermindWorkflowLine(workflow: OvermindWorkflow): string {
     const doneCount = workflow.tasks.filter((task) => task.state === "done").length;
     const currentTask = workflow.current_task || "—";
@@ -411,11 +449,113 @@ export class AssistantCore {
     return id;
   }
 
+  private async relayOvmMessage(input: string): Promise<string> {
+    if (!this.ovmSessionService) return "OVM session service not available.";
+
+    try {
+      await this.ovmSessionService.open();
+      const before = await this.tmuxService.capturePane(OVM_SESSION_TARGET, 500);
+      await this.tmuxService.sendCommand(OVM_SESSION_TARGET, input, true, true);
+      const reply = await this.captureOvmReply(before, input);
+      return reply || OVM_RELAY_FALLBACK;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return `OVM relay error: ${message}`;
+    }
+  }
+
+  private async captureOvmReply(before: string, input: string): Promise<string> {
+    const deadline = Date.now() + OVM_RELAY_TIMEOUT_MS;
+    let latest = before;
+    let changed = false;
+    let stableReads = 0;
+    let bestReply = "";
+
+    while (Date.now() < deadline) {
+      await this.sleep(OVM_RELAY_POLL_MS);
+      const current = await this.tmuxService.capturePane(OVM_SESSION_TARGET, 500);
+      if (current !== latest) {
+        latest = current;
+        changed = true;
+        stableReads = 0;
+        bestReply = this.extractOvmReply(this.diffTerminalOutput(before, latest), input) || bestReply;
+        continue;
+      }
+
+      if (changed) {
+        stableReads += 1;
+        bestReply = this.extractOvmReply(this.diffTerminalOutput(before, latest), input) || bestReply;
+        if (stableReads >= OVM_RELAY_STABLE_READS) break;
+      }
+    }
+
+    return bestReply;
+  }
+
+  private extractOvmReply(diff: string, input: string): string {
+    const cleanInput = input.trim();
+    const lines = this.stripAnsi(diff)
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && line !== cleanInput)
+      .filter((line) => !this.isOvmChromeLine(line));
+
+    return lines.join("\n").trim();
+  }
+
+  private isOvmChromeLine(line: string): boolean {
+    return (
+      /^[╭╰│]/.test(line) ||
+      /^>\s*$/.test(line) ||
+      /^esc to interrupt/i.test(line) ||
+      /^\? for shortcuts/i.test(line) ||
+      /^cwd:/i.test(line) ||
+      /^claude\b/i.test(line)
+    );
+  }
+
+  private diffTerminalOutput(beforeText: string, afterText: string): string {
+    const before = this.normalizeTerminalOutput(this.stripAnsi(beforeText));
+    const after = this.normalizeTerminalOutput(this.stripAnsi(afterText));
+    if (!after) return "";
+    if (!before) return after;
+    if (after === before) return "";
+    if (after.startsWith(before)) return after.slice(before.length).trim();
+
+    const beforeLines = before.split("\n");
+    const afterLines = after.split("\n");
+    let idx = 0;
+    while (idx < beforeLines.length && idx < afterLines.length && beforeLines[idx] === afterLines[idx]) {
+      idx += 1;
+    }
+    return afterLines.slice(idx).join("\n").trim();
+  }
+
+  private normalizeTerminalOutput(text: string): string {
+    return (text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  }
+
+  private stripAnsi(text: string): string {
+    return (text || "")
+      .replace(/\u001B\][^\u0007]*(?:\u0007|\u001B\\)/g, "")
+      .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, "");
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async handleText(input: string, userId?: number): Promise<string> {
     const trimmed = input.trim();
     const timeoutMs = this.timeoutMinutes * 60 * 1000;
     const uid = userId || this.config.telegram.authorizedUserId;
     const state = this.getState(uid);
+
+    if (state.ovmChatMode) {
+      return this.relayOvmMessage(trimmed);
+    }
 
     // --- Directory commands ---
     if (/^cd(\s|$)/i.test(trimmed)) {
