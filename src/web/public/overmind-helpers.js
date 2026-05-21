@@ -42,6 +42,23 @@ export function countDoneTasks(tasks) {
   return Array.isArray(tasks) ? tasks.filter(task => task?.state === 'done').length : 0;
 }
 
+export function formatActiveSessionAttribution(workflow) {
+  if (!workflow?.active_session || !workflow?.active_role) return '— no session active';
+
+  if (workflow.active_role === 'parent') {
+    const childSessions = Array.isArray(workflow.child_sessions) ? workflow.child_sessions : [];
+    const childNote = childSessions.length
+      ? `${childSessions.join(', ')} (child) idle/waiting`
+      : 'children idle/waiting';
+    return `working: ${workflow.active_session} (parent) · ${childNote}`;
+  }
+
+  const coordinator = workflow.coordinator_session
+    ? `${workflow.coordinator_session} (parent) idle/waiting`
+    : 'parent idle/waiting';
+  return `working: ${workflow.active_session} (child) · ${coordinator}`;
+}
+
 export function formatStuckDuration(stuckSince, now = Date.now()) {
   if (!stuckSince) return '—';
   const start = Date.parse(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(stuckSince)

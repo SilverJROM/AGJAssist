@@ -2,7 +2,7 @@ import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
 import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput } from './terminal-chat-state.js';
-import { buildOvermindWsUrl, countDoneTasks, formatStuckDuration, statusColor, statusIcon, taskGlyph } from './overmind-helpers.js';
+import { buildOvermindWsUrl, countDoneTasks, formatActiveSessionAttribution, formatStuckDuration, statusColor, statusIcon, taskGlyph } from './overmind-helpers.js';
 
 const html = htm.bind(h);
 
@@ -584,6 +584,8 @@ function OvermindWorkflows() {
                         <pre>${workflow.pending_decision}</pre>
                       </div>
                     `}
+
+                    <div class="overmind-active-session">${formatActiveSessionAttribution(workflow)}</div>
 
                     <div class="overmind-meta-grid">
                       <div><span>Tier</span><strong>${workflow.tier ?? 0}</strong></div>

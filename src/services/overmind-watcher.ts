@@ -50,6 +50,11 @@ export interface ClassifyResult {
   lastActivityAt: string | null;
 }
 
+export interface ActiveSessionAttribution {
+  active_session: string | null;
+  active_role: "parent" | "child" | null;
+}
+
 interface NudgeLadderFields {
   nudge_count: number;
   tier: number;
@@ -61,6 +66,33 @@ interface NudgeLadderFields {
 
 export function hashPane(pane: string): string {
   return createHash("sha256").update(pane).digest("hex");
+}
+
+export function determineActiveSessionAttribution(input: {
+  coordinatorSession: string;
+  coordinatorPane: string;
+  childSessions: string[];
+  childPanes: string[];
+}): ActiveSessionAttribution {
+  if (BUSY_MARKER_RE.test(input.coordinatorPane)) {
+    return {
+      active_session: input.coordinatorSession,
+      active_role: "parent"
+    };
+  }
+
+  const activeChildIndex = input.childPanes.findIndex((pane) => BUSY_MARKER_RE.test(pane));
+  if (activeChildIndex >= 0) {
+    return {
+      active_session: input.childSessions[activeChildIndex] ?? null,
+      active_role: input.childSessions[activeChildIndex] ? "child" : null
+    };
+  }
+
+  return {
+    active_session: null,
+    active_role: null
+  };
 }
 
 export function classifyWorkflow(input: ClassifyWorkflowInput): ClassifyResult {
@@ -159,6 +191,12 @@ export class OvermindWatcher {
       stuckSincePrev: workflow.stuck_since,
       now
     });
+    const activeAttribution = determineActiveSessionAttribution({
+      coordinatorSession: workflow.coordinator_session,
+      coordinatorPane,
+      childSessions: workflow.child_sessions,
+      childPanes
+    });
 
     const nudgeFields = result.status === "awaiting_decision"
       ? await this.applyDecisionInterception(workflow, result.pendingDecision)
@@ -171,6 +209,8 @@ export class OvermindWatcher {
         : result.pendingDecision,
       last_pane_hash: nudgeFields.last_pane_hash ?? result.coordinatorHash,
       stuck_since: nudgeFields.stuck_since !== undefined ? nudgeFields.stuck_since : result.stuckSince,
+      active_session: activeAttribution.active_session,
+      active_role: activeAttribution.active_role,
       ...nudgeFields,
       ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
     });

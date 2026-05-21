@@ -9,6 +9,7 @@ import { TmuxService } from "../src/tmux/tmux-service.js";
 import {
   buildOvermindWsUrl,
   countDoneTasks,
+  formatActiveSessionAttribution,
   formatStuckDuration,
   statusColor,
   statusIcon,
@@ -47,6 +48,8 @@ function workflow(overrides: Partial<OvermindWorkflow> = {}): OvermindWorkflow {
       { id: "A7", label: "Dashboard", state: "processing" }
     ],
     pending_decision: null,
+    active_session: null,
+    active_role: null,
     last_pane_hash: null,
     last_activity_at: "2026-05-21T00:00:00.000Z",
     stuck_since: null,
@@ -169,6 +172,24 @@ describe("Overmind public helpers", () => {
       { id: "A1", label: "One", state: "done" },
       { id: "A2", label: "Two", state: "processing" }
     ])).toBe(1);
+    expect(formatActiveSessionAttribution({
+      coordinator_session: "hris-d-22",
+      child_sessions: ["hrcdx-33"],
+      active_session: "hrcdx-33",
+      active_role: "child"
+    })).toBe("working: hrcdx-33 (child) · hris-d-22 (parent) idle/waiting");
+    expect(formatActiveSessionAttribution({
+      coordinator_session: "hris-d-22",
+      child_sessions: ["hrcdx-33"],
+      active_session: "hris-d-22",
+      active_role: "parent"
+    })).toBe("working: hris-d-22 (parent) · hrcdx-33 (child) idle/waiting");
+    expect(formatActiveSessionAttribution({
+      coordinator_session: "hris-d-22",
+      child_sessions: ["hrcdx-33"],
+      active_session: null,
+      active_role: null
+    })).toBe("— no session active");
     expect(formatStuckDuration("2026-05-21T00:00:00.000Z", Date.parse("2026-05-21T01:02:03.000Z"))).toBe("1h 2m");
     expect(buildOvermindWsUrl("a b", { protocol: "https:", host: "example.test" })).toBe("wss://example.test/ws/overmind?token=a%20b");
   });

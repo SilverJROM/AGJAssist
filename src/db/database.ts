@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -292,6 +292,8 @@ CREATE TABLE IF NOT EXISTS overmind_workflows (
   current_task TEXT,
   tasks TEXT NOT NULL DEFAULT '[]',
   pending_decision TEXT,
+  active_session TEXT,
+  active_role TEXT CHECK(active_role IN ('parent', 'child') OR active_role IS NULL),
   last_pane_hash TEXT,
   last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
   stuck_since TEXT,
@@ -509,6 +511,18 @@ export class DatabaseService {
       // Migration: v10 → v11: add overmind_workflows table
       if (current && current.version < 11) {
         this.db.exec(SCHEMA_SQL);
+      }
+
+      // Migration: v11 → v12: add active-session attribution to overmind_workflows
+      if (current && current.version < 12) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("active_session")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN active_session TEXT");
+        }
+        if (!colNames.has("active_role")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN active_role TEXT CHECK(active_role IN ('parent', 'child') OR active_role IS NULL)");
+        }
       }
 
       this.db

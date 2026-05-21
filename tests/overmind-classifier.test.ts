@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classifyWorkflow, hashPane } from "../src/services/overmind-watcher.js";
+import {
+  classifyWorkflow,
+  determineActiveSessionAttribution,
+  hashPane
+} from "../src/services/overmind-watcher.js";
 
 const NOW = "2026-05-21T12:00:00.000Z";
 
@@ -127,5 +131,43 @@ describe("classifyWorkflow", () => {
     expect(result.status).toBe("stuck");
     expect(result.stuckSince).toBe("2026-05-21T11:58:29.000Z");
     expect(result.lastActivityAt).toBeNull();
+  });
+});
+
+describe("determineActiveSessionAttribution", () => {
+  it("attributes coordinator busy markers to the parent session", () => {
+    expect(determineActiveSessionAttribution({
+      coordinatorSession: "hris-d-22",
+      coordinatorPane: "Working (12s)\nesc to interrupt",
+      childSessions: ["hrcdx-33"],
+      childPanes: ["quiet child"]
+    })).toEqual({
+      active_session: "hris-d-22",
+      active_role: "parent"
+    });
+  });
+
+  it("attributes child busy markers to the first busy child session when the parent is idle", () => {
+    expect(determineActiveSessionAttribution({
+      coordinatorSession: "hris-d-22",
+      coordinatorPane: "idle parent",
+      childSessions: ["hrcdx-33", "hrcdx-34"],
+      childPanes: ["quiet child", "Thinking\nesc to interrupt"]
+    })).toEqual({
+      active_session: "hrcdx-34",
+      active_role: "child"
+    });
+  });
+
+  it("returns null attribution when no pane has busy markers", () => {
+    expect(determineActiveSessionAttribution({
+      coordinatorSession: "hris-d-22",
+      coordinatorPane: "idle parent",
+      childSessions: ["hrcdx-33"],
+      childPanes: ["quiet child"]
+    })).toEqual({
+      active_session: null,
+      active_role: null
+    });
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DatabaseService } from "../src/db/database.js";
 import { OvermindService } from "../src/services/overmind-service.js";
+import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -27,9 +28,9 @@ afterEach(() => {
 });
 
 describe("OvermindService", () => {
-  it("creates the schema v11 table and indexes", () => {
+  it("creates the schema v12 table, active attribution columns, and indexes", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(11);
+    expect(version.version).toBe(12);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -41,6 +42,11 @@ describe("OvermindService", () => {
       .all() as { name: string }[];
     expect(indexes.map((idx) => idx.name)).toContain("idx_overmind_workflows_coordinator_session");
     expect(indexes.map((idx) => idx.name)).toContain("idx_overmind_workflows_status");
+
+    const cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
+    const colNames = cols.map((col) => col.name);
+    expect(colNames).toContain("active_session");
+    expect(colNames).toContain("active_role");
   });
 
   it("round-trips register, list, get, getBySession, updates, status, tasks, and delete", () => {
@@ -60,6 +66,8 @@ describe("OvermindService", () => {
     expect(created.status).toBe("active");
     expect(created.child_sessions).toEqual(["lkcdx-may20"]);
     expect(created.tasks[0]).toEqual({ id: "A1", label: "Schema", state: "processing" });
+    expect(created.active_session).toBeNull();
+    expect(created.active_role).toBeNull();
 
     expect(service.list()).toHaveLength(1);
     expect(service.get(created.id)?.coordinator_session).toBe("lkcamp-12");
@@ -69,6 +77,8 @@ describe("OvermindService", () => {
       label: "lkcamp updated",
       child_sessions: ["lkcdx-may20", "lkcdx-extra"],
       pending_decision: "Choose option",
+      active_session: "lkcdx-extra",
+      active_role: "child",
       last_pane_hash: "abc123",
       nudge_count: 2,
       tier: 1
@@ -77,6 +87,8 @@ describe("OvermindService", () => {
     expect(updated?.label).toBe("lkcamp updated");
     expect(updated?.child_sessions).toEqual(["lkcdx-may20", "lkcdx-extra"]);
     expect(updated?.pending_decision).toBe("Choose option");
+    expect(updated?.active_session).toBe("lkcdx-extra");
+    expect(updated?.active_role).toBe("child");
     expect(updated?.last_pane_hash).toBe("abc123");
     expect(updated?.nudge_count).toBe(2);
     expect(updated?.tier).toBe(1);
@@ -111,6 +123,8 @@ describe("OvermindService", () => {
     service.update(created.id, {
       status: "stuck",
       pending_decision: "Need input",
+      active_session: "hrcdx-33",
+      active_role: "child",
       stuck_since: "2026-05-21T12:00:00Z",
       nudge_count: 3,
       tier: 2
@@ -133,9 +147,66 @@ describe("OvermindService", () => {
     expect(upserted.current_task).toBe("Restarted");
     expect(upserted.tasks).toEqual([{ id: "A1", label: "Restart", state: "processing" }]);
     expect(upserted.pending_decision).toBeNull();
+    expect(upserted.active_session).toBeNull();
+    expect(upserted.active_role).toBeNull();
     expect(upserted.stuck_since).toBeNull();
     expect(upserted.nudge_count).toBe(0);
     expect(upserted.tier).toBe(0);
     expect(service.list()).toHaveLength(1);
+  });
+
+  it("migrates an existing v11 overmind table with guarded v12 ALTER columns", () => {
+    db.close();
+    cleanup();
+
+    const legacy = new Database(TEST_DB);
+    legacy.exec(`
+      CREATE TABLE schema_version (version INTEGER NOT NULL);
+      INSERT INTO schema_version (version) VALUES (11);
+      CREATE TABLE overmind_workflows (
+        id INTEGER PRIMARY KEY,
+        label TEXT NOT NULL,
+        coordinator_session TEXT NOT NULL UNIQUE,
+        child_sessions TEXT NOT NULL DEFAULT '[]',
+        run_dir TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'working', 'waiting_human', 'awaiting_decision', 'stuck', 'paused', 'completed', 'failed')),
+        current_task TEXT,
+        tasks TEXT NOT NULL DEFAULT '[]',
+        pending_decision TEXT,
+        last_pane_hash TEXT,
+        last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
+        stuck_since TEXT,
+        nudge_count INTEGER NOT NULL DEFAULT 0,
+        tier INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO overmind_workflows (
+        label,
+        coordinator_session,
+        child_sessions,
+        run_dir,
+        status,
+        tasks
+      ) VALUES ('legacy', 'legacy-parent', '["legacy-child"]', '/tmp/legacy', 'active', '[]');
+    `);
+    legacy.close();
+
+    db = new DatabaseService(TEST_DB);
+    service = new OvermindService(db);
+
+    const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
+    expect(version.version).toBe(12);
+
+    let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
+    expect(cols.map((col) => col.name)).toContain("active_session");
+    expect(cols.map((col) => col.name)).toContain("active_role");
+    expect(service.getBySession("legacy-parent")?.active_session).toBeNull();
+
+    db.close();
+    db = new DatabaseService(TEST_DB);
+    cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
+    expect(cols.filter((col) => col.name === "active_session")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "active_role")).toHaveLength(1);
   });
 });

@@ -168,6 +168,78 @@ describe("Overmind watcher nudge ladder", () => {
     expect(tmux.sendCommand).not.toHaveBeenCalled();
   });
 
+  it("persists parent active-session attribution when the coordinator pane is busy", async () => {
+    const workflow = service.register({
+      label: "parent-active",
+      coordinator_session: "coord-parent",
+      child_sessions: ["child-parent"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+
+    const tmux = makeTmuxMock({
+      "coord-parent": "Working (4s)\nesc to interrupt",
+      "child-parent": "child quiet pane"
+    });
+    const watcher = new OvermindWatcher(service, tmux);
+
+    await watcher.tick();
+
+    const updated = service.get(workflow.id);
+    expect(updated?.active_session).toBe("coord-parent");
+    expect(updated?.active_role).toBe("parent");
+    expect(updated?.status).toBe("working");
+  });
+
+  it("persists child active-session attribution when only a child pane is busy", async () => {
+    const workflow = service.register({
+      label: "child-active",
+      coordinator_session: "coord-child",
+      child_sessions: ["child-a", "child-b"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+
+    const tmux = makeTmuxMock({
+      "coord-child": "coordinator idle",
+      "child-a": "child quiet pane",
+      "child-b": "Thinking\nesc to interrupt"
+    });
+    const watcher = new OvermindWatcher(service, tmux);
+
+    await watcher.tick();
+
+    const updated = service.get(workflow.id);
+    expect(updated?.active_session).toBe("child-b");
+    expect(updated?.active_role).toBe("child");
+    expect(updated?.status).toBe("working");
+  });
+
+  it("persists null active-session attribution when no pane is busy", async () => {
+    const workflow = service.register({
+      label: "none-active",
+      coordinator_session: "coord-none",
+      child_sessions: ["child-none"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.update(workflow.id, {
+      active_session: "child-none",
+      active_role: "child",
+      last_pane_hash: hashPane("coordinator idle")
+    });
+
+    const tmux = makeTmuxMock({
+      "coord-none": "coordinator idle",
+      "child-none": "child quiet pane"
+    });
+    const watcher = new OvermindWatcher(service, tmux);
+
+    await watcher.tick();
+
+    const updated = service.get(workflow.id);
+    expect(updated?.active_session).toBeNull();
+    expect(updated?.active_role).toBeNull();
+    expect(updated?.status).toBe("working");
+  });
+
   it("treats Overmind's own nudge text as the stuck baseline so the next tick escalates", async () => {
     const workflow = service.register({
       label: "self-nudge",

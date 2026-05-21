@@ -68,7 +68,7 @@ describe("DatabaseService", () => {
       .prepare("SELECT version FROM schema_version")
       .get() as { version: number };
 
-    expect(version.version).toBe(11);
+    expect(version.version).toBe(12);
     db.close();
   });
 

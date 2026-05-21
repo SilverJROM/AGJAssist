@@ -28,6 +28,8 @@ export interface OvermindWorkflow {
   current_task: string | null;
   tasks: OvermindTask[];
   pending_decision: string | null;
+  active_session: string | null;
+  active_role: "parent" | "child" | null;
   last_pane_hash: string | null;
   last_activity_at: string;
   stuck_since: string | null;
@@ -55,6 +57,8 @@ export interface UpdateOvermindWorkflowInput {
   current_task?: string | null;
   tasks?: OvermindTask[];
   pending_decision?: string | null;
+  active_session?: string | null;
+  active_role?: "parent" | "child" | null;
   last_pane_hash?: string | null;
   last_activity_at?: string | null;
   stuck_since?: string | null;
@@ -72,6 +76,8 @@ interface OvermindWorkflowRow {
   current_task: string | null;
   tasks: string;
   pending_decision: string | null;
+  active_session: string | null;
+  active_role: "parent" | "child" | null;
   last_pane_hash: string | null;
   last_activity_at: string;
   stuck_since: string | null;
@@ -96,11 +102,13 @@ export class OvermindService {
           current_task,
           tasks,
           pending_decision,
+          active_session,
+          active_role,
           stuck_since,
           nudge_count,
           tier,
           updated_at
-        ) VALUES (?, ?, ?, ?, 'active', ?, ?, NULL, NULL, 0, 0, datetime('now'))
+        ) VALUES (?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, NULL, 0, 0, datetime('now'))
         ON CONFLICT(coordinator_session) DO UPDATE SET
           label = excluded.label,
           child_sessions = excluded.child_sessions,
@@ -109,6 +117,8 @@ export class OvermindService {
           current_task = excluded.current_task,
           tasks = excluded.tasks,
           pending_decision = NULL,
+          active_session = NULL,
+          active_role = NULL,
           stuck_since = NULL,
           nudge_count = 0,
           tier = 0,
@@ -166,6 +176,8 @@ export class OvermindService {
       current_task: fields.current_task !== undefined ? fields.current_task : existing.current_task,
       tasks: fields.tasks ?? existing.tasks,
       pending_decision: fields.pending_decision !== undefined ? fields.pending_decision : existing.pending_decision,
+      active_session: fields.active_session !== undefined ? fields.active_session : existing.active_session,
+      active_role: fields.active_role !== undefined ? fields.active_role : existing.active_role,
       last_pane_hash: fields.last_pane_hash !== undefined ? fields.last_pane_hash : existing.last_pane_hash,
       last_activity_at: fields.last_activity_at !== undefined ? fields.last_activity_at : existing.last_activity_at,
       stuck_since: fields.stuck_since !== undefined ? fields.stuck_since : existing.stuck_since,
@@ -184,6 +196,8 @@ export class OvermindService {
             current_task = ?,
             tasks = ?,
             pending_decision = ?,
+            active_session = ?,
+            active_role = ?,
             last_pane_hash = ?,
             last_activity_at = ?,
             stuck_since = ?,
@@ -201,6 +215,8 @@ export class OvermindService {
         next.current_task,
         JSON.stringify(next.tasks),
         next.pending_decision,
+        next.active_session,
+        next.active_role,
         next.last_pane_hash,
         next.last_activity_at,
         next.stuck_since,
