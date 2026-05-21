@@ -161,6 +161,14 @@ export function registerOvermindRoutes(
     }
   );
 
+  app.get(
+    "/api/overmind/history",
+    { preHandler: authMiddleware },
+    async () => {
+      return { history: overmindService.listHistory() };
+    }
+  );
+
   app.post<{ Params: RenameParams; Body: RenameBody }>(
     "/api/overmind/workflows/:id/name",
     { preHandler: authMiddleware },

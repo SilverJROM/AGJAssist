@@ -26,6 +26,16 @@ export interface OvermindTaskLogEntry {
   note?: string;
 }
 
+export interface OvermindTaskHistoryEntry {
+  id: number;
+  coordinator_session: string;
+  name: string;
+  at: string;
+  current_task: string | null;
+  done: number;
+  total: number;
+}
+
 export interface OvermindWorkflow {
   id: number;
   label: string;
@@ -106,6 +116,16 @@ interface OvermindWorkflowRow {
   accumulated_ms: number;
   created_at: string;
   updated_at: string;
+}
+
+interface OvermindTaskHistoryRow {
+  id: number;
+  coordinator_session: string;
+  name: string;
+  at: string;
+  current_task: string | null;
+  done: number;
+  total: number;
 }
 
 export class OvermindService {
@@ -199,6 +219,26 @@ export class OvermindService {
       .prepare("SELECT * FROM overmind_workflows WHERE coordinator_session = ?")
       .get(coordinatorSession) as OvermindWorkflowRow | undefined;
     return row ? this.mapRow(row) : null;
+  }
+
+  listHistory(): OvermindTaskHistoryEntry[] {
+    const rows = this.db
+      .prepare(
+        `SELECT
+          h.id,
+          h.coordinator_session,
+          COALESCE(w.display_name, w.label, h.name) AS name,
+          h.at,
+          h.current_task,
+          h.done,
+          h.total
+        FROM overmind_task_history h
+        LEFT JOIN overmind_workflows w
+          ON w.coordinator_session = h.coordinator_session
+        ORDER BY h.at DESC, h.id DESC`
+      )
+      .all() as OvermindTaskHistoryRow[];
+    return rows.map((row) => ({ ...row }));
   }
 
   update(id: number, fields: UpdateOvermindWorkflowInput): OvermindWorkflow | null {
@@ -325,9 +365,34 @@ export class OvermindService {
       : existing.task_log;
     const endedAt = this.computeEndedAt(tasks, existing.status, existing.ended_at, now);
 
-    this.db
-      .prepare("UPDATE overmind_workflows SET current_task = ?, tasks = ?, ended_at = ?, task_log = ?, updated_at = datetime('now') WHERE id = ?")
-      .run(currentTask, JSON.stringify(tasks), endedAt, JSON.stringify(taskLog), id);
+    const tx = this.db.raw.transaction(() => {
+      this.db
+        .prepare("UPDATE overmind_workflows SET current_task = ?, tasks = ?, ended_at = ?, task_log = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(currentTask, JSON.stringify(tasks), endedAt, JSON.stringify(taskLog), id);
+
+      if (shouldLog) {
+        this.db
+          .prepare(
+            `INSERT INTO overmind_task_history (
+              coordinator_session,
+              name,
+              at,
+              current_task,
+              done,
+              total
+            ) VALUES (?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            existing.coordinator_session,
+            existing.display_name || existing.label,
+            now,
+            currentTask,
+            doneCount,
+            tasks.length
+          );
+      }
+    });
+    tx();
     return this.get(id);
   }
 

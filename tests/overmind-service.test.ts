@@ -28,20 +28,30 @@ afterEach(() => {
 });
 
 describe("OvermindService", () => {
-  it("creates the schema v16 table, display name, active attribution, history, notification, and elapsed columns", () => {
+  it("creates the schema v17 tables, display name, active attribution, history, notification, and elapsed columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(16);
+    expect(version.version).toBe(17);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
       .all();
     expect(tables).toHaveLength(1);
 
+    const historyTables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_task_history'")
+      .all();
+    expect(historyTables).toHaveLength(1);
+
     const indexes = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'overmind_workflows'")
       .all() as { name: string }[];
     expect(indexes.map((idx) => idx.name)).toContain("idx_overmind_workflows_coordinator_session");
     expect(indexes.map((idx) => idx.name)).toContain("idx_overmind_workflows_status");
+
+    const historyIndexes = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'overmind_task_history'")
+      .all() as { name: string }[];
+    expect(historyIndexes.map((idx) => idx.name)).toContain("idx_overmind_task_history_coordinator_session");
 
     const cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     const colNames = cols.map((col) => col.name);
@@ -53,6 +63,17 @@ describe("OvermindService", () => {
     expect(colNames).toContain("last_notified_transition");
     expect(colNames).toContain("run_started_at");
     expect(colNames).toContain("accumulated_ms");
+
+    const historyCols = db.raw.pragma("table_info(overmind_task_history)") as { name: string }[];
+    expect(historyCols.map((col) => col.name)).toEqual([
+      "id",
+      "coordinator_session",
+      "name",
+      "at",
+      "current_task",
+      "done",
+      "total"
+    ]);
   });
 
   it("round-trips register, list, get, getBySession, updates, status, tasks, and delete", () => {
@@ -121,8 +142,23 @@ describe("OvermindService", () => {
     expect(tasks?.task_log).toHaveLength(1);
     expect(tasks?.task_log[0]).toMatchObject({ current_task: "A1 verify", done: 1, total: 2 });
 
+    expect(service.listHistory()).toHaveLength(1);
+    expect(service.listHistory()[0]).toMatchObject({
+      coordinator_session: "lkcamp-12",
+      name: "lkcamp updated",
+      current_task: "A1 verify",
+      done: 1,
+      total: 2
+    });
+
     expect(service.delete(created.id)).toBe(true);
     expect(service.get(created.id)).toBeNull();
+    expect(service.listHistory()).toHaveLength(1);
+    expect(service.listHistory()[0]).toMatchObject({
+      coordinator_session: "lkcamp-12",
+      name: "lkcamp updated",
+      current_task: "A1 verify"
+    });
   });
 
   it("stamps ended_at when a workflow is registered with all tasks done", () => {
@@ -219,6 +255,7 @@ describe("OvermindService", () => {
       { id: "A2", label: "Second", state: "pending" }
     ]);
     expect(noOp?.task_log).toEqual([]);
+    expect(service.listHistory()).toEqual([]);
 
     const currentTaskChanged = service.setTasks(created.id, "A2", [
       { id: "A1", label: "First", state: "processing" },
@@ -226,6 +263,7 @@ describe("OvermindService", () => {
     ]);
     expect(currentTaskChanged?.task_log).toHaveLength(1);
     expect(currentTaskChanged?.task_log[0]).toMatchObject({ current_task: "A2", done: 0, total: 2 });
+    expect(service.listHistory()).toHaveLength(1);
 
     const doneChanged = service.setTasks(created.id, "A2", [
       { id: "A1", label: "First", state: "done" },
@@ -233,12 +271,14 @@ describe("OvermindService", () => {
     ]);
     expect(doneChanged?.task_log).toHaveLength(2);
     expect(doneChanged?.task_log[1]).toMatchObject({ current_task: "A2", done: 1, total: 2 });
+    expect(service.listHistory()).toHaveLength(2);
 
     const repeated = service.setTasks(created.id, "A2", [
       { id: "A1", label: "First", state: "done" },
       { id: "A2", label: "Second", state: "pending" }
     ]);
     expect(repeated?.task_log).toHaveLength(2);
+    expect(service.listHistory()).toHaveLength(2);
 
     const capped = service.register({
       label: "v6-cap",
@@ -258,6 +298,40 @@ describe("OvermindService", () => {
     expect(latest.task_log).toHaveLength(50);
     expect(latest.task_log[0].current_task).toBe("Task 10");
     expect(latest.task_log[49].current_task).toBe("Task 59");
+    expect(service.listHistory().filter((entry) => entry.coordinator_session === "v6-cap-parent")).toHaveLength(60);
+  });
+
+  it("uses the current workflow display name for registered history and snapshot name after delete", () => {
+    const created = service.register({
+      label: "snapshot label",
+      coordinator_session: "snapshot-parent",
+      run_dir: "/tmp/overmind/snapshot",
+      current_task: "Seed",
+      tasks: [{ id: "A1", label: "First", state: "processing" }]
+    });
+    service.setDisplayName(created.id, "Live display");
+
+    service.setTasks(created.id, "Next", [
+      { id: "A1", label: "First", state: "done" }
+    ]);
+
+    expect(service.listHistory()[0]).toMatchObject({
+      coordinator_session: "snapshot-parent",
+      name: "Live display",
+      current_task: "Next",
+      done: 1,
+      total: 1
+    });
+
+    service.setDisplayName(created.id, "Renamed live");
+    expect(service.listHistory()[0].name).toBe("Renamed live");
+
+    expect(service.delete(created.id)).toBe(true);
+    expect(service.listHistory()[0]).toMatchObject({
+      coordinator_session: "snapshot-parent",
+      name: "Live display",
+      current_task: "Next"
+    });
   });
 
   it("upserts by coordinator_session and resets the workflow to active", () => {
@@ -457,7 +531,7 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(16);
+    expect(version.version).toBe(17);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("display_name");
@@ -476,10 +550,12 @@ describe("OvermindService", () => {
     expect(service.getBySession("legacy-parent")?.run_started_at).toBe(service.getBySession("legacy-parent")?.created_at);
     expect(service.getBySession("legacy-parent")?.accumulated_ms).toBe(0);
     expect(service.getBySession("legacy-parent")?.display_name).toBeNull();
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_task_history'").all()).toHaveLength(1);
 
     db.close();
     db = new DatabaseService(TEST_DB);
     cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
+    const historyCols = db.raw.pragma("table_info(overmind_task_history)") as { name: string }[];
     expect(cols.filter((col) => col.name === "display_name")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "active_session")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "active_role")).toHaveLength(1);
@@ -488,5 +564,6 @@ describe("OvermindService", () => {
     expect(cols.filter((col) => col.name === "last_notified_transition")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "run_started_at")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "accumulated_ms")).toHaveLength(1);
+    expect(historyCols.filter((col) => col.name === "coordinator_session")).toHaveLength(1);
   });
 });

@@ -231,6 +231,70 @@ describe("Overmind routes", () => {
     expect(authenticated.json().workflows[0].coordinator_session).toBe("lkvc-38");
   });
 
+  it("requires JWT auth for task history and keeps rows after workflow deletion", async () => {
+    const registered = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "archive label",
+      session: "archive-parent",
+      run_dir: "/tmp/archive",
+      current_task: "Seed",
+      tasks: [{ id: "A1", label: "First", state: "processing" }]
+    });
+    const workflowId = registered.json().workflow.id;
+    overmindService.setDisplayName(workflowId, "Archive display");
+
+    await lifecyclePost("/api/overmind/tasks", {
+      token: OVERMIND_TOKEN,
+      session: "archive-parent",
+      current_task: "Archive this",
+      tasks: [{ id: "A1", label: "First", state: "done" }]
+    });
+
+    const unauthenticated = await app.inject({
+      method: "GET",
+      url: "/api/overmind/history"
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const loginCode = authService.generateLoginCode(111222);
+    const auth = authService.authenticateWithCode(loginCode);
+    expect(auth).not.toBeNull();
+
+    const beforeDrop = await app.inject({
+      method: "GET",
+      url: "/api/overmind/history",
+      headers: {
+        authorization: `Bearer ${auth!.token}`
+      }
+    });
+    expect(beforeDrop.statusCode).toBe(200);
+    expect(beforeDrop.json().history).toHaveLength(1);
+    expect(beforeDrop.json().history[0]).toMatchObject({
+      coordinator_session: "archive-parent",
+      name: "Archive display",
+      current_task: "Archive this",
+      done: 1,
+      total: 1
+    });
+
+    expect(overmindService.delete(workflowId)).toBe(true);
+
+    const afterDrop = await app.inject({
+      method: "GET",
+      url: "/api/overmind/history",
+      headers: {
+        authorization: `Bearer ${auth!.token}`
+      }
+    });
+    expect(afterDrop.statusCode).toBe(200);
+    expect(afterDrop.json().history).toHaveLength(1);
+    expect(afterDrop.json().history[0]).toMatchObject({
+      coordinator_session: "archive-parent",
+      name: "Archive display",
+      current_task: "Archive this"
+    });
+  });
+
   it("requires JWT auth to rename workflows and sets or clears display_name", async () => {
     const registered = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,

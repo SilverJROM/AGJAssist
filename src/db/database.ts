@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 16;
+const SCHEMA_VERSION = 17;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -310,6 +310,17 @@ CREATE TABLE IF NOT EXISTS overmind_workflows (
 );
 CREATE INDEX IF NOT EXISTS idx_overmind_workflows_coordinator_session ON overmind_workflows(coordinator_session);
 CREATE INDEX IF NOT EXISTS idx_overmind_workflows_status ON overmind_workflows(status);
+
+CREATE TABLE IF NOT EXISTS overmind_task_history (
+  id INTEGER PRIMARY KEY,
+  coordinator_session TEXT NOT NULL,
+  name TEXT NOT NULL,
+  at TEXT NOT NULL,
+  current_task TEXT,
+  done INTEGER NOT NULL,
+  total INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_overmind_task_history_coordinator_session ON overmind_task_history(coordinator_session);
 `;
 
 const DEFAULT_SAFETY_PATTERNS = [
@@ -572,6 +583,11 @@ export class DatabaseService {
         if (!colNames.has("display_name")) {
           this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN display_name TEXT");
         }
+      }
+
+      // Migration: v16 → v17: add persistent overmind task history archive
+      if (current && current.version < 17) {
+        this.db.exec(SCHEMA_SQL);
       }
 
       this.db
