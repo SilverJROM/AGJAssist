@@ -6,6 +6,6 @@
 | OU3 | OVM tab UI (live chat view + controls) | O3 | — | UNASSIGNED |
 | OU4 | Telegram /ovm_start + /ovm_end chat relay + menu update | O4 | — | UNASSIGNED |
 
-| OU5 | Telegram startup/polling non-fatal (app stays up if TG down) | O5 | — | UNASSIGNED |
+| OU5 | Telegram startup/polling non-fatal (app stays up if TG down) | O5 | batch-O5/independent-validation.md | VERIFIED |
 
 Final acceptance: every row VERIFIED.

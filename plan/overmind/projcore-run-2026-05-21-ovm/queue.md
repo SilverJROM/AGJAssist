@@ -4,3 +4,4 @@
 3. **O3** — OVM tab UI (live chat view + input + open/restart/close buttons + status) (OU3) — SHORT* — PENDING
 One batch at a time, plan-handshake, gate + live-smoke.
 4. **O4** — Telegram /ovm_start + /ovm_end chat relay (reuse OVM session) + setMyCommands menu update (OU4) — SHORT — PENDING
+5. **O5** — Telegram startup/polling non-fatal resilience (OU5) — SHORT — VERIFIED

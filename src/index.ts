@@ -31,6 +31,13 @@ import { OvermindWatcher, POLL_MS } from "./services/overmind-watcher.js";
 import { SonnetOvermindBrain } from "./services/overmind-brain.js";
 import { OvermindStreamManager } from "./api/websocket/overmind-stream-manager.js";
 import { OvmSessionService } from "./services/ovm-session.js";
+import {
+  formatError,
+  installTelegramProcessGuards,
+  startTelegramNonFatal
+} from "./startup/telegram-resilience.js";
+
+installTelegramProcessGuards();
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -295,18 +302,10 @@ async function main(): Promise<void> {
     }
   }, 60_000);
 
-  if (!telegramAssistant) {
-    console.log("AGJAssist booted in TEST_MODE=true (Telegram polling not started)");
-    return;
-  }
-
-  // Telegram bot
-  await telegramAssistant.start();
-  console.log("AGJAssist Telegram bot started");
+  await startTelegramNonFatal(telegramAssistant);
 }
 
 main().catch((error) => {
-  const msg = error instanceof Error ? error.stack || error.message : String(error);
-  console.error("Fatal startup error:", msg);
+  console.error("Fatal startup error:", formatError(error));
   process.exit(1);
 });
