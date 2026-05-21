@@ -5,3 +5,4 @@
 [projcore callback] V3 PROPOSED Preparing V3 dashboard Active/Done tabs UI-only plan; awaiting APPROVED-PLAN before code.
 [projcore callback] V3 DONE Active/Done dashboard tabs implemented UI-only with isActiveStatus helper, counts, empty states, preserved collapse/attribution, targeted test, npx tsc, and npm run build passing.
 [projcore callback] V4 PROPOSED Proposing split into V4a home Workflows card and V4b customizable bottom nav; awaiting APPROVED-PLAN before code.
+[projcore callback] V4a DONE Home Workflows quick-view summary implemented on web and Telegram home cards; targeted helper test, npx tsc, and npm run build passed; commit bf7e128.

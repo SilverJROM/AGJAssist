@@ -997,6 +997,106 @@ body.tg-miniapp {
   font-size: 9px;
 }
 
+.tg-nav-editor {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 78px;
+  z-index: 200;
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  padding: 12px;
+}
+
+.tg-nav-editor-header,
+.tg-nav-editor-row,
+.tg-nav-editor-add,
+.tg-page-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tg-nav-editor-header {
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.tg-nav-editor-header h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.tg-nav-editor-list {
+  display: grid;
+  gap: 6px;
+}
+
+.tg-nav-editor-row {
+  min-height: 44px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.tg-nav-editor-icon {
+  width: 22px;
+  text-align: center;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tg-nav-editor-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tg-nav-editor-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.tg-icon-button {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tg-icon-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.tg-danger-icon {
+  color: var(--danger);
+}
+
+.tg-nav-editor-add {
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.tg-nav-editor-add select {
+  min-width: 150px;
+  flex: 1;
+}
+
 /* TG Dashboard */
 .tg-dashboard-grid {
   display: grid;
@@ -1050,12 +1150,23 @@ body.tg-miniapp {
 }
 
 /* TG page title */
+.tg-page-title-row {
+  justify-content: center;
+  position: relative;
+}
+
 .tg-page-title {
   font-size: 18px;
   font-weight: 700;
   text-align: center;
   padding: 8px 0 4px;
   color: var(--text);
+}
+
+.tg-title-action {
+  position: absolute;
+  right: 0;
+  top: 2px;
 }
 
 /* Hide web nav in TG */

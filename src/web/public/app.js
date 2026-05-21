@@ -2,7 +2,25 @@ import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
 import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput } from './terminal-chat-state.js';
-import { buildOvermindWsUrl, countDoneTasks, formatActiveSessionAttribution, formatStuckDuration, isActiveStatus, statusColor, statusIcon, summarizeWorkflows, taskGlyph } from './overmind-helpers.js';
+import {
+  AVAILABLE_BOTTOM_NAV_TABS,
+  DEFAULT_BOTTOM_NAV_TAB_IDS,
+  addBottomNavTab,
+  buildOvermindWsUrl,
+  countDoneTasks,
+  formatActiveSessionAttribution,
+  formatStuckDuration,
+  getBottomNavTabs,
+  isActiveStatus,
+  moveBottomNavTab,
+  readBottomNavTabIds,
+  removeBottomNavTab,
+  statusColor,
+  statusIcon,
+  summarizeWorkflows,
+  taskGlyph,
+  writeBottomNavTabIds
+} from './overmind-helpers.js';
 
 const html = htm.bind(h);
 
@@ -4943,7 +4961,7 @@ function LlmHealthCheck() {
   `;
 }
 
-function Settings() {
+function Settings({ onEditBottomNav } = {}) {
   const [patterns, setPatterns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userInfo, setUserInfo] = useState(null);
@@ -4958,6 +4976,12 @@ function Settings() {
   return html`
     <div>
       <h2 style="margin-bottom:16px">Settings</h2>
+
+      ${onEditBottomNav && html`
+        <${SettingsSection} title="Bottom Navigation" defaultOpen=${true}>
+          <button class="btn btn-sm" onclick=${onEditBottomNav}>Edit bottom nav</button>
+        </${SettingsSection}>
+      `}
 
       <${SettingsSection} title="Account" defaultOpen=${true}>
         <div style="margin-bottom:16px">
@@ -5053,7 +5077,50 @@ function Settings() {
 
 // ========== Telegram Mini App Components ==========
 
-function TgDashboard() {
+function BottomNavEditor({ tabIds, onChange, onClose }) {
+  const [addId, setAddId] = useState('');
+  const currentTabs = getBottomNavTabs(tabIds);
+  const hiddenTabs = AVAILABLE_BOTTOM_NAV_TABS.filter(tab => !tabIds.includes(tab.id));
+  const selectedAddId = hiddenTabs.some(tab => tab.id === addId) ? addId : (hiddenTabs[0]?.id || '');
+
+  return html`
+    <div class="tg-nav-editor">
+      <div class="tg-nav-editor-header">
+        <h3>Bottom Nav</h3>
+        <button class="tg-icon-button" title="Close" onclick=${onClose}>×</button>
+      </div>
+      <div class="tg-nav-editor-list">
+        ${currentTabs.map((tab, index) => html`
+          <div class="tg-nav-editor-row" key=${tab.id}>
+            <span class="tg-nav-editor-icon">${tab.icon}</span>
+            <span class="tg-nav-editor-label">${tab.label}</span>
+            <div class="tg-nav-editor-actions">
+              <button class="tg-icon-button" title="Move up" disabled=${index === 0}
+                      onclick=${() => onChange(moveBottomNavTab(tabIds, tab.id, -1))}>↑</button>
+              <button class="tg-icon-button" title="Move down" disabled=${index === currentTabs.length - 1}
+                      onclick=${() => onChange(moveBottomNavTab(tabIds, tab.id, 1))}>↓</button>
+              <button class="tg-icon-button tg-danger-icon" title="Remove tab" disabled=${currentTabs.length <= 1}
+                      onclick=${() => onChange(removeBottomNavTab(tabIds, tab.id))}>×</button>
+            </div>
+          </div>
+        `)}
+      </div>
+      <div class="tg-nav-editor-add">
+        <select value=${selectedAddId} disabled=${hiddenTabs.length === 0}
+                onchange=${e => setAddId(e.target.value)}>
+          ${hiddenTabs.length === 0
+            ? html`<option value="">All tabs shown</option>`
+            : hiddenTabs.map(tab => html`<option value=${tab.id} key=${tab.id}>${tab.label}</option>`)}
+        </select>
+        <button class="btn btn-sm" disabled=${!selectedAddId}
+                onclick=${() => onChange(addBottomNavTab(tabIds, selectedAddId))}>+ Add</button>
+        <button class="btn btn-sm" onclick=${() => onChange(DEFAULT_BOTTOM_NAV_TAB_IDS)}>Reset</button>
+      </div>
+    </div>
+  `;
+}
+
+function TgDashboard({ onEditBottomNav }) {
   const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, conversations: 0, notes: 0, workflows: 0, activeWorkflows: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -5095,7 +5162,10 @@ function TgDashboard() {
 
   return html`
     <div>
-      <div class="tg-page-title">AGJAssist</div>
+      <div class="tg-page-title-row">
+        <div class="tg-page-title">AGJAssist</div>
+        <button class="tg-icon-button tg-title-action" title="Edit bottom navigation" onclick=${onEditBottomNav}>✎</button>
+      </div>
       <div class="tg-dashboard-grid">
         ${cards.map(c => html`
           <div class="tg-dash-card" onclick=${() => {
@@ -5116,21 +5186,20 @@ function TgDashboard() {
 function TgApp() {
   const route = useRoute();
   const user = JSON.parse(localStorage.getItem('agj_user') || 'null');
+  const [bottomNavTabIds, setBottomNavTabIds] = useState(() => readBottomNavTabIds());
+  const [editingBottomNav, setEditingBottomNav] = useState(false);
 
   if (!authToken || !user) return html`<${Login} />`;
 
-  const tabs = [
-    { id: '/', icon: '\u{1F3E0}', label: 'Home' },
-    { id: '/tasks', icon: '\u{2705}', label: 'Tasks' },
-    { id: '/notes', icon: '\u{1F4DD}', label: 'Notes' },
-    { id: '/terminals', icon: '\u{1F5A5}', label: 'Terminal' },
-    { id: '/conversations', icon: '\u{1F4AC}', label: 'Chat' },
-    { id: '/settings', icon: '\u{2699}', label: 'Settings' }
-  ];
+  function applyBottomNavTabIds(nextIds) {
+    setBottomNavTabIds(writeBottomNavTabIds(nextIds));
+  }
+
+  const tabs = getBottomNavTabs(bottomNavTabIds);
 
   let content;
   if (route === '/' || route === '') {
-    content = html`<${TgDashboard} />`;
+    content = html`<${TgDashboard} onEditBottomNav=${() => setEditingBottomNav(true)} />`;
   } else if (route === '/projects') {
     content = html`<${Projects} />`;
   } else if (route === '/terminals') {
@@ -5144,7 +5213,7 @@ function TgApp() {
   } else if (route === '/conversations') {
     content = html`<${Conversations} />`;
   } else if (route === '/settings') {
-    content = html`<${Settings} />`;
+    content = html`<${Settings} onEditBottomNav=${() => setEditingBottomNav(true)} />`;
   } else if (route.startsWith('/project/')) {
     const id = route.split('/')[2];
     content = html`<${ProjectDetail} id=${id} key=${id} />`;
@@ -5156,6 +5225,13 @@ function TgApp() {
 
   return html`
     <main class="main">${content}</main>
+    ${editingBottomNav && html`
+      <${BottomNavEditor}
+        tabIds=${bottomNavTabIds}
+        onChange=${applyBottomNavTabIds}
+        onClose=${() => setEditingBottomNav(false)}
+      />
+    `}
     <nav class="tg-tab-bar">
       ${tabs.map(t => html`
         <button class=${'tg-tab-item' + (activeTab === t.id ? ' active' : '')}
