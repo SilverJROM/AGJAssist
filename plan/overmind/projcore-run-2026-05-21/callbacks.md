@@ -18,3 +18,5 @@
 [projcore callback] A6a PROPOSED Sonnet brain interface, Tier-3 once-per-stuck-episode wiring, BLOCKED waiting_human halt, and fake-brain tests proposed; awaiting APPROVED-PLAN before code changes.
 [projcore callback] A6a APPROVED-PLAN Approved plan received; implementing Sonnet brain Tier-3 plumbing with fake-brain tests on feat/overmind.
 [projcore callback] A6a DONE Sonnet brain Tier-3 plumbing, BLOCKED waiting_human halt, and fake-brain tests implemented; tsc and targeted overmind gates passed.
+[projcore callback] A6b PROPOSED Plan ready: add decision-answer brain method, deterministic always-escalate guardrail, once-per-episode handling, R16 correction log/note, fake-brain tests.
+[projcore callback] A6b DONE Decision interception, deterministic always-escalate guardrail, once-per-decision handling, and R16 correction implemented; tsc and targeted/prior overmind gates passed.

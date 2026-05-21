@@ -3,7 +3,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseService } from "../src/db/database.js";
-import { OvermindBrain, BrainVerdict, StuckInput } from "../src/services/overmind-brain.js";
+import {
+  OvermindBrain,
+  BrainVerdict,
+  DecisionInput,
+  DecisionVerdict,
+  StuckInput
+} from "../src/services/overmind-brain.js";
 import { OvermindService, OvermindWorkflow } from "../src/services/overmind-service.js";
 import { OvermindWatcher, hashPane } from "../src/services/overmind-watcher.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
@@ -15,6 +21,7 @@ const POST_BRAIN_NUDGE_PANE = `${QUIET_PANE}\nOvermind Tier 3 nudge`;
 
 class FakeBrain implements OvermindBrain {
   readonly calls: StuckInput[] = [];
+  readonly decisionCalls: DecisionInput[] = [];
 
   constructor(
     private readonly verdict?: BrainVerdict,
@@ -25,6 +32,11 @@ class FakeBrain implements OvermindBrain {
     this.calls.push(input);
     if (this.error) throw this.error;
     return this.verdict ?? { action: "false-alarm", reason: "test" };
+  }
+
+  async answerDecision(input: DecisionInput): Promise<DecisionVerdict> {
+    this.decisionCalls.push(input);
+    return { action: "escalate", reason: "test" };
   }
 }
 

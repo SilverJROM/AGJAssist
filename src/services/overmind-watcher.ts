@@ -1,9 +1,15 @@
 import { createHash } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "./overmind-service.js";
 import { TmuxService } from "../tmux/tmux-service.js";
-import { BrainVerdict, OvermindBrain } from "./overmind-brain.js";
+import {
+  BrainVerdict,
+  DecisionVerdict,
+  OvermindBrain,
+  hasAlwaysEscalateKeyword
+} from "./overmind-brain.js";
 
 export const POLL_MS = 45_000;
 export const STUCK_THRESHOLD_MS = 90_000;
@@ -11,8 +17,11 @@ export const CAPTURE_LINES = 200;
 export const MAX_CANNED_NUDGES = 2;
 export const BRAIN_COORDINATOR_TAIL_LINES = 40;
 export const BRAIN_RUN_FILE_TAIL_LINES = 80;
+export const DECISION_HANDLED_TIER = 4;
 export const CANNED_NUDGE =
   "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS.";
+export const FRONTLOAD_CORRECTION_NOTE =
+  "Overmind: that decision should have been frontloaded at intake (projcore §1.4a) — please put such decisions in the north-star next time.";
 
 const BUSY_MARKER_RE = /esc to interrupt|Working \(|Waiting for|Compacting|Thinking/i;
 const NUMBERED_OPTION_RE = /^\s*\d+\.\s+\S+/m;
@@ -46,6 +55,7 @@ interface NudgeLadderFields {
   status?: OvermindWorkflowStatus;
   last_pane_hash?: string;
   stuck_since?: string | null;
+  pending_decision?: string | null;
 }
 
 export function hashPane(pane: string): string {
@@ -147,11 +157,15 @@ export class OvermindWatcher {
       now
     });
 
-    const nudgeFields = await this.applyNudgeLadder(workflow, result.status, coordinatorPane);
+    const nudgeFields = result.status === "awaiting_decision"
+      ? await this.applyDecisionInterception(workflow, result.pendingDecision)
+      : await this.applyNudgeLadder(workflow, result.status, coordinatorPane);
 
     this.overmindService.update(workflow.id, {
       status: nudgeFields.status ?? result.status,
-      pending_decision: result.pendingDecision,
+      pending_decision: nudgeFields.pending_decision !== undefined
+        ? nudgeFields.pending_decision
+        : result.pendingDecision,
       last_pane_hash: nudgeFields.last_pane_hash ?? result.coordinatorHash,
       stuck_since: nudgeFields.stuck_since !== undefined ? nudgeFields.stuck_since : result.stuckSince,
       ...nudgeFields,
@@ -190,6 +204,62 @@ export class OvermindWatcher {
       nudge_count: nextNudgeCount,
       tier: nextNudgeCount,
       last_pane_hash: hashPane(postNudgePane)
+    };
+  }
+
+  private async applyDecisionInterception(
+    workflow: OvermindWorkflow,
+    pendingDecision: string | null
+  ): Promise<NudgeLadderFields> {
+    if (!pendingDecision) {
+      return { nudge_count: workflow.nudge_count, tier: workflow.tier };
+    }
+
+    if (workflow.tier >= DECISION_HANDLED_TIER && workflow.pending_decision === pendingDecision) {
+      return { nudge_count: workflow.nudge_count, tier: workflow.tier };
+    }
+
+    let verdict: DecisionVerdict;
+    try {
+      if (!this.brain) {
+        throw new Error("decision brain unavailable");
+      }
+      verdict = await this.brain.answerDecision({
+        label: workflow.label,
+        pendingDecision,
+        northStar: await readFileBestEffort(path.join(workflow.run_dir, "north-star.md")),
+        trustDefaults: await readFileBestEffort(path.join(homedir(), ".claude/JROM/style/trust-defaults.md"))
+      });
+    } catch (error) {
+      console.error("Overmind decision brain failed:", error);
+      verdict = {
+        action: "escalate",
+        reason: "Decision Sonnet brain failed; escalating to JROM instead of auto-answering."
+      };
+    }
+
+    const guardedVerdict = applyAlwaysEscalateGuardrail(pendingDecision, verdict);
+    await this.logDecisionCorrection(workflow, pendingDecision, guardedVerdict);
+
+    if (guardedVerdict.action === "answer") {
+      await this.tmuxService.sendCommand(workflow.coordinator_session, guardedVerdict.answerText!, true, true);
+      await this.tmuxService.sendCommand(workflow.coordinator_session, FRONTLOAD_CORRECTION_NOTE, true, true);
+      const postDecisionPane = await this.capturePaneSafe(workflow.coordinator_session);
+      return {
+        nudge_count: workflow.nudge_count,
+        tier: DECISION_HANDLED_TIER,
+        pending_decision: pendingDecision,
+        last_pane_hash: hashPane(postDecisionPane)
+      };
+    }
+
+    await this.notifyDecisionEscalation(workflow, pendingDecision, guardedVerdict.reason);
+    return {
+      nudge_count: workflow.nudge_count,
+      tier: DECISION_HANDLED_TIER,
+      pending_decision: pendingDecision,
+      status: "awaiting_decision",
+      stuck_since: null
     };
   }
 
@@ -244,6 +314,52 @@ export class OvermindWatcher {
     await this.notifyBestEffort(`BLOCKED · overmind · ${workflow.label}\n${reason}`);
   }
 
+  async notifyDecisionEscalation(
+    workflow: OvermindWorkflow,
+    pendingDecision: string,
+    reason: string
+  ): Promise<void> {
+    await this.notifyBestEffort([
+      `BLOCKED · overmind · ${workflow.label}`,
+      "❓ Awaiting decision escalated to JROM.",
+      "",
+      "Decision:",
+      pendingDecision,
+      "",
+      `Reason: ${reason}`
+    ].join("\n"));
+  }
+
+  private async logDecisionCorrection(
+    workflow: OvermindWorkflow,
+    pendingDecision: string,
+    verdict: DecisionVerdict
+  ): Promise<void> {
+    const correctionsDir = path.join(workflow.run_dir, "corrections");
+    const correctionFile = path.join(correctionsDir, "overmind-decision-corrections.md");
+    const entry = [
+      `## ${new Date().toISOString()} — ${workflow.label}`,
+      "",
+      "Decision:",
+      "```",
+      pendingDecision,
+      "```",
+      "",
+      `Verdict: ${verdict.action}`,
+      `Reason: ${verdict.reason}`,
+      "",
+      "Correction: this decision should have been frontloaded (§1.4a) in the projcore intake interview / north-star.",
+      ""
+    ].join("\n");
+
+    try {
+      await mkdir(correctionsDir, { recursive: true });
+      await appendFile(correctionFile, entry, "utf-8");
+    } catch (error) {
+      console.error("Overmind decision correction log failed:", error);
+    }
+  }
+
   private async notifyBestEffort(text: string): Promise<void> {
     if (!this.notify) return;
     try {
@@ -280,6 +396,19 @@ async function runDirMtimeAdvanced(runDir: string, lastActivityAt: string | null
   return Math.max(...mtimes) > lastActivityMs;
 }
 
+function applyAlwaysEscalateGuardrail(
+  pendingDecision: string,
+  verdict: DecisionVerdict
+): DecisionVerdict {
+  if (!hasAlwaysEscalateKeyword(pendingDecision)) {
+    return verdict;
+  }
+  return {
+    action: "escalate",
+    reason: `Deterministic ALWAYS_ESCALATE_KEYWORDS guardrail matched the pending decision; overriding brain action=${verdict.action}.`
+  };
+}
+
 function isDecisionPrompt(pane: string): boolean {
   return NUMBERED_OPTION_RE.test(pane) && DECISION_FOOTER_RE.test(pane);
 }
@@ -304,6 +433,14 @@ function tailLines(text: string, maxLines: number): string {
 async function readRunFileTail(runDir: string, file: string, maxLines: number): Promise<string> {
   try {
     return tailLines(await readFile(path.join(runDir, file), "utf-8"), maxLines);
+  } catch {
+    return "";
+  }
+}
+
+async function readFileBestEffort(filePath: string): Promise<string> {
+  try {
+    return await readFile(filePath, "utf-8");
   } catch {
     return "";
   }
