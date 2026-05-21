@@ -697,6 +697,21 @@ body {
   color: var(--text);
   font-size: 12px;
 }
+.overmind-history-group {
+  gap: 10px;
+}
+.overmind-history-archive-list {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+@media (max-width: 560px) {
+  .overmind-history-entry {
+    grid-template-columns: 1fr auto;
+  }
+  .overmind-history-entry time {
+    grid-column: 1 / -1;
+  }
+}
 
 /* Status badges */
 .badge {

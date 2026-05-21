@@ -12,3 +12,17 @@ Evidence:
 
 Residual risk:
 - W4b UI rendering and grouping are not implemented in W4a; they are the next approved split.
+
+## W4b
+
+Validation result: PASS.
+
+Evidence:
+- Dashboard tabs now read Active / Completed / History.
+- History tab fetches the persistent `/api/overmind/history` archive, not the live `/api/overmind/workflows` list.
+- Archive rows are grouped by workflow/session with display name from the endpoint and entries sorted newest-first.
+- History rendering is independent of `workflows.length`, so deleted workflows can still appear from archive rows.
+- Helper, service, route, TypeScript, and production build gates passed.
+
+Residual risk:
+- No browser screenshot was captured in this split; validation is code/test/build based.

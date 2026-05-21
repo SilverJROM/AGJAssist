@@ -13,3 +13,21 @@ PASS `npx vitest run tests/overmind-routes.test.ts`
 PASS `npx tsc --noEmit`
 
 PASS `npm run build`
+
+## W4b
+
+PASS `npx vitest run tests/overmind-service.test.ts`
+- 14 tests passed.
+- Re-ran persistence/delete-survival coverage after UI/helper changes.
+
+PASS `npx vitest run tests/overmind-routes.test.ts`
+- 6 tests passed.
+- Re-ran authenticated history endpoint coverage.
+
+PASS `npx vitest run tests/overmind-stream.test.ts`
+- 10 tests passed.
+- Covers `groupOvermindHistoryByWorkflow` grouping by workflow/session and newest-first entry order.
+
+PASS `npx tsc --noEmit`
+
+PASS `npm run build`

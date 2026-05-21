@@ -14,6 +14,7 @@ import {
   formatActiveSessionAttribution,
   formatElapsed,
   formatStuckDuration,
+  groupOvermindHistoryByWorkflow,
   isActiveStatus,
   statusColor,
   statusIcon,
@@ -244,5 +245,82 @@ describe("Overmind public helpers", () => {
       { status: "paused" }
     ])).toEqual({ total: 4, active: 2 });
     expect(summarizeWorkflows(null)).toEqual({ total: 0, active: 0 });
+  });
+
+  it("groups archived task history by workflow with newest entries first", () => {
+    expect(groupOvermindHistoryByWorkflow([
+      {
+        id: 1,
+        coordinator_session: "coord-a",
+        name: "Workflow A",
+        at: "2026-05-21T10:00:00.000Z",
+        current_task: "First",
+        done: 1,
+        total: 3
+      },
+      {
+        id: 2,
+        coordinator_session: "coord-b",
+        name: "Workflow B",
+        at: "2026-05-21T12:00:00.000Z",
+        current_task: "Only",
+        done: 2,
+        total: 2
+      },
+      {
+        id: 3,
+        coordinator_session: "coord-a",
+        name: "Workflow A renamed",
+        at: "2026-05-21T11:00:00.000Z",
+        current_task: "Second",
+        done: 2,
+        total: 3
+      }
+    ])).toEqual([
+      {
+        key: "coord-b",
+        coordinator_session: "coord-b",
+        name: "Workflow B",
+        latest_at: "2026-05-21T12:00:00.000Z",
+        entries: [
+          {
+            id: 2,
+            coordinator_session: "coord-b",
+            name: "Workflow B",
+            at: "2026-05-21T12:00:00.000Z",
+            current_task: "Only",
+            done: 2,
+            total: 2
+          }
+        ]
+      },
+      {
+        key: "coord-a",
+        coordinator_session: "coord-a",
+        name: "Workflow A renamed",
+        latest_at: "2026-05-21T11:00:00.000Z",
+        entries: [
+          {
+            id: 3,
+            coordinator_session: "coord-a",
+            name: "Workflow A renamed",
+            at: "2026-05-21T11:00:00.000Z",
+            current_task: "Second",
+            done: 2,
+            total: 3
+          },
+          {
+            id: 1,
+            coordinator_session: "coord-a",
+            name: "Workflow A",
+            at: "2026-05-21T10:00:00.000Z",
+            current_task: "First",
+            done: 1,
+            total: 3
+          }
+        ]
+      }
+    ]);
+    expect(groupOvermindHistoryByWorkflow(null)).toEqual([]);
   });
 });

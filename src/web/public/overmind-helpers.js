@@ -69,6 +69,50 @@ export function summarizeWorkflows(workflows) {
   };
 }
 
+export function groupOvermindHistoryByWorkflow(history) {
+  const rows = Array.isArray(history) ? history : [];
+  const groups = new Map();
+
+  for (const entry of rows) {
+    if (!entry || typeof entry !== 'object') continue;
+    const session = entry.coordinator_session || '';
+    const name = entry.name || session || 'Unknown workflow';
+    const key = session || name;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        coordinator_session: session || null,
+        name,
+        entries: []
+      });
+    }
+
+    const group = groups.get(key);
+    group.name = name;
+    group.entries.push({
+      id: entry.id,
+      coordinator_session: session || null,
+      name,
+      at: entry.at || null,
+      current_task: entry.current_task ?? null,
+      done: Number.isFinite(Number(entry.done)) ? Number(entry.done) : 0,
+      total: Number.isFinite(Number(entry.total)) ? Number(entry.total) : 0
+    });
+  }
+
+  const sortedGroups = [...groups.values()].map(group => {
+    group.entries.sort(compareHistoryEntriesDesc);
+    group.latest_at = group.entries[0]?.at || null;
+    return group;
+  });
+  sortedGroups.sort((a, b) => {
+    const byTime = compareHistoryTimestampsDesc(a.latest_at, b.latest_at);
+    if (byTime !== 0) return byTime;
+    return a.name.localeCompare(b.name);
+  });
+  return sortedGroups;
+}
+
 export function normalizeBottomNavTabIds(tabIds = DEFAULT_BOTTOM_NAV_TAB_IDS) {
   const source = Array.isArray(tabIds) ? tabIds : DEFAULT_BOTTOM_NAV_TAB_IDS;
   const normalized = [];
@@ -212,4 +256,19 @@ function parseTimestampMs(value) {
   return Date.parse(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
     ? `${value.replace(' ', 'T')}Z`
     : value);
+}
+
+function compareHistoryEntriesDesc(a, b) {
+  const byTime = compareHistoryTimestampsDesc(a?.at, b?.at);
+  if (byTime !== 0) return byTime;
+  return Number(b?.id || 0) - Number(a?.id || 0);
+}
+
+function compareHistoryTimestampsDesc(a, b) {
+  const aTime = parseTimestampMs(a);
+  const bTime = parseTimestampMs(b);
+  if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
+  if (Number.isNaN(aTime)) return 1;
+  if (Number.isNaN(bTime)) return -1;
+  return bTime - aTime;
 }

@@ -16,3 +16,19 @@ Per-file WHY:
 - `tests/overmind-routes.test.ts`: verifies JWT protection and history survival after workflow deletion.
 
 Autonomous decisions: none.
+
+## W4b
+
+User Report verbatim:
+Tabs become Active / Completed / History (rename Done→Completed; add History). History = persistent archive of task-log entries that SURVIVES workflow completion/removal (separate table). Layout: grouped by workflow (display_name ?? label), newest-first, collapsible.
+
+Root Cause mechanism:
+The Overmind dashboard only had Active/Done workflow filters and rendered per-workflow `task_log` inside live workflow cards. That made deleted workflow history unreachable in the UI even after W4a persisted it independently.
+
+Per-file WHY:
+- `src/web/public/overmind-helpers.js`: added `groupOvermindHistoryByWorkflow` so archive grouping and newest-first sorting are testable outside the browser.
+- `src/web/public/app.js`: renamed Done to Completed, added a History tab, fetches `/api/overmind/history`, and renders collapsible workflow groups independent of the live workflow list.
+- `src/web/public/style.css`: added small archive-list layout rules and mobile wrapping for history rows.
+- `tests/overmind-stream.test.ts`: verifies grouped archive output and newest-first ordering.
+
+Autonomous decisions: none.
