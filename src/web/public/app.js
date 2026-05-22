@@ -33,6 +33,15 @@ const OVM_TMUX_TARGET = 'OVM:0.0';
 const isTgMiniApp = !!(window.Telegram?.WebApp?.initData);
 if (isTgMiniApp) {
   document.body.classList.add('tg-miniapp');
+  // Runs on every load (incl. already-authenticated users where Login never mounts).
+  // disableVerticalSwipes stops Telegram's swipe-to-minimize gesture from eating touch
+  // scroll (the "mini-app scroll not working" bug). All guarded for older clients.
+  try {
+    const wa = window.Telegram.WebApp;
+    wa.ready?.();
+    wa.expand?.();
+    wa.disableVerticalSwipes?.();
+  } catch {}
   const tp = window.Telegram.WebApp.themeParams || {};
   const root = document.documentElement.style;
   // Force-apply TG theme params as CSS variables
@@ -302,6 +311,10 @@ function Login() {
     if (tg) {
       tg.ready();
       tg.expand();
+      // Telegram's vertical swipe-to-minimize gesture (Bot API 7.7+) intercepts touch
+      // scroll, breaking in-app scrolling. Disable it so content scrolls normally.
+      // Guarded: no-op on older clients that lack the method.
+      try { tg.disableVerticalSwipes?.(); } catch {}
       if (tg.initData) {
         doAuth(tg.initData, 'miniapp');
       } else {
