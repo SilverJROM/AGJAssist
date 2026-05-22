@@ -162,7 +162,7 @@ export function registerOvermindRoutes(
             if (aliveChildren.length > 0) {
               const killCmds = aliveChildren.map((c) => `tmux kill-session -t ${c}`).join(" ; ");
               const msg = `Overmind: '${completed.label}' is marked complete — please close your child session(s) to free resources (your own session can stay up): ${killCmds}`;
-              await tmuxService.sendCommand(completed.coordinator_session, msg, true, true);
+              await tmuxService.sendAndSubmit(completed.coordinator_session, msg);
             }
           }
         } catch (error) {

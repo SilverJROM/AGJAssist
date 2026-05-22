@@ -457,6 +457,7 @@ describe("Overmind routes", () => {
       return {
         sessionExists: vi.fn(async (target: string) => aliveSet.has(target)),
         sendCommand: vi.fn(async () => ({ message: "sent", blocked: false })),
+        sendAndSubmit: vi.fn(async () => true),
         capturePane: vi.fn(async () => "")
       } as unknown as TmuxService;
     }
@@ -494,8 +495,8 @@ describe("Overmind routes", () => {
 
         expect(complete.statusCode).toBe(200);
         expect(complete.json().workflow.status).toBe("completed");
-        expect(tmux.sendCommand).toHaveBeenCalledOnce();
-        const [target, msg] = (tmux.sendCommand as ReturnType<typeof vi.fn>).mock.calls[0];
+        expect(tmux.sendAndSubmit).toHaveBeenCalledOnce();
+        const [target, msg] = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls[0];
         expect(target).toBe("parent-coord");
         expect(msg).toContain("child-alive-1");
         expect(msg).toContain("kill-session");
@@ -529,7 +530,7 @@ describe("Overmind routes", () => {
 
         expect(complete.statusCode).toBe(200);
         expect(complete.json().workflow.status).toBe("completed");
-        expect(tmux.sendCommand).not.toHaveBeenCalled();
+        expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
       } finally {
         await a.close();
       }
@@ -561,7 +562,7 @@ describe("Overmind routes", () => {
 
         expect(complete.statusCode).toBe(200);
         expect(complete.json().workflow.status).toBe("completed");
-        expect(tmux.sendCommand).not.toHaveBeenCalled();
+        expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
       } finally {
         await a.close();
       }

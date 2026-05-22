@@ -421,7 +421,7 @@ export class OvermindWatcher {
         const msg =
           `Overmind: registration gap detected (${problemDesc}) — please re-register your CURRENT child_sessions, child_roles, and status to overmind now (POST /api/overmind/register), ` +
           `and update your task list (POST /api/overmind/tasks) if it has changed since you last reported.`;
-        await this.tmuxService.sendCommand(workflow.coordinator_session, msg, true, true);
+        await this.tmuxService.sendAndSubmit(workflow.coordinator_session, msg);
 
         // Record the signature we just asked so future cycles with the same gap skip.
         this.lastReconcileAsk.set(workflow.id, gapSignature);
@@ -623,7 +623,7 @@ export class OvermindWatcher {
 
     let lastPaneHash: string | undefined;
     try {
-      await this.tmuxService.sendCommand(workflow.coordinator_session, requestText, true, true);
+      await this.tmuxService.sendAndSubmit(workflow.coordinator_session, requestText);
       lastPaneHash = hashPane(await this.capturePaneSafe(workflow.coordinator_session));
     } catch (error) {
       console.error("Overmind completeness request failed:", error);
@@ -715,7 +715,7 @@ export class OvermindWatcher {
     // consult: ask projcore to confirm + POST /complete (or clarify what remains).
     let lastPaneHash = coordinatorHash;
     try {
-      await this.tmuxService.sendCommand(workflow.coordinator_session, verdict.consultText!, true, true);
+      await this.tmuxService.sendAndSubmit(workflow.coordinator_session, verdict.consultText!);
       lastPaneHash = hashPane(await this.capturePaneSafe(workflow.coordinator_session));
     } catch (error) {
       console.error("Overmind completion consult nudge failed:", error);
@@ -801,7 +801,7 @@ export class OvermindWatcher {
     }
 
     const nextNudgeCount = workflow.nudge_count + 1;
-    await this.tmuxService.sendCommand(workflow.coordinator_session, CANNED_NUDGE, true, true);
+    await this.tmuxService.sendAndSubmit(workflow.coordinator_session, CANNED_NUDGE);
     const postNudgePane = await this.capturePaneSafe(workflow.coordinator_session);
     return {
       nudge_count: nextNudgeCount,
@@ -895,7 +895,7 @@ export class OvermindWatcher {
     }
 
     if (verdict.action === "nudge") {
-      await this.tmuxService.sendCommand(workflow.coordinator_session, verdict.nudgeText!, true, true);
+      await this.tmuxService.sendAndSubmit(workflow.coordinator_session, verdict.nudgeText!);
       const postNudgePane = await this.capturePaneSafe(workflow.coordinator_session);
       return {
         nudge_count: workflow.nudge_count,

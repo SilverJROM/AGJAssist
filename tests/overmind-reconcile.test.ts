@@ -60,12 +60,14 @@ function makeTmuxMock(opts: {
   return {
     capturePane: vi.fn(async () => "quiet pane"),
     sendCommand: vi.fn(async () => ({ message: "sent", blocked: false })),
+    sendAndSubmit: vi.fn(async () => true),
     sessionExists: vi.fn(async (target: string) => {
       if (opts.sessionAliveMap) return opts.sessionAliveMap[target] ?? false;
       return opts.sessionAlive ?? true;
     })
   } as unknown as TmuxService & {
     sendCommand: ReturnType<typeof vi.fn>;
+    sendAndSubmit: ReturnType<typeof vi.fn>;
     sessionExists: ReturnType<typeof vi.fn>;
   };
 }
@@ -79,8 +81,8 @@ describe("OvermindWatcher.reconcile()", () => {
 
     await watcher.reconcile([wf]);
 
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
-    const [target, msg] = (tmux.sendCommand as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    const [target, msg] = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
     expect(target).toBe("coord-reconcile");
     // Must mention the gap
     expect(msg).toContain("roster");
@@ -99,7 +101,7 @@ describe("OvermindWatcher.reconcile()", () => {
 
     await watcher.reconcile([wf]);
 
-    expect(tmux.sendCommand).not.toHaveBeenCalled();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
   });
 
   it("does NOT send a demand when monitoring_paused is true, even with a gap", async () => {
@@ -110,7 +112,7 @@ describe("OvermindWatcher.reconcile()", () => {
 
     await watcher.reconcile([wf]);
 
-    expect(tmux.sendCommand).not.toHaveBeenCalled();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
   });
 
   it("does NOT send a demand when parent session is dead (sessionExists → false)", async () => {
@@ -121,7 +123,7 @@ describe("OvermindWatcher.reconcile()", () => {
 
     await watcher.reconcile([wf]);
 
-    expect(tmux.sendCommand).not.toHaveBeenCalled();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
   });
 
   it("task-list reminder is ONLY sent as part of the re-register demand, never as a standalone call", async () => {
@@ -132,9 +134,9 @@ describe("OvermindWatcher.reconcile()", () => {
 
     await watcher.reconcile([wf]);
 
-    // Exactly one sendCommand call total — task-list ask is never a separate call
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
-    const [, msg] = (tmux.sendCommand as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
+    // Exactly one sendAndSubmit call total — task-list ask is never a separate call
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    const [, msg] = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
     // Must contain both the register ask and the task-list ask in one message
     expect(msg).toContain("/api/overmind/register");
     expect(msg).toContain("/api/overmind/tasks");
@@ -160,8 +162,8 @@ describe("OvermindWatcher.reconcile()", () => {
 
     await watcher.tick();
 
-    // sendCommand should have been called for the reconcile demand
-    const calls = (tmux.sendCommand as ReturnType<typeof vi.fn>).mock.calls as [string, string][];
+    // sendAndSubmit should have been called for the reconcile demand
+    const calls = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls as [string, string][];
     const reconcileCalls = calls.filter(([, msg]) => msg.includes("/api/overmind/register"));
     expect(reconcileCalls.length).toBeGreaterThanOrEqual(1);
   });
@@ -186,7 +188,7 @@ describe("OvermindWatcher.reconcile()", () => {
 
     await watcher.tick();
 
-    const calls = (tmux.sendCommand as ReturnType<typeof vi.fn>).mock.calls as [string, string][];
+    const calls = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls as [string, string][];
     const reconcileCalls = calls.filter(([, msg]) => msg.includes("/api/overmind/register"));
     expect(reconcileCalls.length).toBe(0);
   });
@@ -212,7 +214,7 @@ describe("OvermindWatcher.reconcile()", () => {
     await watcher.reconcile(rows);
 
     // Only coord-a should have received a demand
-    const calls = (tmux.sendCommand as ReturnType<typeof vi.fn>).mock.calls as [string, string][];
+    const calls = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls as [string, string][];
     expect(calls.length).toBe(1);
     expect(calls[0][0]).toBe("coord-a");
     expect(calls[0][1]).toContain("tasklist");
@@ -222,7 +224,7 @@ describe("OvermindWatcher.reconcile()", () => {
 
   // --- Dedupe tests ---
 
-  it("same persistent gap: two reconcile() runs produce exactly ONE sendCommand total", async () => {
+  it("same persistent gap: two reconcile() runs produce exactly ONE sendAndSubmit total", async () => {
     // Same info_request and info_check across both calls — unchanged gap.
     const wf = workflow({ info_request: "roster", info_check: "dead_child" });
     const service = makeServiceStub([wf]);
@@ -233,10 +235,10 @@ describe("OvermindWatcher.reconcile()", () => {
     await watcher.reconcile([wf]); // second cycle, same gap signature
 
     // Must only have asked once — not nagged on the second cycle.
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("gap signature changes between runs: a second sendCommand is sent", async () => {
+  it("gap signature changes between runs: a second sendAndSubmit is sent", async () => {
     const wfFirst = workflow({ id: 1, info_request: "roster", info_check: "dead_child" });
     const service = makeServiceStub([wfFirst]);
     const tmux = makeTmuxMock({ sessionAlive: true });
@@ -244,14 +246,14 @@ describe("OvermindWatcher.reconcile()", () => {
 
     // First reconcile — asks for 'dead_child' gap.
     await watcher.reconcile([wfFirst]);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
 
     // Gap signature changes (e.g. child came back but now tasklist is also missing).
     const wfSecond = workflow({ id: 1, info_request: "tasklist", info_check: "tasklist|run_dir" });
     await watcher.reconcile([wfSecond]);
 
     // New signature → a second ask must be sent.
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(2);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(2);
   });
 
   it("gap clears then recurs: asks again on recurrence", async () => {
@@ -263,14 +265,14 @@ describe("OvermindWatcher.reconcile()", () => {
 
     // First reconcile — gap is asked.
     await watcher.reconcile([wfGap]);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
 
     // Gap clears — dedupe entry should be removed.
     await watcher.reconcile([wfClear]);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1); // still 1, no new ask
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1); // still 1, no new ask
 
     // Gap recurs with the same signature — should ask again (fresh occurrence).
     await watcher.reconcile([wfGap]);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(2);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(2);
   });
 });

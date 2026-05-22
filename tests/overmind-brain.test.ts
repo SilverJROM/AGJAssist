@@ -91,10 +91,12 @@ function makeTmuxMock(
       if (target === "coord-1" && captures[target] > 1) return afterSendPane;
       return panes[target] ?? "";
     }),
-    sendCommand: vi.fn(async () => ({ message: "sent", blocked: false }))
+    sendCommand: vi.fn(async () => ({ message: "sent", blocked: false })),
+    sendAndSubmit: vi.fn(async () => true)
   } as unknown as TmuxService & {
     capturePane: ReturnType<typeof vi.fn>;
     sendCommand: ReturnType<typeof vi.fn>;
+    sendAndSubmit: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -163,14 +165,12 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     expect(brain.calls[0].callbacksTail).toContain("callback line 90");
     expect(brain.calls[0].northStar).toContain("Resolve quiet coordinator stalls");
     expect(brain.calls[0].priorDecisions).toContain("quiet coordinator");
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
-    expect(tmux.sendCommand).toHaveBeenCalledWith(
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledWith(
       "coord-1",
-      "Coordinator: inspect callbacks.md and report STATUS.",
-      true,
-      true
+      "Coordinator: inspect callbacks.md and report STATUS."
     );
-    expect(tmux.sendCommand.mock.calls.every((call) => call[0] === "coord-1")).toBe(true);
+    expect(tmux.sendAndSubmit.mock.calls.every((call: [string, string]) => call[0] === "coord-1")).toBe(true);
     expect(updated?.status).toBe("stuck");
     expect(updated?.nudge_count).toBe(2);
     expect(updated?.tier).toBe(3);
@@ -203,7 +203,7 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     expect(updated?.stuck_since).toBeNull();
     expect(updated?.tier).toBe(3);
     expect(updated?.last_notified_transition).toMatch(/^blocked:/);
-    expect(tmux.sendCommand).not.toHaveBeenCalled();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
 
     await watcher.tick();
     expect(brain.calls).toHaveLength(1);
@@ -226,7 +226,7 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     expect(updated?.stuck_since).toBeNull();
     expect(updated?.nudge_count).toBe(0);
     expect(updated?.tier).toBe(0);
-    expect(tmux.sendCommand).not.toHaveBeenCalled();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
   });
 
   it("falls back to blocked escalation when the brain throws", async () => {
@@ -244,7 +244,7 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     expect(notify.mock.calls[0][0]).toContain("Tier-3 Sonnet brain failed");
     expect(updated?.status).toBe("waiting_human");
     expect(updated?.tier).toBe(3);
-    expect(tmux.sendCommand).not.toHaveBeenCalled();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
   });
 
   it("brain-gates waiting_human workflows and leaves awaiting_decision to decision interception", async () => {
@@ -286,12 +286,10 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     expect(service.get(decisionWorkflow.id)?.status).toBe("awaiting_decision");
     expect(brain.calls).toHaveLength(1);
     expect(brain.decisionCalls).toHaveLength(1);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
-    expect(tmux.sendCommand).toHaveBeenCalledWith(
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledWith(
       "coord-1",
-      "Coordinator: resolve the human-waiting state from north-star context.",
-      true,
-      true
+      "Coordinator: resolve the human-waiting state from north-star context."
     );
   });
 });
@@ -341,18 +339,16 @@ describe("Overmind completion-edge verification (all tasks done, no /complete)",
     expect(after?.status).toBe("waiting_human");
     expect(after?.completion_check).toBe("2/2");
     expect(brain.completionCalls).toHaveLength(1);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
-    expect(tmux.sendCommand).toHaveBeenCalledWith(
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledWith(
       "coord-1",
-      "Overmind: list shows all done — POST /complete if finished, else update it.",
-      true,
-      true
+      "Overmind: list shows all done — POST /complete if finished, else update it."
     );
 
     // Same all-done signature next tick: held quietly, no second Sonnet call, no token spend.
     await watcher.tick();
     expect(brain.completionCalls).toHaveLength(1);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
     expect(service.getBySession("coord-1")?.status).toBe("waiting_human");
   });
 
@@ -367,7 +363,7 @@ describe("Overmind completion-edge verification (all tasks done, no /complete)",
 
     await watcher.tick();
     expect(brain.completionCalls).toHaveLength(1);
-    expect(tmux.sendCommand).not.toHaveBeenCalled();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
     expect(service.getBySession("coord-1")?.completion_check).toBe("2/2");
   });
 

@@ -165,7 +165,8 @@ describe("Overmind watcher stream callback", () => {
     } as unknown as OvermindService;
     const tmuxService = {
       capturePane: vi.fn(async () => "quiet pane"),
-      sessionExists: vi.fn(async () => true)
+      sessionExists: vi.fn(async () => true),
+      sendAndSubmit: vi.fn(async () => true)
     } as unknown as TmuxService;
     const onUpdate = vi.fn();
     const watcher = new OvermindWatcher(overmindService, tmuxService, undefined, undefined, onUpdate);
@@ -195,7 +196,8 @@ describe("Overmind watcher stream callback", () => {
         if (target === "child-working") return "Working (8s)\nesc to interrupt";
         return "";
       }),
-      sessionExists: vi.fn(async (target: string) => target !== "child-closed")
+      sessionExists: vi.fn(async (target: string) => target !== "child-closed"),
+      sendAndSubmit: vi.fn(async () => true)
     } as unknown as TmuxService;
     const watcher = new OvermindWatcher(overmindService, tmuxService);
 
@@ -229,7 +231,8 @@ describe("Overmind watcher stream callback", () => {
         if (target === "child-active") return childPane;
         return "";
       }),
-      sessionExists: vi.fn(async () => true)
+      sessionExists: vi.fn(async () => true),
+      sendAndSubmit: vi.fn(async () => true)
     } as unknown as TmuxService;
     const watcher = new OvermindWatcher(overmindService, tmuxService);
 

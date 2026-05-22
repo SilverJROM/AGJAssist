@@ -67,10 +67,12 @@ function testConfig(): AppConfig {
 function makeTmuxMock(panes: Record<string, string>) {
   return {
     capturePane: vi.fn(async (target: string) => panes[target] ?? ""),
-    sendCommand: vi.fn(async () => ({ message: "sent", blocked: false }))
+    sendCommand: vi.fn(async () => ({ message: "sent", blocked: false })),
+    sendAndSubmit: vi.fn(async () => true)
   } as unknown as TmuxService & {
     capturePane: ReturnType<typeof vi.fn>;
     sendCommand: ReturnType<typeof vi.fn>;
+    sendAndSubmit: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -117,7 +119,7 @@ describe("Overmind watcher nudge ladder", () => {
     let updated = service.get(workflow.id);
     expect(updated?.monitoring_paused).toBe(true);
     expect(updated?.nudge_count).toBe(0);
-    expect(tmux.sendCommand).not.toHaveBeenCalled();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
 
     // Resume: the next stuck tick nudges normally.
     service.setMonitoringPaused(workflow.id, false, null);
@@ -125,8 +127,8 @@ describe("Overmind watcher nudge ladder", () => {
     updated = service.get(workflow.id);
     expect(updated?.monitoring_paused).toBe(false);
     expect(updated?.nudge_count).toBe(1);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
-    expect(tmux.sendCommand).toHaveBeenLastCalledWith("coord-paused", CANNED_NUDGE, true, true);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-paused", CANNED_NUDGE);
   });
 
   it("sends Tier 1 and Tier 2 nudges to the coordinator only, then stops", async () => {
@@ -151,22 +153,22 @@ describe("Overmind watcher nudge ladder", () => {
     let updated = service.get(workflow.id);
     expect(updated?.nudge_count).toBe(1);
     expect(updated?.tier).toBe(1);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
-    expect(tmux.sendCommand).toHaveBeenLastCalledWith("coord-1", CANNED_NUDGE, true, true);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-1", CANNED_NUDGE);
 
     await watcher.tick();
     updated = service.get(workflow.id);
     expect(updated?.nudge_count).toBe(2);
     expect(updated?.tier).toBe(2);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(2);
-    expect(tmux.sendCommand).toHaveBeenLastCalledWith("coord-1", CANNED_NUDGE, true, true);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(2);
+    expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-1", CANNED_NUDGE);
 
     await watcher.tick();
     updated = service.get(workflow.id);
     expect(updated?.nudge_count).toBe(2);
     expect(updated?.tier).toBe(2);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(2);
-    expect(tmux.sendCommand.mock.calls.every((call) => call[0] === "coord-1")).toBe(true);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(2);
+    expect(tmux.sendAndSubmit.mock.calls.every((call: [string, string]) => call[0] === "coord-1")).toBe(true);
   });
 
   it("fail-safe: when all tasks are done but completion was never reported, nudges the coordinator once and flips off 'working'", async () => {
@@ -191,14 +193,14 @@ describe("Overmind watcher nudge ladder", () => {
     await watcher.tick();
     let updated = service.get(workflow.id);
     expect(updated?.status).toBe("waiting_human");
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
-    expect(tmux.sendCommand).toHaveBeenLastCalledWith("coord-done", ALL_DONE_CONFIRM_NUDGE, true, true);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-done", ALL_DONE_CONFIRM_NUDGE);
 
     // Subsequent ticks must NOT re-nudge (once per transition) and stay off "working".
     await watcher.tick();
     updated = service.get(workflow.id);
     expect(updated?.status).toBe("waiting_human");
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
   });
 
   it("resets nudge count and tier when the workflow returns to working", async () => {
@@ -228,7 +230,7 @@ describe("Overmind watcher nudge ladder", () => {
     expect(updated?.stuck_since).toBeNull();
     expect(updated?.nudge_count).toBe(0);
     expect(updated?.tier).toBe(0);
-    expect(tmux.sendCommand).not.toHaveBeenCalled();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
   });
 
   it("persists parent active-session attribution when the coordinator pane is busy", async () => {
@@ -332,8 +334,8 @@ describe("Overmind watcher nudge ladder", () => {
     expect(updated?.status).toBe("stuck");
     expect(updated?.nudge_count).toBe(1);
     expect(updated?.tier).toBe(1);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
-    expect(tmux.sendCommand).toHaveBeenLastCalledWith("coord-lkcamp", CANNED_NUDGE, true, true);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-lkcamp", CANNED_NUDGE);
   });
 
   it("treats Overmind's own nudge text as the stuck baseline so the next tick escalates", async () => {
@@ -356,10 +358,12 @@ describe("Overmind watcher nudge ladder", () => {
         if (coordinatorCaptures === 1) return QUIET_PANE;
         return NUDGED_PANE;
       }),
-      sendCommand: vi.fn(async () => ({ message: "sent", blocked: false }))
+      sendCommand: vi.fn(async () => ({ message: "sent", blocked: false })),
+      sendAndSubmit: vi.fn(async () => true)
     } as unknown as TmuxService & {
       capturePane: ReturnType<typeof vi.fn>;
       sendCommand: ReturnType<typeof vi.fn>;
+      sendAndSubmit: ReturnType<typeof vi.fn>;
     };
     const watcher = new OvermindWatcher(service, tmux);
 
@@ -377,8 +381,8 @@ describe("Overmind watcher nudge ladder", () => {
     expect(updated?.stuck_since).toBe("2000-01-01T00:00:00.000Z");
     expect(updated?.nudge_count).toBe(2);
     expect(updated?.tier).toBe(2);
-    expect(tmux.sendCommand).toHaveBeenCalledTimes(2);
-    expect(tmux.sendCommand.mock.calls.every((call) => call[0] === "coord-4")).toBe(true);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(2);
+    expect(tmux.sendAndSubmit.mock.calls.every((call: [string, string]) => call[0] === "coord-4")).toBe(true);
   });
 });
 
