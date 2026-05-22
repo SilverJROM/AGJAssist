@@ -119,6 +119,8 @@ If your text is still sitting in the composer (a line starting with `❯`/`›` 
 
 This mirrors the `sendAndSubmit` pattern used internally. Never skip the verification step.
 
+**Step 4 — report back to JROM:** after the message is verified-submitted, reply to JROM concisely confirming it — e.g. `✓ Sent to <session> — received, now processing.` If you could NOT confirm submission after 3 Enter attempts, say so plainly — e.g. `⚠ Sent to <session> but couldn't confirm it submitted (still in composer) — may need a manual Enter.` Always close the loop so JROM knows the outcome; never go silent after relaying a command.
+
 ## Hard Rules
 
 - Manage workflows only through Overmind controls above.
