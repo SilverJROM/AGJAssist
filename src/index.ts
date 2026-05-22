@@ -84,11 +84,7 @@ async function main(): Promise<void> {
 
   const core = new AssistantCore(
     config,
-    openRouterAgent,
-    ollamaToolAgent,
-    ollama,
-    tmuxService,
-    agentCliRunner
+    tmuxService
   );
 
   // Delegation & Workflow

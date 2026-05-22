@@ -1,13 +1,9 @@
 import path from "node:path";
 import fs from "node:fs";
 import { AppConfig } from "../config/config.js";
-import { LlmProvider } from "../llm/base-provider.js";
-import { OllamaProvider } from "../llm/ollama-provider.js";
 import { ClaudeCliProvider } from "../llm/claude-cli-provider.js";
 import { CodexCliProvider } from "../llm/codex-cli-provider.js";
-import { ToolAgent } from "../orchestration/tool-agent.js";
 import { TmuxService } from "../tmux/tmux-service.js";
-import { AgentCliRunner } from "../cli/agent-cli-runner.js";
 import { ProjectService } from "../services/project-service.js";
 import { NoteService } from "../services/note-service.js";
 import { ConversationService } from "../services/conversation-service.js";
@@ -16,7 +12,6 @@ import { AuthService } from "../auth/auth-service.js";
 import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "../services/overmind-service.js";
 import type { OvmSessionManager } from "../services/ovm-session.js";
 
-const ALLOWED_OM_MODELS = new Set(["qwek32k:latest", "granite4:64k"]);
 const WEBSITES_ROOT = "/home/agjrom/websites";
 const OVERMIND_ACTIVE_STATUSES: OvermindWorkflowStatus[] = [
   "active",
@@ -72,11 +67,7 @@ export class AssistantCore {
 
   constructor(
     private readonly config: AppConfig,
-    private readonly openRouterAgent: ToolAgent,
-    private readonly ollamaToolAgent: ToolAgent,
-    private readonly ollamaProvider: OllamaProvider,
-    private readonly tmuxService: TmuxService,
-    private readonly agentCliRunner: AgentCliRunner
+    private readonly tmuxService: TmuxService
   ) {
     this.timeoutMinutes = config.runtime.defaultTimeoutMinutes;
   }
@@ -153,9 +144,7 @@ export class AssistantCore {
           "/notes <project> - list recent notes",
           "/weblogin - generate a login code for the web app",
           "/app - open the web app",
-          "/llm - show LLM routing info",
           "/timeout [minutes] - show or set command timeout (default 60)",
-          "/ommodel [qwek32k:latest|granite4:64k] - show or set OM model",
           "/overmind - show active Overmind workflows",
           "/om_tasks <id> - show an Overmind workflow tasklist",
           "/om_pause <id> - pause Overmind checks (no interrupts while you talk to it)",
@@ -164,20 +153,11 @@ export class AssistantCore {
           "/ovm_start - enter OVM chat mode",
           "/ovm_end - exit OVM chat mode",
           "",
-          "Chat commands:",
-          "new haiku|sonnet|opus|codex <prompt> - start new conversation",
-          "cont haiku|sonnet|opus|codex <prompt> - continue last conversation",
-          "haiku|sonnet|opus|claude|codex <prompt> - auto (continues if active)",
-          "",
           "Directory commands:",
           "cd <dir> - change directory (within /home/agjrom/websites/)",
           "cd - return to /home/agjrom/websites/",
           "ls - list current directory",
-          "pwd - show current directory",
-          "",
-          "Tool agent modes:",
-          "op <prompt> - OpenRouter + tools",
-          "om <prompt> - Ollama + tools"
+          "pwd - show current directory"
         ].join("\n");
 
       case "/jobs":
@@ -220,17 +200,6 @@ export class AssistantCore {
         return result.message;
       }
 
-      case "/llm":
-        return [
-          `OpenRouter model: ${this.config.llm.openrouterModel}`,
-          `Ollama chat model: ${this.ollamaProvider.getModel()}`,
-          `OM tool models: ${Array.from(ALLOWED_OM_MODELS).join(", ")}`,
-          `Current timeout: ${this.timeoutMinutes} minutes`,
-          "Headless prefixes: new/cont haiku|sonnet|opus|codex",
-          "Prefix with 'op ' to force OpenRouter + tools",
-          "Prefix with 'om ' to force Ollama + tools"
-        ].join("\n");
-
       case "/timeout": {
         const minutesRaw = parts[1];
         if (!minutesRaw) {
@@ -242,25 +211,6 @@ export class AssistantCore {
         }
         this.timeoutMinutes = minutes;
         return `Timeout updated: ${this.timeoutMinutes} minutes`;
-      }
-
-      case "/ommodel":
-      case "/om_model": {
-        const requested = parts[1];
-        if (!requested) {
-          return [
-            `Current OM model: ${this.ollamaProvider.getModel()}`,
-            `Allowed: ${Array.from(ALLOWED_OM_MODELS).join(", ")}`,
-            "Usage: /ommodel <qwek32k:latest|granite4:64k>"
-          ].join("\n");
-        }
-
-        if (!ALLOWED_OM_MODELS.has(requested)) {
-          return `Invalid OM model. Allowed: ${Array.from(ALLOWED_OM_MODELS).join(", ")}`;
-        }
-
-        this.ollamaProvider.setModel(requested);
-        return `OM model updated to: ${requested}`;
       }
 
       case "/overmind":
@@ -550,7 +500,6 @@ export class AssistantCore {
 
   async handleText(input: string, userId?: number): Promise<string> {
     const trimmed = input.trim();
-    const timeoutMs = this.timeoutMinutes * 60 * 1000;
     const uid = userId || this.config.telegram.authorizedUserId;
     const state = this.getState(uid);
 
@@ -604,202 +553,8 @@ export class AssistantCore {
       }
     }
 
-    // --- new/cont conversation commands ---
-    const newMatch = trimmed.match(/^new\s+(haiku|sonnet|opus|claude|codex)\s+(.+)/is);
-    if (newMatch) {
-      const provider = newMatch[1].toLowerCase();
-      const prompt = newMatch[2].trim();
-      return this.handleConversationChat(uid, provider, prompt, true, timeoutMs);
-    }
-
-    const contMatch = trimmed.match(/^cont\s+(haiku|sonnet|opus|claude|codex)\s+(.+)/is);
-    if (contMatch) {
-      const provider = contMatch[1].toLowerCase();
-      const prompt = contMatch[2].trim();
-      return this.handleConversationChat(uid, provider, prompt, false, timeoutMs);
-    }
-
-    // --- Existing CLI prefixes (auto-continue if active conversation matches) ---
-    if (/^claude\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^claude\b[\s,:-]*/i, "").trim();
-      if (!prompt) return "Usage: claude <prompt>";
-      return this.handleConversationChat(uid, "claude", prompt, false, timeoutMs);
-    }
-
-    if (/^opus\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^opus\b[\s,:-]*/i, "").trim();
-      if (!prompt) return "Usage: opus <prompt>";
-      return this.handleConversationChat(uid, "opus", prompt, false, timeoutMs);
-    }
-
-    if (/^sonnet\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^sonnet\b[\s,:-]*/i, "").trim();
-      if (!prompt) return "Usage: sonnet <prompt>";
-      return this.handleConversationChat(uid, "sonnet", prompt, false, timeoutMs);
-    }
-
-    if (/^haiku\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^haiku\b[\s,:-]*/i, "").trim();
-      if (!prompt) return "Usage: haiku <prompt>";
-      return this.handleConversationChat(uid, "haiku", prompt, false, timeoutMs);
-    }
-
-    if (/^codex\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^codex\b[\s,:-]*/i, "").trim();
-      if (!prompt) return "Usage: codex <prompt>";
-      return this.handleConversationChat(uid, "codex", prompt, false, timeoutMs);
-    }
-
-    if (/^op\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^op\b[\s,:-]*/i, "").trim();
-      if (!prompt) {
-        return "Usage: op <your request>";
-      }
-      return this.openRouterAgent.run(prompt);
-    }
-
-    if (/^om\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^om\b[\s,:-]*/i, "").trim();
-      if (!prompt) {
-        return "Usage: om <your request>";
-      }
-      return this.ollamaToolAgent.run(prompt);
-    }
-
-    // Default simple local chat path.
-    return this.ollamaProvider.chat([
-      {
-        role: "system",
-        content: "You are AGJAssist local helper. Keep responses short and practical."
-      },
-      { role: "user", content: trimmed }
-    ], 600);
+    // Not in OVM chat mode — return a short hint.
+    return "Use /ovm_start to chat with OVM, or a slash command. /help for the list.";
   }
 
-  private async handleConversationChat(
-    userId: number,
-    provider: string,
-    prompt: string,
-    forceNew: boolean,
-    timeoutMs: number
-  ): Promise<string> {
-    if (!this.conversationService || !this.chatSettingsService) {
-      // Fallback: no conversation service, use stateless CLI
-      return this.statelessCliChat(provider, prompt, timeoutMs);
-    }
-
-    const state = this.getState(userId);
-    const dbUserId = this.ownerUserId || 1;
-
-    // Normalize provider name for agent_name
-    const agentName = provider === "claude" ? "claude" : (["haiku", "sonnet", "opus"].includes(provider) ? "claude" : "codex");
-    const model = ["haiku", "sonnet", "opus"].includes(provider) ? provider : undefined;
-
-    // Determine if we should continue or start new
-    let convId = state.activeConversationId;
-    let isNew = forceNew;
-
-    if (!forceNew && convId) {
-      // Check if the conversation still exists and matches provider
-      const existing = this.conversationService.getById(convId);
-      if (!existing || existing.agent_name !== agentName) {
-        isNew = true;
-      }
-    } else if (!forceNew && !convId) {
-      isNew = true;
-    }
-
-    if (isNew) {
-      const conv = this.conversationService.create(agentName, dbUserId);
-      convId = conv.id;
-      this.conversationService.setCwd(convId, state.cwd);
-      state.activeConversationId = convId;
-      state.activeProvider = provider;
-    }
-
-    // Save user message
-    this.conversationService.addMessage(convId!, {
-      role: "user",
-      content: prompt,
-      timestamp: new Date().toISOString()
-    }, dbUserId);
-
-    // Build history
-    const conversation = this.conversationService.getById(convId!);
-    if (!conversation) return "Error: conversation not found after creation";
-
-    const history = conversation.messages
-      .filter(msg => (msg.role === "user" || msg.role === "assistant") && !msg.content.startsWith("Error:"))
-      .slice(-20);
-
-    const soulMd = this.chatSettingsService.get("soul_md") || "";
-    const contextMd = this.chatSettingsService.get("context_md") || "";
-
-    try {
-      let responseText: string;
-
-      if (agentName === "claude" && this.claudeCliProvider) {
-        if (model) this.claudeCliProvider.setModel(model);
-        const existingSessionId = this.conversationService.getCliSessionId(convId!);
-        const result = await this.claudeCliProvider.chatWithSession(
-          [
-            { role: "system", content: [soulMd, contextMd].filter(Boolean).join("\n\n") || "Be concise." },
-            ...history.map(m => ({ role: m.role as "user" | "assistant", content: m.content }))
-          ],
-          undefined,
-          existingSessionId || undefined,
-          state.cwd
-        );
-        responseText = result.content;
-        if (result.sessionId) {
-          this.conversationService.setCliSessionId(convId!, result.sessionId);
-        }
-      } else if (agentName === "codex" && this.codexCliProvider) {
-        const existingSessionId = this.conversationService.getCliSessionId(convId!);
-        const result = await this.codexCliProvider.chatWithSession(
-          [
-            { role: "system", content: [soulMd, contextMd].filter(Boolean).join("\n\n") || "Be concise." },
-            ...history.map(m => ({ role: m.role as "user" | "assistant", content: m.content }))
-          ],
-          undefined,
-          existingSessionId || undefined,
-          state.cwd
-        );
-        responseText = result.content;
-        if (result.sessionId) {
-          this.conversationService.setCliSessionId(convId!, result.sessionId);
-        }
-      } else {
-        // Fallback to stateless
-        return this.statelessCliChat(provider, prompt, timeoutMs);
-      }
-
-      // Clean and save assistant response
-      const cleanResponse = responseText.replace(/<ACTION>[\s\S]*?<\/ACTION>/g, "").trim();
-      this.conversationService.addMessage(convId!, {
-        role: "assistant",
-        content: cleanResponse,
-        timestamp: new Date().toISOString()
-      }, dbUserId);
-
-      const prefix = isNew ? `🆕 Conv #${convId} | 📂 ${state.cwd}\n\n` : `💬 Conv #${convId}\n\n`;
-      return prefix + cleanResponse;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      this.conversationService.addMessage(convId!, {
-        role: "system",
-        content: `Error: ${errorMessage}`,
-        timestamp: new Date().toISOString()
-      }, dbUserId);
-      return `Error: ${errorMessage}`;
-    }
-  }
-
-  private async statelessCliChat(provider: string, prompt: string, timeoutMs: number): Promise<string> {
-    const model = ["haiku", "sonnet", "opus"].includes(provider) ? provider as "haiku" | "sonnet" | "opus" : undefined;
-    if (provider === "codex") {
-      return this.agentCliRunner.runCodex(prompt, { timeoutMs });
-    }
-    return this.agentCliRunner.runClaude(prompt, { model, timeoutMs });
-  }
 }
