@@ -5621,7 +5621,7 @@ function TgApp() {
   } else if (route === '/notes') {
     content = html`<${IosNotesPage} />`;
   } else if (route === '/conversations') {
-    content = html`<${Conversations} />`;
+    content = html`<${OvmConsole} />`;
   } else if (route === '/settings') {
     content = html`<${Settings} onEditBottomNav=${() => setEditingBottomNav(true)} />`;
   } else if (route.startsWith('/project/')) {
@@ -5680,7 +5680,7 @@ function App() {
   } else if (route === '/notes') {
     content = html`<${IosNotesPage} />`;
   } else if (route === '/conversations') {
-    content = html`<${Conversations} />`;
+    content = html`<${OvmConsole} />`;
   } else if (route === '/settings') {
     content = html`<${Settings} />`;
   } else if (route.startsWith('/project/')) {
