@@ -42,15 +42,6 @@ export interface AppConfig {
     authorizedUserId: number;
     testMode: boolean;
   };
-  llm: {
-    ollamaBaseUrl: string;
-    ollamaModel: string;
-    ollamaTimeoutMs: number;
-    openrouterApiKey: string;
-    openrouterBaseUrl: string;
-    openrouterModel: string;
-    openrouterTimeoutMs: number;
-  };
   runtime: {
     workspaceRoot: string;
     allowedCommandPrefixes: string[];
@@ -92,15 +83,6 @@ export function loadConfig(): AppConfig {
       botToken: required("BOT_TOKEN"),
       authorizedUserId,
       testMode: parseBool(optional("TEST_MODE", "false"))
-    },
-    llm: {
-      ollamaBaseUrl: optional("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
-      ollamaModel: optional("OLLAMA_MODEL", "llama3.1:8b"),
-      ollamaTimeoutMs: optionalNumber("OLLAMA_TIMEOUT_MS", 180_000),
-      openrouterApiKey: required("OPENROUTER_API_KEY"),
-      openrouterBaseUrl: optional("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-      openrouterModel: optional("OPENROUTER_MODEL", "z-ai/glm-4.5-air:free"),
-      openrouterTimeoutMs: optionalNumber("OPENROUTER_TIMEOUT_MS", 180_000)
     },
     runtime: {
       workspaceRoot: path.resolve(workspaceRoot),

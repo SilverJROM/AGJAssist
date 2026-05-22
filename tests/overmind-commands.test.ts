@@ -22,15 +22,6 @@ function testConfig(): AppConfig {
       authorizedUserId: 111222,
       testMode: true
     },
-    llm: {
-      ollamaBaseUrl: "http://127.0.0.1:11434",
-      ollamaModel: "test",
-      ollamaTimeoutMs: 1000,
-      openrouterApiKey: "test",
-      openrouterBaseUrl: "https://openrouter.ai/api/v1",
-      openrouterModel: "test",
-      openrouterTimeoutMs: 1000
-    },
     runtime: {
       workspaceRoot: "/tmp",
       allowedCommandPrefixes: [],

@@ -1,13 +1,8 @@
 import { loadConfig } from "./config/config.js";
 import { DatabaseService } from "./db/database.js";
-import { OllamaProvider } from "./llm/ollama-provider.js";
-import { OpenRouterProvider } from "./llm/openrouter-provider.js";
 import { TmuxService } from "./tmux/tmux-service.js";
-import { ToolRegistry } from "./tools/tool-registry.js";
-import { ToolAgent } from "./orchestration/tool-agent.js";
 import { AssistantCore } from "./bot/assistant-core.js";
 import { TelegramAssistant } from "./bot/telegram-bot.js";
-import { DefaultAgentCliRunner } from "./cli/agent-cli-runner.js";
 import { AuthService } from "./auth/auth-service.js";
 import { ProjectService } from "./services/project-service.js";
 import { SafetyService } from "./services/safety-service.js";
@@ -17,15 +12,11 @@ import { DelegationService } from "./services/delegation-service.js";
 import { NoteService } from "./services/note-service.js";
 import { PlanService } from "./services/plan-service.js";
 import { TaskService } from "./services/task-service.js";
-import { ConversationService } from "./services/conversation-service.js";
 import { FileService } from "./services/file-service.js";
 import { StepTemplateService } from "./services/step-template-service.js";
 import { PersonalTaskService } from "./services/personal-task-service.js";
 import { ReminderService } from "./services/reminder-service.js";
-import { ChatSettingsService } from "./services/chat-settings-service.js";
 import { createApiServer } from "./api/server.js";
-import { ClaudeCliProvider } from "./llm/claude-cli-provider.js";
-import { CodexCliProvider } from "./llm/codex-cli-provider.js";
 import { OvermindService } from "./services/overmind-service.js";
 import { OvermindWatcher, POLL_MS } from "./services/overmind-watcher.js";
 import { SonnetOvermindBrain } from "./services/overmind-brain.js";
@@ -60,27 +51,9 @@ async function main(): Promise<void> {
   // Scan projects on startup
   projectService.scanAndSync();
 
-  // LLM providers
-  const ollama = new OllamaProvider(
-    config.llm.ollamaBaseUrl,
-    config.llm.ollamaModel,
-    config.llm.ollamaTimeoutMs
-  );
-
-  const openRouter = new OpenRouterProvider(
-    config.llm.openrouterApiKey,
-    config.llm.openrouterBaseUrl,
-    config.llm.openrouterModel,
-    config.llm.openrouterTimeoutMs
-  );
-
-  // Existing orchestration
+  // Tmux + orchestration
   const tmuxService = new TmuxService();
   tmuxService.setSafetyService(safetyService);
-  const tools = new ToolRegistry(config, tmuxService);
-  const openRouterAgent = new ToolAgent(openRouter, tools, config.runtime.maxToolIterations);
-  const ollamaToolAgent = new ToolAgent(ollama, tools, config.runtime.maxToolIterations);
-  const agentCliRunner = new DefaultAgentCliRunner();
 
   const core = new AssistantCore(
     config,
@@ -92,45 +65,18 @@ async function main(): Promise<void> {
   const noteService = new NoteService(db, auditService);
   const planService = new PlanService(db, auditService);
   const taskService = new TaskService(db, auditService);
-  const conversationService = new ConversationService(db, auditService);
   const fileService = new FileService();
   const stepTemplateService = new StepTemplateService(db, auditService);
   const personalTaskService = new PersonalTaskService(db, auditService);
   const reminderService = new ReminderService(db, auditService);
-  const chatSettingsService = new ChatSettingsService(db);
   const overmindService = new OvermindService(db);
   const ovmSessionService = new OvmSessionService(tmuxService, {
     overmindToken: config.overmind.token
   });
 
-  // Seed default soul.md and context.md if not set
-  if (!chatSettingsService.get("soul_md")) {
-    chatSettingsService.set("soul_md", [
-      "You are AGJAssist, a concise and practical server management assistant.",
-      "You have access to tools: tmux sessions, log reading, and safe command execution.",
-      "When the user asks you to check logs, sessions, or run commands, use your tools to do it.",
-      "Keep responses SHORT and actionable. No lengthy reasoning or step-by-step thinking.",
-      "Give direct answers. If you used a tool, summarize the result clearly.",
-      "Do not explain what you would do — just do it using your tools."
-    ].join("\n"));
-  }
-  if (!chatSettingsService.get("context_md")) {
-    chatSettingsService.set("context_md", [
-      "System context:",
-      "- Server runs multiple projects managed via PM2 and tmux",
-      "- Projects are in /home/agjrom/websites/ and /home/agjrom/TGBOTS/",
-      "- You can list tmux sessions, peek at pane output, send commands, read logs, and run safe commands",
-      "- Common PM2 apps: agjassist (port 3101), ehr-backend, ehr-frontend, hris-be, hris-fe, lokalbase-be, lokalbase-fe",
-      "- Be concise. The user is a developer who wants quick answers."
-    ].join("\n"));
-  }
-
   // Wire services to bot core
   const ownerRow = db.prepare("SELECT id FROM users WHERE telegram_id = ?").get(config.telegram.authorizedUserId) as { id: number } | undefined;
   core.setServices(projectService, noteService, authService, ownerRow?.id || 1);
-  const claudeCliProvider = new ClaudeCliProvider("sonnet", 180_000);
-  const codexCliProvider = new CodexCliProvider(180_000);
-  core.setChatServices(conversationService, chatSettingsService, claudeCliProvider, codexCliProvider);
   core.setOvermindService(overmindService);
   core.setOvmSessionService(ovmSessionService);
   const telegramAssistant = config.telegram.testMode
@@ -172,20 +118,10 @@ async function main(): Promise<void> {
     noteService,
     planService,
     taskService,
-    conversationService,
     fileService,
     stepTemplateService,
     personalTaskService,
     reminderService,
-    chatSettingsService,
-    ollama,
-    openRouter,
-    ollamaAgent: ollamaToolAgent,
-    openRouterAgent,
-    tools,
-    maxToolIterations: config.runtime.maxToolIterations,
-    claudeCliProvider,
-    codexCliProvider,
     overmindService,
     overmindNotify,
     overmindStreamManager,

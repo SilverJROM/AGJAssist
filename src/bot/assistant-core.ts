@@ -1,13 +1,9 @@
 import path from "node:path";
 import fs from "node:fs";
 import { AppConfig } from "../config/config.js";
-import { ClaudeCliProvider } from "../llm/claude-cli-provider.js";
-import { CodexCliProvider } from "../llm/codex-cli-provider.js";
 import { TmuxService } from "../tmux/tmux-service.js";
 import { ProjectService } from "../services/project-service.js";
 import { NoteService } from "../services/note-service.js";
-import { ConversationService } from "../services/conversation-service.js";
-import { ChatSettingsService } from "../services/chat-settings-service.js";
 import { AuthService } from "../auth/auth-service.js";
 import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "../services/overmind-service.js";
 import type { OvmSessionManager } from "../services/ovm-session.js";
@@ -40,8 +36,6 @@ const OVM_RELAY_FALLBACK = "OVM is taking a while / still working.";
 
 interface UserState {
   cwd: string;
-  activeConversationId: number | null;
-  activeProvider: string | null;
   ovmChatMode: boolean;
 }
 
@@ -51,10 +45,6 @@ export class AssistantCore {
   private noteService: NoteService | null = null;
   private authService: AuthService | null = null;
   private ownerUserId: number | null = null;
-  private conversationService: ConversationService | null = null;
-  private chatSettingsService: ChatSettingsService | null = null;
-  private claudeCliProvider: ClaudeCliProvider | null = null;
-  private codexCliProvider: CodexCliProvider | null = null;
   private overmindService: OvermindService | null = null;
   private ovmSessionService: OvmSessionManager | null = null;
 
@@ -75,18 +65,6 @@ export class AssistantCore {
     this.ownerUserId = ownerUserId;
   }
 
-  setChatServices(
-    conversationService: ConversationService,
-    chatSettingsService: ChatSettingsService,
-    claudeCliProvider: ClaudeCliProvider,
-    codexCliProvider: CodexCliProvider
-  ): void {
-    this.conversationService = conversationService;
-    this.chatSettingsService = chatSettingsService;
-    this.claudeCliProvider = claudeCliProvider;
-    this.codexCliProvider = codexCliProvider;
-  }
-
   setOvermindService(overmindService: OvermindService): void {
     this.overmindService = overmindService;
   }
@@ -99,8 +77,6 @@ export class AssistantCore {
     if (!this.userState.has(userId)) {
       this.userState.set(userId, {
         cwd: WEBSITES_ROOT,
-        activeConversationId: null,
-        activeProvider: null,
         ovmChatMode: false
       });
     }
@@ -425,14 +401,8 @@ export class AssistantCore {
       } catch {
         return `Directory not found: ${newCwd}`;
       }
-      const oldCwd = state.cwd;
       state.cwd = newCwd;
-      // Directory change resets active conversation
-      if (oldCwd !== newCwd) {
-        state.activeConversationId = null;
-        state.activeProvider = null;
-      }
-      return `📂 ${newCwd}\n(new conversation will start on next message)`;
+      return `📂 ${newCwd}`;
     }
 
     if (/^pwd$/i.test(trimmed)) {
