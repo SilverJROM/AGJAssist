@@ -61,19 +61,7 @@ function testConfig(): AppConfig {
 }
 
 function createCore(overmindService: OvermindService): AssistantCore {
-  const ollamaProvider = {
-    getModel: () => "qwek32k:latest",
-    setModel: () => {},
-    chat: vi.fn(async () => "normal chat")
-  };
-  const core = new AssistantCore(
-    testConfig(),
-    {} as any,
-    {} as any,
-    ollamaProvider as any,
-    {} as any,
-    {} as any
-  );
+  const core = new AssistantCore(testConfig(), {} as any);
   core.setOvermindService(overmindService);
   return core;
 }
@@ -86,19 +74,7 @@ function createCoreWithOvm(
   },
   ovmSession: OvmSessionManager
 ): AssistantCore {
-  const ollamaProvider = {
-    getModel: () => "qwek32k:latest",
-    setModel: () => {},
-    chat: vi.fn(async () => "normal chat")
-  };
-  const core = new AssistantCore(
-    testConfig(),
-    {} as any,
-    {} as any,
-    ollamaProvider as any,
-    tmux as any,
-    {} as any
-  );
+  const core = new AssistantCore(testConfig(), tmux as any);
   core.setOvermindService(overmindService);
   core.setOvmSessionService(ovmSession);
   return core;
@@ -296,7 +272,9 @@ describe("Overmind Telegram commands", () => {
     await core.handleCommand("/ovm_start", 111222);
 
     await expect(core.handleCommand("/ovm_end", 111222)).resolves.toBe("OVM chat off.");
-    await expect(core.handleText("normal now", 111222)).resolves.toBe("normal chat");
+    await expect(core.handleText("normal now", 111222)).resolves.toBe(
+      "Use /ovm_start to chat with OVM, or a slash command. /help for the list."
+    );
 
     expect(ovm.close).not.toHaveBeenCalled();
     expect(tmux.sendCommand).not.toHaveBeenCalled();
