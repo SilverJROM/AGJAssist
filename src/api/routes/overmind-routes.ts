@@ -20,6 +20,7 @@ interface RegisterBody extends TokenBody {
   label?: string;
   session?: string;
   child_sessions?: string[];
+  child_roles?: string[];
   run_dir?: string;
   current_task?: string | null;
   tasks?: OvermindTask[];
@@ -97,7 +98,7 @@ export function registerOvermindRoutes(
     async (request, reply) => {
       if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
 
-      const { label, session, child_sessions, run_dir, current_task, tasks } = request.body || {};
+      const { label, session, child_sessions, child_roles, run_dir, current_task, tasks } = request.body || {};
       if (!label || !session || !run_dir) {
         return reply.code(400).send({ error: "label, session, and run_dir are required" });
       }
@@ -106,6 +107,7 @@ export function registerOvermindRoutes(
         label,
         coordinator_session: session,
         child_sessions,
+        child_roles,
         run_dir,
         current_task,
         tasks
@@ -192,7 +194,9 @@ export function registerOvermindRoutes(
         return reply.code(400).send({ error: "Invalid workflow id" });
       }
 
-      const workflow = overmindService.setStatus(id, "paused");
+      // projcore RELAY of a JROM-initiated pause. projcore must never call this on its own
+      // initiative (see projcore.md §2.11) — only when JROM explicitly tells it to.
+      const workflow = overmindService.setMonitoringPaused(id, true, "projcore-relay");
       if (!workflow) {
         return reply.code(404).send({ error: "Workflow not found" });
       }
@@ -212,11 +216,46 @@ export function registerOvermindRoutes(
         return reply.code(400).send({ error: "Invalid workflow id" });
       }
 
-      const workflow = overmindService.setStatus(id, "active");
+      const workflow = overmindService.setMonitoringPaused(id, false, null);
       if (!workflow) {
         return reply.code(404).send({ error: "Workflow not found" });
       }
 
+      streamManager?.broadcast();
+      return { workflow };
+    }
+  );
+
+  // JWT (owner) pause/resume for the dashboard button — always JROM-initiated.
+  app.post<{ Params: RenameParams }>(
+    "/api/overmind/workflows/:id/pause-monitoring",
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      const id = Number(request.params.id);
+      if (!Number.isInteger(id) || id < 1) {
+        return reply.code(400).send({ error: "Invalid workflow id" });
+      }
+      const workflow = overmindService.setMonitoringPaused(id, true, "jrom");
+      if (!workflow) {
+        return reply.code(404).send({ error: "Workflow not found" });
+      }
+      streamManager?.broadcast();
+      return { workflow };
+    }
+  );
+
+  app.post<{ Params: RenameParams }>(
+    "/api/overmind/workflows/:id/resume-monitoring",
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      const id = Number(request.params.id);
+      if (!Number.isInteger(id) || id < 1) {
+        return reply.code(400).send({ error: "Invalid workflow id" });
+      }
+      const workflow = overmindService.setMonitoringPaused(id, false, null);
+      if (!workflow) {
+        return reply.code(404).send({ error: "Workflow not found" });
+      }
       streamManager?.broadcast();
       return { workflow };
     }

@@ -49,6 +49,19 @@ describe("extractBody", () => {
     expect(hasActiveTurn("◦ Waiting for background terminal (11m 13s • esc to interrupt)")).toBe(true);
     expect(hasActiveTurn("◦ Waiting for background terminal (11m 13s)")).toBe(false);
   });
+
+  it("does not treat persistent status-bar esc hints as active turns", () => {
+    const pane = [
+      "›",
+      "⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt · ctrl+t to hide tasks"
+    ].join("\n");
+
+    expect(hasActiveTurn(pane)).toBe(false);
+  });
+
+  it("treats real spinner esc lines as active turns", () => {
+    expect(hasActiveTurn("✻ Working… (5s · esc to interrupt)")).toBe(true);
+  });
 });
 
 describe("classifyWorkflow", () => {
@@ -72,7 +85,7 @@ describe("classifyWorkflow", () => {
   it("classifies an active-turn pane as working even when the body hash is unchanged", () => {
     const coordinatorPane = [
       "same quiet coordinator pane",
-      "◦ Waiting for background terminal (11m 13s • esc to interrupt) · 2 monitors · /ps to view"
+      "✻ Working… (5s · esc to interrupt)"
     ].join("\n");
 
     const result = classifyWorkflow({

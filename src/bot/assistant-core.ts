@@ -158,8 +158,8 @@ export class AssistantCore {
           "/ommodel [qwek32k:latest|granite4:64k] - show or set OM model",
           "/overmind - show active Overmind workflows",
           "/om_tasks <id> - show an Overmind workflow tasklist",
-          "/om_pause <id> - pause an Overmind workflow",
-          "/om_resume <id> - resume an Overmind workflow",
+          "/om_pause <id> - pause Overmind checks (no interrupts while you talk to it)",
+          "/om_resume <id> - resume Overmind checks",
           "/om_drop <id> - drop an Overmind workflow",
           "/ovm_start - enter OVM chat mode",
           "/ovm_end - exit OVM chat mode",
@@ -270,10 +270,10 @@ export class AssistantCore {
         return this.handleOvermindTasksCommand(parts[1]);
 
       case "/om_pause":
-        return this.handleOvermindStatusMutation(parts[1], "paused", "Paused");
+        return this.handleOvermindPauseMutation(parts[1], true);
 
       case "/om_resume":
-        return this.handleOvermindStatusMutation(parts[1], "active", "Resumed");
+        return this.handleOvermindPauseMutation(parts[1], false);
 
       case "/om_drop":
         return this.handleOvermindDropCommand(parts[1]);
@@ -397,17 +397,18 @@ export class AssistantCore {
     return lines.join("\n");
   }
 
-  private handleOvermindStatusMutation(
-    rawId: string | undefined,
-    status: OvermindWorkflowStatus,
-    action: string
-  ): string {
-    const id = this.parseOvermindId(rawId, status === "paused" ? "/om_pause <id>" : "/om_resume <id>");
+  // Pause/resume overmind's monitoring of a workflow (suppresses nudges/requests/brain
+  // while JROM talks to the coordinator). Separate from status — the card stays visible.
+  private handleOvermindPauseMutation(rawId: string | undefined, paused: boolean): string {
+    const id = this.parseOvermindId(rawId, paused ? "/om_pause <id>" : "/om_resume <id>");
     if (typeof id === "string") return id;
     if (!this.overmindService) return "Overmind service not available.";
-    const workflow = this.overmindService.setStatus(id, status);
+    const workflow = this.overmindService.setMonitoringPaused(id, paused, paused ? "jrom" : null);
     if (!workflow) return `Workflow not found: ${id}`;
-    return `${action} workflow ${id}: ${this.overmindDisplayName(workflow)}`;
+    const name = this.overmindDisplayName(workflow);
+    return paused
+      ? `⏸ Paused overmind checks for ${id}: ${name}. I won't interrupt — /om_resume ${id} when done.`
+      : `▶ Resumed overmind checks for ${id}: ${name}.`;
   }
 
   private handleOvermindDropCommand(rawId: string | undefined): string {

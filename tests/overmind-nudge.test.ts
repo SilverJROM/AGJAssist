@@ -88,6 +88,9 @@ let service: OvermindService;
 
 beforeEach(() => {
   cleanup();
+  // The fixtures use this run_dir; it must exist on disk so the registration-completeness
+  // layer treats them as complete and the nudge ladder is exercised in isolation.
+  fs.mkdirSync("/tmp/overmind-nudge", { recursive: true });
   db = new DatabaseService(TEST_DB);
   db.ensureOwner(111222);
   service = new OvermindService(db);
@@ -99,6 +102,42 @@ afterEach(() => {
 });
 
 describe("Overmind watcher nudge ladder", () => {
+  it("does NOT nudge a stuck workflow whose monitoring is paused, then resumes nudging", async () => {
+    const workflow = service.register({
+      label: "hris",
+      coordinator_session: "coord-paused",
+      child_sessions: ["child-paused"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.update(workflow.id, {
+      last_pane_hash: hashPane(QUIET_PANE),
+      stuck_since: "2000-01-01T00:00:00.000Z"
+    });
+    service.setMonitoringPaused(workflow.id, true, "jrom");
+
+    const tmux = makeTmuxMock({
+      "coord-paused": QUIET_PANE,
+      "child-paused": "child quiet pane"
+    });
+    const watcher = new OvermindWatcher(service, tmux);
+
+    // Paused: status display still refreshes, but NO nudge is sent.
+    await watcher.tick();
+    let updated = service.get(workflow.id);
+    expect(updated?.monitoring_paused).toBe(true);
+    expect(updated?.nudge_count).toBe(0);
+    expect(tmux.sendCommand).not.toHaveBeenCalled();
+
+    // Resume: the next stuck tick nudges normally.
+    service.setMonitoringPaused(workflow.id, false, null);
+    await watcher.tick();
+    updated = service.get(workflow.id);
+    expect(updated?.monitoring_paused).toBe(false);
+    expect(updated?.nudge_count).toBe(1);
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+    expect(tmux.sendCommand).toHaveBeenLastCalledWith("coord-paused", CANNED_NUDGE, true, true);
+  });
+
   it("sends Tier 1 and Tier 2 nudges to the coordinator only, then stops", async () => {
     const workflow = service.register({
       label: "hris",

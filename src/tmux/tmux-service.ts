@@ -189,6 +189,25 @@ export class TmuxService {
     }
   }
 
+  // Current working directory of a session's active pane. Used to resolve a coordinator's
+  // relative run_dir (registered relative to ITS cwd, not ours). Returns null if unknown.
+  async paneCurrentPath(session: string): Promise<string | null> {
+    this.ensureValidTarget(session);
+    try {
+      const { stdout } = await execFileAsync("tmux", [
+        "display-message",
+        "-p",
+        "-t",
+        session,
+        "#{pane_current_path}"
+      ]);
+      const dir = stdout.trim();
+      return dir || null;
+    } catch {
+      return null;
+    }
+  }
+
   ensureValidTarget(target: string): void {
     const bareSession = /^[a-zA-Z0-9_.-]+$/.test(target);
     const paneTarget = /^[a-zA-Z0-9_.-]+:[0-9]+\.[0-9]+$/.test(target);

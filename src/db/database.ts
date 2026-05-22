@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 19;
+const SCHEMA_VERSION = 22;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -288,6 +288,7 @@ CREATE TABLE IF NOT EXISTS overmind_workflows (
   display_name TEXT,
   coordinator_session TEXT NOT NULL UNIQUE,
   child_sessions TEXT NOT NULL DEFAULT '[]',
+  child_roles TEXT NOT NULL DEFAULT '[]',
   run_dir TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'working', 'waiting_human', 'awaiting_decision', 'stuck', 'paused', 'completed', 'failed')),
   current_task TEXT,
@@ -308,6 +309,11 @@ CREATE TABLE IF NOT EXISTS overmind_workflows (
   completion_check TEXT,
   parent_status TEXT,
   child_statuses TEXT NOT NULL DEFAULT '[]',
+  info_request TEXT,
+  info_check TEXT,
+  monitoring_paused INTEGER NOT NULL DEFAULT 0,
+  paused_at TEXT,
+  paused_by TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -611,6 +617,43 @@ export class DatabaseService {
         }
         if (!colNames.has("child_statuses")) {
           this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN child_statuses TEXT NOT NULL DEFAULT '[]'");
+        }
+      }
+
+      // Migration: v19 → v20: per-child role labels (e.g. coder/tester) for multi-agent workflows
+      if (current && current.version < 20) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("child_roles")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN child_roles TEXT NOT NULL DEFAULT '[]'");
+        }
+      }
+
+      // Migration: v20 → v21: registration completeness badge (info_request) + dedupe signature (info_check)
+      if (current && current.version < 21) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("info_request")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN info_request TEXT");
+        }
+        if (!colNames.has("info_check")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN info_check TEXT");
+        }
+      }
+
+      // Migration: v21 → v22: JROM-initiated monitoring pause (suppresses all interrupts
+      // while he talks to a coordinator) — flag is separate from status so the card stays visible.
+      if (current && current.version < 22) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("monitoring_paused")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN monitoring_paused INTEGER NOT NULL DEFAULT 0");
+        }
+        if (!colNames.has("paused_at")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN paused_at TEXT");
+        }
+        if (!colNames.has("paused_by")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN paused_by TEXT");
         }
       }
 

@@ -49,6 +49,7 @@ export interface OvermindWorkflow {
   display_name: string | null;
   coordinator_session: string;
   child_sessions: string[];
+  child_roles: string[];
   run_dir: string;
   status: OvermindWorkflowStatus;
   current_task: string | null;
@@ -69,6 +70,11 @@ export interface OvermindWorkflow {
   completion_check: string | null;
   parent_status: OvermindParentStatus | null;
   child_statuses: OvermindChildSessionStatus[];
+  info_request: string | null;
+  info_check: string | null;
+  monitoring_paused: boolean;
+  paused_at: string | null;
+  paused_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,6 +83,7 @@ export interface RegisterOvermindWorkflowInput {
   label: string;
   coordinator_session: string;
   child_sessions?: string[];
+  child_roles?: string[];
   run_dir: string;
   current_task?: string | null;
   tasks?: OvermindTask[];
@@ -102,6 +109,8 @@ export interface UpdateOvermindWorkflowInput {
   completion_check?: string | null;
   parent_status?: OvermindParentStatus | null;
   child_statuses?: OvermindChildSessionStatus[];
+  info_request?: string | null;
+  info_check?: string | null;
 }
 
 interface OvermindWorkflowRow {
@@ -110,6 +119,7 @@ interface OvermindWorkflowRow {
   display_name: string | null;
   coordinator_session: string;
   child_sessions: string;
+  child_roles: string;
   run_dir: string;
   status: OvermindWorkflowStatus;
   current_task: string | null;
@@ -130,6 +140,11 @@ interface OvermindWorkflowRow {
   completion_check: string | null;
   parent_status: OvermindParentStatus | null;
   child_statuses: string;
+  info_request: string | null;
+  info_check: string | null;
+  monitoring_paused: number;
+  paused_at: string | null;
+  paused_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -157,6 +172,7 @@ export class OvermindService {
           label,
           coordinator_session,
           child_sessions,
+          child_roles,
           run_dir,
           status,
           current_task,
@@ -173,10 +189,11 @@ export class OvermindService {
           run_started_at,
           accumulated_ms,
           updated_at
-        ) VALUES (?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, ?, '[]', NULL, 0, 0, NULL, ?, 0, ?)
+        ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, ?, '[]', NULL, 0, 0, NULL, ?, 0, ?)
         ON CONFLICT(coordinator_session) DO UPDATE SET
           label = excluded.label,
           child_sessions = excluded.child_sessions,
+          child_roles = CASE WHEN excluded.child_roles = '[]' THEN overmind_workflows.child_roles ELSE excluded.child_roles END,
           run_dir = excluded.run_dir,
           status = 'active',
           current_task = excluded.current_task,
@@ -200,6 +217,7 @@ export class OvermindService {
         input.label,
         input.coordinator_session,
         JSON.stringify(input.child_sessions ?? []),
+        JSON.stringify(input.child_roles ?? []),
         input.run_dir,
         input.current_task ?? null,
         JSON.stringify(tasks),
@@ -285,7 +303,9 @@ export class OvermindService {
         ? fields.completion_check
         : existing.completion_check,
       parent_status: fields.parent_status !== undefined ? fields.parent_status : existing.parent_status,
-      child_statuses: fields.child_statuses ?? existing.child_statuses
+      child_statuses: fields.child_statuses ?? existing.child_statuses,
+      info_request: fields.info_request !== undefined ? fields.info_request : existing.info_request,
+      info_check: fields.info_check !== undefined ? fields.info_check : existing.info_check
     };
 
     this.db
@@ -310,6 +330,8 @@ export class OvermindService {
             completion_check = ?,
             parent_status = ?,
             child_statuses = ?,
+            info_request = ?,
+            info_check = ?,
             updated_at = datetime('now')
         WHERE id = ?`
       )
@@ -333,6 +355,8 @@ export class OvermindService {
         next.completion_check,
         next.parent_status,
         JSON.stringify(next.child_statuses),
+        next.info_request,
+        next.info_check,
         id
       );
 
@@ -358,6 +382,34 @@ export class OvermindService {
       .prepare("UPDATE overmind_workflows SET display_name = ?, updated_at = datetime('now') WHERE id = ?")
       .run(displayName, id);
     if (result.changes === 0) return null;
+    return this.get(id);
+  }
+
+  // JROM-initiated monitoring pause: suppresses all overmind interrupts (nudges,
+  // completeness requests, brain consults, notifications) for this workflow without
+  // changing its status, so the card stays visible. `by` records the initiator for awareness.
+  setMonitoringPaused(id: number, paused: boolean, by: string | null): OvermindWorkflow | null {
+    const existing = this.get(id);
+    if (!existing) return null;
+    this.db
+      .prepare(
+        `UPDATE overmind_workflows
+        SET monitoring_paused = ?,
+            paused_at = ?,
+            paused_by = ?,
+            nudge_count = CASE WHEN ? = 1 THEN 0 ELSE nudge_count END,
+            tier = CASE WHEN ? = 1 THEN 0 ELSE tier END,
+            updated_at = datetime('now')
+        WHERE id = ?`
+      )
+      .run(
+        paused ? 1 : 0,
+        paused ? this.isoNow() : null,
+        paused ? by : null,
+        paused ? 1 : 0,
+        paused ? 1 : 0,
+        id
+      );
     return this.get(id);
   }
 
@@ -432,7 +484,9 @@ export class OvermindService {
   private mapRow(row: OvermindWorkflowRow): OvermindWorkflow {
     return {
       ...row,
+      monitoring_paused: row.monitoring_paused === 1,
       child_sessions: this.parseJsonArray<string>(row.child_sessions),
+      child_roles: this.parseJsonArray<string>(row.child_roles),
       tasks: this.parseJsonArray<OvermindTask>(row.tasks),
       task_log: this.parseJsonArray<OvermindTaskLogEntry>(row.task_log),
       child_statuses: this.parseJsonArray<OvermindChildSessionStatus>(row.child_statuses)

@@ -16,6 +16,7 @@ import {
   DecisionVerdict,
   DEFAULT_COMPLETION_CONSULT_TEXT,
   OvermindBrain,
+  RegistrationReviewVerdict,
   hasAlwaysEscalateKeyword
 } from "./overmind-brain.js";
 import {
@@ -93,7 +94,11 @@ export function hashPane(pane: string): string {
 }
 
 export function hasActiveTurn(pane: string): boolean {
-  return /esc to interrupt/i.test(pane);
+  const statusBarChromeRe = /ctrl\+t|bypass permissions|to manage|for agents|\bshells?\b|\bmonitors?\b|shift\+tab/i;
+  return pane
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .some((line) => /esc to interrupt/i.test(line) && !statusBarChromeRe.test(line));
 }
 
 export function extractBody(pane: string): string {
@@ -240,6 +245,102 @@ export function classifyChildSessionStatus(input: {
   return hasActiveTurn(input.pane) || input.paneHashChanged === true ? "working" : "idle";
 }
 
+// Grace before nagging about an empty tasklist — a freshly-registered run may push its
+// tasks a beat after register. Past this, an empty tasklist is a genuine omission.
+export const EMPTY_TASKLIST_GRACE_MS = 60_000;
+
+export interface CompletenessInput {
+  tasks: { state: string }[];
+  childSessions: string[];
+  childRoles: string[];
+  childStatuses: { session: string; status: string }[];
+  runDir: string;
+  runDirExists: boolean;
+  ageMs: number;
+  currentTask: string | null;
+}
+
+export interface CompletenessResult {
+  // machine keys of what's missing/inconsistent: tasklist | run_dir | dead_child | roles
+  missing: string[];
+  // short badge text for the dashboard (e.g. "tasklist, roles"); null when complete
+  requestLabel: string | null;
+  // canned coordinator-pane request listing the gaps; null when complete or brain-only
+  requestText: string | null;
+  // re-arm key: identical signature => same gap set => don't re-ask
+  signature: string;
+  // present-but-contradictory: deterministic check can't phrase a confident ask -> Sonnet
+  needsBrain: boolean;
+}
+
+// Deterministic registration/data completeness check (the ~90%). Pure: no I/O. The caller
+// runs this only for live, not-all-done workflows. Each gap maps to a canned ask aimed at
+// the coordinator (projcore), NOT JROM. `needsBrain` flags the residual inconsistent case.
+export function assessRegistrationCompleteness(input: CompletenessInput): CompletenessResult {
+  const missing: string[] = [];
+  const labels: string[] = [];
+  const lines: string[] = [];
+
+  if (input.tasks.length === 0 && input.ageMs >= EMPTY_TASKLIST_GRACE_MS) {
+    missing.push("tasklist");
+    labels.push("tasklist");
+    lines.push("push your batch tasklist — it is empty, so the dashboard shows 0/0 (build it from queue.md or your batch plan / req-matrix.md)");
+  }
+
+  if (!input.runDirExists) {
+    missing.push("run_dir");
+    labels.push("run_dir");
+    lines.push(`your run_dir '${input.runDir}' is not found on disk — re-register with the correct absolute path`);
+  }
+
+  const deadChildren = input.childStatuses.filter((c) => c.status === "closed").map((c) => c.session);
+  if (deadChildren.length > 0) {
+    missing.push("dead_child");
+    labels.push("roster");
+    lines.push(`child session(s) ${deadChildren.join(", ")} are no longer alive — re-register with the correct child_sessions roster`);
+  }
+
+  const rolesMissing =
+    input.childSessions.length > 1 &&
+    (input.childRoles.length !== input.childSessions.length ||
+      input.childRoles.some((r) => !r || !r.trim()));
+  if (rolesMissing) {
+    missing.push("roles");
+    labels.push("roles");
+    lines.push("send child_roles (aligned by index with child_sessions) so the dashboard labels your agents (e.g. coder/tester)");
+  }
+
+  // Inconsistency the canned checks can't resolve: current_task names a batch token
+  // (e.g. "B3"/"A2") but no task in the published list matches it. Defer to Sonnet.
+  let needsBrain = false;
+  if (input.tasks.length > 0 && input.currentTask) {
+    const token = input.currentTask.trim().match(/^([A-Za-z]?\d+)\b/)?.[1];
+    if (token) {
+      const tasksAny = input.tasks as Array<{ id?: string; label?: string }>;
+      const matched = tasksAny.some(
+        (t) =>
+          (t.id && t.id.toLowerCase() === token.toLowerCase()) ||
+          (t.label && t.label.toLowerCase().includes(token.toLowerCase()))
+      );
+      if (!matched) {
+        needsBrain = true;
+        if (!missing.includes("task_mismatch")) missing.push("task_mismatch");
+      }
+    }
+  }
+
+  const signature = [...missing].sort().join("|");
+  return {
+    missing,
+    requestLabel: labels.length ? labels.join(", ") : (needsBrain ? "task mismatch" : null),
+    requestText: lines.length
+      ? `Overmind: your overmind registration looks incomplete — please re-register/update so I can track this run:\n- ${lines.join("\n- ")}`
+      : null,
+    signature,
+    needsBrain
+  };
+}
+
 export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
   private readonly childPaneHashes = new Map<number, Map<string, string>>();
@@ -276,10 +377,15 @@ export class OvermindWatcher {
 
   private async tickWorkflow(workflow: OvermindWorkflow): Promise<void> {
     const now = new Date().toISOString();
-    const [coordinatorPane, childSnapshots, mtimeAdvanced] = await Promise.all([
+    // Resolve run_dir to an absolute path first: projcore may register it relative to the
+    // COORDINATOR's cwd, not ours. Resolving against the coordinator pane's cwd avoids a
+    // false "run_dir not found" and keeps the run_dir mtime activity signal working.
+    const resolvedRunDir = await this.resolveRunDir(workflow);
+    const [coordinatorPane, childSnapshots, mtimeAdvanced, runDirExists] = await Promise.all([
       this.capturePaneSafe(workflow.coordinator_session),
       Promise.all(workflow.child_sessions.map((target) => this.captureChildSession(target))),
-      runDirMtimeAdvanced(workflow.run_dir, workflow.last_activity_at)
+      runDirMtimeAdvanced(resolvedRunDir, workflow.last_activity_at),
+      pathExists(resolvedRunDir)
     ]);
     const childPanes = childSnapshots.map((child) => child.pane);
     const childHashChanges = this.updateChildPaneHashes(
@@ -318,6 +424,25 @@ export class OvermindWatcher {
       childPanes
     });
 
+    // Monitoring paused (JROM is talking to this coordinator): keep the display live
+    // (status, parent/child, attribution) so overmind stays AWARE, but suppress every
+    // interrupt — no completion consult, no completeness request, no nudge, no brain,
+    // no notification. Resume re-arms everything on the next tick.
+    if (workflow.monitoring_paused) {
+      this.overmindService.update(workflow.id, {
+        status: result.status,
+        pending_decision: result.pendingDecision,
+        last_pane_hash: result.coordinatorHash,
+        stuck_since: result.stuckSince,
+        active_session: activeAttribution.active_session,
+        active_role: activeAttribution.active_role,
+        parent_status: parentStatus,
+        child_statuses: childStatuses,
+        ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
+      });
+      return;
+    }
+
     // Edge case (the lkvc-38 situation): the task list shows every task done but the
     // coordinator never reported /complete. A clean /complete is trusted and never lands
     // here — this branch ONLY guards the unreported all-done state. Sonnet verifies it
@@ -330,29 +455,155 @@ export class OvermindWatcher {
         result.coordinatorHash,
         activeAttribution,
         parentStatus,
-        childStatuses
+        childStatuses,
+        resolvedRunDir
       );
       return;
     }
 
-    const nudgeFields = result.status === "awaiting_decision"
-      ? await this.applyDecisionInterception(workflow, result.pendingDecision)
-      : await this.applyNudgeLadder(workflow, result.status, coordinatorPane);
+    // Registration/data completeness (the hardening layer): deterministic gap detection
+    // that asks the COORDINATOR (projcore) for missing pieces, ~90% without Sonnet. When
+    // a request is sent this tick we own the pane hash and skip the status nudge so we
+    // never double-type into the coordinator in one tick.
+    const info = await this.applyCompleteness(workflow, {
+      childStatuses,
+      runDirExists,
+      resolvedRunDir,
+      now
+    });
+
+    const nudgeFields = info.requestedThisTick
+      ? { nudge_count: workflow.nudge_count, tier: workflow.tier }
+      : result.status === "awaiting_decision"
+        ? await this.applyDecisionInterception(workflow, result.pendingDecision)
+        : await this.applyNudgeLadder(workflow, result.status, coordinatorPane);
 
     this.overmindService.update(workflow.id, {
       status: nudgeFields.status ?? result.status,
       pending_decision: nudgeFields.pending_decision !== undefined
         ? nudgeFields.pending_decision
         : result.pendingDecision,
-      last_pane_hash: nudgeFields.last_pane_hash ?? result.coordinatorHash,
+      last_pane_hash: info.last_pane_hash ?? nudgeFields.last_pane_hash ?? result.coordinatorHash,
       stuck_since: nudgeFields.stuck_since !== undefined ? nudgeFields.stuck_since : result.stuckSince,
       active_session: activeAttribution.active_session,
       active_role: activeAttribution.active_role,
       parent_status: parentStatus,
       child_statuses: childStatuses,
+      info_request: info.info_request,
+      info_check: info.info_check,
       ...nudgeFields,
       ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
     });
+  }
+
+  // Resolve a workflow's run_dir to an absolute path. Absolute paths pass through. A
+  // relative path is resolved against the coordinator pane's cwd (projcore registers it
+  // relative to ITS working dir, not overmind's). Falls back to the raw value if the
+  // coordinator cwd is unknown — then a genuinely-bad path is still flagged.
+  private async resolveRunDir(workflow: OvermindWorkflow): Promise<string> {
+    if (path.isAbsolute(workflow.run_dir)) return workflow.run_dir;
+    const cwd = await this.tmuxService.paneCurrentPath?.(workflow.coordinator_session);
+    return cwd ? path.resolve(cwd, workflow.run_dir) : workflow.run_dir;
+  }
+
+  // Deterministic-first registration completeness. Clears the badge when complete; asks
+  // once per distinct gap signature (info_check dedupe); routes the present-but-contradictory
+  // case to Sonnet (reviewRegistration) which can request, dismiss, or rarely escalate.
+  private async applyCompleteness(
+    workflow: OvermindWorkflow,
+    ctx: { childStatuses: OvermindChildSessionStatus[]; runDirExists: boolean; resolvedRunDir: string; now: string }
+  ): Promise<{
+    info_request: string | null;
+    info_check: string | null;
+    last_pane_hash?: string;
+    requestedThisTick: boolean;
+  }> {
+    const ageMs = Math.max(
+      0,
+      new Date(ctx.now).getTime() - new Date(workflow.run_started_at ?? workflow.created_at).getTime()
+    );
+    const assessment = assessRegistrationCompleteness({
+      tasks: workflow.tasks ?? [],
+      childSessions: workflow.child_sessions ?? [],
+      childRoles: workflow.child_roles ?? [],
+      childStatuses: ctx.childStatuses,
+      runDir: workflow.run_dir,
+      runDirExists: ctx.runDirExists,
+      ageMs,
+      currentTask: workflow.current_task
+    });
+
+    // Complete — clear any outstanding badge/signature.
+    if (assessment.missing.length === 0) {
+      return { info_request: null, info_check: null, requestedThisTick: false };
+    }
+
+    // Same gap set already handled — hold the badge, do not re-ask (token/pane safe).
+    if (workflow.info_check === assessment.signature) {
+      return { info_request: workflow.info_request, info_check: workflow.info_check, requestedThisTick: false };
+    }
+
+    // New gap set. Deterministic by default; Sonnet only for the contradictory case.
+    let requestText = assessment.requestText;
+    let requestLabel = assessment.requestLabel;
+    if (assessment.needsBrain && this.brain?.reviewRegistration) {
+      const verdict = await this.reviewRegistration(workflow, assessment, ctx.resolvedRunDir);
+      if (verdict.action === "false-alarm") {
+        return { info_request: null, info_check: assessment.signature, requestedThisTick: false };
+      }
+      if (verdict.action === "escalate") {
+        if (verdict.escalateText) {
+          await this.notify?.(verdict.escalateText).catch(() => undefined);
+        }
+        return { info_request: requestLabel, info_check: assessment.signature, requestedThisTick: false };
+      }
+      requestText = verdict.requestText ?? requestText;
+      requestLabel = verdict.requestLabel ?? requestLabel;
+    }
+
+    if (!requestText) {
+      return { info_request: requestLabel, info_check: assessment.signature, requestedThisTick: false };
+    }
+
+    let lastPaneHash: string | undefined;
+    try {
+      await this.tmuxService.sendCommand(workflow.coordinator_session, requestText, true, true);
+      lastPaneHash = hashPane(await this.capturePaneSafe(workflow.coordinator_session));
+    } catch (error) {
+      console.error("Overmind completeness request failed:", error);
+    }
+
+    return {
+      info_request: requestLabel,
+      info_check: assessment.signature,
+      last_pane_hash: lastPaneHash,
+      requestedThisTick: true
+    };
+  }
+
+  private async reviewRegistration(
+    workflow: OvermindWorkflow,
+    assessment: CompletenessResult,
+    resolvedRunDir: string
+  ): Promise<RegistrationReviewVerdict> {
+    if (!this.brain?.reviewRegistration) {
+      return { action: "request", requestText: assessment.requestText ?? undefined, reason: "deterministic fallback" };
+    }
+    try {
+      return await this.brain.reviewRegistration({
+        label: workflow.label,
+        missing: assessment.missing,
+        currentTask: workflow.current_task,
+        tasksSummary: summarizeTasks(workflow.tasks),
+        childSessions: workflow.child_sessions,
+        childRoles: workflow.child_roles,
+        progressTail: await readRunFileTail(resolvedRunDir, "progress.md", BRAIN_RUN_FILE_TAIL_LINES),
+        callbacksTail: await readRunFileTail(resolvedRunDir, "callbacks.md", BRAIN_RUN_FILE_TAIL_LINES)
+      });
+    } catch (error) {
+      console.error("Overmind registration review brain failed:", error);
+      return { action: "request", requestText: assessment.requestText ?? undefined, reason: "deterministic fallback" };
+    }
   }
 
   private async handleAllTasksDone(
@@ -361,7 +612,8 @@ export class OvermindWatcher {
     coordinatorHash: string,
     attribution: ActiveSessionAttribution,
     parentStatus: OvermindParentStatus,
-    childStatuses: OvermindChildSessionStatus[]
+    childStatuses: OvermindChildSessionStatus[],
+    resolvedRunDir: string
   ): Promise<void> {
     const doneCount = workflow.tasks.filter((task) => task.state === "done").length;
     const signature = `${doneCount}/${workflow.tasks.length}`;
@@ -384,7 +636,7 @@ export class OvermindWatcher {
       return;
     }
 
-    const verdict = await this.assessCompletion(workflow, coordinatorPane);
+    const verdict = await this.assessCompletion(workflow, coordinatorPane, resolvedRunDir);
 
     if (verdict.action === "working") {
       // False alarm — Sonnet sees the run is still active despite the all-done list.
@@ -430,7 +682,8 @@ export class OvermindWatcher {
 
   private async assessCompletion(
     workflow: OvermindWorkflow,
-    coordinatorPane: string
+    coordinatorPane: string,
+    resolvedRunDir: string
   ): Promise<CompletionVerdict> {
     if (!this.brain?.verifyCompletion) {
       return {
@@ -445,10 +698,10 @@ export class OvermindWatcher {
         label: workflow.label,
         tasksSummary,
         coordinatorPaneTail: tailLines(coordinatorPane, BRAIN_COORDINATOR_TAIL_LINES),
-        progressTail: await readRunFileTail(workflow.run_dir, "progress.md", BRAIN_RUN_FILE_TAIL_LINES),
-        callbacksTail: await readRunFileTail(workflow.run_dir, "callbacks.md", BRAIN_RUN_FILE_TAIL_LINES),
-        northStar: await readFileBestEffort(path.join(workflow.run_dir, "north-star.md")),
-        priorDecisions: await collectPriorDecisions(workflow.run_dir, `${workflow.label}\ncompletion ${tasksSummary}`)
+        progressTail: await readRunFileTail(resolvedRunDir, "progress.md", BRAIN_RUN_FILE_TAIL_LINES),
+        callbacksTail: await readRunFileTail(resolvedRunDir, "callbacks.md", BRAIN_RUN_FILE_TAIL_LINES),
+        northStar: await readFileBestEffort(path.join(resolvedRunDir, "north-star.md")),
+        priorDecisions: await collectPriorDecisions(resolvedRunDir, `${workflow.label}\ncompletion ${tasksSummary}`)
       });
     } catch (error) {
       console.error("Overmind completion brain failed:", error);
@@ -732,6 +985,15 @@ export class OvermindWatcher {
     } catch {
       return false;
     }
+  }
+}
+
+async function pathExists(target: string): Promise<boolean> {
+  try {
+    await stat(target);
+    return true;
+  } catch {
+    return false;
   }
 }
 

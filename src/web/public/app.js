@@ -814,6 +814,19 @@ function OvermindWorkflows() {
     }
   }, []);
 
+  const toggleMonitoring = useCallback(async (workflow) => {
+    const action = workflow.monitoring_paused ? 'resume-monitoring' : 'pause-monitoring';
+    try {
+      const data = await api(`/api/overmind/workflows/${workflow.id}/${action}`, { method: 'POST' });
+      if (data.workflow) {
+        setWorkflows(prev => prev.map(item => item.id === data.workflow.id ? data.workflow : item));
+      }
+      setError('');
+    } catch (e) {
+      setError(e.message || 'Failed to update monitoring.');
+    }
+  }, []);
+
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(timer);
@@ -984,10 +997,10 @@ function OvermindWorkflows() {
             const tasks = Array.isArray(workflow.tasks) ? workflow.tasks : [];
             const doneCount = countDoneTasks(tasks);
             const childSessions = Array.isArray(workflow.child_sessions) ? workflow.child_sessions : [];
-            const firstChildSession = childSessions[0] || null;
-            const extraChildSessions = childSessions.slice(1);
-            const extraChildStatuses = extraChildSessions.map(session => ({
+            const childRoles = Array.isArray(workflow.child_roles) ? workflow.child_roles : [];
+            const childAgents = childSessions.map((session, i) => ({
               session,
+              role: (childRoles[i] && String(childRoles[i]).trim()) || (childSessions.length > 1 ? `child ${i + 1}` : 'child'),
               status: childSessionStatus(workflow, session)
             }));
             const colorClass = statusColor(workflow.status);
@@ -998,7 +1011,6 @@ function OvermindWorkflows() {
             const displayName = workflowDisplayName(workflow);
             const currentTask = currentWorkflowTask(tasks, workflow.current_task);
             const parentStatus = workflow.parent_status || workflow.status;
-            const firstChildStatus = firstChildSession ? childSessionStatus(workflow, firstChildSession) : null;
             const totalTasks = tasks.length;
             const doneTasks = tasks.filter(t => t && t.state === 'done').length;
             const pctComplete = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
@@ -1019,6 +1031,13 @@ function OvermindWorkflows() {
                     <span class="overmind-pct" title=${doneTasks + '/' + totalTasks + ' tasks complete'}>${pctComplete}%</span>
                     <button
                       type="button"
+                      class=${'overmind-pause-button' + (workflow.monitoring_paused ? ' overmind-pause-active' : '')}
+                      title=${workflow.monitoring_paused ? 'Resume Overmind checks' : 'Pause Overmind checks (no interrupts while you talk to it)'}
+                      aria-label=${(workflow.monitoring_paused ? 'Resume' : 'Pause') + ' Overmind monitoring for ' + displayName}
+                      onclick=${() => toggleMonitoring(workflow)}
+                    >${workflow.monitoring_paused ? '▶' : '⏸'}</button>
+                    <button
+                      type="button"
                       class="overmind-rename-button"
                       title="Rename workflow"
                       aria-label=${'Rename workflow ' + displayName}
@@ -1033,12 +1052,15 @@ function OvermindWorkflows() {
                     >
                       <span class="overmind-chevron" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
                     </button>
+                    ${workflow.monitoring_paused && html`<span class="badge overmind-paused-badge" title=${'Overmind checks paused' + (workflow.paused_by ? ' (' + workflow.paused_by + ')' : '') + ' — no interrupts'}>⏸ paused</span>`}
+                    ${workflow.info_request && !workflow.monitoring_paused && html`<span class="badge overmind-needs-info" title=${'Overmind requested missing data from the coordinator: ' + workflow.info_request}>⚠ needs info</span>`}
                     <span class=${'badge overmind-status-badge ' + colorClass}>${statusIcon(workflow.status)} ${workflow.status}</span>
                   </div>
                 </div>
                 <div class="overmind-substatus">
                   <div class="overmind-task-line"><span><strong>task#${currentTask.id}:</strong> ${workflow.current_task || '—'}</span><span class="overmind-task-count">${doneTasks}/${totalTasks}</span></div>
                   <div>${currentTask.description}</div>
+                  ${workflow.info_request && html`<div class="overmind-info-request">requested from coordinator: <strong>${workflow.info_request}</strong></div>`}
                 </div>
 
                 ${isExpanded && html`
@@ -1055,31 +1077,25 @@ function OvermindWorkflows() {
                         <tr>
                           <th scope="row">parent</th>
                           <td>${workflow.coordinator_session || '—'}</td>
-                          <th scope="row">child</th>
-                          <td>
-                            ${firstChildSession || 'n/a'}
-                            ${extraChildSessions.length > 0 && html`<div class="overmind-extra-children">${extraChildSessions.join(', ')}</div>`}
-                          </td>
-                        </tr>
-                        <tr>
                           <th scope="row">status</th>
                           <td>${renderOvermindStatusValue(parentStatus)}</td>
-                          <th scope="row">status</th>
-                          <td>
-                            ${firstChildSession
-                              ? renderOvermindStatusValue(firstChildStatus, '—')
-                              : html`<span class="overmind-session-status ovm-neutral">n/a</span>`}
-                            ${extraChildSessions.length > 0 && html`
-                              <div class="overmind-extra-children">
-                                ${extraChildStatuses.map(child => html`
-                                  <span class=${'overmind-session-status overmind-extra-child-status ' + statusColor(child.status)} key=${child.session}>
-                                    ${child.session}: ${child.status || '—'}
-                                  </span>
-                                `)}
-                              </div>
-                            `}
-                          </td>
                         </tr>
+                        ${childAgents.length === 0 && html`
+                          <tr>
+                            <th scope="row">child</th>
+                            <td>n/a</td>
+                            <th scope="row">status</th>
+                            <td><span class="overmind-session-status ovm-neutral">n/a</span></td>
+                          </tr>
+                        `}
+                        ${childAgents.map(agent => html`
+                          <tr key=${agent.session}>
+                            <th scope="row">${agent.role}</th>
+                            <td>${agent.session || 'n/a'}</td>
+                            <th scope="row">status</th>
+                            <td>${renderOvermindStatusValue(agent.status, '—')}</td>
+                          </tr>
+                        `)}
                         <tr>
                           <th scope="row">Elapsed</th>
                           <td>${currentElapsed}${workflow.ended_at ? ' (done)' : ''}</td>

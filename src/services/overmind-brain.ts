@@ -55,10 +55,35 @@ export interface CompletionVerdict {
   reason: string;
 }
 
+export interface RegistrationReviewInput {
+  label: string;
+  missing: string[];
+  currentTask: string | null;
+  tasksSummary: string;
+  childSessions: string[];
+  childRoles: string[];
+  progressTail: string;
+  callbacksTail: string;
+}
+
+// "request"     => craft a concise coordinator (projcore) message asking for the missing/fixed data.
+// "false-alarm" => the data is actually fine/expected; send nothing, clear the badge.
+// "escalate"    => truly unresolvable from context; notify JROM (rare last resort).
+export type RegistrationReviewAction = "request" | "false-alarm" | "escalate";
+
+export interface RegistrationReviewVerdict {
+  action: RegistrationReviewAction;
+  requestText?: string;
+  requestLabel?: string;
+  escalateText?: string;
+  reason: string;
+}
+
 export interface OvermindBrain {
   analyzeStuck(input: StuckInput): Promise<BrainVerdict>;
   answerDecision(input: DecisionInput): Promise<DecisionVerdict>;
   verifyCompletion?(input: CompletionInput): Promise<CompletionVerdict>;
+  reviewRegistration?(input: RegistrationReviewInput): Promise<RegistrationReviewVerdict>;
 }
 
 interface RawBrainVerdict {
@@ -79,6 +104,17 @@ interface RawCompletionVerdict {
   action?: unknown;
   consult_text?: unknown;
   consultText?: unknown;
+  reason?: unknown;
+}
+
+interface RawRegistrationVerdict {
+  action?: unknown;
+  request_text?: unknown;
+  requestText?: unknown;
+  request_label?: unknown;
+  requestLabel?: unknown;
+  escalate_text?: unknown;
+  escalateText?: unknown;
   reason?: unknown;
 }
 
@@ -144,6 +180,18 @@ const COMPLETION_SYSTEM_PROMPT = [
   "Allowed shape: {\"action\":\"consult|working\",\"consult_text\":\"optional\",\"reason\":\"short reason\"}.",
   "Use action=consult for the normal case: write a concise coordinator message asking it to POST /api/overmind/complete if truly finished, or to update its task list / answer the open point if work remains.",
   "Use action=working ONLY when the context clearly shows the coordinator is still actively mid-run despite the all-done list (then no message is sent)."
+].join("\n");
+
+const REGISTRATION_SYSTEM_PROMPT = [
+  "You are Overmind's registration-review brain for one projcore coordinator workflow.",
+  "Overmind's deterministic checks flagged the workflow's registration data as present-but-possibly-inconsistent (e.g. current_task names a batch that is not in the published task list).",
+  "Decide, from the supplied tiny context, whether there is a genuine inconsistency the coordinator must fix, OR whether the data is actually fine/expected.",
+  "Requests go to the COORDINATOR (projcore) only — never to child sessions. Escalate to the human ONLY as a true last resort when the context makes the gap unresolvable.",
+  "Return STRICT JSON only, with no markdown, prose, or code fences.",
+  "Allowed shape: {\"action\":\"request|false-alarm|escalate\",\"request_text\":\"optional\",\"request_label\":\"optional short badge\",\"escalate_text\":\"optional\",\"reason\":\"short reason\"}.",
+  "Use action=request with a concise coordinator message naming exactly what to re-register/update (and a 1-3 word request_label for the dashboard).",
+  "Use action=false-alarm when the data is consistent/expected on closer reading; send nothing.",
+  "Use action=escalate only when truly unresolvable; provide escalate_text as a verdict-led human note."
 ].join("\n");
 
 export class SonnetOvermindBrain implements OvermindBrain {
@@ -244,6 +292,35 @@ export class SonnetOvermindBrain implements OvermindBrain {
 
     const raw = await this.llm.chat(messages, 800);
     return normalizeCompletionVerdict(parseJsonObject(raw));
+  }
+
+  async reviewRegistration(input: RegistrationReviewInput): Promise<RegistrationReviewVerdict> {
+    const messages: ChatMessage[] = [
+      { role: "system", content: REGISTRATION_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: [
+          `Workflow label: ${input.label}`,
+          `Deterministic gaps flagged: ${input.missing.join(", ") || "<none>"}`,
+          `current_task: ${input.currentTask || "<empty>"}`,
+          "",
+          "Published task list:",
+          input.tasksSummary || "<empty>",
+          "",
+          `child_sessions: ${input.childSessions.join(", ") || "<none>"}`,
+          `child_roles: ${input.childRoles.join(", ") || "<none>"}`,
+          "",
+          "progress.md tail:",
+          input.progressTail || "<empty>",
+          "",
+          "callbacks.md tail:",
+          input.callbacksTail || "<empty>"
+        ].join("\n")
+      }
+    ];
+
+    const raw = await this.llm.chat(messages, 800);
+    return normalizeRegistrationVerdict(parseJsonObject(raw));
   }
 }
 
@@ -372,6 +449,45 @@ function normalizeCompletionVerdict(raw: RawCompletionVerdict): CompletionVerdic
     consultText: DEFAULT_COMPLETION_CONSULT_TEXT,
     reason: `Sonnet brain returned unsupported completion action: ${action || "<missing>"}; defaulting to consult.`
   };
+}
+
+function normalizeRegistrationVerdict(raw: RawRegistrationVerdict): RegistrationReviewVerdict {
+  const action = typeof raw.action === "string" ? raw.action : "";
+  const reason = typeof raw.reason === "string" && raw.reason.trim()
+    ? raw.reason.trim().slice(0, 500)
+    : "Sonnet brain did not provide a reason.";
+  const requestText = typeof raw.request_text === "string"
+    ? normalizeCoordinatorLine(raw.request_text)
+    : typeof raw.requestText === "string"
+      ? normalizeCoordinatorLine(raw.requestText)
+      : "";
+  const requestLabel = typeof raw.request_label === "string"
+    ? raw.request_label.trim().slice(0, 40)
+    : typeof raw.requestLabel === "string"
+      ? raw.requestLabel.trim().slice(0, 40)
+      : "";
+  const escalateText = typeof raw.escalate_text === "string"
+    ? raw.escalate_text.trim().slice(0, 1000)
+    : typeof raw.escalateText === "string"
+      ? raw.escalateText.trim().slice(0, 1000)
+      : "";
+
+  if (action === "false-alarm") {
+    return { action, reason };
+  }
+
+  if (action === "escalate") {
+    return { action, escalateText: escalateText || undefined, requestLabel: requestLabel || undefined, reason };
+  }
+
+  if (action === "request") {
+    if (!requestText) {
+      return { action: "false-alarm", reason: "Sonnet brain requested a fix without request_text; treating as false alarm." };
+    }
+    return { action, requestText, requestLabel: requestLabel || undefined, reason };
+  }
+
+  return { action: "false-alarm", reason: `Sonnet brain returned unsupported registration action: ${action || "<missing>"}.` };
 }
 
 function normalizeCoordinatorLine(text: string): string {

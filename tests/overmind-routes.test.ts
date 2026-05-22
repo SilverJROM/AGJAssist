@@ -248,15 +248,16 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN
     });
     expect(paused.statusCode).toBe(200);
-    expect(paused.json().workflow.status).toBe("paused");
-    expect(overmindService.get(workflowId)?.status).toBe("paused");
+    expect(paused.json().workflow.monitoring_paused).toBe(true);
+    expect(overmindService.get(workflowId)?.monitoring_paused).toBe(true);
+    expect(overmindService.get(workflowId)?.paused_by).toBe("projcore-relay");
 
     const resumed = await lifecyclePost(`/api/overmind/workflows/${workflowId}/resume`, {
       token: OVERMIND_TOKEN
     });
     expect(resumed.statusCode).toBe(200);
-    expect(resumed.json().workflow.status).toBe("active");
-    expect(overmindService.get(workflowId)?.status).toBe("active");
+    expect(resumed.json().workflow.monitoring_paused).toBe(false);
+    expect(overmindService.get(workflowId)?.monitoring_paused).toBe(false);
 
     const dropped = await lifecycleDeleteWithTokenHeader(`/api/overmind/workflows/${workflowId}`);
     expect(dropped.statusCode).toBe(200);

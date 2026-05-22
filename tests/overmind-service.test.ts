@@ -28,9 +28,9 @@ afterEach(() => {
 });
 
 describe("OvermindService", () => {
-  it("creates the schema v19 tables, display name, active attribution, history, notification, elapsed, completion-check, and per-session status columns", () => {
+  it("creates the schema v22 tables, display name, active attribution, history, notification, elapsed, completion-check, per-session status, child roles, info-request, and monitoring-pause columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(19);
+    expect(version.version).toBe(22);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -65,6 +65,12 @@ describe("OvermindService", () => {
     expect(colNames).toContain("accumulated_ms");
     expect(colNames).toContain("parent_status");
     expect(colNames).toContain("child_statuses");
+    expect(colNames).toContain("child_roles");
+    expect(colNames).toContain("info_request");
+    expect(colNames).toContain("info_check");
+    expect(colNames).toContain("monitoring_paused");
+    expect(colNames).toContain("paused_at");
+    expect(colNames).toContain("paused_by");
 
     const historyCols = db.raw.pragma("table_info(overmind_task_history)") as { name: string }[];
     expect(historyCols.map((col) => col.name)).toEqual([
@@ -545,7 +551,7 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(19);
+    expect(version.version).toBe(22);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("display_name");
@@ -559,6 +565,14 @@ describe("OvermindService", () => {
     expect(cols.map((col) => col.name)).toContain("completion_check");
     expect(cols.map((col) => col.name)).toContain("parent_status");
     expect(cols.map((col) => col.name)).toContain("child_statuses");
+    expect(cols.map((col) => col.name)).toContain("child_roles");
+    expect(cols.map((col) => col.name)).toContain("info_request");
+    expect(cols.map((col) => col.name)).toContain("info_check");
+    expect(service.getBySession("legacy-parent")?.child_roles).toEqual([]);
+    expect(service.getBySession("legacy-parent")?.info_request).toBeNull();
+    expect(service.getBySession("legacy-parent")?.info_check).toBeNull();
+    expect(service.getBySession("legacy-parent")?.monitoring_paused).toBe(false);
+    expect(service.getBySession("legacy-parent")?.paused_at).toBeNull();
     expect(service.getBySession("legacy-parent")?.active_session).toBeNull();
     expect(service.getBySession("legacy-parent")?.ended_at).toBeNull();
     expect(service.getBySession("legacy-parent")?.task_log).toEqual([]);

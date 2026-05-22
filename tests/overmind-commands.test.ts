@@ -195,14 +195,16 @@ describe("Overmind Telegram commands", () => {
     });
 
     await expect(core.handleCommand(`/om_pause ${workflow.id}`)).resolves.toBe(
-      `Paused workflow ${workflow.id}: Mutable run`
+      `⏸ Paused overmind checks for ${workflow.id}: Mutable run. I won't interrupt — /om_resume ${workflow.id} when done.`
     );
-    expect(service.get(workflow.id)?.status).toBe("paused");
+    expect(service.get(workflow.id)?.monitoring_paused).toBe(true);
+    expect(service.get(workflow.id)?.paused_by).toBe("jrom");
+    expect(service.get(workflow.id)?.status).toBe("active");
 
     await expect(core.handleCommand(`/om_resume ${workflow.id}`)).resolves.toBe(
-      `Resumed workflow ${workflow.id}: Mutable run`
+      `▶ Resumed overmind checks for ${workflow.id}: Mutable run.`
     );
-    expect(service.get(workflow.id)?.status).toBe("active");
+    expect(service.get(workflow.id)?.monitoring_paused).toBe(false);
 
     await expect(core.handleCommand(`/om_drop ${workflow.id}`)).resolves.toBe(
       `Dropped workflow ${workflow.id}: Mutable run`
