@@ -72,7 +72,7 @@ export function registerNoteRoutes(
 
   // ── Standalone notes (cross-project) ──
 
-  app.get<{ Querystring: { project_id?: string; status?: string; search?: string; unattached?: string; sort?: string; page?: string; limit?: string; folder_id?: string } }>(
+  app.get<{ Querystring: { search?: string; folder_id?: string } }>(
     "/api/notes",
     { preHandler: authMiddleware },
     async (request) => {
@@ -85,27 +85,19 @@ export function registerNoteRoutes(
       }
 
       // search across all folders (no folder_id supplied)
-      if (q.search && !q.project_id && !q.status && !q.unattached) {
+      if (q.search) {
         const notes = noteService.searchAll(q.search);
         return { notes, total: notes.length, page: 1, totalPages: 1 };
       }
 
-      const filters: { projectId?: number | null; status?: string; search?: string; sort?: string; page?: number; limit?: number } = {};
-      if (q.unattached === "1") {
-        filters.projectId = null;
-      } else if (q.project_id) {
-        filters.projectId = Number(q.project_id);
-      }
-      if (q.status) filters.status = q.status;
-      if (q.search) filters.search = q.search;
-      if (q.sort) filters.sort = q.sort;
-      if (q.page) filters.page = Number(q.page);
-      if (q.limit) filters.limit = Number(q.limit);
-      return noteService.listAll(filters);
+      // No filters — return all notes in default folder
+      const folderId = noteService.defaultFolderId();
+      const notes = noteService.listByFolder(folderId);
+      return { notes, total: notes.length, page: 1, totalPages: 1 };
     }
   );
 
-  app.post<{ Body: { body: string; title?: string; project_id?: number | null; tags?: string[]; folder_id?: number } }>(
+  app.post<{ Body: { body: string; folder_id?: number; pinned?: number } }>(
     "/api/notes",
     { preHandler: authMiddleware },
     async (request, reply) => {
@@ -113,65 +105,11 @@ export function registerNoteRoutes(
         return reply.code(403).send({ error: "Owner role required" });
       }
 
-      const { body, title, project_id, tags, folder_id } = request.body || {};
+      const { body, folder_id } = request.body || {};
       if (!body) return reply.code(400).send({ error: "body is required" });
 
-      // Resolve folder_id: use supplied value or fall back to the default "Notes" folder.
       const resolvedFolderId = folder_id ?? noteService.defaultFolderId();
-
-      // Use createNote (folder-aware) when there is no project association
-      if (!project_id && !title && !tags) {
-        const note = noteService.createNote(resolvedFolderId, body, request.sessionUser.id);
-        return reply.code(201).send({ note });
-      }
-
-      // Legacy path: create with project/title/tags, then patch folder_id in
-      const note = noteService.create(body, request.sessionUser.id, project_id ?? null, title, tags);
-      if (note.folder_id === null || note.folder_id === undefined) {
-        noteService.updateNote(note.id, { folder_id: resolvedFolderId }, request.sessionUser.id);
-        return reply.code(201).send({ note: noteService.getById(note.id) });
-      }
-      return reply.code(201).send({ note });
-    }
-  );
-
-  // ── Project-scoped notes (existing, kept for backward compat) ──
-
-  app.get<{ Params: { projectId: string } }>(
-    "/api/projects/:projectId/notes",
-    { preHandler: authMiddleware },
-    async (request) => {
-      const query = request.query as Record<string, string>;
-      return {
-        notes: noteService.list(Number(request.params.projectId), query.status)
-      };
-    }
-  );
-
-  app.post<{
-    Params: { projectId: string };
-    Body: { title?: string; body: string; tags?: string[] };
-  }>(
-    "/api/projects/:projectId/notes",
-    { preHandler: authMiddleware },
-    async (request, reply) => {
-      if (request.sessionUser?.role !== "owner") {
-        return reply.code(403).send({ error: "Owner role required" });
-      }
-
-      const { title, body, tags } = request.body || {};
-      if (!body) {
-        return reply.code(400).send({ error: "body is required" });
-      }
-
-      const note = noteService.create(
-        body,
-        request.sessionUser.id,
-        Number(request.params.projectId),
-        title,
-        tags
-      );
-
+      const note = noteService.createNote(resolvedFolderId, body, request.sessionUser.id);
       return reply.code(201).send({ note });
     }
   );
@@ -190,7 +128,7 @@ export function registerNoteRoutes(
 
   app.patch<{
     Params: { id: string };
-    Body: { title?: string; body?: string; status?: string; tags?: string[]; project_id?: number | null; pinned?: number; folder_id?: number };
+    Body: { body?: string; pinned?: number; folder_id?: number };
   }>(
     "/api/notes/:id",
     { preHandler: authMiddleware },
@@ -201,22 +139,15 @@ export function registerNoteRoutes(
 
       const userId = request.sessionUser.id;
       const id = Number(request.params.id);
-      const { pinned, folder_id, ...legacyFields } = request.body || {};
+      const { body, pinned, folder_id } = request.body || {};
 
-      // Handle pinned and folder_id via the new-model methods when supplied
-      if (pinned !== undefined) {
-        const result = noteService.setPinned(id, pinned, userId);
-        if (!result) return reply.code(404).send({ error: "Note not found" });
-      }
+      const updates: { body?: string; pinned?: number; folder_id?: number } = {};
+      if (body !== undefined) updates.body = body;
+      if (pinned !== undefined) updates.pinned = pinned;
+      if (folder_id !== undefined) updates.folder_id = folder_id;
 
-      if (folder_id !== undefined) {
-        const result = noteService.moveToFolder(id, folder_id, userId);
-        if (!result) return reply.code(404).send({ error: "Note not found" });
-      }
-
-      // Apply legacy fields (title/body/status/tags/project_id) if any provided
-      if (Object.keys(legacyFields).length > 0) {
-        const result = noteService.update(id, legacyFields, userId);
+      if (Object.keys(updates).length > 0) {
+        const result = noteService.updateNote(id, updates, userId);
         if (!result) return reply.code(404).send({ error: "Note not found" });
       }
 
@@ -240,63 +171,4 @@ export function registerNoteRoutes(
     }
   );
 
-  // ── Plan integration ──
-
-  app.post<{ Body: { noteIds: number[]; projectId: number; planId?: number; newPlanTitle?: string } }>(
-    "/api/notes/add-to-plan",
-    { preHandler: authMiddleware },
-    async (request, reply) => {
-      if (request.sessionUser?.role !== "owner") {
-        return reply.code(403).send({ error: "Owner role required" });
-      }
-
-      const { noteIds, projectId, planId, newPlanTitle } = request.body || {};
-      if (!noteIds?.length || !projectId) {
-        return reply.code(400).send({ error: "noteIds and projectId are required" });
-      }
-      if (!planId && !newPlanTitle) {
-        return reply.code(400).send({ error: "Either planId or newPlanTitle is required" });
-      }
-
-      const result = noteService.addToPlan(
-        noteIds,
-        projectId,
-        request.sessionUser.id,
-        planId,
-        newPlanTitle
-      );
-
-      if (!result) {
-        return reply.code(400).send({ error: "Failed to add notes to plan. Check notes are open and belong to this project." });
-      }
-
-      return reply.code(200).send(result);
-    }
-  );
-
-  app.post<{ Params: { id: string }; Body: { title: string; project_id?: number } }>(
-    "/api/notes/:id/promote",
-    { preHandler: authMiddleware },
-    async (request, reply) => {
-      if (request.sessionUser?.role !== "owner") {
-        return reply.code(403).send({ error: "Owner role required" });
-      }
-
-      const { title, project_id } = request.body || {};
-      if (!title) return reply.code(400).send({ error: "title is required" });
-
-      const result = noteService.promote(
-        Number(request.params.id),
-        title,
-        request.sessionUser.id,
-        project_id
-      );
-
-      if (!result) {
-        return reply.code(400).send({ error: "Note not found or already promoted" });
-      }
-
-      return reply.code(201).send(result);
-    }
-  );
 }

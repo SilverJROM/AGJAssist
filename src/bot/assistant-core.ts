@@ -136,8 +136,8 @@ export class AssistantCore {
           "/tmux_create <project> [name] - create tmux session for project",
           "/tmux_kill <session> - terminate tmux session",
           "/projects - list all projects",
-          "/note <project> <text> - create a quick note",
-          "/notes <project> - list recent notes",
+          "/note <text> - create a quick note in Notes folder",
+          "/notes - list recent notes from Notes folder",
           "/weblogin - generate a login code for the web app",
           "/app - open the web app",
           "/timeout [minutes] - show or set command timeout (default 60)",
@@ -269,17 +269,13 @@ export class AssistantCore {
       }
 
       case "/note": {
-        if (!this.noteService || !this.projectService) return "Note service not available.";
-        const projectName = parts[1];
-        if (!projectName) return "Usage: /note <project> <text>";
-        const noteText = parts.slice(2).join(" ").trim();
-        if (!noteText) return "Usage: /note <project> <text>";
+        if (!this.noteService) return "Note service not available.";
+        const noteText = parts.slice(1).join(" ").trim();
+        if (!noteText) return "Usage: /note <text>";
 
-        const project = this.projectService.getByName(projectName);
-        if (!project) return `Project not found: ${projectName}`;
-
-        const note = this.noteService.create(noteText, this.ownerUserId || 1, project.id);
-        return `Note #${note.id} created on ${projectName}`;
+        const folderId = this.noteService.defaultFolderId();
+        const note = this.noteService.createNote(folderId, noteText, this.ownerUserId || 1);
+        return `Note #${note.id} saved to Notes folder`;
       }
 
       case "/weblogin": {
@@ -295,18 +291,14 @@ export class AssistantCore {
         return "Open AGJAssist: https://agjasst.silverjrom.app";
 
       case "/notes": {
-        if (!this.noteService || !this.projectService) return "Note service not available.";
-        const projectName = parts[1];
-        if (!projectName) return "Usage: /notes <project>";
+        if (!this.noteService) return "Note service not available.";
 
-        const project = this.projectService.getByName(projectName);
-        if (!project) return `Project not found: ${projectName}`;
-
-        const notes = this.noteService.list(project.id, "open");
-        if (!notes.length) return `No open notes for ${projectName}`;
+        const folderId = this.noteService.defaultFolderId();
+        const notes = this.noteService.listByFolder(folderId);
+        if (!notes.length) return "No notes in Notes folder";
         return notes
           .slice(0, 10)
-          .map((n) => `#${n.id} [${n.status}] ${n.title || n.body.slice(0, 60)}`)
+          .map((n) => `#${n.id}${n.pinned ? " 📌" : ""} ${n.body.slice(0, 60)}`)
           .join("\n");
       }
 

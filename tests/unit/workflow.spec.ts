@@ -44,28 +44,15 @@ describe("Notes → Plans → Tasks workflow", () => {
     expect(note.status).toBe("open");
   });
 
-  it("promotes note to plan", () => {
+  it("links note to plan via plan_notes", () => {
+    // promote() removed in N5 — link notes to plans directly via plan_notes
     const note = noteService.create("Fix auth bug", 1, 1);
-    const result = noteService.promote(note.id, "Auth Fix Plan", 1);
+    const plan = planService.create(1, "Auth Fix Plan", note.body, 1);
+    db.prepare("INSERT INTO plan_notes (plan_id, note_id) VALUES (?, ?)").run(plan.id, note.id);
 
-    expect(result).not.toBeNull();
-    expect(result!.planId).toBeGreaterThan(0);
-
-    // Note status should be promoted
-    const updatedNote = noteService.getById(note.id);
-    expect(updatedNote!.status).toBe("promoted");
-
-    // Plan should exist with note's body as description
-    const plan = planService.getById(result!.planId);
-    expect(plan!.title).toBe("Auth Fix Plan");
-    expect(plan!.note_ids).toContain(note.id);
-  });
-
-  it("cannot promote already promoted note", () => {
-    const note = noteService.create("Bug", 1, 1);
-    noteService.promote(note.id, "Plan 1", 1);
-    const second = noteService.promote(note.id, "Plan 2", 1);
-    expect(second).toBeNull();
+    const fetched = planService.getById(plan.id);
+    expect(fetched!.title).toBe("Auth Fix Plan");
+    expect(fetched!.note_ids).toContain(note.id);
   });
 
   it("adds steps to plan", () => {
