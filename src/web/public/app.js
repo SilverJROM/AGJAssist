@@ -2621,8 +2621,8 @@ function relativeDate(dateStr) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-// --- Note row with swipe-to-delete ---
-function IosNoteRow({ note, onOpen, onDelete }) {
+// --- Note row with swipe actions: Pin | Move | Delete ---
+function IosNoteRow({ note, onOpen, onDelete, onPin, onMove }) {
   const [swiped, setSwiped] = useState(false);
   const touchStartX = useRef(null);
   const rowRef = useRef(null);
@@ -2639,7 +2639,7 @@ function IosNoteRow({ note, onOpen, onDelete }) {
   function handleTouchEnd() {
     touchStartX.current = null;
   }
-  // Desktop: right-click or long-press shows delete
+  // Desktop: right-click or long-press shows actions
   function handleContextMenu(e) {
     e.preventDefault();
     setSwiped(v => !v);
@@ -2651,7 +2651,7 @@ function IosNoteRow({ note, onOpen, onDelete }) {
 
   return html`
     <div class="ios-note-row-wrap" ref=${rowRef}>
-      <div class=${'ios-note-row' + (swiped ? ' swiped' : '')}
+      <div class=${'ios-note-row' + (swiped ? ' swiped-actions' : '')}
            ontouchstart=${handleTouchStart}
            ontouchmove=${handleTouchMove}
            ontouchend=${handleTouchEnd}
@@ -2659,24 +2659,65 @@ function IosNoteRow({ note, onOpen, onDelete }) {
            onclick=${() => { if (!swiped) onOpen(note); }}>
         <div class="ios-note-row-content">
           <div class="ios-note-row-top">
-            <span class="ios-note-title">${title}</span>
+            <span class="ios-note-title">${note.pinned ? html`<span class="ios-pin-indicator">📌 </span>` : ''}${title}</span>
             <span class="ios-note-date">${date}</span>
           </div>
           <div class="ios-note-snippet">${snippet || html`<span style="color:var(--text-secondary);font-style:italic">No additional text</span>`}</div>
         </div>
       </div>
-      <button class="ios-swipe-delete-btn" onclick=${(e) => { e.stopPropagation(); onDelete(note); }}>Delete</button>
+      <div class="ios-swipe-actions">
+        ${onPin && html`
+          <button class="ios-swipe-action-btn ios-swipe-pin-btn"
+                  onclick=${(e) => { e.stopPropagation(); setSwiped(false); onPin(note); }}>
+            ${note.pinned ? 'Unpin' : 'Pin'}
+          </button>
+        `}
+        ${onMove && html`
+          <button class="ios-swipe-action-btn ios-swipe-move-btn"
+                  onclick=${(e) => { e.stopPropagation(); setSwiped(false); onMove(note); }}>
+            Move
+          </button>
+        `}
+        <button class="ios-swipe-action-btn ios-swipe-delete-btn"
+                onclick=${(e) => { e.stopPropagation(); setSwiped(false); onDelete(note); }}>
+          Delete
+        </button>
+      </div>
     </div>
     <div class="ios-list-divider"></div>
   `;
 }
 
+// --- Move-to-folder bottom sheet ---
+function IosMoveFolderSheet({ note, folders, currentFolderId, onMove, onClose }) {
+  const others = folders.filter(f => f.id !== currentFolderId);
+  return html`
+    <div class="ios-sheet-backdrop" onclick=${onClose}>
+      <div class="ios-sheet" onclick=${e => e.stopPropagation()}>
+        <div class="ios-sheet-handle"></div>
+        <div class="ios-sheet-title">Move to Folder</div>
+        <div class="ios-sheet-list">
+          ${others.length === 0 && html`<div class="ios-sheet-empty">No other folders.</div>`}
+          ${others.map(f => html`
+            <button key=${f.id} class="ios-sheet-row" onclick=${() => onMove(note, f)}>
+              <span class="ios-folder-icon">📁</span>
+              <span class="ios-sheet-row-name">${f.name}</span>
+            </button>
+          `)}
+        </div>
+        <button class="ios-sheet-cancel" onclick=${onClose}>Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
 // --- Notes list screen (within a folder) ---
-function IosNotesList({ folder, onBack, onOpenNote, onNewNote }) {
+function IosNotesList({ folder, folders, onBack, onOpenNote, onNewNote, onPinNote }) {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
+  const [moveNote, setMoveNote] = useState(null);
   const searchRef = useRef(null);
 
   useEffect(() => {
@@ -2704,6 +2745,23 @@ function IosNotesList({ folder, onBack, onOpenNote, onNewNote }) {
     if (!confirm('Delete this note?')) return;
     try {
       await api(`/api/notes/${note.id}`, { method: 'DELETE' });
+      loadNotes();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handlePin(note) {
+    try {
+      const newPinned = !note.pinned;
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ pinned: newPinned }) });
+      loadNotes();
+      if (onPinNote) onPinNote();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleMoveConfirm(note, targetFolder) {
+    setMoveNote(null);
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ folder_id: targetFolder.id }) });
       loadNotes();
     } catch (e) { alert(e.message); }
   }
@@ -2751,6 +2809,8 @@ function IosNotesList({ folder, onBack, onOpenNote, onNewNote }) {
                 <${IosNoteRow} key=${n.id} note=${n}
                   onOpen=${(note) => onOpenNote(note, loadNotes)}
                   onDelete=${handleDelete}
+                  onPin=${handlePin}
+                  onMove=${(folders && folders.length > 1) ? (note) => setMoveNote(note) : null}
                 />
               `)}
             </div>
@@ -2763,6 +2823,8 @@ function IosNotesList({ folder, onBack, onOpenNote, onNewNote }) {
                 <${IosNoteRow} key=${n.id} note=${n}
                   onOpen=${(note) => onOpenNote(note, loadNotes)}
                   onDelete=${handleDelete}
+                  onPin=${handlePin}
+                  onMove=${(folders && folders.length > 1) ? (note) => setMoveNote(note) : null}
                 />
               `)}
             </div>
@@ -2783,6 +2845,16 @@ function IosNotesList({ folder, onBack, onOpenNote, onNewNote }) {
       <button class="ios-compose-btn" onclick=${handleNewNote}>
         <span class="ios-compose-icon">✏</span>
       </button>
+
+      ${moveNote && html`
+        <${IosMoveFolderSheet}
+          note=${moveNote}
+          folders=${folders || []}
+          currentFolderId=${folder.id}
+          onMove=${handleMoveConfirm}
+          onClose=${() => setMoveNote(null)}
+        />
+      `}
     </div>
   `;
 }
@@ -2809,8 +2881,9 @@ function prepareInitialHtml(body) {
   return body.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
 }
 
-function IosNoteEditor({ note, folder, onBack, onReload }) {
+function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) {
   const [pinned, setPinned] = useState(!!note.pinned);
+  const [showMoveSheet, setShowMoveSheet] = useState(false);
   // Track whether this is a brand-new empty note (for discard-on-back logic)
   const isNewEmpty = useRef(!note.body || note.body.trim() === '');
   const saveTimer = useRef(null);
@@ -2866,6 +2939,16 @@ function IosNoteEditor({ note, folder, onBack, onReload }) {
     try {
       await api(`/api/notes/${note.id}`, { method: 'DELETE' });
       if (onReload) onReload();
+      onBack();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleMoveToFolder(targetFolder) {
+    setShowMoveSheet(false);
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ folder_id: targetFolder.id }) });
+      if (onReload) onReload();
+      if (onMoveNote) onMoveNote(targetFolder);
       onBack();
     } catch (e) { alert(e.message); }
   }
@@ -2961,6 +3044,8 @@ function IosNoteEditor({ note, folder, onBack, onReload }) {
     handleEditorClick(e);
   }
 
+  const otherFolders = (folders || []).filter(f => f.id !== (folder && folder.id));
+
   return html`
     <div class="ios-editor-screen">
       <div class="ios-notes-header ios-editor-header">
@@ -2973,6 +3058,10 @@ function IosNoteEditor({ note, folder, onBack, onReload }) {
                   title=${pinned ? 'Unpin' : 'Pin'}>
             ${pinned ? '📌' : '📍'}
           </button>
+          ${otherFolders.length > 0 && html`
+            <button class="ios-editor-action-btn" onclick=${() => setShowMoveSheet(true)}
+                    title="Move to folder">📂</button>
+          `}
           <button class="ios-editor-action-btn ios-delete-btn" onclick=${handleDelete}
                   title="Delete">🗑</button>
         </div>
@@ -2999,6 +3088,16 @@ function IosNoteEditor({ note, folder, onBack, onReload }) {
              ontouchend=${handleEditorTouchEnd}
         ></div>
       </div>
+
+      ${showMoveSheet && html`
+        <${IosMoveFolderSheet}
+          note=${note}
+          folders=${folders || []}
+          currentFolderId=${folder && folder.id}
+          onMove=${handleMoveToFolder}
+          onClose=${() => setShowMoveSheet(false)}
+        />
+      `}
     </div>
   `;
 }
@@ -3007,6 +3106,7 @@ function IosNoteEditor({ note, folder, onBack, onReload }) {
 function IosNotesPage() {
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
   // nav state: null = folders screen, {folder} = notes list, {folder, note} = editor
   const [currentFolder, setCurrentFolder] = useState(null);
   const [currentNote, setCurrentNote] = useState(null);
@@ -3022,33 +3122,81 @@ function IosNotesPage() {
 
   useEffect(() => { loadFolders(); }, [loadFolders]);
 
+  // --- Folder CRUD ---
+  async function handleCreateFolder() {
+    const name = window.prompt('Folder name:');
+    if (!name || !name.trim()) return;
+    try {
+      await api('/api/note-folders', { method: 'POST', body: JSON.stringify({ name: name.trim() }) });
+      loadFolders();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleRenameFolder(f) {
+    // Default "Notes" folder is protected — match iPhone behavior: skip rename
+    if (f.is_default) { alert('The default "Notes" folder cannot be renamed.'); return; }
+    const name = window.prompt('Rename folder:', f.name);
+    if (!name || !name.trim() || name.trim() === f.name) return;
+    try {
+      await api(`/api/note-folders/${f.id}`, { method: 'PATCH', body: JSON.stringify({ name: name.trim() }) });
+      loadFolders();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleDeleteFolder(f) {
+    if (f.is_default) { alert('The default "Notes" folder cannot be deleted.'); return; }
+    if (!confirm(`Delete folder "${f.name}"?\nIts notes will be moved to the default Notes folder.`)) return;
+    try {
+      await api(`/api/note-folders/${f.id}`, { method: 'DELETE' });
+      loadFolders();
+    } catch (e) {
+      // 4xx from API (e.g. default folder guard on server side)
+      alert(e.message || 'Cannot delete this folder.');
+    }
+  }
+
   // --- Routing within the notes stack ---
   if (currentNote && currentFolder) {
     return html`<${IosNoteEditor}
       note=${currentNote}
       folder=${currentFolder}
+      folders=${folders}
       onBack=${() => setCurrentNote(null)}
       onReload=${reloadNotesRef.current || null}
+      onMoveNote=${(targetFolder) => {
+        // After moving from editor, go back to the list screen (note left current folder)
+        if (reloadNotesRef.current) reloadNotesRef.current();
+      }}
     />`;
   }
 
   if (currentFolder) {
     return html`<${IosNotesList}
       folder=${currentFolder}
+      folders=${folders}
       onBack=${() => { setCurrentFolder(null); loadFolders(); }}
       onOpenNote=${(note, reloadFn) => {
         reloadNotesRef.current = reloadFn;
         setCurrentNote(note);
       }}
       onNewNote=${() => {}}
+      onPinNote=${loadFolders}
     />`;
   }
 
   // --- Folders screen ---
   return html`
     <div class="ios-notes-screen">
-      <div class="ios-folders-header">
+      <div class="ios-folders-header ios-folders-header--row">
         <h1 class="ios-folders-title">Notes</h1>
+        <div class="ios-folders-header-actions">
+          <button class="ios-folder-edit-toggle" onclick=${() => setEditMode(v => !v)}>
+            ${editMode ? 'Done' : 'Edit'}
+          </button>
+          <button class="ios-folder-new-btn" onclick=${handleCreateFolder} title="New Folder">
+            <span class="ios-folder-new-icon">📁+</span>
+          </button>
+        </div>
       </div>
 
       ${loading ? html`<div class="ios-loading">Loading...</div>` : html`
@@ -3056,12 +3204,24 @@ function IosNotesPage() {
           <div class="ios-section-header">iCloud</div>
           <div class="ios-list-group">
             ${folders.map(f => html`
-              <div key=${f.id} class="ios-folder-row"
-                   onclick=${() => setCurrentFolder(f)}>
+              <div key=${f.id} class=${'ios-folder-row' + (editMode ? ' ios-folder-row--edit' : '')}
+                   onclick=${() => { if (!editMode) setCurrentFolder(f); }}>
+                ${editMode && !f.is_default && html`
+                  <button class="ios-folder-delete-circle" title="Delete folder"
+                          onclick=${(e) => { e.stopPropagation(); handleDeleteFolder(f); }}>
+                    <span>–</span>
+                  </button>
+                `}
+                ${editMode && f.is_default && html`
+                  <span class="ios-folder-delete-circle ios-folder-delete-circle--disabled" title="Default folder">–</span>
+                `}
                 <span class="ios-folder-icon">📁</span>
-                <span class="ios-folder-name">${f.name}</span>
+                <span class="ios-folder-name">${f.name}${f.is_default ? '' : ''}</span>
                 <span class="ios-folder-count">${f.note_count ?? ''}</span>
-                <span class="ios-folder-chevron">›</span>
+                ${editMode && !f.is_default
+                  ? html`<button class="ios-folder-rename-btn" onclick=${(e) => { e.stopPropagation(); handleRenameFolder(f); }}>Rename</button>`
+                  : html`<span class="ios-folder-chevron">${editMode ? '' : '›'}</span>`
+                }
               </div>
               <div class="ios-list-divider ios-list-divider--indent"></div>
             `)}
@@ -3069,6 +3229,13 @@ function IosNotesPage() {
               <div class="ios-empty-state">No folders found.</div>
             `}
           </div>
+
+          ${!editMode && html`
+            <div class="ios-folder-new-row" onclick=${handleCreateFolder}>
+              <span class="ios-folder-new-row-icon">📁</span>
+              <span class="ios-folder-new-row-label">New Folder</span>
+            </div>
+          `}
         </div>
       `}
     </div>

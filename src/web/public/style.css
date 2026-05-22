@@ -1919,23 +1919,8 @@ body.tg-miniapp {
   z-index: 1;
 }
 .ios-note-row:active { background: rgba(128,128,128,0.12); }
+/* N4: swipe offset updated; old .swiped kept for any residual references */
 .ios-note-row.swiped { transform: translateX(-76px); }
-
-.ios-swipe-delete-btn {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 76px;
-  background: var(--danger);
-  color: #fff;
-  border: none;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  z-index: 0;
-}
-.ios-swipe-delete-btn:hover { opacity: 0.9; }
 
 .ios-note-row-content { pointer-events: none; }
 .ios-note-row-top {
@@ -2204,3 +2189,208 @@ body.tg-miniapp {
   background: var(--surface);
   border: 1px solid var(--border);
 }
+
+/* ===== N4: Folder management + pin/move affordances ===== */
+
+/* Folders header row (title + Edit + New Folder) */
+.ios-folders-header--row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 8px 16px 4px;
+}
+.ios-folders-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 2px;
+}
+.ios-folder-edit-toggle {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+.ios-folder-new-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px 2px;
+  display: flex;
+  align-items: center;
+}
+.ios-folder-new-icon { font-size: 16px; }
+
+/* Folder row in Edit mode */
+.ios-folder-row--edit {
+  cursor: default;
+}
+.ios-folder-delete-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  font-weight: 700;
+}
+.ios-folder-delete-circle--disabled {
+  background: var(--border);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+.ios-folder-rename-btn {
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: 4px;
+}
+.ios-folder-rename-btn:hover { background: rgba(88,166,255,0.1); }
+
+/* New Folder affordance row at bottom of folders list */
+.ios-folder-new-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 500;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.ios-folder-new-row:active { opacity: 0.7; }
+.ios-folder-new-row-icon { font-size: 18px; }
+
+/* Swipe actions: 3-button bar (pin, move, delete) */
+/* Replace old single-button to multi-button */
+.ios-note-row.swiped-actions { transform: translateX(-168px); }
+.ios-swipe-actions {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  width: 168px;
+  z-index: 0;
+}
+.ios-swipe-action-btn {
+  flex: 1;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.ios-swipe-pin-btn { background: #FF9F0A; }
+.ios-swipe-move-btn { background: #636366; }
+.ios-swipe-delete-btn { background: var(--danger); }
+.ios-swipe-action-btn:hover { opacity: 0.88; }
+
+/* Pin indicator in note title */
+.ios-pin-indicator { font-size: 11px; }
+
+/* Move-to-folder bottom sheet */
+.ios-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 500;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.ios-sheet {
+  background: var(--bg);
+  border-radius: 14px 14px 0 0;
+  width: 100%;
+  max-width: 500px;
+  padding-bottom: env(safe-area-inset-bottom, 12px);
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+.ios-sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 10px auto 6px;
+  flex-shrink: 0;
+}
+.ios-sheet-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 4px 16px 10px;
+  flex-shrink: 0;
+}
+.ios-sheet-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 0 12px;
+}
+.ios-sheet-empty {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  padding: 16px;
+}
+.ios-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: var(--surface);
+  border: none;
+  border-radius: 10px;
+  padding: 13px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.ios-sheet-row:active { background: rgba(128,128,128,0.18); }
+.ios-sheet-row-name {
+  font-size: 16px;
+  color: var(--text);
+}
+.ios-sheet-cancel {
+  margin: 8px 12px 12px;
+  width: calc(100% - 24px);
+  padding: 14px;
+  background: var(--surface);
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.ios-sheet-cancel:active { opacity: 0.7; }
