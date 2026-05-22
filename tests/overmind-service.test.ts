@@ -30,7 +30,7 @@ afterEach(() => {
 describe("OvermindService", () => {
   it("creates the schema v22 tables, display name, active attribution, history, notification, elapsed, completion-check, per-session status, child roles, info-request, and monitoring-pause columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(22);
+    expect(version.version).toBe(23);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -551,7 +551,7 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(22);
+    expect(version.version).toBe(23);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("display_name");

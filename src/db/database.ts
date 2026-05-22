@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 22;
+const SCHEMA_VERSION = 23;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -79,6 +79,15 @@ CREATE TABLE IF NOT EXISTS agent_delegations (
 CREATE INDEX IF NOT EXISTS idx_delegations_agent ON agent_delegations(agent_name);
 CREATE INDEX IF NOT EXISTS idx_delegations_session ON agent_delegations(tmux_session_id);
 
+CREATE TABLE IF NOT EXISTS note_folders (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS notes (
   id INTEGER PRIMARY KEY,
   project_id INTEGER REFERENCES projects(id),
@@ -87,12 +96,17 @@ CREATE TABLE IF NOT EXISTS notes (
   status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'promoted', 'archived')),
   tags TEXT,
   created_by INTEGER NOT NULL REFERENCES users(id),
+  folder_id INTEGER REFERENCES note_folders(id),
+  pinned INTEGER NOT NULL DEFAULT 0,
+  position INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_notes_project ON notes(project_id);
 CREATE INDEX IF NOT EXISTS idx_notes_status ON notes(status);
 CREATE INDEX IF NOT EXISTS idx_notes_created_by ON notes(created_by);
+CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folder_id);
+CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned);
 
 CREATE TABLE IF NOT EXISTS plans (
   id INTEGER PRIMARY KEY,
@@ -370,6 +384,7 @@ export class DatabaseService {
       this.db.exec(SCHEMA_SQL);
       this.db.prepare("INSERT INTO schema_version (version) VALUES (?)").run(SCHEMA_VERSION);
       this.seedSafetyPatterns();
+      this.seedDefaultNotesFolder();
       return;
     }
 
@@ -657,6 +672,53 @@ export class DatabaseService {
         }
       }
 
+      // Migration: v22 → v23: iPhone Notes model — note_folders table + folder_id/pinned/position
+      // columns on notes. Data-safe: seeds default "Notes" folder (owner user) and assigns all
+      // existing notes (folder_id IS NULL) to that folder. project_id/status/tags left dormant.
+      if (current && current.version < 23) {
+        // Create note_folders table if it doesn't exist yet
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS note_folders (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
+            created_by INTEGER REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `);
+
+        // Add new columns to notes (guarded PRAGMA table_info pattern)
+        const noteCols = this.db.pragma("table_info(notes)") as { name: string }[];
+        const noteColNames = new Set(noteCols.map((c) => c.name));
+        if (!noteColNames.has("folder_id")) {
+          this.db.exec("ALTER TABLE notes ADD COLUMN folder_id INTEGER REFERENCES note_folders(id)");
+        }
+        if (!noteColNames.has("pinned")) {
+          this.db.exec("ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
+        }
+        if (!noteColNames.has("position")) {
+          this.db.exec("ALTER TABLE notes ADD COLUMN position INTEGER NOT NULL DEFAULT 0");
+        }
+
+        // Indexes
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folder_id)");
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned)");
+
+        // Seed default "Notes" folder (idempotent helper handles exists-check)
+        this.seedDefaultNotesFolder();
+
+        // Assign all existing notes with no folder to the default folder
+        const defaultFolder = this.db.prepare(
+          "SELECT id FROM note_folders WHERE name = 'Notes' LIMIT 1"
+        ).get() as { id: number } | undefined;
+        if (defaultFolder) {
+          this.db.prepare(
+            "UPDATE notes SET folder_id = ? WHERE folder_id IS NULL"
+          ).run(defaultFolder.id);
+        }
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);
@@ -673,6 +735,25 @@ export class DatabaseService {
       }
     });
     tx();
+  }
+
+  /** Seed the default "Notes" folder if it doesn't already exist.
+   *  Called for fresh DBs and idempotently after v23 migration.
+   *  created_by is set to the owner user if one exists, otherwise null. */
+  private seedDefaultNotesFolder(): void {
+    const existing = this.db
+      .prepare("SELECT id FROM note_folders WHERE name = 'Notes' LIMIT 1")
+      .get() as { id: number } | undefined;
+    if (existing) return;
+
+    const ownerUser = this.db
+      .prepare("SELECT id FROM users WHERE role = 'owner' LIMIT 1")
+      .get() as { id: number } | undefined;
+    const ownerUserId = ownerUser?.id ?? null;
+
+    this.db
+      .prepare("INSERT INTO note_folders (name, position, created_by) VALUES ('Notes', 0, ?)")
+      .run(ownerUserId);
   }
 
   ensureOwner(telegramId: number): void {

@@ -9,6 +9,18 @@ export interface Note {
   status: string;
   tags: string | null;
   created_by: number;
+  folder_id: number | null;
+  pinned: number;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NoteFolder {
+  id: number;
+  name: string;
+  position: number;
+  created_by: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -274,5 +286,155 @@ export class NoteService {
     });
 
     return { noteId: id, planId: plan.id };
+  }
+
+  // -----------------------------------------------------------------------
+  // iPhone Notes model — folders + folder-aware note operations
+  // -----------------------------------------------------------------------
+
+  /** Return the id of the default "Notes" folder (throws if not seeded). */
+  defaultFolderId(): number {
+    const row = this.db
+      .prepare("SELECT id FROM note_folders WHERE name = 'Notes' ORDER BY id ASC LIMIT 1")
+      .get() as { id: number } | undefined;
+    if (!row) throw new Error("Default 'Notes' folder not found — migration v23 may not have run");
+    return row.id;
+  }
+
+  listFolders(): NoteFolder[] {
+    return this.db
+      .prepare("SELECT * FROM note_folders ORDER BY position ASC, id ASC")
+      .all() as NoteFolder[];
+  }
+
+  createFolder(name: string, userId: number): NoteFolder {
+    const result = this.db
+      .prepare(
+        "INSERT INTO note_folders (name, created_by) VALUES (?, ?) RETURNING *"
+      )
+      .get(name, userId) as NoteFolder;
+    this.auditService.log({
+      userId,
+      actionType: "note_folder_create",
+      resourceType: "note_folder",
+      resourceId: String(result.id),
+      details: { name }
+    });
+    return result;
+  }
+
+  renameFolder(id: number, name: string): NoteFolder | null {
+    const existing = this.db
+      .prepare("SELECT * FROM note_folders WHERE id = ?")
+      .get(id) as NoteFolder | undefined;
+    if (!existing) return null;
+    this.db
+      .prepare("UPDATE note_folders SET name = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(name, id);
+    return this.db.prepare("SELECT * FROM note_folders WHERE id = ?").get(id) as NoteFolder;
+  }
+
+  /** Delete a folder. Moves all its notes to the default "Notes" folder.
+   *  Refuses to delete the default "Notes" folder. */
+  deleteFolder(id: number): { ok: boolean; reason?: string } {
+    const folder = this.db
+      .prepare("SELECT * FROM note_folders WHERE id = ?")
+      .get(id) as NoteFolder | undefined;
+    if (!folder) return { ok: false, reason: "not_found" };
+
+    const defaultId = this.defaultFolderId();
+    if (id === defaultId) return { ok: false, reason: "cannot_delete_default" };
+
+    this.db.transaction(() => {
+      this.db
+        .prepare("UPDATE notes SET folder_id = ? WHERE folder_id = ?")
+        .run(defaultId, id);
+      this.db.prepare("DELETE FROM note_folders WHERE id = ?").run(id);
+    });
+    return { ok: true };
+  }
+
+  /** List notes in a folder, optionally filtered by search, ordered pinned DESC, updated_at DESC. */
+  listByFolder(folderId: number, search?: string): Note[] {
+    if (search) {
+      const term = `%${search}%`;
+      return this.db
+        .prepare(
+          "SELECT * FROM notes WHERE folder_id = ? AND (title LIKE ? OR body LIKE ?) ORDER BY pinned DESC, updated_at DESC"
+        )
+        .all(folderId, term, term) as Note[];
+    }
+    return this.db
+      .prepare(
+        "SELECT * FROM notes WHERE folder_id = ? ORDER BY pinned DESC, updated_at DESC"
+      )
+      .all(folderId) as Note[];
+  }
+
+  createNote(folderId: number, body: string, userId: number): Note {
+    const result = this.db
+      .prepare(
+        "INSERT INTO notes (folder_id, body, created_by) VALUES (?, ?, ?) RETURNING *"
+      )
+      .get(folderId, body, userId) as Note;
+    this.auditService.log({
+      userId,
+      actionType: "note_create",
+      resourceType: "note",
+      resourceId: String(result.id),
+      details: { folder_id: folderId }
+    });
+    return result;
+  }
+
+  updateNote(
+    id: number,
+    updates: { body?: string; pinned?: number; folder_id?: number },
+    userId: number
+  ): Note | null {
+    const existing = this.getById(id);
+    if (!existing) return null;
+
+    const body = updates.body ?? existing.body;
+    const pinned = updates.pinned ?? existing.pinned;
+    const folderId = updates.folder_id ?? existing.folder_id;
+
+    this.db
+      .prepare(
+        "UPDATE notes SET body = ?, pinned = ?, folder_id = ?, updated_at = datetime('now') WHERE id = ?"
+      )
+      .run(body, pinned, folderId, id);
+
+    this.auditService.log({
+      userId,
+      actionType: "note_update",
+      resourceType: "note",
+      resourceId: String(id),
+      details: updates
+    });
+
+    return this.getById(id);
+  }
+
+  deleteNote(id: number, userId: number): boolean {
+    return this.delete(id, userId);
+  }
+
+  setPinned(id: number, pinned: number, userId: number): Note | null {
+    return this.updateNote(id, { pinned }, userId);
+  }
+
+  moveToFolder(id: number, folderId: number, userId: number): Note | null {
+    return this.updateNote(id, { folder_id: folderId }, userId);
+  }
+
+  /** Full-text search across all folders (title + body). */
+  searchAll(query: string): Note[] {
+    const term = `%${query}%`;
+    return this.db
+      .prepare(
+        "SELECT * FROM notes WHERE title LIKE ? OR body LIKE ? ORDER BY pinned DESC, updated_at DESC"
+      )
+      .all(term, term) as Note[];
   }
 }
