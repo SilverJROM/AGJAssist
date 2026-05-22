@@ -1029,14 +1029,12 @@ function OvermindWorkflows() {
                       <span class="overmind-chevron" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
                     </button>
                     ${workflow.monitoring_paused && html`<span class="badge overmind-paused-badge" title=${'Overmind checks paused' + (workflow.paused_by ? ' (' + workflow.paused_by + ')' : '') + ' — no interrupts'}>⏸ paused</span>`}
-                    ${workflow.info_request && !workflow.monitoring_paused && html`<span class="badge overmind-needs-info" title=${'Overmind requested missing data from the coordinator: ' + workflow.info_request}>⚠ needs info</span>`}
                     <span class=${'badge overmind-status-badge ' + colorClass}>${statusIcon(workflow.status)} ${workflow.status}</span>
                   </div>
                 </div>
                 <div class="overmind-substatus">
                   <div class="overmind-task-line"><span><strong>task#${currentTask.id}:</strong> ${workflow.current_task || '—'}</span><span class="overmind-task-count">${doneTasks}/${totalTasks}</span></div>
                   <div>${currentTask.description}</div>
-                  ${workflow.info_request && html`<div class="overmind-info-request">requested from coordinator: <strong>${workflow.info_request}</strong></div>`}
                 </div>
 
                 ${isExpanded && html`
@@ -1046,6 +1044,9 @@ function OvermindWorkflows() {
                         <strong>Pending decision</strong>
                         <pre>${workflow.pending_decision}</pre>
                       </div>
+                    `}
+                    ${workflow.info_request && !workflow.monitoring_paused && html`
+                      <div class="overmind-asked-parent" style="color:var(--text-secondary,#888);font-size:0.82em;margin-bottom:6px;">⟳ asked parent to update: ${workflow.info_request}</div>
                     `}
 
                     <table class="overmind-detail-table">
