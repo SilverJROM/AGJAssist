@@ -105,8 +105,9 @@ CREATE TABLE IF NOT EXISTS notes (
 CREATE INDEX IF NOT EXISTS idx_notes_project ON notes(project_id);
 CREATE INDEX IF NOT EXISTS idx_notes_status ON notes(status);
 CREATE INDEX IF NOT EXISTS idx_notes_created_by ON notes(created_by);
-CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folder_id);
-CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned);
+-- NOTE: idx_notes_folder / idx_notes_pinned are NOT created here. SCHEMA_SQL runs against
+-- existing tables before the v23 ALTER adds folder_id/pinned, so indexing them here crashes
+-- an upgrading DB. They are created in the fresh-DB path and the v22→v23 migration block instead.
 
 CREATE TABLE IF NOT EXISTS plans (
   id INTEGER PRIMARY KEY,
@@ -382,6 +383,9 @@ export class DatabaseService {
 
     if (!versionRow) {
       this.db.exec(SCHEMA_SQL);
+      // New-column indexes live outside SCHEMA_SQL (see note there); create them for fresh DBs.
+      this.db.exec("CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folder_id)");
+      this.db.exec("CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned)");
       this.db.prepare("INSERT INTO schema_version (version) VALUES (?)").run(SCHEMA_VERSION);
       this.seedSafetyPatterns();
       this.seedDefaultNotesFolder();
