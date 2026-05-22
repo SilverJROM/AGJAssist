@@ -106,11 +106,43 @@ describe("folder CRUD", () => {
     expect(all.some((f) => f.name === "Work")).toBe(true);
   });
 
+  it("listFolders marks the default folder with is_default=true and others false", () => {
+    const ownerId = (db.prepare("SELECT id FROM users WHERE role='owner'").get() as { id: number }).id;
+    svc.createFolder("Work", ownerId);
+    svc.createFolder("Personal", ownerId);
+
+    const folders = svc.listFolders();
+    const defaultFolders = folders.filter((f) => f.is_default);
+    const nonDefaultFolders = folders.filter((f) => !f.is_default);
+
+    // Exactly one default folder
+    expect(defaultFolders).toHaveLength(1);
+    expect(defaultFolders[0].name).toBe("Notes");
+
+    // All other folders have is_default=false
+    expect(nonDefaultFolders.length).toBeGreaterThanOrEqual(2);
+    expect(nonDefaultFolders.every((f) => f.is_default === false)).toBe(true);
+  });
+
   it("renameFolder changes the folder name", () => {
     const ownerId = (db.prepare("SELECT id FROM users WHERE role='owner'").get() as { id: number }).id;
     const folder = svc.createFolder("OldName", ownerId);
-    const renamed = svc.renameFolder(folder.id, "NewName");
-    expect(renamed?.name).toBe("NewName");
+    const result = svc.renameFolder(folder.id, "NewName");
+    expect(result.ok).toBe(true);
+    expect(result.folder?.name).toBe("NewName");
+  });
+
+  it("renameFolder refuses to rename the default 'Notes' folder", () => {
+    const defaultId = svc.defaultFolderId();
+    const result = svc.renameFolder(defaultId, "Renamed");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("cannot_rename_default");
+  });
+
+  it("renameFolder returns not_found for a missing folder", () => {
+    const result = svc.renameFolder(99999, "Ghost");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("not_found");
   });
 
   it("deleteFolder refuses to delete the default 'Notes' folder", () => {

@@ -23,6 +23,7 @@ export interface NoteFolder {
   created_by: number | null;
   created_at: string;
   updated_at: string;
+  is_default: boolean;
 }
 
 export class NoteService {
@@ -302,9 +303,11 @@ export class NoteService {
   }
 
   listFolders(): NoteFolder[] {
-    return this.db
+    const defaultId = this.defaultFolderId();
+    const rows = this.db
       .prepare("SELECT * FROM note_folders ORDER BY position ASC, id ASC")
-      .all() as NoteFolder[];
+      .all() as Omit<NoteFolder, "is_default">[];
+    return rows.map((row) => ({ ...row, is_default: row.id === defaultId }));
   }
 
   createFolder(name: string, userId: number): NoteFolder {
@@ -312,7 +315,7 @@ export class NoteService {
       .prepare(
         "INSERT INTO note_folders (name, created_by) VALUES (?, ?) RETURNING *"
       )
-      .get(name, userId) as NoteFolder;
+      .get(name, userId) as Omit<NoteFolder, "is_default">;
     this.auditService.log({
       userId,
       actionType: "note_folder_create",
@@ -320,18 +323,24 @@ export class NoteService {
       resourceId: String(result.id),
       details: { name }
     });
-    return result;
+    // Newly created folders are never the default (default is pre-seeded)
+    return { ...result, is_default: false };
   }
 
-  renameFolder(id: number, name: string): NoteFolder | null {
+  renameFolder(id: number, name: string): { ok: boolean; reason?: string; folder?: NoteFolder } {
     const existing = this.db
       .prepare("SELECT * FROM note_folders WHERE id = ?")
-      .get(id) as NoteFolder | undefined;
-    if (!existing) return null;
+      .get(id) as Omit<NoteFolder, "is_default"> | undefined;
+    if (!existing) return { ok: false, reason: "not_found" };
+
+    const defaultId = this.defaultFolderId();
+    if (id === defaultId) return { ok: false, reason: "cannot_rename_default" };
+
     this.db
       .prepare("UPDATE note_folders SET name = ?, updated_at = datetime('now') WHERE id = ?")
       .run(name, id);
-    return this.db.prepare("SELECT * FROM note_folders WHERE id = ?").get(id) as NoteFolder;
+    const updated = this.db.prepare("SELECT * FROM note_folders WHERE id = ?").get(id) as Omit<NoteFolder, "is_default">;
+    return { ok: true, folder: { ...updated, is_default: false } };
   }
 
   /** Delete a folder. Moves all its notes to the default "Notes" folder.

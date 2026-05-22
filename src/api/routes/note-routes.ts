@@ -43,9 +43,13 @@ export function registerNoteRoutes(
       }
       const { name } = request.body || {};
       if (!name) return reply.code(400).send({ error: "name is required" });
-      const folder = noteService.renameFolder(Number(request.params.id), name);
-      if (!folder) return reply.code(404).send({ error: "Folder not found" });
-      return { folder };
+      const result = noteService.renameFolder(Number(request.params.id), name);
+      if (!result.ok) {
+        if (result.reason === "not_found") return reply.code(404).send({ error: "Folder not found" });
+        if (result.reason === "cannot_rename_default") return reply.code(400).send({ error: "Cannot rename the default Notes folder" });
+        return reply.code(400).send({ error: result.reason });
+      }
+      return { folder: result.folder };
     }
   );
 
