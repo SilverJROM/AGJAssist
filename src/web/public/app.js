@@ -2787,38 +2787,69 @@ function IosNotesList({ folder, onBack, onOpenNote, onNewNote }) {
   `;
 }
 
-// --- Note editor stub (minimal; N3 replaces with rich editor) ---
-function IosNoteEditor({ note, folder, onBack, onReload }) {
-  const [body, setBody] = useState(note.body || '');
-  const [pinned, setPinned] = useState(!!note.pinned);
-  const saveTimer = useRef(null);
-  const textareaRef = useRef(null);
+// --- Rich Note Editor (N3: iPhone Notes-style) ---
 
-  // Focus textarea on mount
+// Normalize empty contenteditable to empty string for comparison
+function getEditorHtml(el) {
+  if (!el) return '';
+  const html = el.innerHTML;
+  // contenteditable reports '<br>' for empty state in some browsers
+  if (html === '<br>' || html === '' ) return '';
+  return html;
+}
+
+// Build initial HTML for contenteditable from stored body.
+// If the stored body is plain text (no tags), wrap in a <p> so the first line
+// becomes a proper block for title styling.
+function prepareInitialHtml(body) {
+  if (!body) return '';
+  // Already contains HTML tags — use as-is
+  if (/<[a-zA-Z]/.test(body)) return body;
+  // Plain text: wrap each newline-separated line in <p>
+  return body.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
+}
+
+function IosNoteEditor({ note, folder, onBack, onReload }) {
+  const [pinned, setPinned] = useState(!!note.pinned);
+  // Track whether this is a brand-new empty note (for discard-on-back logic)
+  const isNewEmpty = useRef(!note.body || note.body.trim() === '');
+  const saveTimer = useRef(null);
+  const editorRef = useRef(null);
+  // Keep a live ref to current HTML so handleBack always sees latest value
+  const currentHtmlRef = useRef(note.body || '');
+
+  // Set initial content on mount (once; bypass Preact diffing)
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-      // Move cursor to end
-      const len = textareaRef.current.value.length;
-      textareaRef.current.setSelectionRange(len, len);
-    }
+    if (!editorRef.current) return;
+    const initial = prepareInitialHtml(note.body || '');
+    editorRef.current.innerHTML = initial;
+    currentHtmlRef.current = initial;
+    // Place cursor at end
+    const range = document.createRange();
+    const sel = window.getSelection();
+    range.selectNodeContents(editorRef.current);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    editorRef.current.focus();
   }, []);
 
   // Debounced auto-save
-  function scheduleAutoSave(newBody) {
+  function scheduleAutoSave(html) {
+    currentHtmlRef.current = html;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
-        await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ body: newBody }) });
+        await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ body: html }) });
         if (onReload) onReload();
       } catch {}
     }, 800);
   }
 
-  function handleInput(e) {
-    const val = e.target.value;
-    setBody(val);
-    scheduleAutoSave(val);
+  function handleEditorInput() {
+    if (!editorRef.current) return;
+    const html = getEditorHtml(editorRef.current);
+    scheduleAutoSave(html);
   }
 
   async function handlePinToggle() {
@@ -2839,19 +2870,96 @@ function IosNoteEditor({ note, folder, onBack, onReload }) {
     } catch (e) { alert(e.message); }
   }
 
-  // Flush pending save on back
+  // Flush pending save on back; discard brand-new empty note (iPhone behavior)
   async function handleBack() {
     clearTimeout(saveTimer.current);
-    if (body !== note.body) {
+    const html = editorRef.current ? getEditorHtml(editorRef.current) : currentHtmlRef.current;
+    const isEmpty = !html || html.replace(/<[^>]*>/g, '').replace(/\s/g, '') === '';
+    if (isNewEmpty.current && isEmpty) {
+      // Discard: delete the empty new note silently
+      try { await api(`/api/notes/${note.id}`, { method: 'DELETE' }); } catch {}
+      if (onReload) onReload();
+      onBack();
+      return;
+    }
+    // Flush unsaved changes
+    if (html !== (note.body || '')) {
       try {
-        await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
+        await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ body: html }) });
         if (onReload) onReload();
       } catch {}
     }
     onBack();
   }
 
-  const title = noteTitle(body);
+  // ---- Formatting toolbar commands ----
+
+  function cmdExec(cmd, value) {
+    editorRef.current && editorRef.current.focus();
+    document.execCommand(cmd, false, value || null);
+    handleEditorInput();
+  }
+
+  function fmtBold() { cmdExec('bold'); }
+  function fmtItalic() { cmdExec('italic'); }
+  function fmtUnderline() { cmdExec('underline'); }
+
+  // Heading: wrap the current block in <h1> if not already; else convert back to <p>
+  function fmtHeading() {
+    editorRef.current && editorRef.current.focus();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    // Walk up from anchor to find block-level container inside editor
+    let node = sel.anchorNode;
+    while (node && node !== editorRef.current) {
+      if (node.nodeType === 1 && /^(P|DIV|H[1-6]|LI)$/.test(node.tagName)) break;
+      node = node.parentNode;
+    }
+    if (!node || node === editorRef.current) {
+      // Fallback: formatBlock
+      document.execCommand('formatBlock', false, 'h1');
+    } else if (/^H[1-6]$/.test(node.tagName)) {
+      document.execCommand('formatBlock', false, 'p');
+    } else {
+      document.execCommand('formatBlock', false, 'h1');
+    }
+    handleEditorInput();
+  }
+
+  function fmtBullet() {
+    editorRef.current && editorRef.current.focus();
+    document.execCommand('insertUnorderedList', false, null);
+    handleEditorInput();
+  }
+
+  // Insert a checklist item at current cursor position
+  function fmtChecklist() {
+    editorRef.current && editorRef.current.focus();
+    // Insert a checklist row as HTML
+    const clHtml = '<div class="cl-item" data-checked="false"><button class="cl-btn" tabindex="-1" type="button">◯</button><span class="cl-text"> </span></div>';
+    document.execCommand('insertHTML', false, clHtml);
+    handleEditorInput();
+  }
+
+  // Checklist toggle — event delegation on editor div
+  function handleEditorClick(e) {
+    const btn = e.target.closest('.cl-btn');
+    if (!btn) return;
+    const item = btn.closest('.cl-item');
+    if (!item) return;
+    const checked = item.getAttribute('data-checked') === 'true';
+    item.setAttribute('data-checked', (!checked).toString());
+    btn.textContent = checked ? '◯' : '◉';
+    handleEditorInput();
+  }
+
+  // Same handler for touch (prevent double-fire)
+  function handleEditorTouchEnd(e) {
+    const btn = e.target.closest('.cl-btn');
+    if (!btn) return;
+    e.preventDefault();
+    handleEditorClick(e);
+  }
 
   return html`
     <div class="ios-editor-screen">
@@ -2869,13 +2977,27 @@ function IosNoteEditor({ note, folder, onBack, onReload }) {
                   title="Delete">🗑</button>
         </div>
       </div>
+
+      <div class="ios-format-toolbar">
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtBold(); }} title="Bold"><b>B</b></button>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtItalic(); }} title="Italic"><i>I</i></button>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtUnderline(); }} title="Underline"><u>U</u></button>
+        <div class="ios-fmt-divider"></div>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtHeading(); }} title="Heading">H</button>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtBullet(); }} title="Bullet list">• ≡</button>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtChecklist(); }} title="Checklist">◯✓</button>
+      </div>
+
       <div class="ios-editor-body">
-        <textarea ref=${textareaRef}
-                  class="ios-editor-textarea"
-                  value=${body}
-                  onInput=${handleInput}
-                  placeholder="Start typing…"
-                  spellcheck="true"></textarea>
+        <div ref=${editorRef}
+             class="ios-editor-rich"
+             contenteditable="true"
+             spellcheck="true"
+             data-placeholder="Start typing…"
+             onInput=${handleEditorInput}
+             onclick=${handleEditorClick}
+             ontouchend=${handleEditorTouchEnd}
+        ></div>
       </div>
     </div>
   `;

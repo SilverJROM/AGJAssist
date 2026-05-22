@@ -2040,21 +2040,139 @@ body.tg-miniapp {
   flex: 1;
   display: flex;
   min-height: 0;
+  overflow: hidden;
 }
-.ios-editor-textarea {
+
+/* Formatting toolbar */
+.ios-format-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+.ios-fmt-btn {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 6px;
+  min-width: 36px;
+  text-align: center;
+  transition: background 0.12s;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.ios-fmt-btn:hover,
+.ios-fmt-btn:active { background: rgba(88,166,255,0.15); color: var(--accent); }
+.ios-fmt-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Rich contenteditable editor */
+.ios-editor-rich {
   flex: 1;
   width: 100%;
-  padding: 14px 16px;
+  padding: 14px 16px 60px;
   font-size: 15px;
-  line-height: 1.65;
-  background: var(--bg) !important;
+  line-height: 1.7;
+  background: var(--bg);
   color: var(--text);
-  border: none !important;
+  border: none;
   outline: none;
-  resize: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   font-family: inherit;
+  word-break: break-word;
 }
-.ios-editor-textarea::placeholder { color: var(--text-secondary); }
+/* Placeholder via data attribute */
+.ios-editor-rich:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+/* First block = title styling (large/bold like iPhone Notes) */
+.ios-editor-rich > h1:first-child,
+.ios-editor-rich > p:first-child,
+.ios-editor-rich > div:first-child:not(.cl-item) {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0 0 10px 0;
+  color: var(--text);
+}
+/* Heading blocks (non-first) */
+.ios-editor-rich h1 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 12px 0 4px;
+  color: var(--text);
+}
+/* Body paragraphs */
+.ios-editor-rich p {
+  margin: 0 0 4px 0;
+  min-height: 1.4em;
+}
+.ios-editor-rich div {
+  min-height: 1.4em;
+}
+/* Unordered list */
+.ios-editor-rich ul {
+  padding-left: 22px;
+  margin: 4px 0;
+}
+.ios-editor-rich ul li {
+  line-height: 1.7;
+  margin-bottom: 2px;
+}
+/* Checklist item */
+.cl-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px 0;
+  min-height: 1.7em;
+}
+.cl-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 0 0;
+  cursor: pointer;
+  color: var(--accent);
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cl-btn:active { opacity: 0.6; }
+.cl-text {
+  flex: 1;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.7;
+}
+/* Done state */
+.cl-item[data-checked="true"] .cl-text {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+.cl-item[data-checked="true"] .cl-btn {
+  color: #30d158; /* iOS green check */
+}
 
 /* List body spacing */
 .ios-list-body { padding-bottom: 60px; }
