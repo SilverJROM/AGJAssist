@@ -16,6 +16,10 @@ interface TokenBody {
   token?: string;
 }
 
+interface SendBody {
+  message?: string;
+}
+
 interface RegisterBody extends TokenBody {
   label?: string;
   session?: string;
@@ -348,6 +352,40 @@ export function registerOvermindRoutes(
       }
 
       return ovmSession.status();
+    }
+  );
+
+  app.post<{ Body: SendBody }>(
+    "/api/overmind/ovm/send",
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      if (!ovmSession) {
+        return reply.code(503).send({ error: "OVM session manager is not configured" });
+      }
+
+      const { message } = request.body || {};
+      if (!message || typeof message !== "string" || !message.trim()) {
+        return reply.code(400).send({ error: "message is required" });
+      }
+
+      return ovmSession.sendAndAwaitReply(message.trim());
+    }
+  );
+
+  app.get(
+    "/api/overmind/ovm/reply",
+    { preHandler: authMiddleware },
+    async (_request, reply) => {
+      if (!ovmSession) {
+        return reply.code(503).send({ error: "OVM session manager is not configured" });
+      }
+
+      const result = await ovmSession.getReply();
+      if (result === null) {
+        return reply.code(404).send({ error: "No in-flight OVM send" });
+      }
+
+      return result;
     }
   );
 

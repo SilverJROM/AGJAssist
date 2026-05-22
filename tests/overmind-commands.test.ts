@@ -198,7 +198,9 @@ describe("Overmind Telegram commands", () => {
       status: vi.fn(async () => ({ open: true as const, status: "open" as const })),
       open: vi.fn(async () => ({ open: true as const, status: "open" as const, reused: true })),
       restart: vi.fn(async () => ({ open: true as const, status: "open" as const, restarted: true })),
-      close: vi.fn(async () => ({ open: false as const, status: "closed" as const, closed: true }))
+      close: vi.fn(async () => ({ open: false as const, status: "closed" as const, closed: true })),
+      sendAndAwaitReply: vi.fn(async () => ({ pending: false as const, reply: "" })),
+      getReply: vi.fn(async () => null)
     } satisfies OvmSessionManager;
     core = createCoreWithOvm(service, tmux, ovm);
 
@@ -209,52 +211,50 @@ describe("Overmind Telegram commands", () => {
   });
 
   it("routes plain messages to OVM while mode is active and relays cleaned pane output", async () => {
-    vi.useFakeTimers();
-    const tmux = {
-      sendCommand: vi.fn(async () => ({ blocked: false, message: "sent" })),
-      capturePane: vi
-        .fn()
-        .mockResolvedValueOnce("ready")
-        .mockResolvedValue("ready\r\nhello OVM\r\nHere is the OVM reply.")
-    };
     const ovm = {
       status: vi.fn(async () => ({ open: true as const, status: "open" as const })),
       open: vi.fn(async () => ({ open: true as const, status: "open" as const, reused: true })),
       restart: vi.fn(async () => ({ open: true as const, status: "open" as const, restarted: true })),
-      close: vi.fn(async () => ({ open: false as const, status: "closed" as const, closed: true }))
+      close: vi.fn(async () => ({ open: false as const, status: "closed" as const, closed: true })),
+      sendAndAwaitReply: vi.fn(async (_msg: string) => ({
+        pending: false as const,
+        reply: "Here is the OVM reply."
+      })),
+      getReply: vi.fn(async () => null)
     } satisfies OvmSessionManager;
+    const tmux = {
+      sendCommand: vi.fn(async () => ({ blocked: false, message: "sent" })),
+      capturePane: vi.fn(async () => "")
+    };
     core = createCoreWithOvm(service, tmux, ovm);
     await core.handleCommand("/ovm_start", 111222);
 
-    const replyPromise = core.handleText("hello OVM", 111222);
-    await vi.advanceTimersByTimeAsync(3_000);
-    const reply = await replyPromise;
+    const reply = await core.handleText("hello OVM", 111222);
 
-    expect(tmux.sendCommand).toHaveBeenCalledWith("OVM", "hello OVM", true, true);
+    expect(ovm.sendAndAwaitReply).toHaveBeenCalledWith("hello OVM");
     expect(reply).toBe("Here is the OVM reply.");
   });
 
   it("returns a bounded fallback when OVM does not produce a reply", async () => {
-    vi.useFakeTimers();
-    const tmux = {
-      sendCommand: vi.fn(async () => ({ blocked: false, message: "sent" })),
-      capturePane: vi.fn(async () => "ready")
-    };
     const ovm = {
       status: vi.fn(async () => ({ open: true as const, status: "open" as const })),
       open: vi.fn(async () => ({ open: true as const, status: "open" as const, reused: true })),
       restart: vi.fn(async () => ({ open: true as const, status: "open" as const, restarted: true })),
-      close: vi.fn(async () => ({ open: false as const, status: "closed" as const, closed: true }))
+      close: vi.fn(async () => ({ open: false as const, status: "closed" as const, closed: true })),
+      sendAndAwaitReply: vi.fn(async (_msg: string) => ({ pending: true as const })),
+      getReply: vi.fn(async () => null)
     } satisfies OvmSessionManager;
+    const tmux = {
+      sendCommand: vi.fn(async () => ({ blocked: false, message: "sent" })),
+      capturePane: vi.fn(async () => "")
+    };
     core = createCoreWithOvm(service, tmux, ovm);
     await core.handleCommand("/ovm_start", 111222);
 
-    const replyPromise = core.handleText("long task", 111222);
-    await vi.advanceTimersByTimeAsync(13_000);
-    const reply = await replyPromise;
+    const reply = await core.handleText("long task", 111222);
 
     expect(reply).toBe("OVM is taking a while / still working.");
-    expect(tmux.sendCommand).toHaveBeenCalledWith("OVM", "long task", true, true);
+    expect(ovm.sendAndAwaitReply).toHaveBeenCalledWith("long task");
   });
 
   it("ends OVM chat mode without closing the OVM session", async () => {
@@ -266,7 +266,9 @@ describe("Overmind Telegram commands", () => {
       status: vi.fn(async () => ({ open: true as const, status: "open" as const })),
       open: vi.fn(async () => ({ open: true as const, status: "open" as const, reused: true })),
       restart: vi.fn(async () => ({ open: true as const, status: "open" as const, restarted: true })),
-      close: vi.fn(async () => ({ open: false as const, status: "closed" as const, closed: true }))
+      close: vi.fn(async () => ({ open: false as const, status: "closed" as const, closed: true })),
+      sendAndAwaitReply: vi.fn(async () => ({ pending: false as const, reply: "" })),
+      getReply: vi.fn(async () => null)
     } satisfies OvmSessionManager;
     core = createCoreWithOvm(service, tmux, ovm);
     await core.handleCommand("/ovm_start", 111222);

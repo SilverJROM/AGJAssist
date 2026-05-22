@@ -513,21 +513,10 @@ function OvmConsole() {
   const [statusLoading, setStatusLoading] = useState(true);
   const [action, setAction] = useState('');
   const [error, setError] = useState('');
-  const [streamStatus, setStreamStatus] = useState('idle');
-  const [snapshot, setSnapshot] = useState('');
-  const [entries, setEntries] = useState([]);
+  const [messages, setMessages] = useState([]);  // { id, role: 'user'|'ovm'|'system', text, ts }
+  const [thinking, setThinking] = useState(false);
   const [input, setInput] = useState('');
-  const [streamKey, setStreamKey] = useState(0);
-  const [lineLimit, setLineLimit] = useState(() => {
-    try {
-      const saved = Number(sessionStorage.getItem('agj_ovm_line_limit') || '25');
-      return [25, 50, 100, 150, 200].includes(saved) ? saved : 25;
-    } catch { return 25; }
-  });
-  const [snapshotUpdatedAt, setSnapshotUpdatedAt] = useState(0);
   const transcriptRef = useRef(null);
-  const wsRef = useRef(null);
-  const snapshotRef = useRef('');
   const open = !!ovmStatus?.open;
 
   const loadStatus = useCallback(async () => {
@@ -544,15 +533,14 @@ function OvmConsole() {
     }
   }, []);
 
-  function appendEntry(role, label, content) {
-    const trimmed = normalizeTerminalOutput(content);
+  function addMsg(role, text) {
+    const trimmed = (text || '').trim();
     if (!trimmed) return;
-    setEntries(prev => [...prev.slice(-40), {
-      id: `${role}-${Date.now()}-${prev.length}`,
+    setMessages(prev => [...prev, {
+      id: role + '-' + Date.now() + '-' + prev.length,
       role,
-      label,
-      content: trimmed,
-      timestamp: new Date().toLocaleTimeString()
+      text: trimmed,
+      ts: new Date().toLocaleTimeString()
     }]);
   }
 
@@ -563,14 +551,9 @@ function OvmConsole() {
     try {
       const data = await api(`/api/overmind/ovm/${nextAction}`, { method: 'POST' });
       setOvmStatus(data);
-      setStreamKey(key => key + 1);
       if (nextAction === 'close') {
-        wsRef.current?.close();
-        wsRef.current = null;
-        snapshotRef.current = '';
-        setSnapshot('');
-        setEntries([]);
-        setStreamStatus('idle');
+        setMessages([]);
+        setThinking(false);
       }
     } catch (e) {
       setError(e.message || `Failed to ${nextAction} OVM.`);
@@ -580,19 +563,48 @@ function OvmConsole() {
     }
   }
 
-  function sendMessage() {
-    const message = input.trim();
-    const ws = wsRef.current;
-    if (!message || !ws || ws.readyState !== WebSocket.OPEN) return;
-
-    ws.send(JSON.stringify({ type: 'input', data: `${message}\r` }));
-    appendEntry('user', 'You', message);
-    setInput('');
+  async function pollForReply() {
+    for (;;) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const data = await api('/api/overmind/ovm/reply');
+        if (!data.pending) {
+          setThinking(false);
+          addMsg('ovm', data.reply);
+          return;
+        }
+      } catch (e) {
+        setThinking(false);
+        addMsg('system', 'Error polling for reply: ' + (e.message || 'unknown'));
+        return;
+      }
+    }
   }
 
-  useEffect(() => {
-    try { sessionStorage.setItem('agj_ovm_line_limit', String(lineLimit)); } catch {}
-  }, [lineLimit]);
+  async function sendMessage() {
+    const message = input.trim();
+    if (!message || !open || thinking) return;
+    setInput('');
+    addMsg('user', message);
+    setThinking(true);
+    try {
+      const data = await api('/api/overmind/ovm/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+      if (data.pending) {
+        // OVM is still working past the sync window — poll for reply
+        pollForReply();
+      } else {
+        setThinking(false);
+        addMsg('ovm', data.reply);
+      }
+    } catch (e) {
+      setThinking(false);
+      addMsg('system', 'Send error: ' + (e.message || 'unknown'));
+    }
+  }
 
   useEffect(() => {
     loadStatus();
@@ -604,68 +616,13 @@ function OvmConsole() {
   }, [loadStatus]);
 
   useEffect(() => {
-    snapshotRef.current = snapshot;
-  }, [snapshot]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const wsUrl = buildTmuxWsUrl(OVM_TMUX_TARGET, authToken);
-    if (!wsUrl) {
-      setStreamStatus('error');
-      setError('Missing authentication token for OVM stream.');
-      return;
-    }
-
-    const ws = new WebSocket(wsUrl);
-    let closed = false;
-    wsRef.current = ws;
-    setStreamStatus('connecting');
-
-    ws.onopen = () => {
-      setStreamStatus('connected');
-      setError('');
-    };
-    ws.onerror = () => setStreamStatus('error');
-    ws.onclose = () => {
-      if (!closed) setStreamStatus('disconnected');
-    };
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'snapshot' || msg.type === 'output') {
-          const latest = capTerminalOutput(normalizeTerminalOutput(msg.data), 200);
-          snapshotRef.current = latest;
-          setSnapshot(latest);
-          setSnapshotUpdatedAt(Date.now());
-        } else if (msg.type === 'safety_block') {
-          appendEntry('error', 'Safety', `Command blocked: ${msg.pattern || msg.command || 'safety rule'}`);
-        } else if (msg.type === 'closed') {
-          setStreamStatus('disconnected');
-          appendEntry('system', 'Session', msg.reason || 'OVM pane closed.');
-          loadStatus();
-        } else if (msg.type === 'error') {
-          setStreamStatus('error');
-          appendEntry('error', 'Stream error', msg.message || 'OVM stream error.');
-        }
-      } catch {}
-    };
-
-    return () => {
-      closed = true;
-      ws.close();
-      if (wsRef.current === ws) wsRef.current = null;
-    };
-  }, [open, streamKey, loadStatus]);
-
-  useEffect(() => {
     const node = transcriptRef.current;
     if (node) node.scrollTop = node.scrollHeight;
-  }, [entries, snapshotUpdatedAt]);
+  }, [messages, thinking]);
 
   const statusText = statusLoading ? 'checking' : (ovmStatus?.status || (open ? 'open' : 'closed'));
   const busy = !!action;
-  const canSend = open && streamStatus === 'connected' && input.trim();
+  const canSend = open && !thinking && input.trim();
 
   return html`
     <section class="ovm-console">
@@ -695,58 +652,39 @@ function OvmConsole() {
       ${!open ? html`
         <div class="ovm-open-prompt">
           <h3>OVM is closed</h3>
-          <p>Open the OVM session to start the live operator console.</p>
+          <p>Open the OVM session to start chatting.</p>
           <button class="btn btn-primary" onclick=${() => runAction('open')} disabled=${busy}>
             ${action === 'open' ? 'Opening OVM...' : 'Open OVM'}
           </button>
         </div>
       ` : html`
         <div class="ovm-live-shell">
-          <div class="ovm-transcript" ref=${transcriptRef}>
-            <div class="terminal-chat-controls">
-              <label class="terminal-chat-line-picker">
-                <span>Lines</span>
-                <select value=${String(lineLimit)} onChange=${e => setLineLimit(Number(e.target.value))}>
-                  <option value="25">25</option>
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                  <option value="150">150</option>
-                  <option value="200">200</option>
-                </select>
-              </label>
-            </div>
-            <div class="terminal-chat-details">
-              <span class=${'badge badge-' + (streamStatus === 'connected' ? 'active' : streamStatus === 'connecting' ? 'pending' : 'failed')}>${streamStatus}</span>
-              <span class="terminal-chat-detail-pill">${OVM_TMUX_TARGET}</span>
-              <span class="terminal-chat-detail-pill">Showing ${lineLimit} lines</span>
-              ${snapshotUpdatedAt ? html`<span class="terminal-chat-detail-pill">Updated ${new Date(snapshotUpdatedAt).toLocaleTimeString()}</span>` : ''}
-            </div>
-            <div class="terminal-chat-card terminal-chat-single-output ovm-output-card">
-              <div class="terminal-chat-meta">
-                <span>Current output · OVM</span>
-                <span>${snapshotUpdatedAt ? new Date(snapshotUpdatedAt).toLocaleTimeString() : streamStatus}</span>
-              </div>
-              <div class="terminal-chat-content">
-                ${formatFriendlyTerminalOutput(cleanTerminalOutput(snapshot), lineLimit) || (streamStatus === 'connecting' ? 'Connecting to OVM...' : 'Waiting for OVM output...')}
-              </div>
-            </div>
-            ${entries.map(entry => html`
-              <div class=${'terminal-chat-entry terminal-chat-entry-' + entry.role} key=${entry.id}>
-                <div class="terminal-chat-card">
-                  <div class="terminal-chat-meta">
-                    <span>${entry.label}</span>
-                    <span>${entry.timestamp}</span>
-                  </div>
-                  <div class="terminal-chat-content">${entry.role === 'user' ? entry.content : formatFriendlyTerminalOutput(cleanTerminalOutput(entry.content), lineLimit)}</div>
+          <div class="ovm-chat-messages" ref=${transcriptRef}>
+            ${messages.length === 0 && !thinking ? html`
+              <div class="ovm-chat-empty">Send a message to start chatting with OVM.</div>
+            ` : null}
+            ${messages.map(m => html`
+              <div key=${m.id} class=${'ovm-chat-row ovm-chat-row-' + m.role}>
+                <div class=${'ovm-chat-bubble ovm-chat-bubble-' + m.role}>
+                  <div class="ovm-chat-text">${m.text}</div>
+                  <div class="ovm-chat-ts">${m.ts}</div>
                 </div>
               </div>
             `)}
+            ${thinking ? html`
+              <div class="ovm-chat-row ovm-chat-row-ovm">
+                <div class="ovm-chat-bubble ovm-chat-bubble-ovm ovm-chat-thinking">
+                  <div class="ovm-chat-text">OVM is thinking…</div>
+                </div>
+              </div>
+            ` : null}
           </div>
           <div class="terminal-chat-composer ovm-composer">
             <textarea
               value=${input}
               rows="2"
               placeholder="Message OVM..."
+              disabled=${!open || thinking}
               onInput=${e => setInput(e.target.value)}
               onKeyDown=${e => {
                 if (e.key === 'Enter' && !e.shiftKey) {

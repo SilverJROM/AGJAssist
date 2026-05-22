@@ -117,7 +117,9 @@ beforeEach(async () => {
     status: vi.fn(async () => ({ open: true, status: "open", since: "2026-05-21T00:00:00.000Z" })),
     open: vi.fn(async () => ({ open: true, status: "open", opened: true, since: "2026-05-21T00:00:00.000Z" })),
     restart: vi.fn(async () => ({ open: true, status: "open", opened: true, restarted: true, since: "2026-05-21T00:00:01.000Z" })),
-    close: vi.fn(async () => ({ open: false, status: "closed", closed: true }))
+    close: vi.fn(async () => ({ open: false, status: "closed", closed: true })),
+    sendAndAwaitReply: vi.fn(async () => ({ pending: false as const, reply: "mock reply" })),
+    getReply: vi.fn(async () => null)
   };
   app = Fastify({ logger: false });
   registerOvermindRoutes(app, testConfig(), authService, overmindService, undefined, undefined, ovmSession);

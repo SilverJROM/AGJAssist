@@ -540,6 +540,75 @@ body {
 .ovm-output-card {
   max-width: 100%;
 }
+.ovm-chat-messages {
+  flex: 1;
+  min-height: 360px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: linear-gradient(180deg, rgba(10,14,20,0.98), rgba(13,17,23,0.99));
+}
+.ovm-chat-empty {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin: auto;
+  padding: 24px;
+}
+.ovm-chat-row {
+  display: flex;
+}
+.ovm-chat-row-user {
+  justify-content: flex-end;
+}
+.ovm-chat-row-ovm,
+.ovm-chat-row-system {
+  justify-content: flex-start;
+}
+.ovm-chat-bubble {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.ovm-chat-bubble-user {
+  background: var(--accent, #58a6ff);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.ovm-chat-bubble-ovm {
+  background: var(--surface, #1a1f2c);
+  border: 1px solid var(--border, #30363d);
+  color: #e6edf3;
+  border-bottom-left-radius: 4px;
+}
+.ovm-chat-bubble-system {
+  background: rgba(248,81,73,0.12);
+  border: 1px solid rgba(248,81,73,0.3);
+  color: #f85149;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.ovm-chat-thinking {
+  opacity: 0.7;
+  font-style: italic;
+}
+.ovm-chat-text {
+  margin: 0 0 4px;
+}
+.ovm-chat-ts {
+  font-size: 10px;
+  opacity: 0.55;
+  text-align: right;
+}
+.ovm-chat-bubble-user .ovm-chat-ts {
+  color: rgba(255,255,255,0.75);
+}
 .ovm-composer {
   flex: 0 0 auto;
 }

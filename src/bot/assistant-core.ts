@@ -36,10 +36,6 @@ const OVERMIND_TASK_GLYPHS = {
   processing: "[~]",
   pending: "[ ]"
 } as const;
-const OVM_SESSION_TARGET = "OVM";
-const OVM_RELAY_TIMEOUT_MS = 12_000;
-const OVM_RELAY_POLL_MS = 700;
-const OVM_RELAY_STABLE_READS = 2;
 const OVM_RELAY_FALLBACK = "OVM is taking a while / still working.";
 
 interface UserState {
@@ -404,97 +400,16 @@ export class AssistantCore {
     if (!this.ovmSessionService) return "OVM session service not available.";
 
     try {
-      await this.ovmSessionService.open();
-      const before = await this.tmuxService.capturePane(OVM_SESSION_TARGET, 500);
-      await this.tmuxService.sendCommand(OVM_SESSION_TARGET, input, true, true);
-      const reply = await this.captureOvmReply(before, input);
-      return reply || OVM_RELAY_FALLBACK;
+      const result = await this.ovmSessionService.sendAndAwaitReply(input);
+      if (result.pending) return OVM_RELAY_FALLBACK;
+      return result.reply || OVM_RELAY_FALLBACK;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return `OVM relay error: ${message}`;
     }
   }
 
-  private async captureOvmReply(before: string, input: string): Promise<string> {
-    const deadline = Date.now() + OVM_RELAY_TIMEOUT_MS;
-    let latest = before;
-    let changed = false;
-    let stableReads = 0;
-    let bestReply = "";
-
-    while (Date.now() < deadline) {
-      await this.sleep(OVM_RELAY_POLL_MS);
-      const current = await this.tmuxService.capturePane(OVM_SESSION_TARGET, 500);
-      if (current !== latest) {
-        latest = current;
-        changed = true;
-        stableReads = 0;
-        bestReply = this.extractOvmReply(this.diffTerminalOutput(before, latest), input) || bestReply;
-        continue;
-      }
-
-      if (changed) {
-        stableReads += 1;
-        bestReply = this.extractOvmReply(this.diffTerminalOutput(before, latest), input) || bestReply;
-        if (stableReads >= OVM_RELAY_STABLE_READS) break;
-      }
-    }
-
-    return bestReply;
-  }
-
-  private extractOvmReply(diff: string, input: string): string {
-    const cleanInput = input.trim();
-    const lines = this.stripAnsi(diff)
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line && line !== cleanInput)
-      .filter((line) => !this.isOvmChromeLine(line));
-
-    return lines.join("\n").trim();
-  }
-
-  private isOvmChromeLine(line: string): boolean {
-    return (
-      /^[╭╰│]/.test(line) ||
-      /^>\s*$/.test(line) ||
-      /^esc to interrupt/i.test(line) ||
-      /^\? for shortcuts/i.test(line) ||
-      /^cwd:/i.test(line) ||
-      /^claude\b/i.test(line)
-    );
-  }
-
-  private diffTerminalOutput(beforeText: string, afterText: string): string {
-    const before = this.normalizeTerminalOutput(this.stripAnsi(beforeText));
-    const after = this.normalizeTerminalOutput(this.stripAnsi(afterText));
-    if (!after) return "";
-    if (!before) return after;
-    if (after === before) return "";
-    if (after.startsWith(before)) return after.slice(before.length).trim();
-
-    const beforeLines = before.split("\n");
-    const afterLines = after.split("\n");
-    let idx = 0;
-    while (idx < beforeLines.length && idx < afterLines.length && beforeLines[idx] === afterLines[idx]) {
-      idx += 1;
-    }
-    return afterLines.slice(idx).join("\n").trim();
-  }
-
-  private normalizeTerminalOutput(text: string): string {
-    return (text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-  }
-
-  private stripAnsi(text: string): string {
-    return (text || "")
-      .replace(/\u001B\][^\u0007]*(?:\u0007|\u001B\\)/g, "")
-      .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, "");
-  }
-
-  private async sleep(ms: number): Promise<void> {
+    private async sleep(ms: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
