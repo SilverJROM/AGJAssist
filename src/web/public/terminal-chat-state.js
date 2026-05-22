@@ -2,6 +2,49 @@ export function normalizeTerminalOutput(text) {
   return (text || "").replace(/\r\n/g, "\n").trim();
 }
 
+const _spinnerGlyphs = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷";
+const _leadingSpinnerRe = new RegExp(`^\\s*[${_spinnerGlyphs}]`, "u");
+const _statusChromeRe = /bypass permissions|ctrl\+t|to manage|for agents|\/ps to view|\/stop|\bshells?\b|\bmonitors?\b|\/model|shift\+tab|to cycle|focus-events|\/effort/i;
+const _modelFooterRe = /^\s*(gpt-5|sonnet|opus|haiku)\b/i;
+const _cwdFooterRe = /[·•]\s*~\/\S*\s*$/;
+const _turnChromeRe = /esc to interrupt|Working \(|Waiting for|Compacting|Thinking/i;
+const _tmuxConfRe = /~\/\.tmux\.conf/;
+
+function _isChromeLine(line) {
+  const trimmed = line.trim();
+  if (trimmed === "") return false;
+  return /^[❯›]/u.test(trimmed)
+    || /^[─=]{3,}$/.test(trimmed)
+    || _leadingSpinnerRe.test(line)
+    || _statusChromeRe.test(line)
+    || _modelFooterRe.test(trimmed)
+    || _cwdFooterRe.test(line)
+    || _turnChromeRe.test(line)
+    || _tmuxConfRe.test(line);
+}
+
+/**
+ * Strip ANSI escape sequences and filter Claude-Code TUI chrome lines.
+ * Returns the cleaned text with blank lines collapsed.
+ */
+export function cleanTerminalOutput(text) {
+  if (!text) return "";
+  return text
+    .replace(/\r\n/g, "\n")
+    // Strip CSI sequences (ESC [ ... final byte)
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
+    // Strip OSC sequences (ESC ] ... ST/BEL)
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+    // Strip remaining lone ESC + one char
+    .replace(/\x1b./g, "")
+    // Strip other control chars except newline/tab
+    .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "")
+    .split("\n")
+    .filter(line => !_isChromeLine(line))
+    .join("\n")
+    .trim();
+}
+
 export function diffTerminalOutput(beforeText, afterText) {
   const before = normalizeTerminalOutput(beforeText);
   const after = normalizeTerminalOutput(afterText);

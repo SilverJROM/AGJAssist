@@ -1,7 +1,7 @@
 import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput } from './terminal-chat-state.js';
+import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput, cleanTerminalOutput } from './terminal-chat-state.js';
 import {
   AVAILABLE_BOTTOM_NAV_TABS,
   DEFAULT_BOTTOM_NAV_TAB_IDS,
@@ -518,6 +518,13 @@ function OvmConsole() {
   const [entries, setEntries] = useState([]);
   const [input, setInput] = useState('');
   const [streamKey, setStreamKey] = useState(0);
+  const [lineLimit, setLineLimit] = useState(() => {
+    try {
+      const saved = Number(sessionStorage.getItem('agj_ovm_line_limit') || '25');
+      return [25, 50, 100, 150, 200].includes(saved) ? saved : 25;
+    } catch { return 25; }
+  });
+  const [snapshotUpdatedAt, setSnapshotUpdatedAt] = useState(0);
   const transcriptRef = useRef(null);
   const wsRef = useRef(null);
   const snapshotRef = useRef('');
@@ -584,6 +591,10 @@ function OvmConsole() {
   }
 
   useEffect(() => {
+    try { sessionStorage.setItem('agj_ovm_line_limit', String(lineLimit)); } catch {}
+  }, [lineLimit]);
+
+  useEffect(() => {
     loadStatus();
   }, [loadStatus]);
 
@@ -624,11 +635,9 @@ function OvmConsole() {
         const msg = JSON.parse(event.data);
         if (msg.type === 'snapshot' || msg.type === 'output') {
           const latest = capTerminalOutput(normalizeTerminalOutput(msg.data), 200);
-          const previous = snapshotRef.current;
-          const appended = msg.type === 'output' ? latest : diffTerminalOutput(previous, latest);
           snapshotRef.current = latest;
           setSnapshot(latest);
-          if (appended) appendEntry('terminal', 'OVM', appended);
+          setSnapshotUpdatedAt(Date.now());
         } else if (msg.type === 'safety_block') {
           appendEntry('error', 'Safety', `Command blocked: ${msg.pattern || msg.command || 'safety rule'}`);
         } else if (msg.type === 'closed') {
@@ -652,7 +661,7 @@ function OvmConsole() {
   useEffect(() => {
     const node = transcriptRef.current;
     if (node) node.scrollTop = node.scrollHeight;
-  }, [entries, snapshot]);
+  }, [entries, snapshotUpdatedAt]);
 
   const statusText = statusLoading ? 'checking' : (ovmStatus?.status || (open ? 'open' : 'closed'));
   const busy = !!action;
@@ -693,29 +702,42 @@ function OvmConsole() {
         </div>
       ` : html`
         <div class="ovm-live-shell">
-          <div class="ovm-stream-meta">
-            <span class=${'badge badge-' + (streamStatus === 'connected' ? 'active' : streamStatus === 'connecting' ? 'pending' : 'failed')}>${streamStatus}</span>
-            <span>${OVM_TMUX_TARGET}</span>
-          </div>
           <div class="ovm-transcript" ref=${transcriptRef}>
-            ${entries.length === 0 ? html`
-              <div class="terminal-chat-card terminal-chat-single-output ovm-output-card">
-                <div class="terminal-chat-meta">
-                  <span>Current output · OVM</span>
-                  <span>${streamStatus}</span>
-                </div>
-                <div class="terminal-chat-content">
-                  ${formatFriendlyTerminalOutput(snapshot, 80) || (streamStatus === 'connecting' ? 'Connecting to OVM...' : 'Waiting for OVM output...')}
-                </div>
+            <div class="terminal-chat-controls">
+              <label class="terminal-chat-line-picker">
+                <span>Lines</span>
+                <select value=${String(lineLimit)} onChange=${e => setLineLimit(Number(e.target.value))}>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="150">150</option>
+                  <option value="200">200</option>
+                </select>
+              </label>
+            </div>
+            <div class="terminal-chat-details">
+              <span class=${'badge badge-' + (streamStatus === 'connected' ? 'active' : streamStatus === 'connecting' ? 'pending' : 'failed')}>${streamStatus}</span>
+              <span class="terminal-chat-detail-pill">${OVM_TMUX_TARGET}</span>
+              <span class="terminal-chat-detail-pill">Showing ${lineLimit} lines</span>
+              ${snapshotUpdatedAt ? html`<span class="terminal-chat-detail-pill">Updated ${new Date(snapshotUpdatedAt).toLocaleTimeString()}</span>` : ''}
+            </div>
+            <div class="terminal-chat-card terminal-chat-single-output ovm-output-card">
+              <div class="terminal-chat-meta">
+                <span>Current output · OVM</span>
+                <span>${snapshotUpdatedAt ? new Date(snapshotUpdatedAt).toLocaleTimeString() : streamStatus}</span>
               </div>
-            ` : entries.map(entry => html`
+              <div class="terminal-chat-content">
+                ${formatFriendlyTerminalOutput(cleanTerminalOutput(snapshot), lineLimit) || (streamStatus === 'connecting' ? 'Connecting to OVM...' : 'Waiting for OVM output...')}
+              </div>
+            </div>
+            ${entries.map(entry => html`
               <div class=${'terminal-chat-entry terminal-chat-entry-' + entry.role} key=${entry.id}>
                 <div class="terminal-chat-card">
                   <div class="terminal-chat-meta">
                     <span>${entry.label}</span>
                     <span>${entry.timestamp}</span>
                   </div>
-                  <div class="terminal-chat-content">${formatFriendlyTerminalOutput(entry.content, 80)}</div>
+                  <div class="terminal-chat-content">${entry.role === 'user' ? entry.content : formatFriendlyTerminalOutput(cleanTerminalOutput(entry.content), lineLimit)}</div>
                 </div>
               </div>
             `)}

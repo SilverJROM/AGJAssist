@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildInitialFriendlyState,
   capTerminalOutput,
+  cleanTerminalOutput,
   diffTerminalOutput,
   formatFriendlyTerminalOutput,
   normalizeTerminalOutput,
@@ -54,6 +55,49 @@ describe("terminal chat state", () => {
     expect(state.entries).toHaveLength(1);
     expect(state.entries[0].content).toContain("live terminal prompt");
     expect(state.entries[0].content).not.toContain("old internal debug text");
+  });
+
+  describe("cleanTerminalOutput", () => {
+    it("strips ANSI escape sequences", () => {
+      expect(cleanTerminalOutput("\x1b[39mhello\x1b[0m world")).toBe("hello world");
+    });
+
+    it("drops Claude-Code TUI chrome lines", () => {
+      const input = "actual output line\nbypass permissions · shift+tab to cycle\nmore real output";
+      const result = cleanTerminalOutput(input);
+      expect(result).toContain("actual output line");
+      expect(result).toContain("more real output");
+      expect(result).not.toContain("bypass permissions");
+    });
+
+    it("drops composer prompt lines starting with ❯", () => {
+      const input = "some output\n❯ typed text here\nfollowing line";
+      const result = cleanTerminalOutput(input);
+      expect(result).not.toContain("❯");
+      expect(result).toContain("some output");
+    });
+
+    it("drops horizontal rule lines", () => {
+      const input = "content\n────────────────────\nmore content";
+      const result = cleanTerminalOutput(input);
+      expect(result).not.toMatch(/^[─=]{3,}$/m);
+      expect(result).toContain("content");
+    });
+
+    it("drops spinner/timer chrome lines", () => {
+      const input = "Working (3s)\nreal line\nesc to interrupt";
+      const result = cleanTerminalOutput(input);
+      expect(result).toBe("real line");
+    });
+
+    it("strips OSC sequences", () => {
+      expect(cleanTerminalOutput("\x1b]0;title\x07hello")).toBe("hello");
+    });
+
+    it("returns empty string for empty input", () => {
+      expect(cleanTerminalOutput("")).toBe("");
+      expect(cleanTerminalOutput(null as unknown as string)).toBe("");
+    });
   });
 
   it("resumes a recent transcript when the live output extends the saved snapshot", () => {
