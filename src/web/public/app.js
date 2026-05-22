@@ -540,7 +540,7 @@ function OvmConsole() {
       id: role + '-' + Date.now() + '-' + prev.length,
       role,
       text: trimmed,
-      ts: new Date().toLocaleTimeString()
+      ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
     }]);
   }
 
@@ -665,25 +665,36 @@ function OvmConsole() {
             ` : null}
             ${messages.map(m => html`
               <div key=${m.id} class=${'ovm-chat-row ovm-chat-row-' + m.role}>
-                <div class=${'ovm-chat-bubble ovm-chat-bubble-' + m.role}>
-                  <div class="ovm-chat-text">${m.text}</div>
-                  <div class="ovm-chat-ts">${m.ts}</div>
-                </div>
+                ${m.role === 'system' ? html`
+                  <div class="ovm-chat-pill">${m.text}</div>
+                ` : html`
+                  <div class=${'ovm-chat-bubble ovm-chat-bubble-' + m.role}>
+                    <div class="ovm-chat-text">${m.text}</div>
+                    <div class="ovm-chat-ts">
+                      ${m.ts}${m.role === 'user' ? html`<span class="ovm-chat-ticks"> ✓✓</span>` : ''}
+                    </div>
+                  </div>
+                `}
               </div>
             `)}
             ${thinking ? html`
               <div class="ovm-chat-row ovm-chat-row-ovm">
                 <div class="ovm-chat-bubble ovm-chat-bubble-ovm ovm-chat-thinking">
-                  <div class="ovm-chat-text">OVM is thinking…</div>
+                  <div class="ovm-typing-dots">
+                    <span class="ovm-typing-dot"></span>
+                    <span class="ovm-typing-dot"></span>
+                    <span class="ovm-typing-dot"></span>
+                  </div>
                 </div>
               </div>
             ` : null}
           </div>
-          <div class="terminal-chat-composer ovm-composer">
+          <div class="ovm-input-bar">
             <textarea
+              class="ovm-input-field"
               value=${input}
-              rows="2"
-              placeholder="Message OVM..."
+              rows="1"
+              placeholder="Write a message…"
               disabled=${!open || thinking}
               onInput=${e => setInput(e.target.value)}
               onKeyDown=${e => {
@@ -693,7 +704,12 @@ function OvmConsole() {
                 }
               }}
             ></textarea>
-            <button class="btn btn-primary" onclick=${sendMessage} disabled=${!canSend}>Send</button>
+            <button class="ovm-send-btn" onclick=${sendMessage} disabled=${!canSend} aria-label="Send">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
           </div>
         </div>
       `}
