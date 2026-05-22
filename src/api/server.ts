@@ -26,7 +26,6 @@ import { registerNoteRoutes } from "./routes/note-routes.js";
 import { registerPlanRoutes } from "./routes/plan-routes.js";
 import { registerTaskRoutes } from "./routes/task-routes.js";
 import { ConversationService } from "../services/conversation-service.js";
-import { registerConversationRoutes } from "./routes/conversation-routes.js";
 import { FileService } from "../services/file-service.js";
 import { registerFileRoutes } from "./routes/file-routes.js";
 import { StepTemplateService } from "../services/step-template-service.js";
@@ -36,14 +35,11 @@ import { registerPersonalTaskRoutes } from "./routes/personal-task-routes.js";
 import { ReminderService } from "../services/reminder-service.js";
 import { registerReminderRoutes } from "./routes/reminder-routes.js";
 import { ChatSettingsService } from "../services/chat-settings-service.js";
-import { registerChatSettingsRoutes } from "./routes/chat-settings-routes.js";
-import { registerChatRoutes } from "./routes/chat-routes.js";
 import { registerAgentRoutes } from "./routes/agent-routes.js";
 import { OllamaProvider } from "../llm/ollama-provider.js";
 import { OpenRouterProvider } from "../llm/openrouter-provider.js";
 import { ToolAgent } from "../orchestration/tool-agent.js";
 import { ToolRegistry } from "../tools/tool-registry.js";
-import { registerLocalLlmRoutes } from "./routes/local-llm-routes.js";
 import { ClaudeCliProvider } from "../llm/claude-cli-provider.js";
 import { CodexCliProvider } from "../llm/codex-cli-provider.js";
 import { OvermindService } from "../services/overmind-service.js";
@@ -140,15 +136,11 @@ export async function createApiServer(
   registerNoteRoutes(app, services.authService, services.noteService);
   registerPlanRoutes(app, services.authService, services.planService, services.projectService);
   registerTaskRoutes(app, services.authService, services.taskService);
-  registerConversationRoutes(app, services.authService, services.conversationService);
   registerFileRoutes(app, services.authService, services.projectService, services.fileService, services.auditService);
   registerTemplateRoutes(app, services.authService, services.stepTemplateService);
   registerPersonalTaskRoutes(app, services.authService, services.personalTaskService);
   registerReminderRoutes(app, services.authService, services.reminderService);
-  registerChatSettingsRoutes(app, services.authService, services.chatSettingsService);
-  registerChatRoutes(app, services.authService, services.ollama, services.openRouter, services.conversationService, services.chatSettingsService, services.ollamaAgent, services.openRouterAgent, services.claudeCliProvider, services.codexCliProvider, services.tools, services.maxToolIterations);
   registerAgentRoutes(app, services.authService);
-  registerLocalLlmRoutes(app, services.authService, services.conversationService, services.chatSettingsService, services.tools, services.maxToolIterations);
   registerOvermindRoutes(
     app,
     config,

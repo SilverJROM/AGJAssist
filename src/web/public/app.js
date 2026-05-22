@@ -432,7 +432,7 @@ function Header({ user }) {
           <a href="#/overmind" class=${route === '/overmind' ? 'active' : ''}>Workflows</a>
           <a href="#/tasks" class=${route === '/tasks' ? 'active' : ''}>Tasks</a>
           <a href="#/notes" class=${route === '/notes' ? 'active' : ''}>Notes</a>
-          <a href="#/conversations" class=${route === '/conversations' ? 'active' : ''}>Conversations</a>
+          <a href="#/conversations" class=${route === '/conversations' ? 'active' : ''}>Chat</a>
           <a href="#/settings" class=${route === '/settings' ? 'active' : ''}>Settings</a>
         </nav>
       </div>
