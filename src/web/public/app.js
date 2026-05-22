@@ -2585,6 +2585,374 @@ function NotesTab({ projectId }) {
   `;
 }
 
+// ===================== iOS NOTES PAGE (N2) =====================
+
+// --- Helpers ---
+function stripHtml(html) {
+  if (!html) return '';
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function noteTitle(body) {
+  if (!body) return 'New Note';
+  const clean = stripHtml(body);
+  const first = clean.split('\n')[0].trim();
+  return first.length > 0 ? first.slice(0, 80) : 'New Note';
+}
+
+function noteSnippet(body) {
+  if (!body) return '';
+  const clean = stripHtml(body);
+  const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+  const snippet = lines.slice(1).join(' ') || lines[0] || '';
+  return snippet.slice(0, 100);
+}
+
+function relativeDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z');
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const noteDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = today - noteDay;
+  if (diff === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (diff === 86400000) return 'Yesterday';
+  if (diff < 7 * 86400000) return d.toLocaleDateString([], { weekday: 'long' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+// --- Note row with swipe-to-delete ---
+function IosNoteRow({ note, onOpen, onDelete }) {
+  const [swiped, setSwiped] = useState(false);
+  const touchStartX = useRef(null);
+  const rowRef = useRef(null);
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function handleTouchMove(e) {
+    if (touchStartX.current === null) return;
+    const dx = e.touches[0].clientX - touchStartX.current;
+    if (dx < -50) setSwiped(true);
+    else if (dx > 20) setSwiped(false);
+  }
+  function handleTouchEnd() {
+    touchStartX.current = null;
+  }
+  // Desktop: right-click or long-press shows delete
+  function handleContextMenu(e) {
+    e.preventDefault();
+    setSwiped(v => !v);
+  }
+
+  const title = noteTitle(note.body);
+  const snippet = noteSnippet(note.body);
+  const date = relativeDate(note.updated_at || note.created_at);
+
+  return html`
+    <div class="ios-note-row-wrap" ref=${rowRef}>
+      <div class=${'ios-note-row' + (swiped ? ' swiped' : '')}
+           ontouchstart=${handleTouchStart}
+           ontouchmove=${handleTouchMove}
+           ontouchend=${handleTouchEnd}
+           oncontextmenu=${handleContextMenu}
+           onclick=${() => { if (!swiped) onOpen(note); }}>
+        <div class="ios-note-row-content">
+          <div class="ios-note-row-top">
+            <span class="ios-note-title">${title}</span>
+            <span class="ios-note-date">${date}</span>
+          </div>
+          <div class="ios-note-snippet">${snippet || html`<span style="color:var(--text-secondary);font-style:italic">No additional text</span>`}</div>
+        </div>
+      </div>
+      <button class="ios-swipe-delete-btn" onclick=${(e) => { e.stopPropagation(); onDelete(note); }}>Delete</button>
+    </div>
+    <div class="ios-list-divider"></div>
+  `;
+}
+
+// --- Notes list screen (within a folder) ---
+function IosNotesList({ folder, onBack, onOpenNote, onNewNote }) {
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounced(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const loadNotes = useCallback(() => {
+    setLoading(true);
+    let url;
+    if (searchDebounced) {
+      url = `/api/notes?search=${encodeURIComponent(searchDebounced)}`;
+    } else {
+      url = `/api/notes?folder_id=${folder.id}`;
+    }
+    api(url).then(d => {
+      setNotes(d.notes || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [folder.id, searchDebounced]);
+
+  useEffect(() => { loadNotes(); }, [loadNotes]);
+
+  async function handleDelete(note) {
+    if (!confirm('Delete this note?')) return;
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'DELETE' });
+      loadNotes();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleNewNote() {
+    try {
+      const d = await api('/api/notes', { method: 'POST', body: JSON.stringify({ folder_id: folder.id, body: '' }) });
+      const newNote = d.note || d;
+      loadNotes();
+      onOpenNote(newNote, loadNotes);
+    } catch (e) { alert(e.message); }
+  }
+
+  // Split pinned / regular
+  const pinned = notes.filter(n => n.pinned);
+  const regular = notes.filter(n => !n.pinned);
+
+  return html`
+    <div class="ios-notes-screen">
+      <div class="ios-notes-header">
+        <button class="ios-back-btn" onclick=${onBack}>
+          <span class="ios-back-chevron">‹</span>
+          <span>Folders</span>
+        </button>
+        <h1 class="ios-screen-title">${folder.name}</h1>
+      </div>
+
+      <div class="ios-search-bar-wrap">
+        <div class="ios-search-bar">
+          <span class="ios-search-icon">⌕</span>
+          <input ref=${searchRef} type="text" value=${search}
+                 onInput=${e => setSearch(e.target.value)}
+                 placeholder="Search"
+                 class="ios-search-input" />
+          ${search && html`<button class="ios-search-clear" onclick=${() => setSearch('')}>✕</button>`}
+        </div>
+      </div>
+
+      ${loading ? html`<div class="ios-loading">Loading...</div>` : html`
+        <div class="ios-list-body">
+          ${pinned.length > 0 && html`
+            <div class="ios-section-header">Pinned</div>
+            <div class="ios-list-group">
+              ${pinned.map(n => html`
+                <${IosNoteRow} key=${n.id} note=${n}
+                  onOpen=${(note) => onOpenNote(note, loadNotes)}
+                  onDelete=${handleDelete}
+                />
+              `)}
+            </div>
+          `}
+
+          ${regular.length > 0 && html`
+            <div class="ios-section-header">Notes</div>
+            <div class="ios-list-group">
+              ${regular.map(n => html`
+                <${IosNoteRow} key=${n.id} note=${n}
+                  onOpen=${(note) => onOpenNote(note, loadNotes)}
+                  onDelete=${handleDelete}
+                />
+              `)}
+            </div>
+          `}
+
+          ${notes.length === 0 && html`
+            <div class="ios-empty-state">
+              ${searchDebounced ? 'No notes match your search.' : 'No notes in this folder yet.'}
+            </div>
+          `}
+        </div>
+      `}
+
+      <div class="ios-note-count-bar">
+        ${loading ? '' : `${notes.length} Note${notes.length !== 1 ? 's' : ''}`}
+      </div>
+
+      <button class="ios-compose-btn" onclick=${handleNewNote}>
+        <span class="ios-compose-icon">✏</span>
+      </button>
+    </div>
+  `;
+}
+
+// --- Note editor stub (minimal; N3 replaces with rich editor) ---
+function IosNoteEditor({ note, folder, onBack, onReload }) {
+  const [body, setBody] = useState(note.body || '');
+  const [pinned, setPinned] = useState(!!note.pinned);
+  const saveTimer = useRef(null);
+  const textareaRef = useRef(null);
+
+  // Focus textarea on mount
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      // Move cursor to end
+      const len = textareaRef.current.value.length;
+      textareaRef.current.setSelectionRange(len, len);
+    }
+  }, []);
+
+  // Debounced auto-save
+  function scheduleAutoSave(newBody) {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ body: newBody }) });
+        if (onReload) onReload();
+      } catch {}
+    }, 800);
+  }
+
+  function handleInput(e) {
+    const val = e.target.value;
+    setBody(val);
+    scheduleAutoSave(val);
+  }
+
+  async function handlePinToggle() {
+    const newPinned = !pinned;
+    setPinned(newPinned);
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ pinned: newPinned }) });
+      if (onReload) onReload();
+    } catch {}
+  }
+
+  async function handleDelete() {
+    if (!confirm('Delete this note?')) return;
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'DELETE' });
+      if (onReload) onReload();
+      onBack();
+    } catch (e) { alert(e.message); }
+  }
+
+  // Flush pending save on back
+  async function handleBack() {
+    clearTimeout(saveTimer.current);
+    if (body !== note.body) {
+      try {
+        await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
+        if (onReload) onReload();
+      } catch {}
+    }
+    onBack();
+  }
+
+  const title = noteTitle(body);
+
+  return html`
+    <div class="ios-editor-screen">
+      <div class="ios-notes-header ios-editor-header">
+        <button class="ios-back-btn" onclick=${handleBack}>
+          <span class="ios-back-chevron">‹</span>
+          <span>${folder ? folder.name : 'Notes'}</span>
+        </button>
+        <div class="ios-editor-actions">
+          <button class="ios-editor-action-btn" onclick=${handlePinToggle}
+                  title=${pinned ? 'Unpin' : 'Pin'}>
+            ${pinned ? '📌' : '📍'}
+          </button>
+          <button class="ios-editor-action-btn ios-delete-btn" onclick=${handleDelete}
+                  title="Delete">🗑</button>
+        </div>
+      </div>
+      <div class="ios-editor-body">
+        <textarea ref=${textareaRef}
+                  class="ios-editor-textarea"
+                  value=${body}
+                  onInput=${handleInput}
+                  placeholder="Start typing…"
+                  spellcheck="true"></textarea>
+      </div>
+    </div>
+  `;
+}
+
+// --- Folders screen ---
+function IosNotesPage() {
+  const [folders, setFolders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  // nav state: null = folders screen, {folder} = notes list, {folder, note} = editor
+  const [currentFolder, setCurrentFolder] = useState(null);
+  const [currentNote, setCurrentNote] = useState(null);
+  const reloadNotesRef = useRef(null);
+
+  const loadFolders = useCallback(() => {
+    setLoading(true);
+    api('/api/note-folders').then(d => {
+      setFolders(d.folders || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { loadFolders(); }, [loadFolders]);
+
+  // --- Routing within the notes stack ---
+  if (currentNote && currentFolder) {
+    return html`<${IosNoteEditor}
+      note=${currentNote}
+      folder=${currentFolder}
+      onBack=${() => setCurrentNote(null)}
+      onReload=${reloadNotesRef.current || null}
+    />`;
+  }
+
+  if (currentFolder) {
+    return html`<${IosNotesList}
+      folder=${currentFolder}
+      onBack=${() => { setCurrentFolder(null); loadFolders(); }}
+      onOpenNote=${(note, reloadFn) => {
+        reloadNotesRef.current = reloadFn;
+        setCurrentNote(note);
+      }}
+      onNewNote=${() => {}}
+    />`;
+  }
+
+  // --- Folders screen ---
+  return html`
+    <div class="ios-notes-screen">
+      <div class="ios-folders-header">
+        <h1 class="ios-folders-title">Notes</h1>
+      </div>
+
+      ${loading ? html`<div class="ios-loading">Loading...</div>` : html`
+        <div class="ios-list-body">
+          <div class="ios-section-header">iCloud</div>
+          <div class="ios-list-group">
+            ${folders.map(f => html`
+              <div key=${f.id} class="ios-folder-row"
+                   onclick=${() => setCurrentFolder(f)}>
+                <span class="ios-folder-icon">📁</span>
+                <span class="ios-folder-name">${f.name}</span>
+                <span class="ios-folder-count">${f.note_count ?? ''}</span>
+                <span class="ios-folder-chevron">›</span>
+              </div>
+              <div class="ios-list-divider ios-list-divider--indent"></div>
+            `)}
+            ${folders.length === 0 && html`
+              <div class="ios-empty-state">No folders found.</div>
+            `}
+          </div>
+        </div>
+      `}
+    </div>
+  `;
+}
+
 // ===================== STANDALONE NOTES PAGE =====================
 
 function NotesPage() {
@@ -5651,7 +6019,7 @@ function TgApp() {
   } else if (route === '/tasks') {
     content = html`<${TasksSection} />`;
   } else if (route === '/notes') {
-    content = html`<${NotesPage} />`;
+    content = html`<${IosNotesPage} />`;
   } else if (route === '/conversations') {
     content = html`<${Conversations} />`;
   } else if (route === '/settings') {
@@ -5710,7 +6078,7 @@ function App() {
   } else if (route === '/tasks') {
     content = html`<${TasksSection} />`;
   } else if (route === '/notes') {
-    content = html`<${NotesPage} />`;
+    content = html`<${IosNotesPage} />`;
   } else if (route === '/conversations') {
     content = html`<${Conversations} />`;
   } else if (route === '/settings') {
