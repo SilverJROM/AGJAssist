@@ -1776,8 +1776,8 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
         </div>
       </div>
 
-      <div class="terminal-chat-transcript" ref=${transcriptRef}>
-        <div class="terminal-chat-controls">
+      <div class="terminal-chat-composer">
+        <div class="terminal-chat-composer-top">
           <label class="terminal-chat-line-picker">
             <span>Lines</span>
             <select value=${String(lineLimit)} onChange=${e => setLineLimit(Number(e.target.value))}>
@@ -1794,11 +1794,31 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
             </button>
           `}
         </div>
+        <div class="terminal-chat-composer-row">
+          <textarea class="terminal-chat-input-field"
+                    value=${input}
+                    rows="1"
+                    placeholder="Type a terminal command..."
+                    onInput=${e => setInput(e.target.value)}
+                    onKeyDown=${e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendCommand();
+                      }
+                    }}></textarea>
+          <button class="terminal-chat-enter-btn" onclick=${sendManualEnter} disabled=${sending} title="Send Enter key">
+            ↵
+          </button>
+          <button class="terminal-chat-send-btn" onclick=${sendCommand} disabled=${sending || !input.trim()}>
+            ${sending ? html`<div class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>` : html`<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`}
+          </button>
+        </div>
+      </div>
+
+      <div class="terminal-chat-transcript" ref=${transcriptRef}>
         <div class="terminal-chat-details">
           <span class="terminal-chat-detail-pill">${sessionName || 'Terminal chat'}</span>
           <span class="terminal-chat-detail-pill">${target}</span>
-          <span class="terminal-chat-detail-pill">Showing ${lineLimit} lines</span>
-          <span class="terminal-chat-detail-pill">Stored max 200</span>
           ${lastUpdatedAt ? html`<span class="terminal-chat-detail-pill">Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}</span>` : ''}
         </div>
         <div class="terminal-chat-card terminal-chat-single-output">
@@ -1807,7 +1827,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
             <span>${lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : status}</span>
           </div>
           <div class="terminal-chat-content">
-            ${formatFriendlyTerminalOutput(snapshot, lineLimit) || (sending ? 'Running command...' : status === 'loading' ? 'Loading terminal output...' : status === 'error' ? 'Terminal output unavailable.' : `Connected to ${target}. Waiting for terminal output...`)}
+            ${formatFriendlyTerminalOutput(cleanTerminalOutput(snapshot), lineLimit) || (sending ? 'Running command...' : status === 'loading' ? 'Loading terminal output...' : status === 'error' ? 'Terminal output unavailable.' : `Connected to ${target}. Waiting for terminal output...`)}
           </div>
           ${sending && html`
             <div class="terminal-chat-inline-status">
@@ -1819,25 +1839,6 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
             </div>
           `}
         </div>
-      </div>
-
-      <div class="terminal-chat-composer">
-        <textarea value=${input}
-                  rows="2"
-                  placeholder="Type a terminal command..."
-                  onInput=${e => setInput(e.target.value)}
-                  onKeyDown=${e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      sendCommand();
-                    }
-                  }}></textarea>
-        <button class="btn" onclick=${sendManualEnter} disabled=${sending}>
-          Enter
-        </button>
-        <button class="btn btn-primary" onclick=${sendCommand} disabled=${sending || !input.trim()}>
-          ${sending ? 'Running...' : 'Send'}
-        </button>
       </div>
     </div>
   `;
