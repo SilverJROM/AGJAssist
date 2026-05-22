@@ -1,6 +1,6 @@
 ---
 type: refactor/decommission
-status: in-progress
+status: resolved
 agent: projcore
 qa_verification: "Telegram has no /op //om //llm //ommodel //claude etc chat; only /ovm_start/_end chat. Web 💬 tab opens OVM console. No /api/chat|conversations|local-llm endpoints. Build + suite green."
 ---

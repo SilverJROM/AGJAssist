@@ -1,6 +1,6 @@
 ---
 type: feature/redesign
-status: in-progress
+status: resolved
 agent: projcore
 qa_verification: "Notes app mimics iPhone Notes: folders, rich text + checklists, pinning, iOS list (previews, search, swipe-delete, auto-save). status/tags/project-link/promote-to-plan removed."
 ---
