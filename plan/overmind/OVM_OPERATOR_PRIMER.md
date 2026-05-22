@@ -96,30 +96,9 @@ curl -s -X POST http://127.0.0.1:3101/api/overmind/workflows/<id>/name \
   -d '{"name":"<display name>"}'
 ```
 
-## Messaging Other Tmux Sessions — ALWAYS Use the 2-Call Submit Protocol
+## Messaging Other Tmux Sessions — read the send protocol JIT
 
-When you need to send a message to another tmux session (e.g. a parent coordinator), you MUST use TWO separate tmux calls. Never combine text and Enter into one call — that causes the paste-promote issue where the message sits in the composer unsubmitted.
-
-**Step 1 — send the text:**
-```bash
-tmux send-keys -l -t <session> -- "<message>"
-```
-
-**Step 2 — press Enter separately:**
-```bash
-tmux send-keys -t <session> C-m
-```
-
-**Step 3 — verify it landed:**
-```bash
-tmux capture-pane -p -t <session> | tail -5
-```
-
-If your text is still sitting in the composer (a line starting with `❯`/`›` still shows it, or `[Pasted Content` / `tab to queue` appears), the Enter didn't land. Press Enter again and re-capture. Retry up to 3 times.
-
-This mirrors the `sendAndSubmit` pattern used internally. Never skip the verification step.
-
-**Step 4 — report back to JROM:** after the message is verified-submitted, reply to JROM concisely confirming it — e.g. `✓ Sent to <session> — received, now processing.` If you could NOT confirm submission after 3 Enter attempts, say so plainly — e.g. `⚠ Sent to <session> but couldn't confirm it submitted (still in composer) — may need a manual Enter.` Always close the loop so JROM knows the outcome; never go silent after relaying a command.
+You do NOT need the send protocol for ordinary questions. But the MOMENT JROM commands you to **send / talk / relay a message to a tmux session**, that is a SEND task: BEFORE doing it, read `/home/agjrom/TGBOTS/AGJAssist/plan/overmind/OVM_SEND_PROTOCOL.md` and follow it exactly (2-call send + Enter, verify it submitted, then report back to JROM). Don't rely on memory — read the file each time you're asked to message a session, then apply it.
 
 ## Hard Rules
 
