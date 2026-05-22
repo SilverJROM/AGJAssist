@@ -6,6 +6,7 @@ import { OvermindService } from "../src/services/overmind-service.js";
 import { registerOvermindRoutes } from "../src/api/routes/overmind-routes.js";
 import { AppConfig } from "../src/config/config.js";
 import { OvmSessionManager } from "../src/services/ovm-session.js";
+import type { TmuxService } from "../src/tmux/tmux-service.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -449,6 +450,149 @@ describe("Overmind routes", () => {
       payload: { name: "Nope" }
     });
     expect(missing.statusCode).toBe(404);
+  });
+
+  describe("child-close reminder on /complete", () => {
+    function makeTmuxMock(aliveSet: Set<string>): TmuxService {
+      return {
+        sessionExists: vi.fn(async (target: string) => aliveSet.has(target)),
+        sendCommand: vi.fn(async () => ({ message: "sent", blocked: false })),
+        capturePane: vi.fn(async () => "")
+      } as unknown as TmuxService;
+    }
+
+    async function buildAppWithTmux(tmuxMock: TmuxService): Promise<FastifyInstance> {
+      const a = Fastify({ logger: false });
+      registerOvermindRoutes(a, testConfig(), authService, overmindService, undefined, undefined, undefined, tmuxMock);
+      await a.ready();
+      return a;
+    }
+
+    it("sends one sendCommand to coordinator_session containing child name + kill-session when ≥1 child is alive", async () => {
+      const tmux = makeTmuxMock(new Set(["child-alive-1"]));
+      const a = await buildAppWithTmux(tmux);
+      try {
+        await a.inject({
+          method: "POST",
+          url: "/api/overmind/register",
+          remoteAddress: "127.0.0.1",
+          payload: {
+            token: OVERMIND_TOKEN,
+            label: "close-reminder-test",
+            session: "parent-coord",
+            child_sessions: ["child-alive-1"],
+            run_dir: "/tmp/close-test"
+          }
+        });
+
+        const complete = await a.inject({
+          method: "POST",
+          url: "/api/overmind/complete",
+          remoteAddress: "127.0.0.1",
+          payload: { token: OVERMIND_TOKEN, session: "parent-coord" }
+        });
+
+        expect(complete.statusCode).toBe(200);
+        expect(complete.json().workflow.status).toBe("completed");
+        expect(tmux.sendCommand).toHaveBeenCalledOnce();
+        const [target, msg] = (tmux.sendCommand as ReturnType<typeof vi.fn>).mock.calls[0];
+        expect(target).toBe("parent-coord");
+        expect(msg).toContain("child-alive-1");
+        expect(msg).toContain("kill-session");
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("does NOT call sendCommand when workflow has no child_sessions", async () => {
+      const tmux = makeTmuxMock(new Set());
+      const a = await buildAppWithTmux(tmux);
+      try {
+        await a.inject({
+          method: "POST",
+          url: "/api/overmind/register",
+          remoteAddress: "127.0.0.1",
+          payload: {
+            token: OVERMIND_TOKEN,
+            label: "no-children-test",
+            session: "parent-no-children",
+            run_dir: "/tmp/no-children"
+          }
+        });
+
+        const complete = await a.inject({
+          method: "POST",
+          url: "/api/overmind/complete",
+          remoteAddress: "127.0.0.1",
+          payload: { token: OVERMIND_TOKEN, session: "parent-no-children" }
+        });
+
+        expect(complete.statusCode).toBe(200);
+        expect(complete.json().workflow.status).toBe("completed");
+        expect(tmux.sendCommand).not.toHaveBeenCalled();
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("does NOT call sendCommand when all children are dead (sessionExists → false)", async () => {
+      const tmux = makeTmuxMock(new Set()); // nothing alive
+      const a = await buildAppWithTmux(tmux);
+      try {
+        await a.inject({
+          method: "POST",
+          url: "/api/overmind/register",
+          remoteAddress: "127.0.0.1",
+          payload: {
+            token: OVERMIND_TOKEN,
+            label: "dead-children-test",
+            session: "parent-dead-children",
+            child_sessions: ["child-dead-1", "child-dead-2"],
+            run_dir: "/tmp/dead-children"
+          }
+        });
+
+        const complete = await a.inject({
+          method: "POST",
+          url: "/api/overmind/complete",
+          remoteAddress: "127.0.0.1",
+          payload: { token: OVERMIND_TOKEN, session: "parent-dead-children" }
+        });
+
+        expect(complete.statusCode).toBe(200);
+        expect(complete.json().workflow.status).toBe("completed");
+        expect(tmux.sendCommand).not.toHaveBeenCalled();
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("does NOT call sendCommand when no tmuxService is provided (existing behaviour unchanged)", async () => {
+      // default app (no tmuxService) — uses the shared `app` from beforeEach
+      await app.inject({
+        method: "POST",
+        url: "/api/overmind/register",
+        remoteAddress: "127.0.0.1",
+        payload: {
+          token: OVERMIND_TOKEN,
+          label: "no-tmux-test",
+          session: "parent-no-tmux",
+          child_sessions: ["child-1"],
+          run_dir: "/tmp/no-tmux"
+        }
+      });
+
+      const complete = await app.inject({
+        method: "POST",
+        url: "/api/overmind/complete",
+        remoteAddress: "127.0.0.1",
+        payload: { token: OVERMIND_TOKEN, session: "parent-no-tmux" }
+      });
+
+      expect(complete.statusCode).toBe(200);
+      expect(complete.json().workflow.status).toBe("completed");
+      // no tmuxService — nothing to assert on, just verify no crash
+    });
   });
 
   it("requires JWT auth for OVM session manager endpoints and delegates to the manager", async () => {

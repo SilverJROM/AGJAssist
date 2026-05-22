@@ -11,6 +11,7 @@ import type { OvermindNotify } from "../../services/overmind-watcher.js";
 import { buildDoneNotification } from "../../services/overmind-notifications.js";
 import { OvermindStreamManager } from "../websocket/overmind-stream-manager.js";
 import type { OvmSessionManager } from "../../services/ovm-session.js";
+import type { TmuxService } from "../../tmux/tmux-service.js";
 
 interface TokenBody {
   token?: string;
@@ -93,7 +94,8 @@ export function registerOvermindRoutes(
   overmindService: OvermindService,
   notify?: OvermindNotify,
   streamManager?: OvermindStreamManager,
-  ovmSession?: OvmSessionManager
+  ovmSession?: OvmSessionManager,
+  tmuxService?: TmuxService
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
 
@@ -146,6 +148,25 @@ export function registerOvermindRoutes(
           await notify?.(buildDoneNotification(completed));
         } catch (error) {
           console.error("Overmind DONE notify failed:", error);
+        }
+
+        try {
+          if (completed.child_sessions && completed.child_sessions.length > 0 && tmuxService) {
+            const aliveChecks = await Promise.all(
+              completed.child_sessions.map(async (child) => {
+                const alive = await tmuxService.sessionExists(child);
+                return alive ? child : null;
+              })
+            );
+            const aliveChildren = aliveChecks.filter((c): c is string => c !== null);
+            if (aliveChildren.length > 0) {
+              const killCmds = aliveChildren.map((c) => `tmux kill-session -t ${c}`).join(" ; ");
+              const msg = `Overmind: '${completed.label}' is marked complete — please close your child session(s) to free resources (your own session can stay up): ${killCmds}`;
+              await tmuxService.sendCommand(completed.coordinator_session, msg, true, true);
+            }
+          }
+        } catch (error) {
+          console.error("Overmind child-close reminder failed:", error);
         }
       }
 

@@ -130,7 +130,8 @@ export async function createApiServer(
     services.overmindService,
     services.overmindNotify,
     services.overmindStreamManager,
-    services.ovmSessionService
+    services.ovmSessionService,
+    services.tmuxService
   );
 
   return app;
