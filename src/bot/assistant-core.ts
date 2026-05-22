@@ -96,6 +96,10 @@ export class AssistantCore {
     return Boolean(userId) && userId === this.config.telegram.authorizedUserId;
   }
 
+  isOvmChatMode(userId: number): boolean {
+    return this.getState(userId).ovmChatMode;
+  }
+
   async handleCommand(input: string, userId?: number): Promise<string> {
     const parts = input.trim().split(/\s+/);
     const command = (parts[0] || "").toLowerCase();

@@ -96,6 +96,29 @@ curl -s -X POST http://127.0.0.1:3101/api/overmind/workflows/<id>/name \
   -d '{"name":"<display name>"}'
 ```
 
+## Messaging Other Tmux Sessions — ALWAYS Use the 2-Call Submit Protocol
+
+When you need to send a message to another tmux session (e.g. a parent coordinator), you MUST use TWO separate tmux calls. Never combine text and Enter into one call — that causes the paste-promote issue where the message sits in the composer unsubmitted.
+
+**Step 1 — send the text:**
+```bash
+tmux send-keys -l -t <session> -- "<message>"
+```
+
+**Step 2 — press Enter separately:**
+```bash
+tmux send-keys -t <session> C-m
+```
+
+**Step 3 — verify it landed:**
+```bash
+tmux capture-pane -p -t <session> | tail -5
+```
+
+If your text is still sitting in the composer (a line starting with `❯`/`›` still shows it, or `[Pasted Content` / `tab to queue` appears), the Enter didn't land. Press Enter again and re-capture. Retry up to 3 times.
+
+This mirrors the `sendAndSubmit` pattern used internally. Never skip the verification step.
+
 ## Hard Rules
 
 - Manage workflows only through Overmind controls above.

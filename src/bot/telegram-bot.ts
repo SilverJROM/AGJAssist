@@ -36,26 +36,16 @@ export class TelegramAssistant {
   private async configureCommands(): Promise<void> {
     try {
       await this.bot.setMyCommands([
-        { command: "start", description: "Show help" },
-        { command: "help", description: "Show help" },
+        { command: "help", description: "Show all commands" },
+        { command: "app", description: "Open the web app" },
         { command: "weblogin", description: "Get a web app login code" },
-        { command: "projects", description: "List all projects" },
-        { command: "note", description: "Quick note: /note <text>" },
-        { command: "notes", description: "List recent notes from Notes folder" },
-        { command: "jobs", description: "List tmux jobs" },
-        { command: "peek", description: "Peek tmux pane output" },
-        { command: "tmux_send", description: "Send command to tmux pane" },
-        { command: "tmux_create", description: "Create tmux session" },
-        { command: "tmux_kill", description: "Kill tmux session" },
-        { command: "timeout", description: "Show/set timeout minutes" },
-        { command: "overmind", description: "Show active Overmind workflows" },
-        { command: "om_tasks", description: "Show Overmind tasklist" },
-        { command: "om_pause", description: "Pause Overmind checks (no interrupts)" },
-        { command: "om_resume", description: "Resume Overmind checks" },
-        { command: "om_drop", description: "Drop Overmind workflow" },
-        { command: "ovm_start", description: "Start OVM chat mode" },
-        { command: "ovm_end", description: "End OVM chat mode" },
-        { command: "app", description: "Open the web app" }
+        { command: "overmind", description: "Active Overmind workflows" },
+        { command: "om_pause", description: "Pause Overmind checks for a workflow" },
+        { command: "om_resume", description: "Resume Overmind checks for a workflow" },
+        { command: "ovm_start", description: "Enter OVM chat mode" },
+        { command: "ovm_end", description: "Exit OVM chat mode" },
+        { command: "jobs", description: "List tmux sessions" },
+        { command: "tmux_send", description: "Send command to tmux pane" }
       ]);
     } catch (error) {
       console.error("Telegram setMyCommands failed; continuing without command menu update:", error);
@@ -122,9 +112,15 @@ export class TelegramAssistant {
       }
 
       try {
+        const fromId = message.from?.id;
+        const isOvmChat = !text.startsWith("/") && fromId !== undefined && this.core.isOvmChatMode(fromId);
+        if (isOvmChat) {
+          await this.sendMessageSafe(chatId, "⏳ Sent to OVM — processing…");
+        }
+
         const response = text.startsWith("/")
-          ? await this.core.handleCommand(text, message.from?.id)
-          : await this.core.handleText(text, message.from?.id);
+          ? await this.core.handleCommand(text, fromId)
+          : await this.core.handleText(text, fromId);
 
         for (const chunk of splitMessage(response)) {
           await this.sendMessageSafe(chatId, chunk);
