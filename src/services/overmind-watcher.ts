@@ -346,6 +346,10 @@ export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
   private readonly childPaneHashes = new Map<number, Map<string, string>>();
   private lastReconcileAt = 0;
+  // Per-workflow dedupe: workflowId → gap signature last asked. Prevents re-asking the
+  // same unchanged gap every 30-min cycle. Cleared when the gap resolves so a fresh
+  // recurrence triggers a new ask.
+  private readonly lastReconcileAsk = new Map<number, string>();
 
   constructor(
     private readonly overmindService: OvermindService,
@@ -387,20 +391,40 @@ export class OvermindWatcher {
   // (info_request is set), check whether the parent session is still alive. If it is,
   // send a single consolidated demand asking the parent to re-register its current roster
   // and confirm status — bundling the task-list update reminder into the SAME message.
-  // Re-asks on every 30-min cycle while the gap persists. Best-effort: never throws.
+  //
+  // Dedupe: a gap is asked ONCE per distinct signature (info_check ?? info_request).
+  // The same unchanged gap is NOT re-asked on subsequent 30-min cycles. A changed gap
+  // signature triggers a new ask. When the gap clears (info_request null) or the workflow
+  // becomes terminal/paused, the entry is removed so a fresh recurrence asks again.
+  // Best-effort: never throws.
   async reconcile(workflows: OvermindWorkflow[]): Promise<void> {
     for (const workflow of workflows) {
-      if (workflow.monitoring_paused) continue;
-      if (!workflow.info_request) continue;
+      // Gap resolved or terminal/paused — clear the dedupe entry so a future recurrence asks.
+      if (!workflow.info_request || workflow.monitoring_paused) {
+        this.lastReconcileAsk.delete(workflow.id);
+        if (workflow.monitoring_paused) continue;
+        continue;
+      }
+
       try {
         const parentAlive = await this.sessionExistsSafe(workflow.coordinator_session);
         if (!parentAlive) continue;
+
+        // Compute the gap signature: prefer info_check (richer, already encodes the gap set);
+        // fall back to info_request if info_check is not yet populated.
+        const gapSignature = workflow.info_check ?? workflow.info_request;
+
+        // Same gap as last ask — do not nag again.
+        if (this.lastReconcileAsk.get(workflow.id) === gapSignature) continue;
 
         const problemDesc = workflow.info_request;
         const msg =
           `Overmind: registration gap detected (${problemDesc}) — please re-register your CURRENT child_sessions, child_roles, and status to overmind now (POST /api/overmind/register), ` +
           `and update your task list (POST /api/overmind/tasks) if it has changed since you last reported.`;
         await this.tmuxService.sendCommand(workflow.coordinator_session, msg, true, true);
+
+        // Record the signature we just asked so future cycles with the same gap skip.
+        this.lastReconcileAsk.set(workflow.id, gapSignature);
       } catch (error) {
         console.error(`Overmind reconcile failed for workflow ${workflow.id}:`, error);
       }

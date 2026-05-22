@@ -219,4 +219,58 @@ describe("OvermindWatcher.reconcile()", () => {
     expect(calls[0][1]).toContain("/api/overmind/register");
     expect(calls[0][1]).toContain("/api/overmind/tasks");
   });
+
+  // --- Dedupe tests ---
+
+  it("same persistent gap: two reconcile() runs produce exactly ONE sendCommand total", async () => {
+    // Same info_request and info_check across both calls — unchanged gap.
+    const wf = workflow({ info_request: "roster", info_check: "dead_child" });
+    const service = makeServiceStub([wf]);
+    const tmux = makeTmuxMock({ sessionAlive: true });
+    const watcher = new OvermindWatcher(service, tmux);
+
+    await watcher.reconcile([wf]);
+    await watcher.reconcile([wf]); // second cycle, same gap signature
+
+    // Must only have asked once — not nagged on the second cycle.
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it("gap signature changes between runs: a second sendCommand is sent", async () => {
+    const wfFirst = workflow({ id: 1, info_request: "roster", info_check: "dead_child" });
+    const service = makeServiceStub([wfFirst]);
+    const tmux = makeTmuxMock({ sessionAlive: true });
+    const watcher = new OvermindWatcher(service, tmux);
+
+    // First reconcile — asks for 'dead_child' gap.
+    await watcher.reconcile([wfFirst]);
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+
+    // Gap signature changes (e.g. child came back but now tasklist is also missing).
+    const wfSecond = workflow({ id: 1, info_request: "tasklist", info_check: "tasklist|run_dir" });
+    await watcher.reconcile([wfSecond]);
+
+    // New signature → a second ask must be sent.
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(2);
+  });
+
+  it("gap clears then recurs: asks again on recurrence", async () => {
+    const wfGap = workflow({ id: 1, info_request: "roster", info_check: "dead_child" });
+    const wfClear = workflow({ id: 1, info_request: null, info_check: null });
+    const service = makeServiceStub([wfGap]);
+    const tmux = makeTmuxMock({ sessionAlive: true });
+    const watcher = new OvermindWatcher(service, tmux);
+
+    // First reconcile — gap is asked.
+    await watcher.reconcile([wfGap]);
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(1);
+
+    // Gap clears — dedupe entry should be removed.
+    await watcher.reconcile([wfClear]);
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(1); // still 1, no new ask
+
+    // Gap recurs with the same signature — should ask again (fresh occurrence).
+    await watcher.reconcile([wfGap]);
+    expect(tmux.sendCommand).toHaveBeenCalledTimes(2);
+  });
 });

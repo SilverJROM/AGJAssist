@@ -54,3 +54,23 @@
 - `npx vitest run`: 27 files, 302 tests — all passed
 
 The NEEDS-INFO badge is no longer shown as a headline card status. The 30-min gate is purely in-memory (`lastReconcileAt` field on the OvermindWatcher instance). The task-list ask is bundled-only: it appears only as the trailing clause of the re-register demand, never in isolation.
+
+---
+
+## Amendment: reconcile dedupe — ask once per distinct gap (2026-05-22)
+
+**Problem:** `reconcile()` re-sent the same demand every 30-min cycle while a gap persisted — it was nagging the coordinator with the same message unchanged. The parent should have already acted on the first ask; repeating identically is noise.
+
+**Fix:** Added `private readonly lastReconcileAsk = new Map<number, string>()` to `OvermindWatcher`. Before sending a demand, `reconcile()` computes the gap signature (`info_check ?? info_request`) and compares it against the stored last-asked signature for that workflow id. If identical → skip. After sending → store. When the gap clears (`info_request null`) or is paused, the entry is deleted so a fresh recurrence triggers a new ask.
+
+**Net behavior:**
+- Same gap, same signature across cycles → asked ONCE, not every 30 min
+- Gap signature changes (e.g. new set of missing items) → new ask sent
+- Gap resolves then recurs → entry deleted on clear, new ask on recurrence
+
+**Tests added** (`tests/overmind-reconcile.test.ts`):
+1. Two reconcile() runs with the same persistent gap → exactly ONE sendCommand total
+2. Gap signature changes between runs → a SECOND sendCommand is sent
+3. Gap clears (info_request null) then recurs with same signature → asks again
+
+**Verification (post-amendment):** `npx tsc --noEmit` clean; `npx vitest run` 27 files, 305 tests — all passed.
