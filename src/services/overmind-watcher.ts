@@ -34,7 +34,7 @@ import { NudgeStateService } from "./nudge-state-service.js";
 
 export const POLL_MS = 30_000;
 export const RECONCILE_MS = 1_800_000;
-export const STUCK_THRESHOLD_MS = 90_000;
+// STUCK_THRESHOLD_MS moved to ./overmind/classifier.ts (B4). Re-exported below.
 
 // Sub-agent detection lives in ./overmind/subagent-detection.ts as of B3 of the
 // modularization refactor (2026-05-23). Re-exported here for public-surface
@@ -84,89 +84,50 @@ export const SPARK_TASK_FALLBACK_PER_HOUR = 1; // max Tier-3 LLM calls per workf
 export const SPARK_TASK_CMD = process.env["OVM_SPARK_CMD"] ?? "codex exec --model gpt-5.3-codex --skip-git-repo-check";
 export const SONNET_TASK_CMD = process.env["OVM_SONNET_FALLBACK_CMD"] ?? "claude -p --dangerously-skip-permissions --model sonnet";
 
-// ─── Pure helper ──────────────────────────────────────────────────────────────
-// Regex-scan a text blob for evidence of task-id states. Returns ONLY ids the
-// regexes matched (no fabrication for unmentioned ids). Case-insensitive, word-
-// boundaried. Patterns follow the locked design.
-export function deriveTaskStateFromText(
-  text: string,
-  tasks: { id: string }[]
-): Map<string, "done" | "in-progress" | "unknown"> {
-  const result = new Map<string, "done" | "in-progress" | "unknown">();
-  const lower = text.toLowerCase();
+// Classifier symbols moved to ./overmind/classifier.ts (B4). Re-exported below
+// for public-surface stability per R2.5.
+export {
+  STUCK_THRESHOLD_MS,
+  deriveTaskStateFromText,
+  classifyWorkflow,
+  classifyParentSession,
+  classifyChildSessionStatus,
+  allTasksComplete
+} from "./overmind/classifier.js";
+export type {
+  ClassifyWorkflowInput,
+  ClassifyResult,
+  ClassifyParentSessionInput
+} from "./overmind/classifier.js";
+// Watcher-internal usages:
+import { STUCK_THRESHOLD_MS } from "./overmind/classifier.js";
 
-  for (const task of tasks) {
-    const id = task.id;
-    if (!id) continue;
-    const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-    // Done patterns:
-    //   \b<id>\b[^\n]{0,40}(PASS|done|merged|VERIFIED)
-    //   (?:✓|✔|\[x\])\s*<id>\b
-    //   <id>\s*(?:✓|✔|done|PASS)
-    const doneRe = new RegExp(
-      `\\b${escapedId}\\b[^\\n]{0,40}(?:pass|done|merged|verified)\\b` +
-      `|(?:✓|✔|\\[x\\])\\s*${escapedId}\\b` +
-      `|\\b${escapedId}\\s*(?:✓|✔|done|pass)`,
-      "i"
-    );
-
-    // In-progress patterns:
-    //   \b<id>\b[^\n]{0,40}(in-flight|in-progress|processing|REVISE|iter-N|FAIL)
-    const inProgressRe = new RegExp(
-      `\\b${escapedId}\\b[^\\n]{0,40}(?:in[\\s\\-]?flight|in[\\s\\-]?progress|processing|revise|iter[\\s\\-]?\\d|fail)\\b`,
-      "i"
-    );
-
-    if (doneRe.test(lower)) {
-      result.set(id, "done");
-    } else if (inProgressRe.test(lower)) {
-      result.set(id, "in-progress");
-    }
-    // Otherwise: no match → do NOT add to result (don't infer pending for unknown)
-  }
-
-  return result;
-}
-
-const NUMBERED_OPTION_RE = /^\s*\d+\.\s+\S+/m;
-const DECISION_FOOTER_RE = /Enter to select|Tab\/Arrow keys to navigate|Type something|Chat about this/i;
-const HUMAN_WAIT_RE = /\bNEEDS-INFO\b|needs info|waiting for (human|user|input)|blocked on (human|user|input)|\bquestion\b|\bplease (confirm|choose|provide|advise)\b/i;
 const RUN_DIR_ACTIVITY_FILES = ["callbacks.md", "progress.md", "queue.md"] as const;
 const TERMINAL_STATUSES: OvermindWorkflowStatus[] = ["paused", "completed", "failed"];
 
 export type OvermindNotify = (text: string) => Promise<void>;
 export type OvermindUpdate = (workflows: OvermindWorkflow[]) => void | Promise<void>;
 
-export interface ClassifyWorkflowInput {
-  coordinatorPane: string;
-  childPanes: string[];
-  childPaneHashChanged?: boolean;
-  coordinatorHashPrev: string | null;
-  mtimeAdvanced: boolean;
-  stuckSincePrev: string | null;
-  now: string;
-}
+// ClassifyWorkflowInput / ClassifyResult / ClassifyParentSessionInput moved to
+// ./overmind/classifier.ts (B4) — re-exported at top of file. Local imports
+// below give the watcher class direct access.
+import type {
+  ClassifyWorkflowInput,
+  ClassifyResult,
+  ClassifyParentSessionInput
+} from "./overmind/classifier.js";
+import {
+  allTasksComplete,
+  classifyWorkflow,
+  classifyParentSession,
+  classifyChildSessionStatus,
+  deriveTaskStateFromText
+} from "./overmind/classifier.js";
 
-export interface ClassifyResult {
-  status: "working" | "stuck" | "waiting_human" | "awaiting_decision";
-  coordinatorHash: string;
-  pendingDecision: string | null;
-  stuckSince: string | null;
-  lastActivityAt: string | null;
-}
-
-export interface ClassifyParentSessionInput {
-  coordinatorPane: string;
-  coordinatorHashPrev: string | null;
-  stuckSincePrev: string | null;
-  now: string;
-}
-
-export interface ActiveSessionAttribution {
-  active_session: string | null;
-  active_role: "parent" | "child" | null;
-}
+// ActiveSessionAttribution lives in ./overmind/active-session-attribution.ts as
+// of B4a (DEC-002). Re-exported for public-surface stability per R2.5.
+export type { ActiveSessionAttribution } from "./overmind/active-session-attribution.js";
+import type { ActiveSessionAttribution } from "./overmind/active-session-attribution.js";
 
 interface NudgeLadderFields {
   nudge_count: number;
@@ -186,118 +147,12 @@ export { hashPane, hasActiveTurn, extractBody, isPaneChromeLine } from "./overmi
 // class methods below call hasActiveTurn/hashPane directly.
 import { hashPane, hasActiveTurn } from "./overmind/pane-utils.js";
 
-export function allTasksComplete(tasks: { state: string }[]): boolean {
-  return tasks.length > 0 && tasks.every((task) => task.state === "done");
-}
+// allTasksComplete, classifyWorkflow, classifyParentSession,
+// classifyChildSessionStatus moved to ./overmind/classifier.ts in B4. The
+// re-exports above keep call sites working until the B9 cleanup pass.
 
-export function determineActiveSessionAttribution(input: {
-  coordinatorSession: string;
-  coordinatorPane: string;
-  childSessions: string[];
-  childPanes: string[];
-}): ActiveSessionAttribution {
-  if (hasActiveTurn(input.coordinatorPane)) {
-    return {
-      active_session: input.coordinatorSession,
-      active_role: "parent"
-    };
-  }
-
-  const activeChildIndex = input.childPanes.findIndex((pane) => hasActiveTurn(pane));
-  if (activeChildIndex >= 0) {
-    return {
-      active_session: input.childSessions[activeChildIndex] ?? null,
-      active_role: input.childSessions[activeChildIndex] ? "child" : null
-    };
-  }
-
-  return {
-    active_session: null,
-    active_role: null
-  };
-}
-
-export function classifyWorkflow(input: ClassifyWorkflowInput): ClassifyResult {
-  const coordinatorHash = hashPane(input.coordinatorPane);
-  const coordinatorHashChanged =
-    input.coordinatorHashPrev !== null && coordinatorHash !== input.coordinatorHashPrev;
-  const childPaneHashChanged = input.childPaneHashChanged === true;
-  const activeTurn = hasActiveTurn(input.coordinatorPane) || input.childPanes.some((pane) => hasActiveTurn(pane));
-  // In-process sub-agent running inside the coordinator counts as active work.
-  const subAgentRunning = subAgentInFlight(input.coordinatorPane);
-
-  if (activeTurn || coordinatorHashChanged || input.mtimeAdvanced || childPaneHashChanged || subAgentRunning) {
-    return {
-      status: "working",
-      coordinatorHash,
-      pendingDecision: null,
-      stuckSince: null,
-      lastActivityAt: input.now
-    };
-  }
-
-  if (isDecisionPrompt(input.coordinatorPane)) {
-    return {
-      status: "awaiting_decision",
-      coordinatorHash,
-      pendingDecision: capturePendingDecision(input.coordinatorPane),
-      stuckSince: null,
-      lastActivityAt: null
-    };
-  }
-
-  if (HUMAN_WAIT_RE.test(input.coordinatorPane)) {
-    return {
-      status: "waiting_human",
-      coordinatorHash,
-      pendingDecision: null,
-      stuckSince: null,
-      lastActivityAt: null
-    };
-  }
-
-  const stuckSince = input.stuckSincePrev ?? input.now;
-  return {
-    status: isPastStuckThreshold(stuckSince, input.now) ? "stuck" : "working",
-    coordinatorHash,
-    pendingDecision: null,
-    stuckSince,
-    lastActivityAt: null
-  };
-}
-
-export function classifyParentSession(input: ClassifyParentSessionInput): OvermindParentStatus {
-  const coordinatorHash = hashPane(input.coordinatorPane);
-  const coordinatorHashChanged =
-    input.coordinatorHashPrev !== null && coordinatorHash !== input.coordinatorHashPrev;
-
-  if (hasActiveTurn(input.coordinatorPane) || coordinatorHashChanged) {
-    return "working";
-  }
-
-  if (isDecisionPrompt(input.coordinatorPane)) {
-    return "awaiting_decision";
-  }
-
-  if (HUMAN_WAIT_RE.test(input.coordinatorPane)) {
-    return "waiting_human";
-  }
-
-  if (input.stuckSincePrev && isPastStuckThreshold(input.stuckSincePrev, input.now)) {
-    return "stuck";
-  }
-
-  return "idle";
-}
-
-export function classifyChildSessionStatus(input: {
-  pane: string;
-  exists: boolean;
-  paneHashChanged?: boolean;
-}): OvermindChildSessionStatus["status"] {
-  if (!input.exists) return "closed";
-  return hasActiveTurn(input.pane) || input.paneHashChanged === true ? "working" : "idle";
-}
+export { determineActiveSessionAttribution } from "./overmind/active-session-attribution.js";
+import { determineActiveSessionAttribution } from "./overmind/active-session-attribution.js";
 
 // Grace before nagging about an empty tasklist — a freshly-registered run may push its
 // tasks a beat after register. Past this, an empty tasklist is a genuine omission.
@@ -1822,20 +1677,7 @@ function hashShort(text: string): string {
   return createHash("sha256").update(text).digest("hex").slice(0, 16);
 }
 
-function isDecisionPrompt(pane: string): boolean {
-  return NUMBERED_OPTION_RE.test(pane) && DECISION_FOOTER_RE.test(pane);
-}
-
-function capturePendingDecision(pane: string): string {
-  const lines = pane
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const firstOptionIndex = lines.findIndex((line) => /^\d+\.\s+\S+/.test(line));
-  const start = firstOptionIndex === -1 ? Math.max(0, lines.length - 12) : Math.max(0, firstOptionIndex - 3);
-  return lines.slice(start, start + 14).join("\n").slice(0, 2000);
-}
+// isDecisionPrompt + capturePendingDecision moved to ./overmind/classifier.ts (B4)
 
 function summarizeTasks(tasks: { id: string; label: string; state: string }[]): string {
   if (tasks.length === 0) return "<no tasks>";
@@ -1864,12 +1706,7 @@ async function readFileBestEffort(filePath: string): Promise<string> {
   }
 }
 
-function isPastStuckThreshold(stuckSince: string, now: string): boolean {
-  const stuckSinceMs = parseTimestamp(stuckSince);
-  const nowMs = parseTimestamp(now);
-  if (stuckSinceMs === null || nowMs === null) return false;
-  return nowMs - stuckSinceMs >= STUCK_THRESHOLD_MS;
-}
+// isPastStuckThreshold moved to ./overmind/classifier.ts (B4)
 
 function parseTimestamp(value: string | null): number | null {
   if (!value) return null;
