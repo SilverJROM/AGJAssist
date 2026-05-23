@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DatabaseService } from "../src/db/database.js";
-import { OvermindService } from "../src/services/overmind-service.js";
+import { DuplicateRunDirError, OvermindService } from "../src/services/overmind-service.js";
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
@@ -831,5 +831,116 @@ describe("OvermindService", () => {
 
     const noMatch = service.listHistory("nonexistent-session");
     expect(noMatch.length).toBe(0);
+  });
+
+  it("rejects register() with DuplicateRunDirError when an active workflow already owns the same run_dir under a different coordinator_session", () => {
+    const first = service.register({
+      label: "HRIS · trapprove",
+      coordinator_session: "hris-d-22",
+      run_dir: "/home/agjrom/websites/HRIS/plan/WK_0522/tr-auto-approve/projcore-run-2026-05-23",
+      tasks: [{ id: "B1", label: "Schema migration", state: "processing" }]
+    });
+    expect(first.id).toBeGreaterThan(0);
+
+    // Different coord session, same run_dir, existing row still active → reject.
+    expect(() =>
+      service.register({
+        label: "HRIS · trapprove",
+        coordinator_session: "hris-claude-main",
+        run_dir: "/home/agjrom/websites/HRIS/plan/WK_0522/tr-auto-approve/projcore-run-2026-05-23",
+        tasks: []
+      })
+    ).toThrow(DuplicateRunDirError);
+
+    try {
+      service.register({
+        label: "HRIS · trapprove",
+        coordinator_session: "hris-claude-main",
+        run_dir: "/home/agjrom/websites/HRIS/plan/WK_0522/tr-auto-approve/projcore-run-2026-05-23",
+        tasks: []
+      });
+    } catch (err) {
+      expect(err).toBeInstanceOf(DuplicateRunDirError);
+      const existing = (err as DuplicateRunDirError).existing;
+      expect(existing.id).toBe(first.id);
+      expect(existing.coordinator_session).toBe("hris-d-22");
+    }
+
+    // Still only one row — the duplicate did not insert.
+    expect(service.list()).toHaveLength(1);
+  });
+
+  it("allows re-register under the same coordinator_session (idempotent upsert path)", () => {
+    const first = service.register({
+      label: "L",
+      coordinator_session: "same-session",
+      run_dir: "/tmp/overmind/same-run-dir",
+      tasks: []
+    });
+    const again = service.register({
+      label: "L",
+      coordinator_session: "same-session",
+      run_dir: "/tmp/overmind/same-run-dir",
+      tasks: []
+    });
+    expect(again.id).toBe(first.id);
+    expect(service.list()).toHaveLength(1);
+  });
+
+  it("allows a new workflow on the same run_dir once the prior one is completed", () => {
+    const first = service.register({
+      label: "L",
+      coordinator_session: "old-session",
+      run_dir: "/tmp/overmind/reusable-dir",
+      tasks: [{ id: "A", label: "A", state: "done" }]
+    });
+    service.setStatus(first.id, "completed");
+
+    // Completed row no longer blocks a fresh registration under a new coord session.
+    const fresh = service.register({
+      label: "L round 2",
+      coordinator_session: "new-session",
+      run_dir: "/tmp/overmind/reusable-dir",
+      tasks: []
+    });
+    expect(fresh.id).not.toBe(first.id);
+    expect(service.list()).toHaveLength(2);
+  });
+
+  it("sanitizes markdown table chrome (header + separator) out of task lists on register()", () => {
+    const created = service.register({
+      label: "trash-paste",
+      coordinator_session: "tp-session",
+      run_dir: "/tmp/overmind/trash-paste",
+      current_task: "| # | Batch | Owner | Status | Notes |",
+      tasks: [
+        { id: "row-1", label: "| # | Batch | Owner | Status | Notes |", state: "pending" },
+        { id: "row-2", label: "|---|-------|-------|--------|-------|", state: "pending" },
+        { id: "row-3", label: "| B0 | Design memo rev | codex-impl | DONE | …", state: "pending" },
+        { id: "row-4", label: "   ", state: "pending" }
+      ]
+    });
+
+    // Header + separator + empty-only labels dropped; real task survives.
+    expect(created.tasks.map((t) => t.id)).toEqual(["row-3"]);
+    // current_task was a table header → nulled.
+    expect(created.current_task).toBeNull();
+  });
+
+  it("sanitizes markdown table chrome out of task lists on setTasks() too", () => {
+    const created = service.register({
+      label: "trash-paste-2",
+      coordinator_session: "tp2-session",
+      run_dir: "/tmp/overmind/trash-paste-2",
+      tasks: []
+    });
+
+    const updated = service.setTasks(created.id, "|---|---|---|", [
+      { id: "row-1", label: "|---|---|---|", state: "pending" },
+      { id: "row-2", label: "| # | Batch |", state: "pending" },
+      { id: "row-3", label: "Real task", state: "processing" }
+    ]);
+    expect(updated?.tasks.map((t) => t.id)).toEqual(["row-3"]);
+    expect(updated?.current_task).toBeNull();
   });
 });

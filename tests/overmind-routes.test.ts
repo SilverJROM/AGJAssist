@@ -159,6 +159,61 @@ describe("Overmind routes", () => {
     expect(overmindService.list()).toHaveLength(1);
   });
 
+  it("rejects /register with 409 when a different coordinator_session already owns the same run_dir (1 workflow per parent)", async () => {
+    const first = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "HRIS · trapprove",
+      session: "hris-d-22",
+      run_dir: "/home/agjrom/websites/HRIS/plan/WK_0522/tr-auto-approve/projcore-run-2026-05-23"
+    });
+    expect(first.statusCode).toBe(201);
+
+    const dup = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "HRIS · trapprove",
+      session: "hris-claude-main",
+      run_dir: "/home/agjrom/websites/HRIS/plan/WK_0522/tr-auto-approve/projcore-run-2026-05-23"
+    });
+    expect(dup.statusCode).toBe(409);
+    const body = dup.json();
+    expect(body.existing.coordinator_session).toBe("hris-d-22");
+    expect(body.existing.id).toBe(first.json().workflow.id);
+
+    // Only one workflow row exists — the duplicate did not persist.
+    expect(overmindService.list()).toHaveLength(1);
+  });
+
+  it("sanitizes markdown table chrome out of tasks on /register and /tasks", async () => {
+    const reg = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "trash-paste",
+      session: "tp-route",
+      run_dir: "/tmp/overmind/trash-paste-route",
+      current_task: "| # | Batch | Owner | Status | Notes |",
+      tasks: [
+        { id: "row-1", label: "| # | Batch | Owner | Status | Notes |", state: "pending" },
+        { id: "row-2", label: "|---|-------|-------|--------|-------|", state: "pending" },
+        { id: "row-3", label: "| B0 | Design memo rev | codex-impl | DONE | …", state: "pending" }
+      ]
+    });
+    expect(reg.statusCode).toBe(201);
+    expect(reg.json().workflow.tasks.map((t: { id: string }) => t.id)).toEqual(["row-3"]);
+    expect(reg.json().workflow.current_task).toBeNull();
+
+    const upd = await lifecyclePost("/api/overmind/tasks", {
+      token: OVERMIND_TOKEN,
+      session: "tp-route",
+      current_task: "|---|---|---|",
+      tasks: [
+        { id: "row-a", label: "|---|---|---|", state: "pending" },
+        { id: "row-b", label: "Real follow-up", state: "processing" }
+      ]
+    });
+    expect(upd.statusCode).toBe(200);
+    expect(upd.json().workflow.tasks.map((t: { id: string }) => t.id)).toEqual(["row-b"]);
+    expect(upd.json().workflow.current_task).toBeNull();
+  });
+
   it("rejects lifecycle requests with missing or invalid token and non-loopback source", async () => {
     const missingToken = await lifecyclePost("/api/overmind/register", {
       label: "bad",

@@ -3,6 +3,7 @@ import { AppConfig } from "../../config/config.js";
 import { createAuthMiddleware } from "../../auth/auth-middleware.js";
 import { AuthService } from "../../auth/auth-service.js";
 import {
+  DuplicateRunDirError,
   OvermindService,
   OvermindTask,
   OvermindWorkflowStatus,
@@ -110,17 +111,35 @@ export function registerOvermindRoutes(
         return reply.code(400).send({ error: "label, session, and run_dir are required" });
       }
 
-      const workflow = overmindService.register({
-        label,
-        coordinator_session: session,
-        child_sessions,
-        child_roles,
-        run_dir,
-        current_task,
-        tasks
-      });
-
-      return reply.code(201).send({ workflow });
+      try {
+        const workflow = overmindService.register({
+          label,
+          coordinator_session: session,
+          child_sessions,
+          child_roles,
+          run_dir,
+          current_task,
+          tasks
+        });
+        return reply.code(201).send({ workflow });
+      } catch (err) {
+        // Duplicate-run_dir collision: another active workflow already owns this run_dir
+        // under a different coordinator_session (JROM's "1 workflow per parent session"
+        // rule). Return 409 with the existing row so the caller can recover.
+        if (err instanceof DuplicateRunDirError) {
+          return reply.code(409).send({
+            error: err.message,
+            existing: {
+              id: err.existing.id,
+              coordinator_session: err.existing.coordinator_session,
+              label: err.existing.label,
+              run_dir: err.existing.run_dir,
+              status: err.existing.status
+            }
+          });
+        }
+        throw err;
+      }
     }
   );
 

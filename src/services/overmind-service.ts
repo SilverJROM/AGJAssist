@@ -171,11 +171,66 @@ interface OvermindTaskHistoryRow {
   total: number;
 }
 
+// Thrown by `register` when another non-terminal workflow already owns the same `run_dir`
+// under a different `coordinator_session`. Enforces JROM's "1 workflow per parent session"
+// rule — a parent that renamed its tmux session must close the old workflow before
+// re-registering, instead of silently spawning a duplicate row (e.g. the hris-d-22 /
+// hris-claude-main twins on 2026-05-23).
+export class DuplicateRunDirError extends Error {
+  constructor(public readonly existing: OvermindWorkflow) {
+    super(
+      `Workflow already registered as coordinator_session='${existing.coordinator_session}' (id=${existing.id}) for run_dir='${existing.run_dir}'. ` +
+        `One workflow per parent session — reuse the existing session or POST /api/overmind/complete on it first.`
+    );
+    this.name = "DuplicateRunDirError";
+  }
+}
+
+// Recognises markdown table chrome that callers sometimes paste as task labels
+// when they naively line-scan a queue.md (header `| # | Batch | ... |` and the
+// `|---|---|...|` separator). Conservative — only the obviously-structural lines
+// are dropped; legit short labels containing pipes still pass.
+const TABLE_SEPARATOR_RE = /^[\s|\-:=_*]+$/;
+const TABLE_HEADER_RE = /^\s*\|\s*#\s*\|/i;
+
+function isTrashTaskLabel(label: string | null | undefined): boolean {
+  const trimmed = (label ?? "").trim();
+  if (!trimmed) return true;
+  if (TABLE_SEPARATOR_RE.test(trimmed)) return true;
+  if (TABLE_HEADER_RE.test(trimmed)) return true;
+  return false;
+}
+
+function sanitizeTaskList(tasks: OvermindTask[] | undefined): OvermindTask[] {
+  return (tasks ?? []).filter((t) => !isTrashTaskLabel(t?.label));
+}
+
+function sanitizeCurrentTask(current: string | null | undefined): string | null {
+  if (current == null) return null;
+  return isTrashTaskLabel(current) ? null : current;
+}
+
 export class OvermindService {
   constructor(private readonly db: DatabaseService) {}
 
   register(input: RegisterOvermindWorkflowInput): OvermindWorkflow {
-    const tasks = input.tasks ?? [];
+    // Same-run_dir duplicate check (see DuplicateRunDirError above). Skip terminal rows
+    // so re-running the same project after completion is still allowed.
+    const collision = this.db
+      .prepare(
+        `SELECT * FROM overmind_workflows
+         WHERE run_dir = ?
+           AND coordinator_session != ?
+           AND status NOT IN ('completed','failed')
+         LIMIT 1`
+      )
+      .get(input.run_dir, input.coordinator_session) as OvermindWorkflowRow | undefined;
+    if (collision) {
+      throw new DuplicateRunDirError(this.mapRow(collision));
+    }
+
+    const tasks = sanitizeTaskList(input.tasks);
+    const currentTask = sanitizeCurrentTask(input.current_task);
     const now = this.isoNow();
     const endedAt = this.computeEndedAt(tasks, "active", null, now);
     const row = this.db
@@ -231,7 +286,7 @@ export class OvermindService {
         JSON.stringify(input.child_sessions ?? []),
         JSON.stringify(input.child_roles ?? []),
         input.run_dir,
-        input.current_task ?? null,
+        currentTask,
         JSON.stringify(tasks),
         endedAt,
         now,
@@ -498,6 +553,11 @@ export class OvermindService {
   setTasks(id: number, currentTask: string | null, tasks: OvermindTask[]): OvermindWorkflow | null {
     const existing = this.get(id);
     if (!existing) return null;
+    // Same defensive filter as register — strips markdown table chrome ("| # | Batch | …"
+    // and "|---|---|") and empty labels before persisting. Callers that accidentally
+    // pipe a queue.md through line-by-line stop polluting the dashboard.
+    tasks = sanitizeTaskList(tasks);
+    currentTask = sanitizeCurrentTask(currentTask);
     const now = this.isoNow();
     const doneCount = this.countDoneTasks(tasks);
     const existingDoneCount = this.countDoneTasks(existing.tasks);
