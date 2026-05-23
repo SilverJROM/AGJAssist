@@ -21,6 +21,7 @@ import { OvermindService } from "./services/overmind-service.js";
 import { OvermindWatcher, POLL_MS } from "./services/overmind-watcher.js";
 import { SonnetOvermindBrain } from "./services/overmind-brain.js";
 import { AppSettingsService } from "./services/app-settings-service.js";
+import { NudgeStateService } from "./services/nudge-state-service.js";
 import { OvermindStreamManager } from "./api/websocket/overmind-stream-manager.js";
 import { OvmSessionService } from "./services/ovm-session.js";
 import {
@@ -73,6 +74,8 @@ async function main(): Promise<void> {
   const overmindService = new OvermindService(db);
   const appSettingsService = new AppSettingsService();
   await appSettingsService.load();
+  const nudgeStateService = new NudgeStateService();
+  await nudgeStateService.load();
   const ovmSessionService = new OvmSessionService(tmuxService, {
     overmindToken: config.overmind.token
   });
@@ -97,7 +100,8 @@ async function main(): Promise<void> {
     overmindNotify,
     overmindBrain,
     (workflows) => overmindStreamManager.broadcast(workflows),
-    appSettingsService
+    appSettingsService,
+    nudgeStateService
   );
 
   // Tmux streaming

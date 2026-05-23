@@ -30,6 +30,7 @@ import {
   DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN,
   DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN
 } from "./app-settings-service.js";
+import { NudgeStateService } from "./nudge-state-service.js";
 
 export const POLL_MS = 30_000;
 export const RECONCILE_MS = 1_800_000;
@@ -626,7 +627,8 @@ export class OvermindWatcher {
     private readonly notify?: OvermindNotify,
     private readonly brain?: OvermindBrain,
     private readonly onUpdate?: OvermindUpdate,
-    private readonly appSettings?: AppSettingsService
+    private readonly appSettings?: AppSettingsService,
+    private readonly nudgeState?: NudgeStateService
   ) {}
 
   async tick(): Promise<void> {
@@ -1229,7 +1231,12 @@ export class OvermindWatcher {
     if (this.appSettings) {
       const idleCooldownMs = this.appSettings.get().idle_nudge_cooldown_minutes * 60_000;
       const nowMs = Date.now();
-      const lastIdleNudge = this.lastIdleNudgeAt.get(workflow.id) ?? 0;
+      // Prefer persisted timestamp (survives restarts); fall back to in-memory for tests
+      // that don't inject nudgeState.
+      const lastIdleNudge =
+        this.nudgeState?.getLastIdleNudge(workflow.id) ??
+        this.lastIdleNudgeAt.get(workflow.id) ??
+        0;
       if (nowMs - lastIdleNudge < idleCooldownMs) {
         // Still in cooldown — return current state unchanged (no increment, no send).
         return { nudge_count: workflow.nudge_count, tier: workflow.tier };
@@ -1241,8 +1248,11 @@ export class OvermindWatcher {
     // the nudge probes for an unregistered child instead of asking about callbacks.
     const nudgeText = (workflow.child_sessions?.length ?? 0) === 0 ? CANNED_NUDGE_NO_CHILD : CANNED_NUDGE;
     await this.tmuxService.sendAndSubmit(workflow.coordinator_session, nudgeText);
-    // Record the send time AFTER successful sendAndSubmit.
-    this.lastIdleNudgeAt.set(workflow.id, Date.now());
+    // Record the send time AFTER successful sendAndSubmit — both in-memory (for tests
+    // that don't inject nudgeState) and in the persisted store (survives restarts).
+    const sendTs = Date.now();
+    this.lastIdleNudgeAt.set(workflow.id, sendTs);
+    this.nudgeState?.setLastIdleNudge(workflow.id, sendTs);
     const postNudgePane = await this.capturePaneSafe(workflow.coordinator_session);
     return {
       nudge_count: nextNudgeCount,
@@ -1365,8 +1375,9 @@ export class OvermindWatcher {
     this.subagentInFlight.delete(workflowId);
     this.apparentIdleSince.delete(workflowId);
     this.lastSubagentAskAt.delete(workflowId);
-    // Idle-nudge cooldown
+    // Idle-nudge cooldown (in-memory + persisted)
     this.lastIdleNudgeAt.delete(workflowId);
+    this.nudgeState?.clearWorkflow(workflowId);
   }
 
   // Async derivation of per-task states from local files + pane text. Best-effort:

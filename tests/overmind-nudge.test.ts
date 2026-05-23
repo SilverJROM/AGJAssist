@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Fastify, { FastifyInstance } from "fastify";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { DatabaseService } from "../src/db/database.js";
 import { AuthService } from "../src/auth/auth-service.js";
@@ -15,6 +16,7 @@ import {
 } from "../src/services/overmind-watcher.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 import type { AppSettingsService, OvermindCooldowns } from "../src/services/app-settings-service.js";
+import { NudgeStateService } from "../src/services/nudge-state-service.js";
 
 const TEST_DB = path.join("data", "test-overmind-nudge.sqlite");
 const BOT_TOKEN = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11";
@@ -464,6 +466,73 @@ describe("Idle-nudge cooldown", () => {
     await watcher.tick();
     expect(service.get(workflow.id)?.nudge_count).toBe(2);
     expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ─── Persisted cooldown survives watcher restart ─────────────────────────────
+
+describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateService)", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-nudge-restart-test-"));
+    vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
+    fs.mkdirSync(path.join(tmpDir, "data"), { recursive: true });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("cooldown holds after simulated pm2 restart (new OvermindWatcher + same NudgeStateService)", async () => {
+    // ── Setup ──────────────────────────────────────────────────────────────────
+    const workflow = service.register({
+      label: "restart-persist",
+      coordinator_session: "coord-rp",
+      child_sessions: ["child-rp"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.update(workflow.id, {
+      last_pane_hash: hashPane(QUIET_PANE),
+      stuck_since: "2000-01-01T00:00:00.000Z"
+    });
+
+    const tmux = makeTmuxMock({ "coord-rp": QUIET_PANE, "child-rp": "child quiet pane" });
+    // 30-minute cooldown, same as the live setting.
+    const settings = makeSettingsStub(30);
+    const nudgeState = new NudgeStateService();
+    await nudgeState.load();
+
+    const watcher1 = new OvermindWatcher(service, tmux, undefined, undefined, undefined, settings, nudgeState);
+
+    // ── First tick: nudge fires, timestamp persisted ────────────────────────────
+    await watcher1.tick();
+    let updated = service.get(workflow.id);
+    expect(updated?.nudge_count).toBe(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-rp", CANNED_NUDGE);
+
+    // Verify the timestamp landed in the persisted store (non-zero).
+    expect(nudgeState.getLastIdleNudge(workflow.id)).toBeGreaterThan(0);
+
+    // ── Simulate pm2 restart: new OvermindWatcher instance, same NudgeStateService ──
+    // (NudgeStateService.load() already ran; on a real restart we'd load() again from
+    // the same file — simulate that by creating a NEW service that reads from the same file.)
+    const nudgeState2 = new NudgeStateService();
+    await nudgeState2.load();
+
+    const tmux2 = makeTmuxMock({ "coord-rp": QUIET_PANE, "child-rp": "child quiet pane" });
+    const watcher2 = new OvermindWatcher(service, tmux2, undefined, undefined, undefined, settings, nudgeState2);
+
+    // ── Immediately stuck again — cooldown should hold ─────────────────────────
+    // (the in-memory lastIdleNudgeAt on watcher2 starts at 0, but nudgeState2
+    // returns the persisted timestamp → cooldown is respected).
+    await watcher2.tick();
+    updated = service.get(workflow.id);
+    // nudge_count must NOT increment — the persisted timestamp suppressed the send.
+    expect(updated?.nudge_count).toBe(1);
+    expect(tmux2.sendAndSubmit).not.toHaveBeenCalled();
   });
 });
 
