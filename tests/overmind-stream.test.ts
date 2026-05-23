@@ -4,7 +4,8 @@ import { WebSocket } from "ws";
 import { OvermindStreamManager } from "../src/api/websocket/overmind-stream-manager.js";
 import { AuthService } from "../src/auth/auth-service.js";
 import { OvermindService, OvermindWorkflow } from "../src/services/overmind-service.js";
-import { OvermindWatcher, hashPane } from "../src/services/overmind-watcher.js";
+import { OvermindWatcher } from "../src/services/overmind-watcher.js";
+import { hashPane } from "../src/services/overmind/pane-utils.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 import {
   buildOvermindWsUrl,

@@ -2,12 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   classifyChildSessionStatus,
   classifyParentSession,
-  classifyWorkflow,
-  determineActiveSessionAttribution,
-  extractBody,
-  hashPane,
-  hasActiveTurn
-} from "../src/services/overmind-watcher.js";
+  classifyWorkflow
+} from "../src/services/overmind/classifier.js";
+import { determineActiveSessionAttribution } from "../src/services/overmind/active-session-attribution.js";
+import { extractBody, hashPane, hasActiveTurn } from "../src/services/overmind/pane-utils.js";
 
 const NOW = "2026-05-21T12:00:00.000Z";
 

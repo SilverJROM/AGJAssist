@@ -13,9 +13,9 @@ import {
 import { OvermindService, OvermindWorkflow } from "../src/services/overmind-service.js";
 import {
   FRONTLOAD_CORRECTION_NOTE,
-  OvermindWatcher,
-  hashPane
+  OvermindWatcher
 } from "../src/services/overmind-watcher.js";
+import { hashPane } from "../src/services/overmind/pane-utils.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 
 const TEST_DB = path.join("data", "test-overmind-decision.sqlite");

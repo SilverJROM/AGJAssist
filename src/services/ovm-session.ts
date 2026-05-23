@@ -1,4 +1,4 @@
-import { hasActiveTurn } from "./overmind-watcher.js";
+import { hasActiveTurn } from "./overmind/pane-utils.js";
 import { TmuxService } from "../tmux/tmux-service.js";
 
 const DEFAULT_SESSION = "OVM";

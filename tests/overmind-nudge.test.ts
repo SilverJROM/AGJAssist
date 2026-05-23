@@ -11,9 +11,9 @@ import { OvermindService } from "../src/services/overmind-service.js";
 import {
   ALL_DONE_CONFIRM_NUDGE,
   CANNED_NUDGE,
-  OvermindWatcher,
-  hashPane
+  OvermindWatcher
 } from "../src/services/overmind-watcher.js";
+import { hashPane } from "../src/services/overmind/pane-utils.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 import type { AppSettingsService, OvermindCooldowns } from "../src/services/app-settings-service.js";
 import { NudgeStateService } from "../src/services/nudge-state-service.js";

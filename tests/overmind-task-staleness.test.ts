@@ -2,12 +2,12 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  deriveTaskStateFromText,
   invokeJudgeWithFallback,
   OvermindWatcher,
   TASK_STALE_NAG_COOLDOWN_MS,
   TASK_RECENT_UPDATE_GRACE_MS
 } from "../src/services/overmind-watcher.js";
+import { deriveTaskStateFromText } from "../src/services/overmind/classifier.js";
 import { OvermindService, OvermindWorkflow } from "../src/services/overmind-service.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 

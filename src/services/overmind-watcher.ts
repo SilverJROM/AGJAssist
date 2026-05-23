@@ -34,21 +34,10 @@ import { NudgeStateService } from "./nudge-state-service.js";
 
 export const POLL_MS = 30_000;
 export const RECONCILE_MS = 1_800_000;
-// STUCK_THRESHOLD_MS moved to ./overmind/classifier.ts (B4). Re-exported below.
+// STUCK_THRESHOLD_MS owned by ./overmind/classifier.ts (B4 + B9). Imported below.
 
-// Sub-agent detection lives in ./overmind/subagent-detection.ts as of B3 of the
-// modularization refactor (2026-05-23). Re-exported here for public-surface
-// stability per og-requirements R2.5.
-export {
-  SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS,
-  SUBAGENT_REASK_GRACE_MS,
-  SUBAGENT_DURATION_GRACE_MS,
-  SUBAGENT_PATTERNS,
-  subAgentInFlight,
-  paneShowsSubagentDone,
-  parseSubagentAckFromPane
-} from "./overmind/subagent-detection.js";
-// Local bindings the watcher class methods use directly:
+// Sub-agent detection lives in ./overmind/subagent-detection.ts (B3). Local
+// imports for the watcher class methods.
 import {
   SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS,
   SUBAGENT_REASK_GRACE_MS,
@@ -62,18 +51,8 @@ export const MAX_CANNED_NUDGES = 2;
 export const BRAIN_COORDINATOR_TAIL_LINES = 40;
 export const BRAIN_RUN_FILE_TAIL_LINES = 80;
 export const DECISION_HANDLED_TIER = 4;
-// PRIOR_DECISION_* constants live in ./overmind/decision-match.ts (B6).
-export {
-  PRIOR_DECISION_CONTEXT_CHAR_LIMIT,
-  PRIOR_DECISION_FILE_CHAR_LIMIT,
-  PRIOR_DECISION_MAX_FILES,
-  applyAlwaysEscalateGuardrail,
-  collectPriorDecisions,
-  extractDecisionTerms,
-  selectDecisionSnippet,
-  countOccurrences,
-  checkedContextLine
-} from "./overmind/decision-match.js";
+// Prior-decision matching + ALWAYS_ESCALATE guardrail live in
+// ./overmind/decision-match.ts (B6). Local imports for the watcher's use.
 import {
   applyAlwaysEscalateGuardrail,
   collectPriorDecisions,
@@ -98,22 +77,9 @@ export const SPARK_TASK_FALLBACK_PER_HOUR = 1; // max Tier-3 LLM calls per workf
 export const SPARK_TASK_CMD = process.env["OVM_SPARK_CMD"] ?? "codex exec --model gpt-5.3-codex --skip-git-repo-check";
 export const SONNET_TASK_CMD = process.env["OVM_SONNET_FALLBACK_CMD"] ?? "claude -p --dangerously-skip-permissions --model sonnet";
 
-// Classifier symbols moved to ./overmind/classifier.ts (B4). Re-exported below
-// for public-surface stability per R2.5.
-export {
-  STUCK_THRESHOLD_MS,
-  deriveTaskStateFromText,
-  classifyWorkflow,
-  classifyParentSession,
-  classifyChildSessionStatus,
-  allTasksComplete
-} from "./overmind/classifier.js";
-export type {
-  ClassifyWorkflowInput,
-  ClassifyResult,
-  ClassifyParentSessionInput
-} from "./overmind/classifier.js";
-// Watcher-internal usages:
+// Classifier symbols are owned by ./overmind/classifier.ts (B4). The B9 cleanup
+// dropped the barrel re-exports — call sites now import from the new direct
+// paths. Local imports below for the watcher's own usage.
 import { STUCK_THRESHOLD_MS } from "./overmind/classifier.js";
 
 const RUN_DIR_ACTIVITY_FILES = ["callbacks.md", "progress.md", "queue.md"] as const;
@@ -122,9 +88,9 @@ const TERMINAL_STATUSES: OvermindWorkflowStatus[] = ["paused", "completed", "fai
 export type OvermindNotify = (text: string) => Promise<void>;
 export type OvermindUpdate = (workflows: OvermindWorkflow[]) => void | Promise<void>;
 
-// ClassifyWorkflowInput / ClassifyResult / ClassifyParentSessionInput moved to
-// ./overmind/classifier.ts (B4) — re-exported at top of file. Local imports
-// below give the watcher class direct access.
+// Classifier inputs/outputs + ActiveSessionAttribution are owned by
+// ./overmind/classifier.ts + active-session-attribution.ts (B4 + B4a). The
+// watcher class uses them locally.
 import type {
   ClassifyWorkflowInput,
   ClassifyResult,
@@ -137,10 +103,6 @@ import {
   classifyChildSessionStatus,
   deriveTaskStateFromText
 } from "./overmind/classifier.js";
-
-// ActiveSessionAttribution lives in ./overmind/active-session-attribution.ts as
-// of B4a (DEC-002). Re-exported for public-surface stability per R2.5.
-export type { ActiveSessionAttribution } from "./overmind/active-session-attribution.js";
 import type { ActiveSessionAttribution } from "./overmind/active-session-attribution.js";
 
 interface NudgeLadderFields {
@@ -152,34 +114,12 @@ interface NudgeLadderFields {
   pending_decision?: string | null;
 }
 
-// Pure pane-text utilities live in ./overmind/pane-utils.ts as of B2 of the
-// modularization refactor (2026-05-23). Re-exported here for public-surface
-// stability per og-requirements R2.5 — existing call sites keep working until
-// the B9 cleanup pass.
-export { hashPane, hasActiveTurn, extractBody, isPaneChromeLine } from "./overmind/pane-utils.js";
-// Local bindings — `export { … } from` doesn't introduce them, but the watcher
-// class methods below call hasActiveTurn/hashPane directly.
+// Pure pane-text utilities live in ./overmind/pane-utils.ts (B2). Watcher
+// class methods use them locally.
 import { hashPane, hasActiveTurn } from "./overmind/pane-utils.js";
-
-// allTasksComplete, classifyWorkflow, classifyParentSession,
-// classifyChildSessionStatus moved to ./overmind/classifier.ts in B4. The
-// re-exports above keep call sites working until the B9 cleanup pass.
-
-export { determineActiveSessionAttribution } from "./overmind/active-session-attribution.js";
 import { determineActiveSessionAttribution } from "./overmind/active-session-attribution.js";
 
-// Completeness symbols moved to ./overmind/completeness.ts (B5). Re-exported
-// below for public-surface stability per R2.5. Local imports give the watcher
-// class direct access.
-export {
-  EMPTY_TASKLIST_GRACE_MS,
-  STALE_THRESHOLD_MS,
-  assessRegistrationCompleteness
-} from "./overmind/completeness.js";
-export type {
-  CompletenessInput,
-  CompletenessResult
-} from "./overmind/completeness.js";
+// Completeness assessment lives in ./overmind/completeness.ts (B5).
 import { assessRegistrationCompleteness } from "./overmind/completeness.js";
 import type { CompletenessResult } from "./overmind/completeness.js";
 

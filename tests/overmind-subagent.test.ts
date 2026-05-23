@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { OvermindWatcher } from "../src/services/overmind-watcher.js";
+import { hashPane } from "../src/services/overmind/pane-utils.js";
 import {
   SUBAGENT_PATTERNS,
   SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS,
@@ -6,10 +8,8 @@ import {
   SUBAGENT_DURATION_GRACE_MS,
   subAgentInFlight,
   paneShowsSubagentDone,
-  parseSubagentAckFromPane,
-  OvermindWatcher,
-  hashPane
-} from "../src/services/overmind-watcher.js";
+  parseSubagentAckFromPane
+} from "../src/services/overmind/subagent-detection.js";
 import { OvermindService, OvermindWorkflow } from "../src/services/overmind-service.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 

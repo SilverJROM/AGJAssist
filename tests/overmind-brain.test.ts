@@ -15,7 +15,8 @@ import {
 } from "../src/services/overmind-brain.js";
 import { ChatMessage, LlmProvider } from "../src/llm/base-provider.js";
 import { OvermindService, OvermindWorkflow } from "../src/services/overmind-service.js";
-import { OvermindWatcher, hashPane } from "../src/services/overmind-watcher.js";
+import { OvermindWatcher } from "../src/services/overmind-watcher.js";
+import { hashPane } from "../src/services/overmind/pane-utils.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 
 const TEST_DB = path.join("data", "test-overmind-brain.sqlite");

@@ -4,7 +4,7 @@ import {
   EMPTY_TASKLIST_GRACE_MS,
   STALE_THRESHOLD_MS,
   CompletenessInput
-} from "../src/services/overmind-watcher.js";
+} from "../src/services/overmind/completeness.js";
 
 // Re-export type alias used in staleness tests for clarity.
 type TaskState = "done" | "in-progress" | "unknown";
