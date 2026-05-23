@@ -14,6 +14,7 @@ import {
   hashPane
 } from "../src/services/overmind-watcher.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
+import type { AppSettingsService, OvermindCooldowns } from "../src/services/app-settings-service.js";
 
 const TEST_DB = path.join("data", "test-overmind-nudge.sqlite");
 const BOT_TOKEN = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11";
@@ -383,6 +384,86 @@ describe("Overmind watcher nudge ladder", () => {
     expect(updated?.tier).toBe(2);
     expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(2);
     expect(tmux.sendAndSubmit.mock.calls.every((call: [string, string]) => call[0] === "coord-4")).toBe(true);
+  });
+});
+
+// ─── Idle-nudge cooldown tests ───────────────────────────────────────────────
+
+function makeSettingsStub(idle_nudge_cooldown_minutes: number): AppSettingsService {
+  return {
+    get: () => ({
+      idle_nudge_cooldown_minutes,
+      task_stale_ask_cooldown_minutes: 30,
+      task_stale_recent_update_grace_minutes: 45
+    } satisfies OvermindCooldowns),
+    load: async () => {},
+    setOvermindCooldown: async () => {}
+  } as unknown as AppSettingsService;
+}
+
+describe("Idle-nudge cooldown", () => {
+  it("sends ONE nudge on first stuck tick, then skips the second tick within cooldown (nudge_count unchanged)", async () => {
+    const workflow = service.register({
+      label: "cooldown-test",
+      coordinator_session: "coord-cd",
+      child_sessions: ["child-cd"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.update(workflow.id, {
+      last_pane_hash: hashPane(QUIET_PANE),
+      stuck_since: "2000-01-01T00:00:00.000Z"
+    });
+
+    const tmux = makeTmuxMock({ "coord-cd": QUIET_PANE, "child-cd": "child quiet pane" });
+    // 20-minute cooldown (default).
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20));
+
+    // Tick 1: first nudge should go out.
+    await watcher.tick();
+    let updated = service.get(workflow.id);
+    expect(updated?.nudge_count).toBe(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-cd", CANNED_NUDGE);
+
+    // Tick 2: 1 minute later — still within the 20-min cooldown.
+    // Simulate time passing: override lastIdleNudgeAt to 1 min ago.
+    (watcher as any).lastIdleNudgeAt.set(workflow.id, Date.now() - 1 * 60 * 1000);
+
+    await watcher.tick();
+    updated = service.get(workflow.id);
+    // nudge_count must NOT increment — cooldown suppressed the send.
+    expect(updated?.nudge_count).toBe(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1); // no additional send
+  });
+
+  it("sends a second nudge once the cooldown window has elapsed", async () => {
+    const workflow = service.register({
+      label: "cooldown-expire",
+      coordinator_session: "coord-ce",
+      child_sessions: ["child-ce"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.update(workflow.id, {
+      last_pane_hash: hashPane(QUIET_PANE),
+      stuck_since: "2000-01-01T00:00:00.000Z"
+    });
+
+    const tmux = makeTmuxMock({ "coord-ce": QUIET_PANE, "child-ce": "child quiet pane" });
+    // 5-minute cooldown so we can easily "expire" it without waiting.
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(5));
+
+    // Tick 1: sends the first nudge.
+    await watcher.tick();
+    expect(service.get(workflow.id)?.nudge_count).toBe(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+
+    // Simulate last nudge was sent 6 minutes ago — cooldown expired.
+    (watcher as any).lastIdleNudgeAt.set(workflow.id, Date.now() - 6 * 60 * 1000);
+
+    // Tick 2: cooldown expired → second nudge goes out.
+    await watcher.tick();
+    expect(service.get(workflow.id)?.nudge_count).toBe(2);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(2);
   });
 });
 

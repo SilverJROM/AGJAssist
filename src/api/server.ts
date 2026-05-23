@@ -39,6 +39,8 @@ import { registerOvermindRoutes } from "./routes/overmind-routes.js";
 import type { OvermindNotify } from "../services/overmind-watcher.js";
 import { OvermindStreamManager } from "./websocket/overmind-stream-manager.js";
 import type { OvmSessionManager } from "../services/ovm-session.js";
+import { AppSettingsService } from "../services/app-settings-service.js";
+import { registerAppSettingsRoutes } from "./routes/app-settings-routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -62,6 +64,7 @@ export interface ApiServices {
   overmindNotify?: OvermindNotify;
   overmindStreamManager?: OvermindStreamManager;
   ovmSessionService?: OvmSessionManager;
+  appSettingsService?: AppSettingsService;
 }
 
 export async function createApiServer(
@@ -133,6 +136,10 @@ export async function createApiServer(
     services.ovmSessionService,
     services.tmuxService
   );
+
+  if (services.appSettingsService) {
+    registerAppSettingsRoutes(app, services.authService, services.appSettingsService);
+  }
 
   return app;
 }

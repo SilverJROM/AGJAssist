@@ -4952,6 +4952,84 @@ function Conversations() {
   `;
 }
 
+// ── Overmind Cooldowns Settings Section ────────────────────────────────────
+
+function OvermindCooldownsSection() {
+  const [vals, setVals] = useState({
+    idle_nudge_cooldown_minutes: 20,
+    task_stale_ask_cooldown_minutes: 30,
+    task_stale_recent_update_grace_minutes: 45
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api('/api/app-settings').then(d => {
+      if (d && d.overmind) setVals(d.overmind);
+    }).catch(() => {});
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const d = await api('/api/app-settings/overmind', {
+        method: 'PATCH',
+        body: JSON.stringify(vals)
+      });
+      if (d && d.overmind) setVals(d.overmind);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e) {
+      alert('Save failed: ' + (e.message || e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function field(key, label, desc) {
+    return html`
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px">${label}</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input
+            type="number"
+            min="0"
+            style="width:80px"
+            value=${vals[key]}
+            oninput=${e => setVals(v => ({ ...v, [key]: Number(e.target.value) }))}
+          />
+          <span style="font-size:12px;color:var(--text-secondary)">minutes</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:3px">${desc}</div>
+      </div>
+    `;
+  }
+
+  return html`
+    <div>
+      ${field('idle_nudge_cooldown_minutes',
+        'Idle-nudge cooldown (minutes)',
+        "Wait this many minutes before sending another 'you appear idle' nudge to a workflow."
+      )}
+      ${field('task_stale_ask_cooldown_minutes',
+        'Task-list reminder cooldown (minutes)',
+        'Minimum time between task-list staleness reminders sent to the parent.'
+      )}
+      ${field('task_stale_recent_update_grace_minutes',
+        'Skip task-list reminder if parent updated within (minutes)',
+        "Don't send a task-list reminder if the parent posted /tasks within this window."
+      )}
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+        <button class="btn btn-primary btn-sm" onclick=${save} disabled=${saving}>
+          ${saving ? 'Saving...' : 'Save'}
+        </button>
+        ${saved ? html`<span style="font-size:12px;color:var(--success,#4caf50)">Saved.</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
 // Settings
 function TwoFactorSetup() {
   const [status, setStatus] = useState('loading'); // loading | disabled | setup | enabled
@@ -5446,6 +5524,10 @@ function Settings({ onEditBottomNav } = {}) {
 
       <${SettingsSection} title="Step Templates" defaultOpen=${false}>
         <${TemplateManagement} />
+      </${SettingsSection}>
+
+      <${SettingsSection} title="Overmind cooldowns" defaultOpen=${false}>
+        <${OvermindCooldownsSection} />
       </${SettingsSection}>
 
       <${SettingsSection} title="Safety Patterns" defaultOpen=${false}>

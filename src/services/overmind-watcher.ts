@@ -24,6 +24,12 @@ import {
   buildBlockedNotification,
   buildNeedsInputNotification
 } from "./overmind-notifications.js";
+import {
+  AppSettingsService,
+  DEFAULT_IDLE_NUDGE_COOLDOWN_MIN,
+  DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN,
+  DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN
+} from "./app-settings-service.js";
 
 export const POLL_MS = 30_000;
 export const RECONCILE_MS = 1_800_000;
@@ -609,12 +615,18 @@ export class OvermindWatcher {
   // When the one-time Tier-2 ask was sent (for re-ask rate cap).
   private readonly lastSubagentAskAt = new Map<number, number>();
 
+  // ── Idle-nudge cooldown (CANNED_NUDGE / CANNED_NUDGE_NO_CHILD) ────────────
+  // Per-workflow timestamp of the last successfully-sent canned idle nudge.
+  // Rate-limits nudges regardless of whether the parent replied.
+  private readonly lastIdleNudgeAt = new Map<number, number>();
+
   constructor(
     private readonly overmindService: OvermindService,
     private readonly tmuxService: TmuxService,
     private readonly notify?: OvermindNotify,
     private readonly brain?: OvermindBrain,
-    private readonly onUpdate?: OvermindUpdate
+    private readonly onUpdate?: OvermindUpdate,
+    private readonly appSettings?: AppSettingsService
   ) {}
 
   async tick(): Promise<void> {
@@ -1209,11 +1221,28 @@ export class OvermindWatcher {
       return { nudge_count: workflow.nudge_count, tier: workflow.tier };
     }
 
+    // ── Idle-nudge cooldown ──────────────────────────────────────────────────
+    // Flat rate-limit: if appSettings is injected and the last canned idle nudge was sent
+    // less than idle_nudge_cooldown_minutes ago, skip this tick entirely.
+    // When appSettings is not provided (e.g. in unit tests without injection) the cooldown
+    // is not applied and the ladder runs at full speed — preserving backward compatibility.
+    if (this.appSettings) {
+      const idleCooldownMs = this.appSettings.get().idle_nudge_cooldown_minutes * 60_000;
+      const nowMs = Date.now();
+      const lastIdleNudge = this.lastIdleNudgeAt.get(workflow.id) ?? 0;
+      if (nowMs - lastIdleNudge < idleCooldownMs) {
+        // Still in cooldown — return current state unchanged (no increment, no send).
+        return { nudge_count: workflow.nudge_count, tier: workflow.tier };
+      }
+    }
+
     const nextNudgeCount = workflow.nudge_count + 1;
     // No-child workflows can be legitimately registered without children. In that case
     // the nudge probes for an unregistered child instead of asking about callbacks.
     const nudgeText = (workflow.child_sessions?.length ?? 0) === 0 ? CANNED_NUDGE_NO_CHILD : CANNED_NUDGE;
     await this.tmuxService.sendAndSubmit(workflow.coordinator_session, nudgeText);
+    // Record the send time AFTER successful sendAndSubmit.
+    this.lastIdleNudgeAt.set(workflow.id, Date.now());
     const postNudgePane = await this.capturePaneSafe(workflow.coordinator_session);
     return {
       nudge_count: nextNudgeCount,
@@ -1336,6 +1365,8 @@ export class OvermindWatcher {
     this.subagentInFlight.delete(workflowId);
     this.apparentIdleSince.delete(workflowId);
     this.lastSubagentAskAt.delete(workflowId);
+    // Idle-nudge cooldown
+    this.lastIdleNudgeAt.delete(workflowId);
   }
 
   // Async derivation of per-task states from local files + pane text. Best-effort:
@@ -1358,19 +1389,26 @@ export class OvermindWatcher {
     if (tasks.length === 0) return undefined;
 
     // ── Throttle gates (cheap, no I/O — bail before any file reads) ─────────
+    // Read settings-driven cooldown values (fall back to exported constants for back-compat).
+    const settings = this.appSettings?.get();
+    const taskStaleGraceMs =
+      (settings?.task_stale_recent_update_grace_minutes ?? DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN) * 60_000;
+    const taskStaleNagCooldownMs =
+      (settings?.task_stale_ask_cooldown_minutes ?? DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN) * 60_000;
+
     // 1. Recent-update grace: if the parent posted a /tasks update in the last
-    //    45 min, the agents are actively working — skip derivation entirely.
+    //    N min (settings-driven, default 45), the agents are actively working — skip derivation entirely.
     const lastTaskLogEntry = workflow.task_log?.[workflow.task_log.length - 1];
     if (lastTaskLogEntry?.at) {
       const lastTaskUpdateMs = Date.parse(lastTaskLogEntry.at);
-      if (!Number.isNaN(lastTaskUpdateMs) && now - lastTaskUpdateMs < TASK_RECENT_UPDATE_GRACE_MS) {
+      if (!Number.isNaN(lastTaskUpdateMs) && now - lastTaskUpdateMs < taskStaleGraceMs) {
         return undefined;
       }
     }
-    // 2. Nag cooldown: even when staleness is detected, don't re-ask within 30 min
-    //    of the last tasks_stale-bearing ask. Other gaps are unaffected.
+    // 2. Nag cooldown: even when staleness is detected, don't re-ask within N min
+    //    (settings-driven, default 30) of the last tasks_stale-bearing ask. Other gaps are unaffected.
     const lastNagAt = this.lastTaskStaleNudgeAt.get(wid) ?? 0;
-    if (now - lastNagAt < TASK_STALE_NAG_COOLDOWN_MS) {
+    if (now - lastNagAt < taskStaleNagCooldownMs) {
       return undefined;
     }
 

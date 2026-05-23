@@ -20,6 +20,7 @@ import { createApiServer } from "./api/server.js";
 import { OvermindService } from "./services/overmind-service.js";
 import { OvermindWatcher, POLL_MS } from "./services/overmind-watcher.js";
 import { SonnetOvermindBrain } from "./services/overmind-brain.js";
+import { AppSettingsService } from "./services/app-settings-service.js";
 import { OvermindStreamManager } from "./api/websocket/overmind-stream-manager.js";
 import { OvmSessionService } from "./services/ovm-session.js";
 import {
@@ -70,6 +71,8 @@ async function main(): Promise<void> {
   const personalTaskService = new PersonalTaskService(db, auditService);
   const reminderService = new ReminderService(db, auditService);
   const overmindService = new OvermindService(db);
+  const appSettingsService = new AppSettingsService();
+  await appSettingsService.load();
   const ovmSessionService = new OvmSessionService(tmuxService, {
     overmindToken: config.overmind.token
   });
@@ -93,7 +96,8 @@ async function main(): Promise<void> {
     tmuxService,
     overmindNotify,
     overmindBrain,
-    (workflows) => overmindStreamManager.broadcast(workflows)
+    (workflows) => overmindStreamManager.broadcast(workflows),
+    appSettingsService
   );
 
   // Tmux streaming
@@ -125,7 +129,8 @@ async function main(): Promise<void> {
     overmindService,
     overmindNotify,
     overmindStreamManager,
-    ovmSessionService
+    ovmSessionService,
+    appSettingsService
   });
 
   await apiServer.listen({ port: config.api.port, host: config.api.host });
