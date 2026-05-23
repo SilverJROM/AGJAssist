@@ -5,7 +5,8 @@ import { AuthService } from "../../auth/auth-service.js";
 import {
   OvermindService,
   OvermindTask,
-  OvermindWorkflowStatus
+  OvermindWorkflowStatus,
+  RunSummary
 } from "../../services/overmind-service.js";
 import type { OvermindNotify } from "../../services/overmind-watcher.js";
 import { buildDoneNotification } from "../../services/overmind-notifications.js";
@@ -217,11 +218,20 @@ export function registerOvermindRoutes(
     }
   );
 
-  app.get(
+  app.get<{ Querystring: { session?: string } }>(
     "/api/overmind/history",
     { preHandler: authMiddleware },
-    async () => {
-      return { history: overmindService.listHistory() };
+    async (request) => {
+      const { session } = request.query;
+      return { history: overmindService.listHistory(session || undefined) };
+    }
+  );
+
+  app.get(
+    "/api/overmind/runs",
+    { preHandler: authMiddleware },
+    async (): Promise<{ runs: RunSummary[] }> => {
+      return { runs: overmindService.listRuns() };
     }
   );
 

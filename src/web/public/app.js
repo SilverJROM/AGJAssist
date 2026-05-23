@@ -13,7 +13,6 @@ import {
   formatElapsed,
   formatStuckDuration,
   getBottomNavTabs,
-  groupOvermindHistoryByWorkflow,
   isActiveStatus,
   moveBottomNavTab,
   readBottomNavTabIds,
@@ -734,13 +733,15 @@ function OvermindWorkflows() {
   const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [history, setHistory] = useState([]);
+  const [runs, setRuns] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
   const [streamStatus, setStreamStatus] = useState('connecting');
   const [now, setNow] = useState(Date.now());
   const [expandedWorkflows, setExpandedWorkflows] = useState({});
-  const [expandedHistoryGroups, setExpandedHistoryGroups] = useState({});
+  const [expandedRuns, setExpandedRuns] = useState({});
+  const [runDrilldown, setRunDrilldown] = useState({});
+  const [runDrilldownLoading, setRunDrilldownLoading] = useState({});
   const [workflowTab, setWorkflowTab] = useState('active');
   const streamStatusRef = useRef(streamStatus);
 
@@ -763,15 +764,33 @@ function OvermindWorkflows() {
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
-      const data = await api('/api/overmind/history');
-      setHistory(data.history || []);
+      const data = await api('/api/overmind/runs');
+      setRuns(data.runs || []);
       setHistoryError('');
     } catch (e) {
-      setHistoryError(e.message || 'Failed to load workflow history.');
+      setHistoryError(e.message || 'Failed to load run history.');
     } finally {
       setHistoryLoading(false);
     }
   }, []);
+
+  const toggleRunRow = useCallback(async (run) => {
+    const key = run.coordinator_session;
+    const wasExpanded = !!expandedRuns[key];
+    setExpandedRuns(prev => ({ ...prev, [key]: !wasExpanded }));
+    // lazy-load drill-down on first expand
+    if (!wasExpanded && !runDrilldown[key]) {
+      setRunDrilldownLoading(prev => ({ ...prev, [key]: true }));
+      try {
+        const data = await api('/api/overmind/history?session=' + encodeURIComponent(key));
+        setRunDrilldown(prev => ({ ...prev, [key]: data.history || [] }));
+      } catch {
+        setRunDrilldown(prev => ({ ...prev, [key]: [] }));
+      } finally {
+        setRunDrilldownLoading(prev => ({ ...prev, [key]: false }));
+      }
+    }
+  }, [expandedRuns, runDrilldown]);
 
   useEffect(() => {
     loadWorkflows();
@@ -779,10 +798,6 @@ function OvermindWorkflows() {
 
   const toggleWorkflow = useCallback((workflowId) => {
     setExpandedWorkflows(prev => ({ ...prev, [workflowId]: !prev[workflowId] }));
-  }, []);
-
-  const toggleHistoryGroup = useCallback((groupKey) => {
-    setExpandedHistoryGroups(prev => ({ ...prev, [groupKey]: prev[groupKey] === false }));
   }, []);
 
   const renameWorkflow = useCallback(async (workflow) => {
@@ -875,7 +890,6 @@ function OvermindWorkflows() {
 
   const activeWorkflows = workflows.filter(workflow => isActiveStatus(workflow.status));
   const completedWorkflows = workflows.filter(workflow => workflow.status === 'completed' || workflow.status === 'paused');
-  const historyGroups = groupOvermindHistoryByWorkflow(history);
   const visibleWorkflows = workflowTab === 'completed' ? completedWorkflows : activeWorkflows;
   const tabEmptyText = workflowTab === 'completed' ? 'No completed workflows' : 'No active workflows';
 
@@ -918,7 +932,7 @@ function OvermindWorkflows() {
           class=${'overmind-tab ' + (workflowTab === 'history' ? 'active' : '')}
           onclick=${() => setWorkflowTab('history')}
         >
-          History (${history.length})
+          History (${runs.length})
         </button>
         <button
           type="button"
@@ -935,40 +949,59 @@ function OvermindWorkflows() {
         <${OvmConsole} />
       ` : workflowTab === 'history' ? html`
         ${historyLoading ? html`
-          <div class="loading">Loading workflow history...</div>
-        ` : historyGroups.length === 0 ? html`
-          <div class="empty-state">No workflow history archived.</div>
+          <div class="loading">Loading run history...</div>
+        ` : runs.length === 0 ? html`
+          <div class="empty-state">No completed runs yet.</div>
         ` : html`
           <div class="item-list overmind-list">
-            ${historyGroups.map(group => {
-              const isExpanded = expandedHistoryGroups[group.key] !== false;
+            ${runs.map(run => {
+              const key = run.coordinator_session;
+              const isExpanded = !!expandedRuns[key];
+              const drillLoading = !!runDrilldownLoading[key];
+              const drillEntries = runDrilldown[key] || null;
+              const title = run.display_name || run.label;
+              const startStr = run.run_started_at ? new Date(run.run_started_at).toLocaleString() : '—';
+              const endStr = run.ended_at ? new Date(run.ended_at).toLocaleString() : '—';
+              let durationStr = '—';
+              if (run.run_started_at && run.ended_at) {
+                const ms = new Date(run.ended_at).getTime() - new Date(run.run_started_at).getTime();
+                if (ms >= 0) {
+                  const totalMin = Math.floor(ms / 60000);
+                  const hrs = Math.floor(totalMin / 60);
+                  const mins = totalMin % 60;
+                  durationStr = hrs > 0 ? hrs + 'h ' + mins + 'm' : (mins > 0 ? mins + 'm' : '<1m');
+                }
+              }
+              const statusBadgeClass = run.status === 'completed' ? 'badge-active' : 'badge-stuck';
               return html`
-                <section class="item-card overmind-card ovm-neutral overmind-history-group" key=${group.key}>
+                <section class="item-card overmind-card ovm-neutral overmind-history-group" key=${run.id}>
                   <div class="overmind-card-header">
                     <button
                       type="button"
                       class="overmind-card-toggle"
                       aria-expanded=${isExpanded}
-                      onclick=${() => toggleHistoryGroup(group.key)}
+                      onclick=${() => toggleRunRow(run)}
                     >
                       <div class="overmind-title">
                         <span class="overmind-chevron" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
                         <div>
-                          <h3>${group.name}</h3>
-                          <div class="overmind-current">${group.coordinator_session || '—'} · ${group.entries.length} ${group.entries.length === 1 ? 'entry' : 'entries'}</div>
+                          <h3>${title}</h3>
+                          <div class="overmind-current">
+                            Start: ${startStr} · End: ${endStr} · Duration: ${durationStr} · ${run.done_tasks}/${run.total_tasks} tasks · <span class=${'badge ' + statusBadgeClass}>${run.status}</span>
+                          </div>
                         </div>
                       </div>
                     </button>
                   </div>
                   ${isExpanded && html`
                     <div class="overmind-history-list overmind-history-archive-list">
-                      ${group.entries.map(entry => html`
+                      ${drillLoading ? html`<div class="loading">Loading task detail...</div>` : drillEntries && drillEntries.length === 0 ? html`<div class="empty-state">No task transitions recorded.</div>` : drillEntries ? drillEntries.map(entry => html`
                         <div class="overmind-history-entry" key=${(entry.id || entry.at) + '-' + entry.done + '-' + entry.total}>
                           <time>${entry.at ? new Date(entry.at).toLocaleString() : '—'}</time>
                           <span>${entry.current_task || '—'}</span>
                           <strong>${entry.done ?? 0}/${entry.total ?? 0}</strong>
                         </div>
-                      `)}
+                      `) : null}
                     </div>
                   `}
                 </section>

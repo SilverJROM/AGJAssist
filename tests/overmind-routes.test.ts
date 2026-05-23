@@ -820,4 +820,150 @@ describe("Overmind routes", () => {
     expect(ovmSession.restart).toHaveBeenCalledOnce();
     expect(ovmSession.close).toHaveBeenCalledOnce();
   });
+
+  it("GET /api/overmind/runs requires JWT, returns terminal-only run summaries with correct shape", async () => {
+    // register active + completed + failed workflows
+    const activeReg = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "runs-active",
+      session: "runs-active-parent",
+      run_dir: "/tmp/runs-active",
+      tasks: [{ id: "T1", label: "Task 1", state: "processing" }]
+    });
+    expect(activeReg.statusCode).toBe(201);
+
+    const compReg = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "runs-completed",
+      session: "runs-comp-parent",
+      run_dir: "/tmp/runs-completed",
+      tasks: [
+        { id: "A1", label: "Task A", state: "done" },
+        { id: "A2", label: "Task B", state: "done" }
+      ]
+    });
+    expect(compReg.statusCode).toBe(201);
+    await lifecyclePost("/api/overmind/complete", {
+      token: OVERMIND_TOKEN,
+      session: "runs-comp-parent"
+    });
+
+    const failedReg = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "runs-failed",
+      session: "runs-failed-parent",
+      run_dir: "/tmp/runs-failed",
+      tasks: [{ id: "F1", label: "Task F", state: "pending" }]
+    });
+    expect(failedReg.statusCode).toBe(201);
+    overmindService.setStatus(failedReg.json().workflow.id, "failed");
+
+    // unauthenticated is rejected
+    const unauthenticated = await app.inject({
+      method: "GET",
+      url: "/api/overmind/runs"
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const headers = authHeader();
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/overmind/runs",
+      headers
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(Array.isArray(body.runs)).toBe(true);
+
+    // only terminal workflows returned
+    const sessions = body.runs.map((r: { coordinator_session: string }) => r.coordinator_session);
+    expect(sessions).not.toContain("runs-active-parent");
+    expect(sessions).toContain("runs-comp-parent");
+    expect(sessions).toContain("runs-failed-parent");
+
+    // each run has the expected shape
+    for (const run of body.runs) {
+      expect(run).toHaveProperty("id");
+      expect(run).toHaveProperty("label");
+      expect(run).toHaveProperty("display_name");
+      expect(run).toHaveProperty("coordinator_session");
+      expect(run).toHaveProperty("status");
+      expect(run).toHaveProperty("run_started_at");
+      expect(run).toHaveProperty("ended_at");
+      expect(run).toHaveProperty("total_tasks");
+      expect(run).toHaveProperty("done_tasks");
+    }
+
+    // completed run has correct done_tasks / total_tasks
+    const compRun = body.runs.find((r: { coordinator_session: string }) => r.coordinator_session === "runs-comp-parent");
+    expect(compRun.total_tasks).toBe(2);
+    expect(compRun.done_tasks).toBe(2);
+    expect(compRun.status).toBe("completed");
+  });
+
+  it("GET /api/overmind/history?session=X filters to that session only", async () => {
+    // set up two workflows with task transitions
+    await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "hist-filter-1",
+      session: "hist-filter-s1",
+      run_dir: "/tmp/hist-filter-1",
+      current_task: "T1",
+      tasks: [{ id: "A1", label: "A1", state: "processing" }]
+    });
+    await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "hist-filter-2",
+      session: "hist-filter-s2",
+      run_dir: "/tmp/hist-filter-2",
+      current_task: "T2",
+      tasks: [{ id: "B1", label: "B1", state: "processing" }]
+    });
+
+    // create task transitions for both
+    await lifecyclePost("/api/overmind/tasks", {
+      token: OVERMIND_TOKEN,
+      session: "hist-filter-s1",
+      current_task: "T1-done",
+      tasks: [{ id: "A1", label: "A1", state: "done" }]
+    });
+    await lifecyclePost("/api/overmind/tasks", {
+      token: OVERMIND_TOKEN,
+      session: "hist-filter-s2",
+      current_task: "T2-done",
+      tasks: [{ id: "B1", label: "B1", state: "done" }]
+    });
+
+    const headers = authHeader();
+
+    // unfiltered returns all
+    const allHistory = await app.inject({
+      method: "GET",
+      url: "/api/overmind/history",
+      headers
+    });
+    expect(allHistory.statusCode).toBe(200);
+    expect(allHistory.json().history.length).toBe(2);
+
+    // filtered to session 1
+    const filtered = await app.inject({
+      method: "GET",
+      url: "/api/overmind/history?session=hist-filter-s1",
+      headers
+    });
+    expect(filtered.statusCode).toBe(200);
+    const filteredHistory = filtered.json().history;
+    expect(filteredHistory.length).toBe(1);
+    expect(filteredHistory[0].coordinator_session).toBe("hist-filter-s1");
+
+    // filtered to nonexistent session
+    const noMatch = await app.inject({
+      method: "GET",
+      url: "/api/overmind/history?session=nonexistent",
+      headers
+    });
+    expect(noMatch.statusCode).toBe(200);
+    expect(noMatch.json().history).toHaveLength(0);
+  });
 });

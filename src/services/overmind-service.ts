@@ -43,6 +43,18 @@ export interface OvermindTaskHistoryEntry {
   total: number;
 }
 
+export interface RunSummary {
+  id: number;
+  label: string;
+  display_name: string | null;
+  coordinator_session: string;
+  status: OvermindWorkflowStatus;
+  run_started_at: string | null;
+  ended_at: string | null;
+  total_tasks: number;
+  done_tasks: number;
+}
+
 export interface OvermindWorkflow {
   id: number;
   label: string;
@@ -256,24 +268,80 @@ export class OvermindService {
     return row ? this.mapRow(row) : null;
   }
 
-  listHistory(): OvermindTaskHistoryEntry[] {
+  listHistory(coordinatorSession?: string): OvermindTaskHistoryEntry[] {
+    const rows = coordinatorSession
+      ? this.db
+          .prepare(
+            `SELECT
+              h.id,
+              h.coordinator_session,
+              COALESCE(w.display_name, w.label, h.name) AS name,
+              h.at,
+              h.current_task,
+              h.done,
+              h.total
+            FROM overmind_task_history h
+            LEFT JOIN overmind_workflows w
+              ON w.coordinator_session = h.coordinator_session
+            WHERE h.coordinator_session = ?
+            ORDER BY h.at DESC, h.id DESC`
+          )
+          .all(coordinatorSession)
+      : this.db
+          .prepare(
+            `SELECT
+              h.id,
+              h.coordinator_session,
+              COALESCE(w.display_name, w.label, h.name) AS name,
+              h.at,
+              h.current_task,
+              h.done,
+              h.total
+            FROM overmind_task_history h
+            LEFT JOIN overmind_workflows w
+              ON w.coordinator_session = h.coordinator_session
+            ORDER BY h.at DESC, h.id DESC`
+          )
+          .all();
+    return (rows as OvermindTaskHistoryRow[]).map((row) => ({ ...row }));
+  }
+
+  listRuns(): RunSummary[] {
     const rows = this.db
       .prepare(
-        `SELECT
-          h.id,
-          h.coordinator_session,
-          COALESCE(w.display_name, w.label, h.name) AS name,
-          h.at,
-          h.current_task,
-          h.done,
-          h.total
-        FROM overmind_task_history h
-        LEFT JOIN overmind_workflows w
-          ON w.coordinator_session = h.coordinator_session
-        ORDER BY h.at DESC, h.id DESC`
+        `SELECT id, label, display_name, coordinator_session, status, run_started_at, ended_at, tasks
+        FROM overmind_workflows
+        WHERE status IN ('completed', 'failed')
+        ORDER BY
+          CASE WHEN ended_at IS NULL THEN 1 ELSE 0 END,
+          ended_at DESC,
+          run_started_at DESC`
       )
-      .all() as OvermindTaskHistoryRow[];
-    return rows.map((row) => ({ ...row }));
+      .all() as Array<{
+        id: number;
+        label: string;
+        display_name: string | null;
+        coordinator_session: string;
+        status: OvermindWorkflowStatus;
+        run_started_at: string | null;
+        ended_at: string | null;
+        tasks: string;
+      }>;
+
+    return rows.map((row) => {
+      const tasks = this.parseJsonArray<OvermindTask>(row.tasks);
+      return {
+        id: row.id,
+        label: row.label,
+        display_name: row.display_name,
+        coordinator_session: row.coordinator_session,
+        status: row.status,
+        run_started_at: row.run_started_at,
+        ended_at: row.ended_at,
+        total_tasks: tasks.length,
+        done_tasks: this.countDoneTasks(tasks)
+      };
+    });
   }
 
   update(id: number, fields: UpdateOvermindWorkflowInput): OvermindWorkflow | null {

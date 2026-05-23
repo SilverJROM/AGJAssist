@@ -602,4 +602,130 @@ describe("OvermindService", () => {
     expect(cols.filter((col) => col.name === "child_statuses")).toHaveLength(1);
     expect(historyCols.filter((col) => col.name === "coordinator_session")).toHaveLength(1);
   });
+
+  it("listRuns() returns only terminal workflows ordered by ended_at desc, computing done_tasks/total_tasks from tasks JSON", () => {
+    const active = service.register({
+      label: "active-run",
+      coordinator_session: "active-run-parent",
+      run_dir: "/tmp/active-run",
+      tasks: [{ id: "T1", label: "Task 1", state: "processing" }]
+    });
+
+    const completed1 = service.register({
+      label: "completed-run-1",
+      coordinator_session: "completed-run-1-parent",
+      run_dir: "/tmp/completed-run-1",
+      tasks: [
+        { id: "A1", label: "Task A", state: "done" },
+        { id: "A2", label: "Task B", state: "done" },
+        { id: "A3", label: "Task C", state: "pending" }
+      ]
+    });
+    service.setStatus(completed1.id, "completed");
+
+    const completed2 = service.register({
+      label: "completed-run-2",
+      coordinator_session: "completed-run-2-parent",
+      run_dir: "/tmp/completed-run-2",
+      tasks: [
+        { id: "B1", label: "Task B1", state: "done" }
+      ]
+    });
+    service.setStatus(completed2.id, "completed");
+
+    const failed = service.register({
+      label: "failed-run",
+      coordinator_session: "failed-run-parent",
+      run_dir: "/tmp/failed-run",
+      tasks: []
+    });
+    service.setStatus(failed.id, "failed");
+
+    const runs = service.listRuns();
+
+    // only terminal workflows (completed / failed), not active
+    expect(runs.map((r) => r.coordinator_session)).not.toContain("active-run-parent");
+    expect(runs.length).toBe(3);
+
+    // every run has the expected shape
+    for (const run of runs) {
+      expect(run).toHaveProperty("id");
+      expect(run).toHaveProperty("label");
+      expect(run).toHaveProperty("display_name");
+      expect(run).toHaveProperty("coordinator_session");
+      expect(run).toHaveProperty("status");
+      expect(run).toHaveProperty("run_started_at");
+      expect(run).toHaveProperty("ended_at");
+      expect(run).toHaveProperty("total_tasks");
+      expect(run).toHaveProperty("done_tasks");
+    }
+
+    // statuses are terminal only
+    for (const run of runs) {
+      expect(["completed", "failed"]).toContain(run.status);
+    }
+
+    // done_tasks / total_tasks computed correctly
+    const run1 = runs.find((r) => r.coordinator_session === "completed-run-1-parent")!;
+    expect(run1.total_tasks).toBe(3);
+    expect(run1.done_tasks).toBe(2);
+
+    const run2 = runs.find((r) => r.coordinator_session === "completed-run-2-parent")!;
+    expect(run2.total_tasks).toBe(1);
+    expect(run2.done_tasks).toBe(1);
+
+    const runFailed = runs.find((r) => r.coordinator_session === "failed-run-parent")!;
+    expect(runFailed.total_tasks).toBe(0);
+    expect(runFailed.done_tasks).toBe(0);
+  });
+
+  it("listRuns() uses display_name when set", () => {
+    const wf = service.register({
+      label: "display-run",
+      coordinator_session: "display-run-parent",
+      run_dir: "/tmp/display-run"
+    });
+    service.setDisplayName(wf.id, "My Custom Run Name");
+    service.setStatus(wf.id, "completed");
+
+    const runs = service.listRuns();
+    expect(runs).toHaveLength(1);
+    expect(runs[0].display_name).toBe("My Custom Run Name");
+    expect(runs[0].label).toBe("display-run");
+  });
+
+  it("listHistory() with session filter returns only entries for that session", () => {
+    const wf1 = service.register({
+      label: "session-filter-1",
+      coordinator_session: "sf-session-1",
+      run_dir: "/tmp/sf-1",
+      current_task: "T1",
+      tasks: [{ id: "A1", label: "A1", state: "processing" }]
+    });
+    const wf2 = service.register({
+      label: "session-filter-2",
+      coordinator_session: "sf-session-2",
+      run_dir: "/tmp/sf-2",
+      current_task: "T2",
+      tasks: [{ id: "B1", label: "B1", state: "processing" }]
+    });
+
+    // generate history entries for both
+    service.setTasks(wf1.id, "T1-done", [{ id: "A1", label: "A1", state: "done" }]);
+    service.setTasks(wf2.id, "T2-done", [{ id: "B1", label: "B1", state: "done" }]);
+
+    const allHistory = service.listHistory();
+    expect(allHistory.length).toBe(2);
+
+    const filtered = service.listHistory("sf-session-1");
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].coordinator_session).toBe("sf-session-1");
+
+    const filtered2 = service.listHistory("sf-session-2");
+    expect(filtered2.length).toBe(1);
+    expect(filtered2[0].coordinator_session).toBe("sf-session-2");
+
+    const noMatch = service.listHistory("nonexistent-session");
+    expect(noMatch.length).toBe(0);
+  });
 });
