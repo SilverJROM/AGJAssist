@@ -1,0 +1,129 @@
+// Pure type/interface declarations for overmind workflows. Extracted from
+// overmind-service.ts in batch B7 of the modularization refactor (2026-05-23).
+// Importing from here gets you the shape without dragging in the OvermindService
+// class + better-sqlite3.
+
+export type OvermindWorkflowStatus =
+  | "active"
+  | "working"
+  | "waiting_human"
+  | "awaiting_decision"
+  | "stuck"
+  | "paused"
+  | "completed"
+  | "failed";
+
+export type OvermindTaskState = "done" | "processing" | "pending";
+export type OvermindParentStatus = "working" | "idle" | "waiting_human" | "awaiting_decision" | "stuck";
+export type OvermindChildStatus = "working" | "idle" | "closed";
+
+export interface OvermindChildSessionStatus {
+  session: string;
+  status: OvermindChildStatus;
+}
+
+export interface OvermindTask {
+  id: string;
+  label: string;
+  state: OvermindTaskState;
+}
+
+export interface OvermindTaskLogEntry {
+  at: string;
+  current_task: string | null;
+  done: number;
+  total: number;
+  note?: string;
+}
+
+export interface OvermindTaskHistoryEntry {
+  id: number;
+  coordinator_session: string;
+  name: string;
+  at: string;
+  current_task: string | null;
+  done: number;
+  total: number;
+}
+
+export interface RunSummary {
+  id: number;
+  label: string;
+  display_name: string | null;
+  coordinator_session: string;
+  status: OvermindWorkflowStatus;
+  run_started_at: string | null;
+  ended_at: string | null;
+  total_tasks: number;
+  done_tasks: number;
+}
+
+export interface OvermindWorkflow {
+  id: number;
+  label: string;
+  display_name: string | null;
+  coordinator_session: string;
+  child_sessions: string[];
+  child_roles: string[];
+  run_dir: string;
+  status: OvermindWorkflowStatus;
+  current_task: string | null;
+  tasks: OvermindTask[];
+  pending_decision: string | null;
+  active_session: string | null;
+  active_role: "parent" | "child" | null;
+  ended_at: string | null;
+  task_log: OvermindTaskLogEntry[];
+  last_pane_hash: string | null;
+  last_activity_at: string;
+  stuck_since: string | null;
+  nudge_count: number;
+  tier: number;
+  last_notified_transition: string | null;
+  run_started_at: string | null;
+  accumulated_ms: number;
+  completion_check: string | null;
+  parent_status: OvermindParentStatus | null;
+  child_statuses: OvermindChildSessionStatus[];
+  info_request: string | null;
+  info_check: string | null;
+  monitoring_paused: boolean;
+  paused_at: string | null;
+  paused_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RegisterOvermindWorkflowInput {
+  label: string;
+  coordinator_session: string;
+  child_sessions?: string[];
+  child_roles?: string[];
+  run_dir: string;
+  current_task?: string | null;
+  tasks?: OvermindTask[];
+}
+
+export interface UpdateOvermindWorkflowInput {
+  label?: string;
+  coordinator_session?: string;
+  child_sessions?: string[];
+  run_dir?: string;
+  status?: OvermindWorkflowStatus;
+  current_task?: string | null;
+  tasks?: OvermindTask[];
+  pending_decision?: string | null;
+  active_session?: string | null;
+  active_role?: "parent" | "child" | null;
+  last_pane_hash?: string | null;
+  last_activity_at?: string | null;
+  stuck_since?: string | null;
+  nudge_count?: number;
+  tier?: number;
+  last_notified_transition?: string | null;
+  completion_check?: string | null;
+  parent_status?: OvermindParentStatus | null;
+  child_statuses?: OvermindChildSessionStatus[];
+  info_request?: string | null;
+  info_check?: string | null;
+}

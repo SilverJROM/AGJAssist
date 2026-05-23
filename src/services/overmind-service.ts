@@ -1,129 +1,41 @@
 import { DatabaseService } from "../db/database.js";
+import {
+  OvermindChildSessionStatus,
+  OvermindParentStatus,
+  OvermindTask,
+  OvermindTaskHistoryEntry,
+  OvermindTaskLogEntry,
+  OvermindWorkflow,
+  OvermindWorkflowStatus,
+  RegisterOvermindWorkflowInput,
+  RunSummary,
+  UpdateOvermindWorkflowInput
+} from "./overmind/types.js";
+import {
+  DuplicateRunDirError,
+  sanitizeCurrentTask,
+  sanitizeTaskList
+} from "./overmind/sanitize.js";
 
-export type OvermindWorkflowStatus =
-  | "active"
-  | "working"
-  | "waiting_human"
-  | "awaiting_decision"
-  | "stuck"
-  | "paused"
-  | "completed"
-  | "failed";
+// Types live in ./overmind/types.ts (B7). Re-exported here for public-surface
+// stability per og-requirements R2.5.
+export type {
+  OvermindChildSessionStatus,
+  OvermindChildStatus,
+  OvermindParentStatus,
+  OvermindTask,
+  OvermindTaskHistoryEntry,
+  OvermindTaskLogEntry,
+  OvermindTaskState,
+  OvermindWorkflow,
+  OvermindWorkflowStatus,
+  RegisterOvermindWorkflowInput,
+  RunSummary,
+  UpdateOvermindWorkflowInput
+} from "./overmind/types.js";
 
-export type OvermindTaskState = "done" | "processing" | "pending";
-export type OvermindParentStatus = "working" | "idle" | "waiting_human" | "awaiting_decision" | "stuck";
-export type OvermindChildStatus = "working" | "idle" | "closed";
-
-export interface OvermindChildSessionStatus {
-  session: string;
-  status: OvermindChildStatus;
-}
-
-export interface OvermindTask {
-  id: string;
-  label: string;
-  state: OvermindTaskState;
-}
-
-export interface OvermindTaskLogEntry {
-  at: string;
-  current_task: string | null;
-  done: number;
-  total: number;
-  note?: string;
-}
-
-export interface OvermindTaskHistoryEntry {
-  id: number;
-  coordinator_session: string;
-  name: string;
-  at: string;
-  current_task: string | null;
-  done: number;
-  total: number;
-}
-
-export interface RunSummary {
-  id: number;
-  label: string;
-  display_name: string | null;
-  coordinator_session: string;
-  status: OvermindWorkflowStatus;
-  run_started_at: string | null;
-  ended_at: string | null;
-  total_tasks: number;
-  done_tasks: number;
-}
-
-export interface OvermindWorkflow {
-  id: number;
-  label: string;
-  display_name: string | null;
-  coordinator_session: string;
-  child_sessions: string[];
-  child_roles: string[];
-  run_dir: string;
-  status: OvermindWorkflowStatus;
-  current_task: string | null;
-  tasks: OvermindTask[];
-  pending_decision: string | null;
-  active_session: string | null;
-  active_role: "parent" | "child" | null;
-  ended_at: string | null;
-  task_log: OvermindTaskLogEntry[];
-  last_pane_hash: string | null;
-  last_activity_at: string;
-  stuck_since: string | null;
-  nudge_count: number;
-  tier: number;
-  last_notified_transition: string | null;
-  run_started_at: string | null;
-  accumulated_ms: number;
-  completion_check: string | null;
-  parent_status: OvermindParentStatus | null;
-  child_statuses: OvermindChildSessionStatus[];
-  info_request: string | null;
-  info_check: string | null;
-  monitoring_paused: boolean;
-  paused_at: string | null;
-  paused_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface RegisterOvermindWorkflowInput {
-  label: string;
-  coordinator_session: string;
-  child_sessions?: string[];
-  child_roles?: string[];
-  run_dir: string;
-  current_task?: string | null;
-  tasks?: OvermindTask[];
-}
-
-export interface UpdateOvermindWorkflowInput {
-  label?: string;
-  coordinator_session?: string;
-  child_sessions?: string[];
-  run_dir?: string;
-  status?: OvermindWorkflowStatus;
-  current_task?: string | null;
-  tasks?: OvermindTask[];
-  pending_decision?: string | null;
-  active_session?: string | null;
-  active_role?: "parent" | "child" | null;
-  last_pane_hash?: string | null;
-  last_activity_at?: string | null;
-  stuck_since?: string | null;
-  nudge_count?: number;
-  tier?: number;
-  last_notified_transition?: string | null;
-  completion_check?: string | null;
-  parent_status?: OvermindParentStatus | null;
-  child_statuses?: OvermindChildSessionStatus[];
-  info_request?: string | null;
-  info_check?: string | null;
-}
+// Sanitation + dup-run_dir guard live in ./overmind/sanitize.ts (B7).
+export { DuplicateRunDirError, isTrashTaskLabel, sanitizeTaskList, sanitizeCurrentTask } from "./overmind/sanitize.js";
 
 interface OvermindWorkflowRow {
   id: number;
@@ -171,44 +83,9 @@ interface OvermindTaskHistoryRow {
   total: number;
 }
 
-// Thrown by `register` when another non-terminal workflow already owns the same `run_dir`
-// under a different `coordinator_session`. Enforces JROM's "1 workflow per parent session"
-// rule — a parent that renamed its tmux session must close the old workflow before
-// re-registering, instead of silently spawning a duplicate row (e.g. the hris-d-22 /
-// hris-claude-main twins on 2026-05-23).
-export class DuplicateRunDirError extends Error {
-  constructor(public readonly existing: OvermindWorkflow) {
-    super(
-      `Workflow already registered as coordinator_session='${existing.coordinator_session}' (id=${existing.id}) for run_dir='${existing.run_dir}'. ` +
-        `One workflow per parent session — reuse the existing session or POST /api/overmind/complete on it first.`
-    );
-    this.name = "DuplicateRunDirError";
-  }
-}
-
-// Recognises markdown table chrome that callers sometimes paste as task labels
-// when they naively line-scan a queue.md (header `| # | Batch | ... |` and the
-// `|---|---|...|` separator). Conservative — only the obviously-structural lines
-// are dropped; legit short labels containing pipes still pass.
-const TABLE_SEPARATOR_RE = /^[\s|\-:=_*]+$/;
-const TABLE_HEADER_RE = /^\s*\|\s*#\s*\|/i;
-
-function isTrashTaskLabel(label: string | null | undefined): boolean {
-  const trimmed = (label ?? "").trim();
-  if (!trimmed) return true;
-  if (TABLE_SEPARATOR_RE.test(trimmed)) return true;
-  if (TABLE_HEADER_RE.test(trimmed)) return true;
-  return false;
-}
-
-function sanitizeTaskList(tasks: OvermindTask[] | undefined): OvermindTask[] {
-  return (tasks ?? []).filter((t) => !isTrashTaskLabel(t?.label));
-}
-
-function sanitizeCurrentTask(current: string | null | undefined): string | null {
-  if (current == null) return null;
-  return isTrashTaskLabel(current) ? null : current;
-}
+// DuplicateRunDirError + isTrashTaskLabel / sanitizeTaskList / sanitizeCurrentTask
+// moved to ./overmind/sanitize.ts (B7) — re-exported at top of file. Local
+// imports above give the class direct access.
 
 export class OvermindService {
   constructor(private readonly db: DatabaseService) {}
