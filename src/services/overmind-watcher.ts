@@ -36,54 +36,27 @@ export const POLL_MS = 30_000;
 export const RECONCILE_MS = 1_800_000;
 export const STUCK_THRESHOLD_MS = 90_000;
 
-// ─── In-process sub-agent suppression constants ──────────────────────────────
-export const SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS = 10 * 60 * 1000; // 10 min
-export const SUBAGENT_REASK_GRACE_MS = 2 * 60 * 60 * 1000; // 2 h
-export const SUBAGENT_DURATION_GRACE_MS = 10 * 60 * 1000; // 10 min grace past expectedEndAt
-
-// Tunable patterns — JROM will refine once a real sub-agent pane is captured.
-// Primary (TUI inference):
-//   ● Task(...)  or  ⏺ Task(...)  — Claude Code in-process Task tool invocation header
-//   ● Agent(...)  or  ⏺ Agent(...)  — Claude Code in-process Agent tool invocation header
-//   Running '<name>' agent  — another TUI form that may appear
-// Secondary (parent-emitted explicit marker):
-//   [OVERMIND] subagent <name>  — parent explicitly marks a sub-agent (also the Tier-2 ack)
-export const SUBAGENT_PATTERNS: RegExp[] = [
-  /^\s*[●⏺]\s*Task\(/m,
-  /^\s*[●⏺]\s*Agent\(/m,
-  /Running\s+'[^']+'\s+agent\b/i,
-  /\[OVERMIND\]\s+subagent\s+\S+/i
-];
-
-/** Returns true if ANY sub-agent indicator pattern matches the pane text. */
-export function subAgentInFlight(paneText: string): boolean {
-  return SUBAGENT_PATTERNS.some((re) => re.test(paneText));
-}
-
-/** Returns true when the parent explicitly signals the sub-agent is done. */
-export function paneShowsSubagentDone(paneText: string): boolean {
-  return /\[OVERMIND\]\s+subagent\s+done\b/i.test(paneText);
-}
-
-/**
- * Extracts sub-agent name + optional expected minutes from the last
- * `[OVERMIND] subagent <name> ~<N>min` marker in the pane text.
- * Returns null if no match.
- */
-export function parseSubagentAckFromPane(
-  paneText: string
-): { name: string; expectedMinutes?: number } | null {
-  const re = /\[OVERMIND\]\s+subagent\s+(\S+)(?:\s+~?(\d+)\s*min)?/gi;
-  let last: RegExpExecArray | null = null;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(paneText)) !== null) {
-    last = match;
-  }
-  if (!last) return null;
-  const name = last[1];
-  const minutes = last[2] ? parseInt(last[2], 10) : undefined;
-  return { name, expectedMinutes: minutes };
-}
+// Sub-agent detection lives in ./overmind/subagent-detection.ts as of B3 of the
+// modularization refactor (2026-05-23). Re-exported here for public-surface
+// stability per og-requirements R2.5.
+export {
+  SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS,
+  SUBAGENT_REASK_GRACE_MS,
+  SUBAGENT_DURATION_GRACE_MS,
+  SUBAGENT_PATTERNS,
+  subAgentInFlight,
+  paneShowsSubagentDone,
+  parseSubagentAckFromPane
+} from "./overmind/subagent-detection.js";
+// Local bindings the watcher class methods use directly:
+import {
+  SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS,
+  SUBAGENT_REASK_GRACE_MS,
+  SUBAGENT_DURATION_GRACE_MS,
+  subAgentInFlight,
+  paneShowsSubagentDone,
+  parseSubagentAckFromPane
+} from "./overmind/subagent-detection.js";
 export const CAPTURE_LINES = 200;
 export const MAX_CANNED_NUDGES = 2;
 export const BRAIN_COORDINATOR_TAIL_LINES = 40;
@@ -204,50 +177,14 @@ interface NudgeLadderFields {
   pending_decision?: string | null;
 }
 
-export function hashPane(pane: string): string {
-  return createHash("sha256").update(extractBody(pane)).digest("hex");
-}
-
-export function hasActiveTurn(pane: string): boolean {
-  const statusBarChromeRe = /ctrl\+t|bypass permissions|to manage|for agents|\bshells?\b|\bmonitors?\b|shift\+tab/i;
-  return pane
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .some((line) => /esc to interrupt/i.test(line) && !statusBarChromeRe.test(line));
-}
-
-export function extractBody(pane: string): string {
-  const lines = pane
-    .replace(/\r\n/g, "\n")
-    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
-    .split("\n")
-    .filter((line) => !isPaneChromeLine(line));
-
-  while (lines.length > 0 && lines[lines.length - 1].trim() === "") {
-    lines.pop();
-  }
-
-  return lines.join("\n");
-}
-
-function isPaneChromeLine(line: string): boolean {
-  const trimmed = line.trim();
-  const spinnerGlyphs = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷";
-  const leadingSpinnerRe = new RegExp(`^\\s*[${spinnerGlyphs}]`, "u");
-  const statusChromeRe = /bypass permissions|ctrl\+t|to manage|for agents|\/ps to view|\/stop|\bshells?\b|\bmonitors?\b|\/model/i;
-  const modelFooterRe = /^\s*(gpt-5|sonnet|opus|haiku)\b/i;
-  const cwdFooterRe = /[·•]\s*~\/\S*\s*$/;
-  const turnChromeRe = /esc to interrupt|Working \(|Waiting for|Compacting|Thinking/i;
-
-  return trimmed === "" ? false
-    : /^[❯›]/u.test(trimmed)
-      || /^[─=]{3,}$/.test(trimmed)
-      || leadingSpinnerRe.test(line)
-      || statusChromeRe.test(line)
-      || modelFooterRe.test(line)
-      || cwdFooterRe.test(line)
-      || turnChromeRe.test(line);
-}
+// Pure pane-text utilities live in ./overmind/pane-utils.ts as of B2 of the
+// modularization refactor (2026-05-23). Re-exported here for public-surface
+// stability per og-requirements R2.5 — existing call sites keep working until
+// the B9 cleanup pass.
+export { hashPane, hasActiveTurn, extractBody, isPaneChromeLine } from "./overmind/pane-utils.js";
+// Local bindings — `export { … } from` doesn't introduce them, but the watcher
+// class methods below call hasActiveTurn/hashPane directly.
+import { hashPane, hasActiveTurn } from "./overmind/pane-utils.js";
 
 export function allTasksComplete(tasks: { state: string }[]): boolean {
   return tasks.length > 0 && tasks.every((task) => task.state === "done");
