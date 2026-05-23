@@ -24,7 +24,7 @@ import {
   buildNeedsInputNotification
 } from "./overmind-notifications.js";
 
-export const POLL_MS = 45_000;
+export const POLL_MS = 30_000;
 export const RECONCILE_MS = 1_800_000;
 export const STUCK_THRESHOLD_MS = 90_000;
 export const CAPTURE_LINES = 200;
