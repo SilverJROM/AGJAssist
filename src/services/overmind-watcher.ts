@@ -49,8 +49,9 @@ export const FRONTLOAD_CORRECTION_NOTE =
 
 // ─── Task-staleness detector constants ──────────────────────────────────────
 export const TASK_STALE_CHECK_MS = 5 * 60 * 1000; // 5 min between checks
-export const SPARK_TASK_FALLBACK_PER_HOUR = 1; // max Tier-3 spark calls per workflow/hour
+export const SPARK_TASK_FALLBACK_PER_HOUR = 1; // max Tier-3 LLM calls per workflow/hour (counts once regardless of which model)
 export const SPARK_TASK_CMD = process.env["OVM_SPARK_CMD"] ?? "codex exec --model gpt-5.3-codex --skip-git-repo-check";
+export const SONNET_TASK_CMD = process.env["OVM_SONNET_FALLBACK_CMD"] ?? "claude -p --dangerously-skip-permissions --model sonnet";
 
 // ─── Pure helper ──────────────────────────────────────────────────────────────
 // Regex-scan a text blob for evidence of task-id states. Returns ONLY ids the
@@ -465,6 +466,68 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
     signature,
     needsBrain
   };
+}
+
+// ─── Judge-with-fallback helper (task-staleness Tier-3) ─────────────────────
+// Tries primaryCmd first. On any failure (spawn error / non-zero / timeout /
+// parse fail) tries fallbackCmd once. Returns null if both fail.
+export async function invokeJudgeWithFallback(
+  prompt: string,
+  primaryCmd: string,
+  fallbackCmd: string,
+  timeoutMs: number
+): Promise<{ json: object; model: "primary" | "fallback" } | null> {
+  const trySpawn = (cmd: string): Promise<object | null> =>
+    new Promise((resolve) => {
+      let stdout = "";
+      let timedOut = false;
+      const [bin, ...args] = cmd.split(/\s+/);
+      let child: ReturnType<typeof spawn>;
+      try {
+        child = spawn(bin, args, { stdio: ["pipe", "pipe", "ignore"] });
+      } catch {
+        resolve(null);
+        return;
+      }
+
+      const timer = setTimeout(() => {
+        timedOut = true;
+        child.kill();
+        resolve(null);
+      }, timeoutMs);
+
+      child.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+
+      child.on("close", (code: number | null) => {
+        clearTimeout(timer);
+        if (timedOut) { resolve(null); return; }
+        if (code !== 0) { resolve(null); return; }
+        try {
+          const clean = stdout.replace(/^```[^\n]*\n?|```$/gm, "").trim();
+          resolve(JSON.parse(clean));
+        } catch {
+          resolve(null);
+        }
+      });
+
+      child.on("error", () => { clearTimeout(timer); resolve(null); });
+
+      try {
+        child.stdin?.write(prompt);
+        child.stdin?.end();
+      } catch {
+        clearTimeout(timer);
+        resolve(null);
+      }
+    });
+
+  const primary = await trySpawn(primaryCmd);
+  if (primary !== null) return { json: primary, model: "primary" };
+
+  const fallback = await trySpawn(fallbackCmd);
+  if (fallback !== null) return { json: fallback, model: "fallback" };
+
+  return null;
 }
 
 export class OvermindWatcher {
@@ -1179,8 +1242,10 @@ export class OvermindWatcher {
     return record;
   }
 
-  // Tier-3 spark invocation. Spawns the SPARK_TASK_CMD process, writes the prompt to
-  // stdin, reads stdout, parses JSON. Timeout 60s. Returns undefined on any failure.
+  // Tier-3 spark invocation with Sonnet fallback. Tries OVM_SPARK_CMD first; on any
+  // failure (spawn error / non-zero / timeout / parse fail) retries once against
+  // OVM_SONNET_FALLBACK_CMD. Timeout 60s per attempt. Returns undefined on both fail.
+  // The hourly budget counter is bumped ONCE at attempt-start (not per-model).
   private async runSparkTaskDerivation(
     coordinatorPane: string,
     tasks: Array<{ id: string; state: string }>
@@ -1195,58 +1260,21 @@ export class OvermindWatcher {
       `'in-progress' if it's the active batch. 'unknown' if not clearly indicated.\n\n` +
       `Task ids: ${taskIds}\n\nCoordinator pane:\n${paneSnippet}`;
 
-    return new Promise((resolve) => {
-      let stdout = "";
-      let timedOut = false;
+    const result = await invokeJudgeWithFallback(prompt, SPARK_TASK_CMD, SONNET_TASK_CMD, 60_000);
+    if (!result) return undefined;
 
-      // Split the SPARK_TASK_CMD into argv0 + args to avoid shell injection.
-      const [cmd, ...args] = SPARK_TASK_CMD.split(/\s+/);
-      let child: ReturnType<typeof spawn>;
-      try {
-        child = spawn(cmd, args, { stdio: ["pipe", "pipe", "ignore"] });
-      } catch {
-        resolve(undefined);
-        return;
+    const judgedBy = result.model === "primary" ? "spark" : "sonnet";
+    console.log(`task-stale: judged by ${judgedBy}`);
+
+    const parsed = result.json as { sessions?: Array<{ id: string; status: string }> };
+    const derived = new Map<string, "done" | "in-progress" | "unknown">();
+    for (const entry of parsed.sessions ?? []) {
+      const s = entry.status;
+      if (s === "done" || s === "in-progress" || s === "unknown") {
+        derived.set(entry.id, s);
       }
-
-      const timer = setTimeout(() => {
-        timedOut = true;
-        child.kill();
-        resolve(undefined);
-      }, 60_000);
-
-      child.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
-
-      child.on("close", () => {
-        clearTimeout(timer);
-        if (timedOut) { resolve(undefined); return; }
-        try {
-          // Strip code fences if present.
-          const clean = stdout.replace(/^```[^\n]*\n?|```$/gm, "").trim();
-          const parsed = JSON.parse(clean) as { sessions?: Array<{ id: string; status: string }> };
-          const result = new Map<string, "done" | "in-progress" | "unknown">();
-          for (const entry of parsed.sessions ?? []) {
-            const s = entry.status;
-            if (s === "done" || s === "in-progress" || s === "unknown") {
-              result.set(entry.id, s);
-            }
-          }
-          resolve(result.size > 0 ? result : undefined);
-        } catch {
-          resolve(undefined);
-        }
-      });
-
-      child.on("error", () => { clearTimeout(timer); resolve(undefined); });
-
-      try {
-        child.stdin?.write(prompt);
-        child.stdin?.end();
-      } catch {
-        clearTimeout(timer);
-        resolve(undefined);
-      }
-    });
+    }
+    return derived.size > 0 ? derived : undefined;
   }
 
   async notifyBlocked(workflow: OvermindWorkflow, issue: string, reason: string): Promise<void> {

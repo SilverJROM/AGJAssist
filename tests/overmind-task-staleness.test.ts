@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { deriveTaskStateFromText } from "../src/services/overmind-watcher.js";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { deriveTaskStateFromText, invokeJudgeWithFallback } from "../src/services/overmind-watcher.js";
+
+const FIXTURES_DIR = path.resolve(fileURLToPath(import.meta.url), "../fixtures");
+// node <script> — no spaces in paths so the cmd.split(/\s+/) in the helper works correctly.
+const EMIT_JSON_CMD = `node ${path.join(FIXTURES_DIR, "emit-json.js")}`;
+const EMIT_BAD_JSON_CMD = `node ${path.join(FIXTURES_DIR, "emit-bad-json.js")}`;
 
 // Fixtures — a few simple task stubs.
 const tasks = [
@@ -172,5 +179,37 @@ describe("deriveTaskStateFromText", () => {
   it('flags done for "[x]  B2" with extra space', () => {
     const result = deriveTaskStateFromText("[x]  B2 label", tasks);
     expect(result.get("B2")).toBe("done");
+  });
+});
+
+// ─── invokeJudgeWithFallback ─────────────────────────────────────────────────
+// Uses real fixture scripts so no spawn mocking is needed:
+//   primary = "false"         → always exits non-zero (simulates spark unavailable)
+//   fallback = EMIT_JSON_CMD  → emits valid JSON and exits 0
+//   both-fail = "false"/"false"
+describe("invokeJudgeWithFallback", () => {
+  it("returns primary result when primary succeeds", async () => {
+    const result = await invokeJudgeWithFallback("prompt", EMIT_JSON_CMD, "false", 10_000);
+    expect(result).not.toBeNull();
+    expect(result!.model).toBe("primary");
+    expect((result!.json as { sessions: unknown[] }).sessions).toHaveLength(1);
+  });
+
+  it("falls back to fallback when primary fails (non-zero exit)", async () => {
+    const result = await invokeJudgeWithFallback("prompt", "false", EMIT_JSON_CMD, 10_000);
+    expect(result).not.toBeNull();
+    expect(result!.model).toBe("fallback");
+    expect((result!.json as { sessions: unknown[] }).sessions).toHaveLength(1);
+  });
+
+  it("returns null when both primary and fallback fail", async () => {
+    const result = await invokeJudgeWithFallback("prompt", "false", "false", 10_000);
+    expect(result).toBeNull();
+  });
+
+  it("falls back when primary emits invalid JSON", async () => {
+    const result = await invokeJudgeWithFallback("prompt", EMIT_BAD_JSON_CMD, EMIT_JSON_CMD, 10_000);
+    expect(result).not.toBeNull();
+    expect(result!.model).toBe("fallback");
   });
 });

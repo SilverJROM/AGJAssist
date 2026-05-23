@@ -33,6 +33,8 @@ const AUDIT_DAYS = Number(process.env.AUDIT_DAYS ?? 3);
 const CADENCE_20_WEIGHT = Number(process.env.AUDIT_CADENCE_20_WEIGHT ?? 0.6);
 const SPARK_CMD = process.env.AUDIT_SPARK_CMD ??
   "codex exec --model gpt-5.3-codex --skip-git-repo-check";
+const SONNET_FALLBACK_CMD = process.env.AUDIT_SONNET_FALLBACK_CMD ??
+  "claude -p --dangerously-skip-permissions --model sonnet";
 const ANALYST_MODEL = process.env.AUDIT_ANALYST_MODEL ?? "opus";
 const LOG_DIR = path.resolve(
   REPO_ROOT,
@@ -149,6 +151,33 @@ function safeJson(str, fallback) {
 }
 
 // ---------------------------------------------------------------------------
+// Judge-with-fallback helper (spark → Sonnet)
+// Tries primaryCmd first via spawnSync. On any failure (spawn error / non-zero /
+// timeout / parse fail) tries fallbackCmd once. Returns null if both fail.
+// Returns { json, model: "primary"|"fallback" } on success.
+// ---------------------------------------------------------------------------
+function invokeJudgeWithFallback(prompt, primaryCmd, fallbackCmd, timeoutMs = 120_000) {
+  function tryCmd(cmd) {
+    const [bin, ...args] = cmd.trim().split(/\s+/);
+    const result = shellSpawn(bin, args, prompt, timeoutMs);
+    if (!result.ok) return null;
+    try {
+      return parseSparkJson(result.stdout?.trim() ?? "");
+    } catch {
+      return null;
+    }
+  }
+
+  const primary = tryCmd(primaryCmd);
+  if (primary !== null) return { json: primary, model: "primary" };
+
+  const fallback = tryCmd(fallbackCmd);
+  if (fallback !== null) return { json: fallback, model: "fallback" };
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Spark invocation
 // ---------------------------------------------------------------------------
 const SYSTEM_PROMPT =
@@ -174,16 +203,18 @@ function buildSparkPrompt(workflow, sessionPanes) {
   );
 }
 
+// invokeSpark: tries spark first, falls back to Sonnet on any failure.
+// Returns { sessions: [...], judge_model: "spark"|"sonnet" }.
+// Throws if both fail (caller catches and logs spark_parse_error).
 function invokeSpark(prompt) {
-  log(`  Invoking spark (${SPARK_CMD.split(" ")[0]})…`);
-  const [bin, ...args] = SPARK_CMD.trim().split(/\s+/);
-  const result = shellSpawn(bin, args, prompt, 120_000);
-
-  if (!result.ok) {
-    throw new Error(`spark failed (exit ${result.status}): ${result.stderr.slice(0, 400)}`);
+  log(`  Invoking spark (${SPARK_CMD.split(" ")[0]}) with Sonnet fallback…`);
+  const result = invokeJudgeWithFallback(prompt, SPARK_CMD, SONNET_FALLBACK_CMD, 120_000);
+  if (!result) {
+    throw new Error("both spark and Sonnet fallback failed");
   }
-
-  return parseSparkJson(result.stdout?.trim() ?? "");
+  const judgeModel = result.model === "primary" ? "spark" : "sonnet";
+  log(`  Judge model: ${judgeModel}`);
+  return { ...result.json, judge_model: judgeModel };
 }
 
 function parseSparkJson(raw) {
@@ -303,14 +334,16 @@ function runTick(tickN) {
       log(`    Sidecar write error: ${err.message}`);
     }
 
-    // --- Invoke spark ---
+    // --- Invoke spark (with Sonnet fallback) ---
     let sparkSessions = null;
+    let judgeModel = "spark";
     try {
       const prompt = buildSparkPrompt(wf, sessionPanes);
       const sparkReply = invokeSpark(prompt);
       sparkSessions = sparkReply?.sessions ?? null;
+      judgeModel = sparkReply?.judge_model ?? "spark";
       if (!Array.isArray(sparkSessions)) throw new Error("spark reply missing .sessions array");
-      log(`    Spark replied with ${sparkSessions.length} session(s).`);
+      log(`    Judge replied (${judgeModel}) with ${sparkSessions.length} session(s).`);
     } catch (err) {
       log(`    spark_parse_error: ${err.message}`);
       appendJsonl({
@@ -358,6 +391,7 @@ function runTick(tickN) {
         agreement,
         spark_reason: sparkReason,
         pane_excerpt_hash: paneExcerptHash,
+        judge_model: judgeModel,
       };
 
       try {
