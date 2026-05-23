@@ -27,6 +27,8 @@ import {
 export const POLL_MS = 45_000;
 export const RECONCILE_MS = 1_800_000;
 export const STUCK_THRESHOLD_MS = 90_000;
+export const PARENT_IDLE_THRESHOLD_MS = 15 * 60 * 1000;
+export const PARENT_IDLE_RENUDGE_MS = 30 * 60 * 1000;
 export const CAPTURE_LINES = 200;
 export const MAX_CANNED_NUDGES = 2;
 export const BRAIN_COORDINATOR_TAIL_LINES = 40;
@@ -390,6 +392,11 @@ export class OvermindWatcher {
   // same unchanged gap every 30-min cycle. Cleared when the gap resolves so a fresh
   // recurrence triggers a new ask.
   private readonly lastReconcileAsk = new Map<number, string>();
+  // Parent-idle-while-child-working detector (in-memory only, no DB column).
+  // workflowId → ms timestamp when parent first went non-working.
+  private readonly parentIdleSince = new Map<number, number>();
+  // workflowId → ms timestamp of last parent-idle nudge sent.
+  private readonly lastParentIdleNudgeAt = new Map<number, number>();
 
   constructor(
     private readonly overmindService: OvermindService,
@@ -525,6 +532,9 @@ export class OvermindWatcher {
     // interrupt — no completion consult, no completeness request, no nudge, no brain,
     // no notification. Resume re-arms everything on the next tick.
     if (workflow.monitoring_paused) {
+      // Defensive: clear parent-idle maps for paused/terminal workflows.
+      this.parentIdleSince.delete(workflow.id);
+      this.lastParentIdleNudgeAt.delete(workflow.id);
       this.overmindService.update(workflow.id, {
         status: result.status,
         pending_decision: result.pendingDecision,
@@ -537,6 +547,43 @@ export class OvermindWatcher {
         ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
       });
       return;
+    }
+
+    // Parent-idle-while-child-working detector: nudge the PARENT when it has been
+    // non-working (idle/waiting_human/stuck/awaiting_decision) for >15min while at least
+    // one child is still working. This is orthogonal to the stuck-workflow nudge ladder —
+    // that fires on the workflow being stuck; this fires when the workflow is "working"
+    // (child activity keeps it alive) but the PARENT is genuinely idle. Best-effort.
+    try {
+      if (parentStatus === "working") {
+        // Parent is active — reset both the idle clock and the re-nudge cap so a
+        // fresh idle period after recovery starts a clean cycle.
+        this.parentIdleSince.delete(workflow.id);
+        this.lastParentIdleNudgeAt.delete(workflow.id);
+      } else {
+        // Parent is not working (idle / waiting_human / stuck / awaiting_decision).
+        if (!this.parentIdleSince.has(workflow.id)) {
+          this.parentIdleSince.set(workflow.id, Date.now());
+        }
+        const idleSince = this.parentIdleSince.get(workflow.id)!;
+        const parentIdleMs = Date.now() - idleSince;
+        const anyChildWorking = childStatuses.some((c) => c.status === "working");
+        const lastNudgeAt = this.lastParentIdleNudgeAt.get(workflow.id) ?? 0;
+        if (
+          parentIdleMs > PARENT_IDLE_THRESHOLD_MS &&
+          anyChildWorking &&
+          Date.now() - lastNudgeAt > PARENT_IDLE_RENUDGE_MS
+        ) {
+          const workingChild = childStatuses.find((c) => c.status === "working");
+          const idleMinutes = Math.trunc(parentIdleMs / 60_000);
+          const nudgeMsg =
+            `Overmind: your child session ${workingChild!.session} has been working but you've been idle for ~${idleMinutes}min — check recent callbacks / route the current batch, or report STATUS.`;
+          await this.tmuxService.sendAndSubmit(workflow.coordinator_session, nudgeMsg);
+          this.lastParentIdleNudgeAt.set(workflow.id, Date.now());
+        }
+      }
+    } catch (error) {
+      console.error("Overmind parent-idle nudge failed:", error);
     }
 
     // Edge case (the lkvc-38 situation): the task list shows every task done but the
