@@ -49,6 +49,8 @@ export const FRONTLOAD_CORRECTION_NOTE =
 
 // ─── Task-staleness detector constants ──────────────────────────────────────
 export const TASK_STALE_CHECK_MS = 5 * 60 * 1000; // 5 min between checks
+export const TASK_STALE_NAG_COOLDOWN_MS = 30 * 60 * 1000; // 30 min between tasks_stale asks
+export const TASK_RECENT_UPDATE_GRACE_MS = 45 * 60 * 1000; // skip derivation if parent updated within 45 min
 export const SPARK_TASK_FALLBACK_PER_HOUR = 1; // max Tier-3 LLM calls per workflow/hour (counts once regardless of which model)
 export const SPARK_TASK_CMD = process.env["OVM_SPARK_CMD"] ?? "codex exec --model gpt-5.3-codex --skip-git-repo-check";
 export const SONNET_TASK_CMD = process.env["OVM_SONNET_FALLBACK_CMD"] ?? "claude -p --dangerously-skip-permissions --model sonnet";
@@ -542,6 +544,8 @@ export class OvermindWatcher {
   private readonly lastTaskStaleCheckAt = new Map<number, number>();
   private readonly lastProgressMtimeMs = new Map<number, number>();
   private readonly sparkTaskUsageWindow = new Map<number, number[]>();
+  // Throttle: tracks when the last tasks_stale-bearing ask was sent per workflow.
+  private readonly lastTaskStaleNudgeAt = new Map<number, number>();
 
   constructor(
     private readonly overmindService: OvermindService,
@@ -846,6 +850,12 @@ export class OvermindWatcher {
     try {
       await this.tmuxService.sendAndSubmit(workflow.coordinator_session, requestText);
       lastPaneHash = hashPane(await this.capturePaneSafe(workflow.coordinator_session));
+      // Record nag timestamp for tasks_stale throttle (per-workflow, in-memory).
+      // Done here (after send success) so the cooldown is based on "when was the
+      // last tasks_stale-bearing ask actually sent," not "when was staleness detected."
+      if (assessment.missing.includes("tasks_stale")) {
+        this.lastTaskStaleNudgeAt.set(workflow.id, Date.now());
+      }
     } catch (error) {
       console.error("Overmind completeness request failed:", error);
     }
@@ -1143,6 +1153,7 @@ export class OvermindWatcher {
     this.lastTaskStaleCheckAt.delete(workflowId);
     this.lastProgressMtimeMs.delete(workflowId);
     this.sparkTaskUsageWindow.delete(workflowId);
+    this.lastTaskStaleNudgeAt.delete(workflowId);
   }
 
   // Async derivation of per-task states from local files + pane text. Best-effort:
@@ -1163,6 +1174,23 @@ export class OvermindWatcher {
     const wid = workflow.id;
     const tasks = (workflow.tasks ?? []) as Array<{ id: string; state: string }>;
     if (tasks.length === 0) return undefined;
+
+    // ── Throttle gates (cheap, no I/O — bail before any file reads) ─────────
+    // 1. Recent-update grace: if the parent posted a /tasks update in the last
+    //    45 min, the agents are actively working — skip derivation entirely.
+    const lastTaskLogEntry = workflow.task_log?.[workflow.task_log.length - 1];
+    if (lastTaskLogEntry?.at) {
+      const lastTaskUpdateMs = Date.parse(lastTaskLogEntry.at);
+      if (!Number.isNaN(lastTaskUpdateMs) && now - lastTaskUpdateMs < TASK_RECENT_UPDATE_GRACE_MS) {
+        return undefined;
+      }
+    }
+    // 2. Nag cooldown: even when staleness is detected, don't re-ask within 30 min
+    //    of the last tasks_stale-bearing ask. Other gaps are unaffected.
+    const lastNagAt = this.lastTaskStaleNudgeAt.get(wid) ?? 0;
+    if (now - lastNagAt < TASK_STALE_NAG_COOLDOWN_MS) {
+      return undefined;
+    }
 
     // Gate: skip unless 5 min elapsed OR progress.md has a newer mtime.
     const lastCheck = this.lastTaskStaleCheckAt.get(wid) ?? 0;
