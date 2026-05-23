@@ -249,6 +249,9 @@ export function classifyChildSessionStatus(input: {
 // Grace before nagging about an empty tasklist — a freshly-registered run may push its
 // tasks a beat after register. Past this, an empty tasklist is a genuine omission.
 export const EMPTY_TASKLIST_GRACE_MS = 60_000;
+// How long the parent can go without any /api/overmind/tasks update before it's flagged
+// as "stale" — catches Lokalcamp-style silent runs where /complete was never called.
+export const STALE_THRESHOLD_MS = 3 * 60 * 60 * 1000; // 3 hours
 
 export interface CompletenessInput {
   tasks: { state: string }[];
@@ -259,6 +262,10 @@ export interface CompletenessInput {
   runDirExists: boolean;
   ageMs: number;
   currentTask: string | null;
+  // For stale detection: ISO timestamp of the run start, last task_log entry, and current time
+  runStartedAt: string | null;
+  taskLogLastAt: string | null;
+  nowMs: number;
 }
 
 export interface CompletenessResult {
@@ -309,6 +316,39 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
     missing.push("roles");
     labels.push("roles");
     lines.push("send child_roles (aligned by index with child_sessions) so the dashboard labels your agents (e.g. coder/tester)");
+  }
+
+  // Half-broken register: child_roles declared but no child_sessions provided.
+  // Distinct from the `roles` check above (which fires for ≥2 children with mismatched counts).
+  if (input.childRoles.length > 0 && input.childSessions.length === 0) {
+    missing.push("roles_without_sessions");
+    labels.push("roster");
+    lines.push(
+      `you registered child_roles (${input.childRoles.join(", ")}) but no child_sessions — please re-register with the actual child session names.`
+    );
+  }
+
+  // Stale parent: the parent has not sent any /api/overmind/tasks update for >STALE_THRESHOLD_MS.
+  // Catches Lokalcamp-style silent runs where the run finished but /complete was never called.
+  // Skip when tasks are empty and within grace (leave that to the tasklist check) or when there
+  // are no tasks at all (can't tell if done; defer to tasklist check).
+  const notAllDone = input.tasks.length > 0 && !input.tasks.every((t) => t.state === "done");
+  if (notAllDone) {
+    const lastParentUpdateMs = (() => {
+      const fromLog = input.taskLogLastAt ? Date.parse(input.taskLogLastAt) : NaN;
+      const fromStart = input.runStartedAt ? Date.parse(input.runStartedAt) : NaN;
+      const candidates = [fromLog, fromStart].filter((v) => !Number.isNaN(v));
+      return candidates.length > 0 ? Math.max(...candidates) : null;
+    })();
+
+    if (lastParentUpdateMs !== null && input.nowMs - lastParentUpdateMs > STALE_THRESHOLD_MS) {
+      const ageHours = Math.round((input.nowMs - lastParentUpdateMs) / (60 * 60 * 1000));
+      missing.push("stale");
+      labels.push("stale");
+      lines.push(
+        `your last update to overmind was ~${ageHours}h ago — if you're still running, send a /api/overmind/tasks update; if the run is finished, POST /api/overmind/complete.`
+      );
+    }
   }
 
   // Inconsistency the canned checks can't resolve: current_task names a batch token
@@ -586,7 +626,10 @@ export class OvermindWatcher {
       runDir: workflow.run_dir,
       runDirExists: ctx.runDirExists,
       ageMs,
-      currentTask: workflow.current_task
+      currentTask: workflow.current_task,
+      runStartedAt: workflow.run_started_at ?? null,
+      taskLogLastAt: workflow.task_log?.[workflow.task_log.length - 1]?.at ?? null,
+      nowMs: new Date(ctx.now).getTime()
     });
 
     // Complete — clear any outstanding badge/signature.
