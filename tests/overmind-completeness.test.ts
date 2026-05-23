@@ -6,6 +6,9 @@ import {
   CompletenessInput
 } from "../src/services/overmind-watcher.js";
 
+// Re-export type alias used in staleness tests for clarity.
+type TaskState = "done" | "in-progress" | "unknown";
+
 const PAST_GRACE = EMPTY_TASKLIST_GRACE_MS + 1000;
 
 // A "now" reference used in stale tests — fixed so assertions are deterministic.
@@ -272,5 +275,140 @@ describe("assessRegistrationCompleteness", () => {
 
   it("STALE_THRESHOLD_MS is exactly 3 hours in milliseconds", () => {
     expect(STALE_THRESHOLD_MS).toBe(3 * 60 * 60 * 1000);
+  });
+});
+
+// ─── tasks_stale integration tests ───────────────────────────────────────────
+
+// A base input that has two registered tasks, neither done, and no other gaps.
+function stalenessBase(
+  overrides: Partial<CompletenessInput> = {}
+): CompletenessInput {
+  return {
+    tasks: [
+      { id: "B1", label: "setup", state: "processing" } as unknown as { state: string },
+      { id: "B2", label: "implement", state: "processing" } as unknown as { state: string }
+    ],
+    childSessions: [],
+    childRoles: [],
+    childStatuses: [],
+    runDir: "/tmp/run",
+    runDirExists: true,
+    ageMs: EMPTY_TASKLIST_GRACE_MS + 1000,
+    currentTask: null,
+    runStartedAt: null,
+    taskLogLastAt: null,
+    nowMs: NOW_MS,
+    ...overrides
+  };
+}
+
+describe("assessRegistrationCompleteness — tasks_stale", () => {
+  it('flags tasks_stale when derivedTaskState shows a registered-as-not-done task as "done"', () => {
+    const derivedTaskState: Record<string, TaskState> = { B2: "done" };
+    const r = assessRegistrationCompleteness(
+      stalenessBase({ derivedTaskState })
+    );
+    expect(r.missing).toContain("tasks_stale");
+    expect(r.requestLabel).toContain("tasks-stale");
+    expect(r.requestText).toContain("B2");
+    expect(r.requestText).toContain("POST /api/overmind/tasks");
+  });
+
+  it("does NOT flag tasks_stale when derivedTaskState is absent", () => {
+    const r = assessRegistrationCompleteness(stalenessBase());
+    expect(r.missing).not.toContain("tasks_stale");
+  });
+
+  it("does NOT flag tasks_stale when derivedTaskState is an empty object", () => {
+    const r = assessRegistrationCompleteness(
+      stalenessBase({ derivedTaskState: {} })
+    );
+    expect(r.missing).not.toContain("tasks_stale");
+  });
+
+  it("does NOT flag tasks_stale when the derived task is in-progress (only done triggers)", () => {
+    const derivedTaskState: Record<string, TaskState> = { B2: "in-progress" };
+    const r = assessRegistrationCompleteness(stalenessBase({ derivedTaskState }));
+    expect(r.missing).not.toContain("tasks_stale");
+  });
+
+  it("does NOT flag tasks_stale when the derived task is unknown", () => {
+    const derivedTaskState: Record<string, TaskState> = { B2: "unknown" };
+    const r = assessRegistrationCompleteness(stalenessBase({ derivedTaskState }));
+    expect(r.missing).not.toContain("tasks_stale");
+  });
+
+  it("does NOT flag tasks_stale when the registered task is already done", () => {
+    // B2 is already marked done in the registered list — no staleness.
+    const derivedTaskState: Record<string, TaskState> = { B2: "done" };
+    const r = assessRegistrationCompleteness(
+      stalenessBase({
+        tasks: [
+          { id: "B1", label: "setup", state: "processing" } as unknown as { state: string },
+          { id: "B2", label: "implement", state: "done" } as unknown as { state: string }
+        ],
+        derivedTaskState
+      })
+    );
+    expect(r.missing).not.toContain("tasks_stale");
+  });
+
+  it("flags all stale task ids when multiple are out of date", () => {
+    const derivedTaskState: Record<string, TaskState> = { B1: "done", B2: "done" };
+    const r = assessRegistrationCompleteness(stalenessBase({ derivedTaskState }));
+    expect(r.missing).toContain("tasks_stale");
+    expect(r.requestText).toContain("B1");
+    expect(r.requestText).toContain("B2");
+  });
+
+  // ── Signature stability ─────────────────────────────────────────────────────
+
+  it("signature is stable across two identical calls (same gap → same signature)", () => {
+    const derivedTaskState: Record<string, TaskState> = { B2: "done" };
+    const a = assessRegistrationCompleteness(stalenessBase({ derivedTaskState }));
+    const b = assessRegistrationCompleteness(stalenessBase({ derivedTaskState }));
+    expect(a.signature).toBe(b.signature);
+  });
+
+  it("signature changes when the stale-id set changes (re-arms the ask)", () => {
+    const onlyB2: Record<string, TaskState> = { B2: "done" };
+    const b1AndB2: Record<string, TaskState> = { B1: "done", B2: "done" };
+    const sigA = assessRegistrationCompleteness(stalenessBase({ derivedTaskState: onlyB2 })).signature;
+    const sigB = assessRegistrationCompleteness(stalenessBase({ derivedTaskState: b1AndB2 })).signature;
+    expect(sigA).not.toBe(sigB);
+  });
+
+  it("signature includes the stale ids so it is distinct from a plain 'tasks_stale' with different ids", () => {
+    const justB1: Record<string, TaskState> = { B1: "done" };
+    const justB2: Record<string, TaskState> = { B2: "done" };
+    const sigA = assessRegistrationCompleteness(stalenessBase({ derivedTaskState: justB1 })).signature;
+    const sigB = assessRegistrationCompleteness(stalenessBase({ derivedTaskState: justB2 })).signature;
+    expect(sigA).not.toBe(sigB);
+  });
+
+  it("signature with tasks_stale differs from a no-stale signature", () => {
+    const withStaleness = assessRegistrationCompleteness(
+      stalenessBase({ derivedTaskState: { B2: "done" } })
+    );
+    const withoutStaleness = assessRegistrationCompleteness(stalenessBase());
+    expect(withStaleness.signature).not.toBe(withoutStaleness.signature);
+  });
+
+  it("signature contains the stale suffix (:: separator)", () => {
+    const r = assessRegistrationCompleteness(
+      stalenessBase({ derivedTaskState: { B2: "done" } })
+    );
+    expect(r.signature).toContain("::");
+    expect(r.signature).toContain("B2");
+  });
+
+  it("signature is order-stable regardless of staleIds order in the input", () => {
+    // derivedTaskState is a plain object — key iteration order can vary.
+    const abOrder: Record<string, TaskState> = { B1: "done", B2: "done" };
+    const baOrder: Record<string, TaskState> = { B2: "done", B1: "done" };
+    const sigA = assessRegistrationCompleteness(stalenessBase({ derivedTaskState: abOrder })).signature;
+    const sigB = assessRegistrationCompleteness(stalenessBase({ derivedTaskState: baOrder })).signature;
+    expect(sigA).toBe(sigB);
   });
 });

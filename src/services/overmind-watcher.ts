@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { appendFile, mkdir, readFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+import { spawn } from "node:child_process";
 import {
   OvermindChildSessionStatus,
   OvermindParentStatus,
@@ -45,6 +46,56 @@ export const CANNED_NUDGE_NO_CHILD =
 export const ALL_DONE_CONFIRM_NUDGE = DEFAULT_COMPLETION_CONSULT_TEXT;
 export const FRONTLOAD_CORRECTION_NOTE =
   "Overmind: that decision should have been frontloaded at intake (projcore §1.4a) — please put such decisions in the north-star next time.";
+
+// ─── Task-staleness detector constants ──────────────────────────────────────
+export const TASK_STALE_CHECK_MS = 5 * 60 * 1000; // 5 min between checks
+export const SPARK_TASK_FALLBACK_PER_HOUR = 1; // max Tier-3 spark calls per workflow/hour
+export const SPARK_TASK_CMD = process.env["OVM_SPARK_CMD"] ?? "codex exec --model gpt-5.3-codex --skip-git-repo-check";
+
+// ─── Pure helper ──────────────────────────────────────────────────────────────
+// Regex-scan a text blob for evidence of task-id states. Returns ONLY ids the
+// regexes matched (no fabrication for unmentioned ids). Case-insensitive, word-
+// boundaried. Patterns follow the locked design.
+export function deriveTaskStateFromText(
+  text: string,
+  tasks: { id: string }[]
+): Map<string, "done" | "in-progress" | "unknown"> {
+  const result = new Map<string, "done" | "in-progress" | "unknown">();
+  const lower = text.toLowerCase();
+
+  for (const task of tasks) {
+    const id = task.id;
+    if (!id) continue;
+    const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    // Done patterns:
+    //   \b<id>\b[^\n]{0,40}(PASS|done|merged|VERIFIED)
+    //   (?:✓|✔|\[x\])\s*<id>\b
+    //   <id>\s*(?:✓|✔|done|PASS)
+    const doneRe = new RegExp(
+      `\\b${escapedId}\\b[^\\n]{0,40}(?:pass|done|merged|verified)\\b` +
+      `|(?:✓|✔|\\[x\\])\\s*${escapedId}\\b` +
+      `|\\b${escapedId}\\s*(?:✓|✔|done|pass)`,
+      "i"
+    );
+
+    // In-progress patterns:
+    //   \b<id>\b[^\n]{0,40}(in-flight|in-progress|processing|REVISE|iter-N|FAIL)
+    const inProgressRe = new RegExp(
+      `\\b${escapedId}\\b[^\\n]{0,40}(?:in[\\s\\-]?flight|in[\\s\\-]?progress|processing|revise|iter[\\s\\-]?\\d|fail)\\b`,
+      "i"
+    );
+
+    if (doneRe.test(lower)) {
+      result.set(id, "done");
+    } else if (inProgressRe.test(lower)) {
+      result.set(id, "in-progress");
+    }
+    // Otherwise: no match → do NOT add to result (don't infer pending for unknown)
+  }
+
+  return result;
+}
 
 const NUMBERED_OPTION_RE = /^\s*\d+\.\s+\S+/m;
 const DECISION_FOOTER_RE = /Enter to select|Tab\/Arrow keys to navigate|Type something|Chat about this/i;
@@ -270,6 +321,9 @@ export interface CompletenessInput {
   runStartedAt: string | null;
   taskLogLastAt: string | null;
   nowMs: number;
+  // Optional: derived task state from progress.md / callbacks.md / pane text.
+  // Keys are task ids; values are the inferred state. Only ids with a match are present.
+  derivedTaskState?: Record<string, "done" | "in-progress" | "unknown">;
 }
 
 export interface CompletenessResult {
@@ -355,6 +409,28 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
     }
   }
 
+  // Tasks-staleness: deterministic evidence from progress.md / callbacks.md shows tasks as
+  // done that the registered list still marks not-done. Ask the parent to POST /tasks.
+  let staleIds: string[] = [];
+  if (input.derivedTaskState && Object.keys(input.derivedTaskState).length > 0) {
+    const tasksAny = input.tasks as Array<{ id?: string; state?: string }>;
+    staleIds = tasksAny
+      .filter(
+        (t) =>
+          t.id &&
+          t.state !== "done" &&
+          input.derivedTaskState![t.id] === "done"
+      )
+      .map((t) => t.id as string);
+    if (staleIds.length > 0) {
+      missing.push("tasks_stale");
+      labels.push("tasks-stale");
+      lines.push(
+        `your tasks list looks out of date — evidence shows ${staleIds.join(", ")} appear to be done, but my registered list still shows them not-done. Please POST /api/overmind/tasks with your current state.`
+      );
+    }
+  }
+
   // Inconsistency the canned checks can't resolve: current_task names a batch token
   // (e.g. "B3"/"A2") but no task in the published list matches it. Defer to Sonnet.
   let needsBrain = false;
@@ -374,7 +450,12 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
     }
   }
 
-  const signature = [...missing].sort().join("|");
+  // Signature: sorted missing keys, plus stale-ids suffix so changing the stale set re-arms.
+  const baseSig = [...missing].sort().join("|");
+  const signature = staleIds.length > 0
+    ? `${baseSig}::${[...staleIds].sort().join(",")}`
+    : baseSig;
+
   return {
     missing,
     requestLabel: labels.length ? labels.join(", ") : (needsBrain ? "task mismatch" : null),
@@ -394,6 +475,10 @@ export class OvermindWatcher {
   // same unchanged gap every 30-min cycle. Cleared when the gap resolves so a fresh
   // recurrence triggers a new ask.
   private readonly lastReconcileAsk = new Map<number, string>();
+  // Task-staleness detector state — per workflow, keyed by workflow.id
+  private readonly lastTaskStaleCheckAt = new Map<number, number>();
+  private readonly lastProgressMtimeMs = new Map<number, number>();
+  private readonly sparkTaskUsageWindow = new Map<number, number[]>();
 
   constructor(
     private readonly overmindService: OvermindService,
@@ -404,14 +489,22 @@ export class OvermindWatcher {
   ) {}
 
   async tick(): Promise<void> {
-    const workflows = this.overmindService
-      .list()
-      .filter((workflow) => !TERMINAL_STATUSES.includes(workflow.status));
+    const allWorkflows = this.overmindService.list();
+    const activeWorkflows = allWorkflows.filter(
+      (workflow) => !TERMINAL_STATUSES.includes(workflow.status)
+    );
 
-    await Promise.all(workflows.map((workflow) => this.tickWorkflow(workflow)));
+    // Clean up staleness state for any workflow that just became terminal/paused.
+    for (const workflow of allWorkflows) {
+      if (TERMINAL_STATUSES.includes(workflow.status)) {
+        this.cleanupStalenessState(workflow.id);
+      }
+    }
+
+    await Promise.all(activeWorkflows.map((workflow) => this.tickWorkflow(workflow)));
 
     if (Date.now() - this.lastReconcileAt >= RECONCILE_MS) {
-      await this.reconcile(workflows);
+      await this.reconcile(activeWorkflows);
       this.lastReconcileAt = Date.now();
     }
 
@@ -524,11 +617,21 @@ export class OvermindWatcher {
       childPanes
     });
 
+    // Task-staleness derivation (best-effort, never throws out of tick).
+    const paneChanged = workflow.last_pane_hash !== null && result.coordinatorHash !== workflow.last_pane_hash;
+    let derivedTaskState: Record<string, "done" | "in-progress" | "unknown"> | undefined;
+    try {
+      derivedTaskState = await this.assessTaskStaleness(workflow, coordinatorPane, resolvedRunDir, paneChanged);
+    } catch {
+      derivedTaskState = undefined;
+    }
+
     // Monitoring paused (JROM is talking to this coordinator): keep the display live
     // (status, parent/child, attribution) so overmind stays AWARE, but suppress every
     // interrupt — no completion consult, no completeness request, no nudge, no brain,
     // no notification. Resume re-arms everything on the next tick.
     if (workflow.monitoring_paused) {
+      this.cleanupStalenessState(workflow.id);
       this.overmindService.update(workflow.id, {
         status: result.status,
         pending_decision: result.pendingDecision,
@@ -569,7 +672,8 @@ export class OvermindWatcher {
       childStatuses,
       runDirExists,
       resolvedRunDir,
-      now
+      now,
+      derivedTaskState
     });
 
     const nudgeFields = info.requestedThisTick
@@ -611,7 +715,13 @@ export class OvermindWatcher {
   // case to Sonnet (reviewRegistration) which can request, dismiss, or rarely escalate.
   private async applyCompleteness(
     workflow: OvermindWorkflow,
-    ctx: { childStatuses: OvermindChildSessionStatus[]; runDirExists: boolean; resolvedRunDir: string; now: string }
+    ctx: {
+      childStatuses: OvermindChildSessionStatus[];
+      runDirExists: boolean;
+      resolvedRunDir: string;
+      now: string;
+      derivedTaskState?: Record<string, "done" | "in-progress" | "unknown">;
+    }
   ): Promise<{
     info_request: string | null;
     info_check: string | null;
@@ -633,7 +743,8 @@ export class OvermindWatcher {
       currentTask: workflow.current_task,
       runStartedAt: workflow.run_started_at ?? null,
       taskLogLastAt: workflow.task_log?.[workflow.task_log.length - 1]?.at ?? null,
-      nowMs: new Date(ctx.now).getTime()
+      nowMs: new Date(ctx.now).getTime(),
+      derivedTaskState: ctx.derivedTaskState
     });
 
     // Complete — clear any outstanding badge/signature.
@@ -961,6 +1072,181 @@ export class OvermindWatcher {
       status: "waiting_human",
       stuck_since: null
     };
+  }
+
+  // Clean up staleness-detector Maps for a workflow that has gone terminal or paused.
+  // Defensive: silently skips if the id isn't present.
+  private cleanupStalenessState(workflowId: number): void {
+    this.lastTaskStaleCheckAt.delete(workflowId);
+    this.lastProgressMtimeMs.delete(workflowId);
+    this.sparkTaskUsageWindow.delete(workflowId);
+  }
+
+  // Async derivation of per-task states from local files + pane text. Best-effort:
+  // returns undefined on any unrecoverable failure. Never throws.
+  //
+  // Tier 1:  progress.md + callbacks.md regex scan (deterministic, ~90%)
+  // Tier 1b: coordinator pane text (if Tier-1 files yielded nothing, pane >200 chars)
+  // Tier 3:  bounded spark call (≤SPARK_TASK_FALLBACK_PER_HOUR/workflow/hour) when Tier-1
+  //          and 1b both yielded nothing AND the pane changed since the last tick.
+  //          Gated by OVM_SPARK_CMD env var and the SPARK_TASK_FALLBACK_PER_HOUR cap.
+  private async assessTaskStaleness(
+    workflow: OvermindWorkflow,
+    coordinatorPane: string,
+    resolvedRunDir: string,
+    paneChanged: boolean
+  ): Promise<Record<string, "done" | "in-progress" | "unknown"> | undefined> {
+    const now = Date.now();
+    const wid = workflow.id;
+    const tasks = (workflow.tasks ?? []) as Array<{ id: string; state: string }>;
+    if (tasks.length === 0) return undefined;
+
+    // Gate: skip unless 5 min elapsed OR progress.md has a newer mtime.
+    const lastCheck = this.lastTaskStaleCheckAt.get(wid) ?? 0;
+    let progressMtime = 0;
+    let progressText = "";
+    let callbacksText = "";
+
+    try {
+      const progressStat = await stat(path.join(resolvedRunDir, "progress.md"));
+      progressMtime = progressStat.mtimeMs;
+    } catch { /* no file */ }
+
+    const lastKnownMtime = this.lastProgressMtimeMs.get(wid) ?? 0;
+    const mtimeAdvanced = progressMtime > lastKnownMtime;
+    const checkDue = now - lastCheck >= TASK_STALE_CHECK_MS;
+
+    if (!checkDue && !mtimeAdvanced) return undefined;
+
+    // Read Tier-1 files.
+    try {
+      progressText = await readFile(path.join(resolvedRunDir, "progress.md"), "utf-8");
+    } catch { /* no file */ }
+    try {
+      callbacksText = await readFile(path.join(resolvedRunDir, "callbacks.md"), "utf-8");
+    } catch { /* no file */ }
+
+    // Tier 1: merge derive from both files.
+    let derived = new Map<string, "done" | "in-progress" | "unknown">();
+    if (progressText) {
+      const fromProgress = deriveTaskStateFromText(progressText, tasks);
+      for (const [id, state] of fromProgress) derived.set(id, state);
+    }
+    if (callbacksText) {
+      const fromCallbacks = deriveTaskStateFromText(callbacksText, tasks);
+      for (const [id, state] of fromCallbacks) {
+        // Done takes priority over in-progress; otherwise overwrite.
+        const existing = derived.get(id);
+        if (existing !== "done") derived.set(id, state);
+      }
+    }
+
+    // Tier 1b: fallback to pane text when files yielded nothing and pane is substantive.
+    if (derived.size === 0 && coordinatorPane.length > 200) {
+      derived = deriveTaskStateFromText(coordinatorPane, tasks);
+    }
+
+    // Tier 3: bounded spark fallback — only when Tier-1/1b yielded nothing, pane changed,
+    // and we have budget left this hour. Gate on env var presence so unit tests never fire.
+    if (derived.size === 0 && paneChanged && process.env["OVM_SPARK_CMD"] !== undefined) {
+      const window = this.sparkTaskUsageWindow.get(wid) ?? [];
+      const oneHourAgo = now - 60 * 60 * 1000;
+      const pruned = window.filter((ts) => ts > oneHourAgo);
+      if (pruned.length < SPARK_TASK_FALLBACK_PER_HOUR) {
+        const sparkResult = await this.runSparkTaskDerivation(coordinatorPane, tasks);
+        if (sparkResult) {
+          derived = sparkResult;
+          pruned.push(now);
+          this.sparkTaskUsageWindow.set(wid, pruned);
+        }
+      }
+    } else if (derived.size === 0) {
+      // Update timestamps even when we return nothing, so we don't spin.
+      this.lastTaskStaleCheckAt.set(wid, now);
+      if (progressMtime > 0) this.lastProgressMtimeMs.set(wid, progressMtime);
+      return undefined;
+    }
+
+    // Update timestamps.
+    this.lastTaskStaleCheckAt.set(wid, now);
+    if (progressMtime > 0) this.lastProgressMtimeMs.set(wid, progressMtime);
+
+    if (derived.size === 0) return undefined;
+
+    // Convert Map to plain Record.
+    const record: Record<string, "done" | "in-progress" | "unknown"> = {};
+    for (const [id, state] of derived) record[id] = state;
+    return record;
+  }
+
+  // Tier-3 spark invocation. Spawns the SPARK_TASK_CMD process, writes the prompt to
+  // stdin, reads stdout, parses JSON. Timeout 60s. Returns undefined on any failure.
+  private async runSparkTaskDerivation(
+    coordinatorPane: string,
+    tasks: Array<{ id: string; state: string }>
+  ): Promise<Map<string, "done" | "in-progress" | "unknown"> | undefined> {
+    const taskIds = tasks.map((t) => t.id).join(", ");
+    const paneSnippet = tailLines(coordinatorPane, BRAIN_COORDINATOR_TAIL_LINES);
+    const prompt =
+      `Given this coordinator pane and the registered task ids, return STRICT JSON: ` +
+      `{"sessions":[{"id":"<task-id>","status":"done|in-progress|pending|unknown","reason":"<short>"}]} ` +
+      `— one entry per task id. ` +
+      `Status 'done' if the pane shows that batch finished/passed/merged. ` +
+      `'in-progress' if it's the active batch. 'unknown' if not clearly indicated.\n\n` +
+      `Task ids: ${taskIds}\n\nCoordinator pane:\n${paneSnippet}`;
+
+    return new Promise((resolve) => {
+      let stdout = "";
+      let timedOut = false;
+
+      // Split the SPARK_TASK_CMD into argv0 + args to avoid shell injection.
+      const [cmd, ...args] = SPARK_TASK_CMD.split(/\s+/);
+      let child: ReturnType<typeof spawn>;
+      try {
+        child = spawn(cmd, args, { stdio: ["pipe", "pipe", "ignore"] });
+      } catch {
+        resolve(undefined);
+        return;
+      }
+
+      const timer = setTimeout(() => {
+        timedOut = true;
+        child.kill();
+        resolve(undefined);
+      }, 60_000);
+
+      child.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+
+      child.on("close", () => {
+        clearTimeout(timer);
+        if (timedOut) { resolve(undefined); return; }
+        try {
+          // Strip code fences if present.
+          const clean = stdout.replace(/^```[^\n]*\n?|```$/gm, "").trim();
+          const parsed = JSON.parse(clean) as { sessions?: Array<{ id: string; status: string }> };
+          const result = new Map<string, "done" | "in-progress" | "unknown">();
+          for (const entry of parsed.sessions ?? []) {
+            const s = entry.status;
+            if (s === "done" || s === "in-progress" || s === "unknown") {
+              result.set(entry.id, s);
+            }
+          }
+          resolve(result.size > 0 ? result : undefined);
+        } catch {
+          resolve(undefined);
+        }
+      });
+
+      child.on("error", () => { clearTimeout(timer); resolve(undefined); });
+
+      try {
+        child.stdin?.write(prompt);
+        child.stdin?.end();
+      } catch {
+        clearTimeout(timer);
+        resolve(undefined);
+      }
+    });
   }
 
   async notifyBlocked(workflow: OvermindWorkflow, issue: string, reason: string): Promise<void> {
