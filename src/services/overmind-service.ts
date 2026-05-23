@@ -443,6 +443,9 @@ export class OvermindService {
     return result.changes > 0;
   }
 
+  // JROM-only field — only this method may write display_name; only the JWT/owner-guarded
+  // POST /api/overmind/workflows/:id/name route may call it. Do not add display_name to
+  // register/update/setStatus/setTasks SQL.
   setDisplayName(id: number, name: string | null): OvermindWorkflow | null {
     const normalized = name === null ? null : name.trim();
     const displayName = normalized ? normalized : null;

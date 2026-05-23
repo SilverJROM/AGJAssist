@@ -452,6 +452,33 @@ describe("Overmind routes", () => {
     expect(missing.statusCode).toBe(404);
   });
 
+  it("POST /api/overmind/register with display_name in body does NOT change an existing display_name", async () => {
+    // Register and set a custom display_name
+    const first = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "spoof-test",
+      session: "spoof-session",
+      run_dir: "/tmp/spoof-test"
+    });
+    const workflowId = first.json().workflow.id;
+    overmindService.setDisplayName(workflowId, "JROM Custom Title");
+
+    // Re-register with a spoofed display_name field in the body
+    const second = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "spoof-test-v2",
+      session: "spoof-session",
+      run_dir: "/tmp/spoof-test-v2",
+      display_name: "spoofed"
+    });
+
+    expect(second.statusCode).toBe(201);
+    // display_name must be unchanged — the register route must never forward it
+    const wf = overmindService.get(workflowId);
+    expect(wf?.display_name).toBe("JROM Custom Title");
+    expect(second.json().workflow.display_name).toBe("JROM Custom Title");
+  });
+
   describe("child-close reminder on /complete", () => {
     function makeTmuxMock(aliveSet: Set<string>): TmuxService {
       return {

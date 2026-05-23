@@ -1061,7 +1061,7 @@ function OvermindWorkflows() {
                     <button
                       type="button"
                       class="overmind-rename-button"
-                      title="Rename workflow"
+                      title="Title is owner-protected — only you can rename"
                       aria-label=${'Rename workflow ' + displayName}
                       onclick=${() => renameWorkflow(workflow)}
                     >✎</button>

@@ -694,6 +694,110 @@ describe("OvermindService", () => {
     expect(runs[0].label).toBe("display-run");
   });
 
+  describe("display_name protection", () => {
+    it("register() twice with setDisplayName between calls preserves the custom name on re-register", () => {
+      const created = service.register({
+        label: "protect-label",
+        coordinator_session: "protect-session",
+        run_dir: "/tmp/protect"
+      });
+
+      service.setDisplayName(created.id, "My Name");
+
+      const reRegistered = service.register({
+        label: "protect-label-v2",
+        coordinator_session: "protect-session",
+        run_dir: "/tmp/protect-v2"
+      });
+
+      expect(reRegistered.id).toBe(created.id);
+      expect(reRegistered.display_name).toBe("My Name");
+    });
+
+    it("update() with any fields does not touch display_name", () => {
+      const created = service.register({
+        label: "update-protect",
+        coordinator_session: "update-protect-session",
+        run_dir: "/tmp/update-protect"
+      });
+      service.setDisplayName(created.id, "Protected Title");
+
+      const updated = service.update(created.id, {
+        label: "update-protect-changed",
+        status: "working",
+        nudge_count: 5,
+        tier: 1
+      });
+
+      expect(updated?.label).toBe("update-protect-changed");
+      expect(updated?.display_name).toBe("Protected Title");
+    });
+
+    it("setStatus() does not touch display_name", () => {
+      const created = service.register({
+        label: "status-protect",
+        coordinator_session: "status-protect-session",
+        run_dir: "/tmp/status-protect"
+      });
+      service.setDisplayName(created.id, "Status Safe");
+
+      const result = service.setStatus(created.id, "working");
+
+      expect(result?.status).toBe("working");
+      expect(result?.display_name).toBe("Status Safe");
+    });
+
+    it("setTasks() does not touch display_name", () => {
+      const created = service.register({
+        label: "tasks-protect",
+        coordinator_session: "tasks-protect-session",
+        run_dir: "/tmp/tasks-protect",
+        current_task: "T1",
+        tasks: [{ id: "T1", label: "Task 1", state: "processing" }]
+      });
+      service.setDisplayName(created.id, "Tasks Safe");
+
+      const result = service.setTasks(created.id, "T2", [
+        { id: "T1", label: "Task 1", state: "done" },
+        { id: "T2", label: "Task 2", state: "processing" }
+      ]);
+
+      expect(result?.current_task).toBe("T2");
+      expect(result?.display_name).toBe("Tasks Safe");
+    });
+
+    it("setMonitoringPaused() does not touch display_name", () => {
+      const created = service.register({
+        label: "pause-protect",
+        coordinator_session: "pause-protect-session",
+        run_dir: "/tmp/pause-protect"
+      });
+      service.setDisplayName(created.id, "Pause Safe");
+
+      const paused = service.setMonitoringPaused(created.id, true, "jrom");
+      expect(paused?.monitoring_paused).toBe(true);
+      expect(paused?.display_name).toBe("Pause Safe");
+
+      const resumed = service.setMonitoringPaused(created.id, false, null);
+      expect(resumed?.monitoring_paused).toBe(false);
+      expect(resumed?.display_name).toBe("Pause Safe");
+    });
+
+    it("setDisplayName('Foo') then setDisplayName(null) sets then clears display_name correctly", () => {
+      const created = service.register({
+        label: "null-protect",
+        coordinator_session: "null-protect-session",
+        run_dir: "/tmp/null-protect"
+      });
+
+      const set = service.setDisplayName(created.id, "Foo");
+      expect(set?.display_name).toBe("Foo");
+
+      const cleared = service.setDisplayName(created.id, null);
+      expect(cleared?.display_name).toBeNull();
+    });
+  });
+
   it("listHistory() with session filter returns only entries for that session", () => {
     const wf1 = service.register({
       label: "session-filter-1",
