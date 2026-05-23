@@ -151,17 +151,33 @@ export function registerOvermindRoutes(
         }
 
         try {
-          if (completed.child_sessions && completed.child_sessions.length > 0 && tmuxService) {
-            const aliveChecks = await Promise.all(
-              completed.child_sessions.map(async (child) => {
-                const alive = await tmuxService.sessionExists(child);
-                return alive ? child : null;
-              })
-            );
-            const aliveChildren = aliveChecks.filter((c): c is string => c !== null);
+          if (tmuxService) {
+            const aliveChildren: string[] = [];
+            if (completed.child_sessions && completed.child_sessions.length > 0) {
+              const aliveChecks = await Promise.all(
+                completed.child_sessions.map(async (child) => {
+                  const alive = await tmuxService.sessionExists(child);
+                  return alive ? child : null;
+                })
+              );
+              aliveChildren.push(...aliveChecks.filter((c): c is string => c !== null));
+            }
+
+            const notDoneTaskIds = (completed.tasks ?? [])
+              .filter((t) => t.state !== "done")
+              .map((t) => t.id);
+
+            const parts: string[] = [];
             if (aliveChildren.length > 0) {
               const killCmds = aliveChildren.map((c) => `tmux kill-session -t ${c}`).join(" ; ");
-              const msg = `Overmind: '${completed.label}' is marked complete — please close your child session(s) to free resources (your own session can stay up): ${killCmds}`;
+              parts.push(`Overmind: '${completed.label}' is marked complete — please close your child session(s) to free resources (your own session can stay up): ${killCmds}`);
+            }
+            if (notDoneTaskIds.length > 0) {
+              parts.push(`Also your task list still shows these as not-done — please POST /api/overmind/tasks marking them done if the run truly finished: ${notDoneTaskIds.join(", ")}.`);
+            }
+
+            if (parts.length > 0) {
+              const msg = parts.join(" ");
               await tmuxService.sendAndSubmit(completed.coordinator_session, msg);
             }
           }

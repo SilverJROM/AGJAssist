@@ -594,6 +594,180 @@ describe("Overmind routes", () => {
       expect(complete.json().workflow.status).toBe("completed");
       // no tmuxService — nothing to assert on, just verify no crash
     });
+
+    it("(a) alive child + not-all-tasks-done → ONE sendAndSubmit with BOTH kill-session AND task-list ask", async () => {
+      const tmux = makeTmuxMock(new Set(["child-alive-x"]));
+      const a = await buildAppWithTmux(tmux);
+      try {
+        await a.inject({
+          method: "POST",
+          url: "/api/overmind/register",
+          remoteAddress: "127.0.0.1",
+          payload: {
+            token: OVERMIND_TOKEN,
+            label: "hris-partial",
+            session: "hris-partial-coord",
+            child_sessions: ["child-alive-x"],
+            run_dir: "/tmp/hris-partial",
+            tasks: [
+              { id: "T1", label: "Done task", state: "done" },
+              { id: "T2", label: "Still processing", state: "processing" },
+              { id: "T3", label: "Still pending", state: "pending" }
+            ]
+          }
+        });
+
+        const complete = await a.inject({
+          method: "POST",
+          url: "/api/overmind/complete",
+          remoteAddress: "127.0.0.1",
+          payload: { token: OVERMIND_TOKEN, session: "hris-partial-coord" }
+        });
+
+        expect(complete.statusCode).toBe(200);
+        expect(complete.json().workflow.status).toBe("completed");
+        expect(tmux.sendAndSubmit).toHaveBeenCalledOnce();
+        const [target, msg] = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls[0];
+        expect(target).toBe("hris-partial-coord");
+        // must include kill-session line
+        expect(msg).toContain("child-alive-x");
+        expect(msg).toContain("kill-session");
+        // must include task-list ask with both not-done ids
+        expect(msg).toContain("T2");
+        expect(msg).toContain("T3");
+        expect(msg).toContain("/api/overmind/tasks");
+        // must be single-line
+        expect(msg).not.toContain("\n");
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("(b) no alive children + not-all-tasks-done → sendAndSubmit fires with ONLY the task-list ask", async () => {
+      const tmux = makeTmuxMock(new Set()); // no alive children
+      const a = await buildAppWithTmux(tmux);
+      try {
+        await a.inject({
+          method: "POST",
+          url: "/api/overmind/register",
+          remoteAddress: "127.0.0.1",
+          payload: {
+            token: OVERMIND_TOKEN,
+            label: "hris-no-children-partial",
+            session: "hris-ncp-coord",
+            child_sessions: ["child-dead-x"],
+            run_dir: "/tmp/hris-ncp",
+            tasks: [
+              { id: "X1", label: "Done", state: "done" },
+              { id: "X2", label: "Not done", state: "processing" }
+            ]
+          }
+        });
+
+        const complete = await a.inject({
+          method: "POST",
+          url: "/api/overmind/complete",
+          remoteAddress: "127.0.0.1",
+          payload: { token: OVERMIND_TOKEN, session: "hris-ncp-coord" }
+        });
+
+        expect(complete.statusCode).toBe(200);
+        expect(complete.json().workflow.status).toBe("completed");
+        expect(tmux.sendAndSubmit).toHaveBeenCalledOnce();
+        const [target, msg] = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls[0];
+        expect(target).toBe("hris-ncp-coord");
+        // must include task-list ask
+        expect(msg).toContain("X2");
+        expect(msg).toContain("/api/overmind/tasks");
+        // must NOT include kill-session (no alive children)
+        expect(msg).not.toContain("kill-session");
+        expect(msg).not.toContain("child-dead-x");
+        // must be single-line
+        expect(msg).not.toContain("\n");
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("(c) alive child + all-tasks-done → sendAndSubmit fires with ONLY the kill-session ask (no task-list line)", async () => {
+      const tmux = makeTmuxMock(new Set(["child-alive-y"]));
+      const a = await buildAppWithTmux(tmux);
+      try {
+        await a.inject({
+          method: "POST",
+          url: "/api/overmind/register",
+          remoteAddress: "127.0.0.1",
+          payload: {
+            token: OVERMIND_TOKEN,
+            label: "hris-all-done",
+            session: "hris-ad-coord",
+            child_sessions: ["child-alive-y"],
+            run_dir: "/tmp/hris-ad",
+            tasks: [
+              { id: "Y1", label: "Done 1", state: "done" },
+              { id: "Y2", label: "Done 2", state: "done" }
+            ]
+          }
+        });
+
+        const complete = await a.inject({
+          method: "POST",
+          url: "/api/overmind/complete",
+          remoteAddress: "127.0.0.1",
+          payload: { token: OVERMIND_TOKEN, session: "hris-ad-coord" }
+        });
+
+        expect(complete.statusCode).toBe(200);
+        expect(complete.json().workflow.status).toBe("completed");
+        expect(tmux.sendAndSubmit).toHaveBeenCalledOnce();
+        const [target, msg] = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls[0];
+        expect(target).toBe("hris-ad-coord");
+        // must include kill-session
+        expect(msg).toContain("child-alive-y");
+        expect(msg).toContain("kill-session");
+        // must NOT include the task-list ask
+        expect(msg).not.toContain("/api/overmind/tasks");
+        // must be single-line
+        expect(msg).not.toContain("\n");
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("(d) no alive children + all tasks done → NO sendAndSubmit at all", async () => {
+      const tmux = makeTmuxMock(new Set()); // all dead
+      const a = await buildAppWithTmux(tmux);
+      try {
+        await a.inject({
+          method: "POST",
+          url: "/api/overmind/register",
+          remoteAddress: "127.0.0.1",
+          payload: {
+            token: OVERMIND_TOKEN,
+            label: "hris-all-done-no-children",
+            session: "hris-adnc-coord",
+            child_sessions: ["child-dead-z"],
+            run_dir: "/tmp/hris-adnc",
+            tasks: [
+              { id: "Z1", label: "Done", state: "done" }
+            ]
+          }
+        });
+
+        const complete = await a.inject({
+          method: "POST",
+          url: "/api/overmind/complete",
+          remoteAddress: "127.0.0.1",
+          payload: { token: OVERMIND_TOKEN, session: "hris-adnc-coord" }
+        });
+
+        expect(complete.statusCode).toBe(200);
+        expect(complete.json().workflow.status).toBe("completed");
+        expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+      } finally {
+        await a.close();
+      }
+    });
   });
 
   it("requires JWT auth for OVM session manager endpoints and delegates to the manager", async () => {
