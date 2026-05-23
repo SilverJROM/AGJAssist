@@ -1,14 +1,47 @@
 import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput } from './terminal-chat-state.js';
+import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput, cleanTerminalOutput } from './terminal-chat-state.js';
+import {
+  AVAILABLE_BOTTOM_NAV_TABS,
+  DEFAULT_BOTTOM_NAV_TAB_IDS,
+  addBottomNavTab,
+  buildOvermindWsUrl,
+  buildTmuxWsUrl,
+  countDoneTasks,
+  currentElapsedMs,
+  formatElapsed,
+  formatStuckDuration,
+  getBottomNavTabs,
+  groupOvermindHistoryByWorkflow,
+  isActiveStatus,
+  moveBottomNavTab,
+  readBottomNavTabIds,
+  removeBottomNavTab,
+  statusColor,
+  statusIcon,
+  summarizeWorkflows,
+  taskGlyph,
+  totalElapsedMs,
+  writeBottomNavTabIds
+} from './overmind-helpers.js';
 
 const html = htm.bind(h);
+const OVM_TMUX_TARGET = 'OVM:0.0';
 
 // Telegram Mini App detection
 const isTgMiniApp = !!(window.Telegram?.WebApp?.initData);
 if (isTgMiniApp) {
   document.body.classList.add('tg-miniapp');
+  // Runs on every load (incl. already-authenticated users where Login never mounts).
+  // disableVerticalSwipes stops Telegram's swipe-to-minimize gesture from eating touch
+  // scroll (the "mini-app scroll not working" bug). All guarded for older clients.
+  try {
+    const wa = window.Telegram.WebApp;
+    wa.ready?.();
+    wa.expand?.();
+    wa.disableVerticalSwipes?.();
+  } catch {}
   const tp = window.Telegram.WebApp.themeParams || {};
   const root = document.documentElement.style;
   // Force-apply TG theme params as CSS variables
@@ -233,6 +266,40 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function workflowDisplayName(workflow) {
+  return workflow.display_name || workflow.label;
+}
+
+function currentWorkflowTask(tasks, currentTask) {
+  const rows = Array.isArray(tasks) ? tasks : [];
+  const processingTask = rows.find(task => task?.state === 'processing');
+  if (processingTask) {
+    return {
+      id: processingTask.id || rows.indexOf(processingTask) + 1,
+      description: processingTask.label || currentTask || '—'
+    };
+  }
+
+  const matchedTask = currentTask
+    ? rows.find(task => task?.id === currentTask || task?.label === currentTask || (task?.id && currentTask.includes(task.id)))
+    : null;
+  return {
+    id: matchedTask?.id || (matchedTask ? rows.indexOf(matchedTask) + 1 : '—'),
+    description: matchedTask?.label || currentTask || '—'
+  };
+}
+
+function childSessionStatus(workflow, session) {
+  const childStatuses = Array.isArray(workflow.child_statuses) ? workflow.child_statuses : [];
+  return childStatuses.find(child => child?.session === session)?.status || null;
+}
+
+function renderOvermindStatusValue(status, fallback = '—') {
+  const label = status || fallback;
+  const colorClass = status ? statusColor(status) : 'ovm-neutral';
+  return html`<span class=${'overmind-session-status ' + colorClass}>${label}</span>`;
+}
+
 // Auth
 function Login() {
   const [error, setError] = useState('');
@@ -244,6 +311,10 @@ function Login() {
     if (tg) {
       tg.ready();
       tg.expand();
+      // Telegram's vertical swipe-to-minimize gesture (Bot API 7.7+) intercepts touch
+      // scroll, breaking in-app scrolling. Disable it so content scrolls normally.
+      // Guarded: no-op on older clients that lack the method.
+      try { tg.disableVerticalSwipes?.(); } catch {}
       if (tg.initData) {
         doAuth(tg.initData, 'miniapp');
       } else {
@@ -371,9 +442,10 @@ function Header({ user }) {
           <a href="#/" class=${route === '/' ? 'active' : ''}>Dashboard</a>
           <a href="#/projects" class=${route === '/projects' || route.startsWith('/project/') ? 'active' : ''}>Projects</a>
           <a href="#/terminals" class=${route === '/terminals' ? 'active' : ''}>Terminals</a>
+          <a href="#/overmind" class=${route === '/overmind' ? 'active' : ''}>Workflows</a>
           <a href="#/tasks" class=${route === '/tasks' ? 'active' : ''}>Tasks</a>
           <a href="#/notes" class=${route === '/notes' ? 'active' : ''}>Notes</a>
-          <a href="#/conversations" class=${route === '/conversations' ? 'active' : ''}>Conversations</a>
+          <a href="#/conversations" class=${route === '/conversations' ? 'active' : ''}>Chat</a>
           <a href="#/settings" class=${route === '/settings' ? 'active' : ''}>Settings</a>
         </nav>
       </div>
@@ -393,7 +465,7 @@ function Header({ user }) {
 
 // Dashboard (hub with section cards)
 function Dashboard() {
-  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, conversations: 0, notes: 0 });
+  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, conversations: 0, notes: 0, workflows: 0, activeWorkflows: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -402,14 +474,18 @@ function Dashboard() {
       api('/api/personal-tasks').catch(() => ({ tasks: [] })),
       api('/api/reminders').catch(() => ({ reminders: [] })),
       api('/api/conversations').catch(() => ({ conversations: [] })),
-      api('/api/notes?status=open').catch(() => ({ notes: [] }))
-    ]).then(([p, t, r, c, n]) => {
+      api('/api/notes?status=open').catch(() => ({ notes: [] })),
+      api('/api/overmind/workflows').catch(() => ({ workflows: [] }))
+    ]).then(([p, t, r, c, n, w]) => {
+      const workflowSummary = summarizeWorkflows(w.workflows);
       setStats({
         projects: p.projects?.length || 0,
         tasks: t.tasks?.length || 0,
         reminders: r.reminders?.length || 0,
         conversations: c.conversations?.length || 0,
-        notes: n.notes?.length || 0
+        notes: n.notes?.length || 0,
+        workflows: workflowSummary.total,
+        activeWorkflows: workflowSummary.active
       });
       setLoading(false);
     });
@@ -420,6 +496,7 @@ function Dashboard() {
   const cards = [
     { label: 'Projects', count: stats.projects, route: '/projects', desc: 'Manage your development projects' },
     { label: 'Terminals', count: null, route: '/terminals', desc: 'Tmux terminal sessions' },
+    { label: 'Workflows', count: stats.workflows, route: '/overmind', desc: `${stats.workflows} workflows · ${stats.activeWorkflows} active` },
     { label: 'Tasks', count: stats.tasks, route: '/tasks', desc: 'Daily & weekly tasks, reminders' },
     { label: 'Notes', count: stats.notes, route: '/notes', desc: 'Quick notes, attach to any project' },
     { label: 'Conversations', count: stats.conversations, route: '/conversations', desc: 'Chat with LLMs' },
@@ -440,6 +517,612 @@ function Dashboard() {
           </div>
         `)}
       </div>
+    </div>
+  `;
+}
+
+function OvmConsole() {
+  const [ovmStatus, setOvmStatus] = useState({ open: false, status: 'closed' });
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [action, setAction] = useState('');
+  const [error, setError] = useState('');
+  const [messages, setMessages] = useState([]);  // { id, role: 'user'|'ovm'|'system', text, ts }
+  const [thinking, setThinking] = useState(false);
+  const [input, setInput] = useState('');
+  const transcriptRef = useRef(null);
+  const open = !!ovmStatus?.open;
+
+  const loadStatus = useCallback(async () => {
+    try {
+      const data = await api('/api/overmind/ovm/status');
+      setOvmStatus(data);
+      setError('');
+      return data;
+    } catch (e) {
+      setError(e.message || 'Failed to load OVM status.');
+      return null;
+    } finally {
+      setStatusLoading(false);
+    }
+  }, []);
+
+  function addMsg(role, text) {
+    const trimmed = (text || '').trim();
+    if (!trimmed) return;
+    setMessages(prev => [...prev, {
+      id: role + '-' + Date.now() + '-' + prev.length,
+      role,
+      text: trimmed,
+      ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+    }]);
+  }
+
+  async function runAction(nextAction) {
+    if (action) return;
+    setAction(nextAction);
+    setError('');
+    try {
+      const data = await api(`/api/overmind/ovm/${nextAction}`, { method: 'POST' });
+      setOvmStatus(data);
+      if (nextAction === 'close') {
+        setMessages([]);
+        setThinking(false);
+      }
+    } catch (e) {
+      setError(e.message || `Failed to ${nextAction} OVM.`);
+    } finally {
+      setAction('');
+      await loadStatus();
+    }
+  }
+
+  async function pollForReply() {
+    for (;;) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const data = await api('/api/overmind/ovm/reply');
+        if (!data.pending) {
+          setThinking(false);
+          addMsg('ovm', data.reply);
+          return;
+        }
+      } catch (e) {
+        setThinking(false);
+        addMsg('system', 'Error polling for reply: ' + (e.message || 'unknown'));
+        return;
+      }
+    }
+  }
+
+  async function sendMessage() {
+    const message = input.trim();
+    if (!message || !open || thinking) return;
+    setInput('');
+    addMsg('user', message);
+    setThinking(true);
+    try {
+      const data = await api('/api/overmind/ovm/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+      if (data.pending) {
+        // OVM is still working past the sync window — poll for reply
+        pollForReply();
+      } else {
+        setThinking(false);
+        addMsg('ovm', data.reply);
+      }
+    } catch (e) {
+      setThinking(false);
+      addMsg('system', 'Send error: ' + (e.message || 'unknown'));
+    }
+  }
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
+
+  useEffect(() => {
+    const timer = setInterval(loadStatus, 10000);
+    return () => clearInterval(timer);
+  }, [loadStatus]);
+
+  useEffect(() => {
+    const node = transcriptRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, [messages, thinking]);
+
+  const statusText = statusLoading ? 'checking' : (ovmStatus?.status || (open ? 'open' : 'closed'));
+  const busy = !!action;
+  const canSend = open && !thinking && input.trim();
+
+  return html`
+    <section class="ovm-console">
+      <div class="ovm-console-header">
+        <div class="ovm-console-title">
+          <span class=${'ovm-status-dot ' + (open ? 'open' : 'closed')} aria-hidden="true"></span>
+          <div>
+            <h3>OVM</h3>
+            <div>${OVM_TMUX_TARGET} · ${statusText}${ovmStatus?.since ? ` · opened ${new Date(ovmStatus.since).toLocaleTimeString()}` : ''}</div>
+          </div>
+        </div>
+        <div class="ovm-console-actions">
+          <button class="btn btn-sm" onclick=${() => runAction('open')} disabled=${busy || open}>
+            ${action === 'open' ? 'Opening...' : 'Open'}
+          </button>
+          <button class="btn btn-sm" onclick=${() => runAction('restart')} disabled=${busy}>
+            ${action === 'restart' ? 'Restarting...' : 'Restart'}
+          </button>
+          <button class="btn btn-sm btn-danger" onclick=${() => runAction('close')} disabled=${busy || !open}>
+            ${action === 'close' ? 'Closing...' : 'Close'}
+          </button>
+        </div>
+      </div>
+
+      ${error && html`<div class="overmind-alert">${error}</div>`}
+
+      ${!open ? html`
+        <div class="ovm-open-prompt">
+          <h3>OVM is closed</h3>
+          <p>Open the OVM session to start chatting.</p>
+          <button class="btn btn-primary" onclick=${() => runAction('open')} disabled=${busy}>
+            ${action === 'open' ? 'Opening OVM...' : 'Open OVM'}
+          </button>
+        </div>
+      ` : html`
+        <div class="ovm-live-shell">
+          <div class="ovm-chat-messages" ref=${transcriptRef}>
+            ${messages.length === 0 && !thinking ? html`
+              <div class="ovm-chat-empty">Send a message to start chatting with OVM.</div>
+            ` : null}
+            ${messages.map(m => html`
+              <div key=${m.id} class=${'ovm-chat-row ovm-chat-row-' + m.role}>
+                ${m.role === 'system' ? html`
+                  <div class="ovm-chat-pill">${m.text}</div>
+                ` : html`
+                  <div class=${'ovm-chat-bubble ovm-chat-bubble-' + m.role}>
+                    <div class="ovm-chat-text">${m.text}</div>
+                    <div class="ovm-chat-ts">
+                      ${m.ts}${m.role === 'user' ? html`<span class="ovm-chat-ticks"> ✓✓</span>` : ''}
+                    </div>
+                  </div>
+                `}
+              </div>
+            `)}
+            ${thinking ? html`
+              <div class="ovm-chat-row ovm-chat-row-ovm">
+                <div class="ovm-chat-bubble ovm-chat-bubble-ovm ovm-chat-thinking">
+                  <div class="ovm-typing-dots">
+                    <span class="ovm-typing-dot"></span>
+                    <span class="ovm-typing-dot"></span>
+                    <span class="ovm-typing-dot"></span>
+                  </div>
+                </div>
+              </div>
+            ` : null}
+          </div>
+          <div class="ovm-input-bar">
+            <textarea
+              class="ovm-input-field"
+              value=${input}
+              rows="1"
+              placeholder="Write a message…"
+              disabled=${!open || thinking}
+              onInput=${e => setInput(e.target.value)}
+              onKeyDown=${e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+            ></textarea>
+            <button class="ovm-send-btn" onclick=${sendMessage} disabled=${!canSend} aria-label="Send">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+        </div>
+      `}
+    </section>
+  `;
+}
+
+function OvermindWorkflows() {
+  const [workflows, setWorkflows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [streamStatus, setStreamStatus] = useState('connecting');
+  const [now, setNow] = useState(Date.now());
+  const [expandedWorkflows, setExpandedWorkflows] = useState({});
+  const [expandedHistoryGroups, setExpandedHistoryGroups] = useState({});
+  const [workflowTab, setWorkflowTab] = useState('active');
+  const streamStatusRef = useRef(streamStatus);
+
+  useEffect(() => {
+    streamStatusRef.current = streamStatus;
+  }, [streamStatus]);
+
+  const loadWorkflows = useCallback(async () => {
+    try {
+      const data = await api('/api/overmind/workflows');
+      setWorkflows(data.workflows || []);
+      setError('');
+    } catch (e) {
+      setError(e.message || 'Failed to load workflows.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const data = await api('/api/overmind/history');
+      setHistory(data.history || []);
+      setHistoryError('');
+    } catch (e) {
+      setHistoryError(e.message || 'Failed to load workflow history.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadWorkflows();
+  }, [loadWorkflows]);
+
+  const toggleWorkflow = useCallback((workflowId) => {
+    setExpandedWorkflows(prev => ({ ...prev, [workflowId]: !prev[workflowId] }));
+  }, []);
+
+  const toggleHistoryGroup = useCallback((groupKey) => {
+    setExpandedHistoryGroups(prev => ({ ...prev, [groupKey]: prev[groupKey] === false }));
+  }, []);
+
+  const renameWorkflow = useCallback(async (workflow) => {
+    const nextName = window.prompt('Rename workflow', workflow.display_name || workflow.label);
+    if (nextName === null) return;
+
+    try {
+      const data = await api(`/api/overmind/workflows/${workflow.id}/name`, {
+        method: 'POST',
+        body: JSON.stringify({ name: nextName })
+      });
+      if (data.workflow) {
+        setWorkflows(prev => prev.map(item => item.id === data.workflow.id ? data.workflow : item));
+      }
+      setError('');
+    } catch (e) {
+      setError(e.message || 'Failed to rename workflow.');
+    }
+  }, []);
+
+  const toggleMonitoring = useCallback(async (workflow) => {
+    const action = workflow.monitoring_paused ? 'resume-monitoring' : 'pause-monitoring';
+    try {
+      const data = await api(`/api/overmind/workflows/${workflow.id}/${action}`, { method: 'POST' });
+      if (data.workflow) {
+        setWorkflows(prev => prev.map(item => item.id === data.workflow.id ? data.workflow : item));
+      }
+      setError('');
+    } catch (e) {
+      setError(e.message || 'Failed to update monitoring.');
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (workflowTab === 'history') {
+      loadHistory();
+    }
+  }, [workflowTab, loadHistory]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (streamStatusRef.current !== 'connected') {
+        loadWorkflows();
+      }
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [loadWorkflows]);
+
+  useEffect(() => {
+    const wsUrl = buildOvermindWsUrl(authToken);
+    if (!wsUrl) {
+      setStreamStatus('polling');
+      return;
+    }
+
+    const ws = new WebSocket(wsUrl);
+    let closed = false;
+
+    ws.onopen = () => setStreamStatus('connected');
+    ws.onerror = () => setStreamStatus('polling');
+    ws.onclose = () => {
+      if (!closed) setStreamStatus('polling');
+    };
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if ((msg.type === 'snapshot' || msg.type === 'update') && Array.isArray(msg.workflows)) {
+          setWorkflows(msg.workflows);
+          setLoading(false);
+          setError('');
+          setNow(Date.now());
+        } else if (msg.type === 'error') {
+          setError(msg.message || 'Workflow stream error.');
+        }
+      } catch {}
+    };
+
+    return () => {
+      closed = true;
+      ws.close();
+    };
+  }, []);
+
+  if (loading) return html`<div class="loading">Loading workflows...</div>`;
+
+  const activeWorkflows = workflows.filter(workflow => isActiveStatus(workflow.status));
+  const completedWorkflows = workflows.filter(workflow => workflow.status === 'completed' || workflow.status === 'paused');
+  const historyGroups = groupOvermindHistoryByWorkflow(history);
+  const visibleWorkflows = workflowTab === 'completed' ? completedWorkflows : activeWorkflows;
+  const tabEmptyText = workflowTab === 'completed' ? 'No completed workflows' : 'No active workflows';
+
+  return html`
+    <div class="overmind-page">
+      <div class="action-bar">
+        <h2>Workflows</h2>
+        <div class="overmind-actions">
+          <span class="badge badge-${streamStatus === 'connected' ? 'active' : 'pending'}">${streamStatus}</span>
+          <button class="btn btn-sm" onclick=${workflowTab === 'history' ? loadHistory : loadWorkflows}>Refresh</button>
+        </div>
+      </div>
+
+      ${error && html`<div class="overmind-alert">${error}</div>`}
+      ${historyError && workflowTab === 'history' && html`<div class="overmind-alert">${historyError}</div>`}
+
+      <div class="overmind-tabs" role="tablist" aria-label="Workflow status filters">
+        <button
+          type="button"
+          role="tab"
+          aria-selected=${workflowTab === 'active'}
+          class=${'overmind-tab ' + (workflowTab === 'active' ? 'active' : '')}
+          onclick=${() => setWorkflowTab('active')}
+        >
+          Active (${activeWorkflows.length})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected=${workflowTab === 'completed'}
+          class=${'overmind-tab ' + (workflowTab === 'completed' ? 'active' : '')}
+          onclick=${() => setWorkflowTab('completed')}
+        >
+          Completed (${completedWorkflows.length})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected=${workflowTab === 'history'}
+          class=${'overmind-tab ' + (workflowTab === 'history' ? 'active' : '')}
+          onclick=${() => setWorkflowTab('history')}
+        >
+          History (${history.length})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected=${workflowTab === 'ovm'}
+          class=${'overmind-tab ' + (workflowTab === 'ovm' ? 'active' : '')}
+          onclick=${() => setWorkflowTab('ovm')}
+        >
+          OVM
+        </button>
+      </div>
+
+      ${workflowTab === 'ovm' ? html`
+        <${OvmConsole} />
+      ` : workflowTab === 'history' ? html`
+        ${historyLoading ? html`
+          <div class="loading">Loading workflow history...</div>
+        ` : historyGroups.length === 0 ? html`
+          <div class="empty-state">No workflow history archived.</div>
+        ` : html`
+          <div class="item-list overmind-list">
+            ${historyGroups.map(group => {
+              const isExpanded = expandedHistoryGroups[group.key] !== false;
+              return html`
+                <section class="item-card overmind-card ovm-neutral overmind-history-group" key=${group.key}>
+                  <div class="overmind-card-header">
+                    <button
+                      type="button"
+                      class="overmind-card-toggle"
+                      aria-expanded=${isExpanded}
+                      onclick=${() => toggleHistoryGroup(group.key)}
+                    >
+                      <div class="overmind-title">
+                        <span class="overmind-chevron" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
+                        <div>
+                          <h3>${group.name}</h3>
+                          <div class="overmind-current">${group.coordinator_session || '—'} · ${group.entries.length} ${group.entries.length === 1 ? 'entry' : 'entries'}</div>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                  ${isExpanded && html`
+                    <div class="overmind-history-list overmind-history-archive-list">
+                      ${group.entries.map(entry => html`
+                        <div class="overmind-history-entry" key=${(entry.id || entry.at) + '-' + entry.done + '-' + entry.total}>
+                          <time>${entry.at ? new Date(entry.at).toLocaleString() : '—'}</time>
+                          <span>${entry.current_task || '—'}</span>
+                          <strong>${entry.done ?? 0}/${entry.total ?? 0}</strong>
+                        </div>
+                      `)}
+                    </div>
+                  `}
+                </section>
+              `;
+            })}
+          </div>
+        `}
+      ` : workflows.length === 0 ? html`
+        <div class="empty-state">No workflows registered.</div>
+      ` : visibleWorkflows.length === 0 ? html`
+        <div class="empty-state">${tabEmptyText}</div>
+      ` : html`
+        <div class="item-list overmind-list">
+          ${visibleWorkflows.map(workflow => {
+            const tasks = Array.isArray(workflow.tasks) ? workflow.tasks : [];
+            const doneCount = countDoneTasks(tasks);
+            const childSessions = Array.isArray(workflow.child_sessions) ? workflow.child_sessions : [];
+            const childRoles = Array.isArray(workflow.child_roles) ? workflow.child_roles : [];
+            const childAgents = childSessions.map((session, i) => ({
+              session,
+              role: (childRoles[i] && String(childRoles[i]).trim()) || (childSessions.length > 1 ? `child ${i + 1}` : 'child'),
+              status: childSessionStatus(workflow, session)
+            }));
+            const colorClass = statusColor(workflow.status);
+            const isExpanded = !!expandedWorkflows[workflow.id];
+            const runStartedAt = workflow.run_started_at || workflow.created_at;
+            const currentElapsed = formatElapsed(currentElapsedMs(runStartedAt, workflow.ended_at, now));
+            const totalElapsed = formatElapsed(totalElapsedMs(workflow.accumulated_ms, runStartedAt, workflow.ended_at, now));
+            const displayName = workflowDisplayName(workflow);
+            const currentTask = currentWorkflowTask(tasks, workflow.current_task);
+            const parentStatus = workflow.parent_status || workflow.status;
+            const totalTasks = tasks.length;
+            const doneTasks = tasks.filter(t => t && t.state === 'done').length;
+            const pctComplete = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+            return html`
+              <section class=${'item-card overmind-card ' + colorClass} key=${workflow.id}>
+                <div class="overmind-card-header">
+                  <button
+                    type="button"
+                    class="overmind-card-toggle overmind-title-toggle"
+                    aria-expanded=${isExpanded}
+                    onclick=${() => toggleWorkflow(workflow.id)}
+                  >
+                    <div class="overmind-title">
+                      <h3>${displayName}</h3>
+                    </div>
+                  </button>
+                  <div class="overmind-status">
+                    <span class="overmind-pct" title=${doneTasks + '/' + totalTasks + ' tasks complete'}>${pctComplete}%</span>
+                    <button
+                      type="button"
+                      class=${'overmind-pause-button' + (workflow.monitoring_paused ? ' overmind-pause-active' : '')}
+                      title=${workflow.monitoring_paused ? 'Resume Overmind checks' : 'Pause Overmind checks (no interrupts while you talk to it)'}
+                      aria-label=${(workflow.monitoring_paused ? 'Resume' : 'Pause') + ' Overmind monitoring for ' + displayName}
+                      onclick=${() => toggleMonitoring(workflow)}
+                    >${workflow.monitoring_paused ? '▶' : '⏸'}</button>
+                    <button
+                      type="button"
+                      class="overmind-rename-button"
+                      title="Rename workflow"
+                      aria-label=${'Rename workflow ' + displayName}
+                      onclick=${() => renameWorkflow(workflow)}
+                    >✎</button>
+                    <button
+                      type="button"
+                      class="overmind-chevron-button"
+                      aria-label=${isExpanded ? 'Collapse workflow ' + displayName : 'Expand workflow ' + displayName}
+                      aria-expanded=${isExpanded}
+                      onclick=${() => toggleWorkflow(workflow.id)}
+                    >
+                      <span class="overmind-chevron" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
+                    </button>
+                    ${workflow.monitoring_paused && html`<span class="badge overmind-paused-badge" title=${'Overmind checks paused' + (workflow.paused_by ? ' (' + workflow.paused_by + ')' : '') + ' — no interrupts'}>⏸ paused</span>`}
+                    <span class=${'badge overmind-status-badge ' + colorClass}>${statusIcon(workflow.status)} ${workflow.status}</span>
+                  </div>
+                </div>
+                <div class="overmind-substatus">
+                  <div class="overmind-task-line"><span><strong>task#${currentTask.id}:</strong> ${workflow.current_task || '—'}</span><span class="overmind-task-count">${doneTasks}/${totalTasks}</span></div>
+                  <div>${currentTask.description}</div>
+                </div>
+
+                ${isExpanded && html`
+                  <div class="overmind-expanded">
+                    ${workflow.status === 'awaiting_decision' && workflow.pending_decision && html`
+                      <div class="overmind-decision">
+                        <strong>Pending decision</strong>
+                        <pre>${workflow.pending_decision}</pre>
+                      </div>
+                    `}
+                    ${workflow.info_request && !workflow.monitoring_paused && html`
+                      <div class="overmind-asked-parent" style="color:var(--text-secondary,#888);font-size:0.82em;margin-bottom:6px;">⟳ asked parent to update: ${workflow.info_request}</div>
+                    `}
+
+                    <table class="overmind-detail-table">
+                      <tbody>
+                        <tr>
+                          <th scope="row">parent</th>
+                          <td>${workflow.coordinator_session || '—'}</td>
+                          <th scope="row">status</th>
+                          <td>${renderOvermindStatusValue(parentStatus)}</td>
+                        </tr>
+                        ${childAgents.length === 0 && html`
+                          <tr>
+                            <th scope="row">child</th>
+                            <td>n/a</td>
+                            <th scope="row">status</th>
+                            <td><span class="overmind-session-status ovm-neutral">n/a</span></td>
+                          </tr>
+                        `}
+                        ${childAgents.map(agent => html`
+                          <tr key=${agent.session}>
+                            <th scope="row">${agent.role}</th>
+                            <td>${agent.session || 'n/a'}</td>
+                            <th scope="row">status</th>
+                            <td>${renderOvermindStatusValue(agent.status, '—')}</td>
+                          </tr>
+                        `)}
+                        <tr>
+                          <th scope="row">Elapsed</th>
+                          <td>${currentElapsed}${workflow.ended_at ? ' (done)' : ''}</td>
+                          <th scope="row">Total</th>
+                          <td>${totalElapsed}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Tier</th>
+                          <td>${workflow.tier ?? 0}</td>
+                          <th scope="row">Stuck</th>
+                          <td>${workflow.stuck_since ? formatStuckDuration(workflow.stuck_since, now) : '—'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <details class="overmind-tasklist" open=${tasks.length <= 6}>
+                      <summary>Tasks ${doneCount}/${tasks.length}</summary>
+                      ${tasks.length === 0 ? html`
+                        <div class="overmind-task-empty">No tasklist published.</div>
+                      ` : html`
+                        <div class="overmind-tasks">
+                          ${tasks.map(task => html`
+                            <div class=${'overmind-task overmind-task-' + task.state} key=${task.id || task.label}>
+                              <span class="overmind-task-glyph">${taskGlyph(task.state)}</span>
+                              <span>${task.label}</span>
+                            </div>
+                          `)}
+                        </div>
+                      `}
+                    </details>
+                  </div>
+                `}
+              </section>
+            `;
+          })}
+        </div>
+      `}
     </div>
   `;
 }
@@ -549,7 +1232,7 @@ function ProjectDetail({ id }) {
   if (loading) return html`<div class="loading">Loading...</div>`;
   if (!project) return html`<div class="empty-state">Project not found</div>`;
 
-  const tabs = ['code', 'notes', 'plans', 'tasks', 'activity'];
+  const tabs = ['code', 'plans', 'tasks', 'activity'];
 
   return html`
     <div>
@@ -560,7 +1243,6 @@ function ProjectDetail({ id }) {
         ${tabs.map(t => html`<div class="tab ${tab === t ? 'active' : ''}" onclick=${() => setTab(t)}>${t.charAt(0).toUpperCase() + t.slice(1)}</div>`)}
       </div>
       ${tab === 'code' && html`<${CodeTab} projectId=${id} projectRoot=${project.fullPath || ''} />`}
-      ${tab === 'notes' && html`<${NotesTab} projectId=${id} />`}
       ${tab === 'plans' && html`<${PlansTab} projectId=${id} />`}
       ${tab === 'tasks' && html`<${TasksTab} projectId=${id} />`}
       ${tab === 'activity' && html`<${ActivityTab} />`}
@@ -1094,8 +1776,8 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
         </div>
       </div>
 
-      <div class="terminal-chat-transcript" ref=${transcriptRef}>
-        <div class="terminal-chat-controls">
+      <div class="terminal-chat-composer">
+        <div class="terminal-chat-composer-top">
           <label class="terminal-chat-line-picker">
             <span>Lines</span>
             <select value=${String(lineLimit)} onChange=${e => setLineLimit(Number(e.target.value))}>
@@ -1112,11 +1794,31 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
             </button>
           `}
         </div>
+        <div class="terminal-chat-composer-row">
+          <textarea class="terminal-chat-input-field"
+                    value=${input}
+                    rows="1"
+                    placeholder="Type a terminal command..."
+                    onInput=${e => setInput(e.target.value)}
+                    onKeyDown=${e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendCommand();
+                      }
+                    }}></textarea>
+          <button class="terminal-chat-enter-btn" onclick=${sendManualEnter} disabled=${sending} title="Send Enter key">
+            ↵
+          </button>
+          <button class="terminal-chat-send-btn" onclick=${sendCommand} disabled=${sending || !input.trim()}>
+            ${sending ? html`<div class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>` : html`<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`}
+          </button>
+        </div>
+      </div>
+
+      <div class="terminal-chat-transcript" ref=${transcriptRef}>
         <div class="terminal-chat-details">
           <span class="terminal-chat-detail-pill">${sessionName || 'Terminal chat'}</span>
           <span class="terminal-chat-detail-pill">${target}</span>
-          <span class="terminal-chat-detail-pill">Showing ${lineLimit} lines</span>
-          <span class="terminal-chat-detail-pill">Stored max 200</span>
           ${lastUpdatedAt ? html`<span class="terminal-chat-detail-pill">Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}</span>` : ''}
         </div>
         <div class="terminal-chat-card terminal-chat-single-output">
@@ -1125,7 +1827,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
             <span>${lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : status}</span>
           </div>
           <div class="terminal-chat-content">
-            ${formatFriendlyTerminalOutput(snapshot, lineLimit) || (sending ? 'Running command...' : status === 'loading' ? 'Loading terminal output...' : status === 'error' ? 'Terminal output unavailable.' : `Connected to ${target}. Waiting for terminal output...`)}
+            ${formatFriendlyTerminalOutput(cleanTerminalOutput(snapshot), lineLimit) || (sending ? 'Running command...' : status === 'loading' ? 'Loading terminal output...' : status === 'error' ? 'Terminal output unavailable.' : `Connected to ${target}. Waiting for terminal output...`)}
           </div>
           ${sending && html`
             <div class="terminal-chat-inline-status">
@@ -1137,25 +1839,6 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
             </div>
           `}
         </div>
-      </div>
-
-      <div class="terminal-chat-composer">
-        <textarea value=${input}
-                  rows="2"
-                  placeholder="Type a terminal command..."
-                  onInput=${e => setInput(e.target.value)}
-                  onKeyDown=${e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      sendCommand();
-                    }
-                  }}></textarea>
-        <button class="btn" onclick=${sendManualEnter} disabled=${sending}>
-          Enter
-        </button>
-        <button class="btn btn-primary" onclick=${sendCommand} disabled=${sending || !input.trim()}>
-          ${sending ? 'Running...' : 'Send'}
-        </button>
       </div>
     </div>
   `;
@@ -1765,694 +2448,663 @@ function NoteCard({ note: n, selected, onToggle, onDelete, onSave }) {
   `;
 }
 
-function NotesTab({ projectId }) {
-  const [notes, setNotes] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(new Set());
-  const [showAddToPlan, setShowAddToPlan] = useState(false);
-  const [plans, setPlans] = useState([]);
-  const [addMode, setAddMode] = useState('new'); // 'new' | 'existing'
-  const [newPlanTitle, setNewPlanTitle] = useState('');
-  const [selectedPlanId, setSelectedPlanId] = useState('');
+// ===================== iOS NOTES PAGE (N2) =====================
 
-  const load = useCallback(() => {
-    api(`/api/projects/${projectId}/notes?status=open`).then(d => { setNotes(d.notes); setLoading(false); }).catch(() => setLoading(false));
-  }, [projectId]);
+// --- Helpers ---
+function stripHtml(html) {
+  if (!html) return '';
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
 
-  useEffect(() => { load(); }, [load]);
+function noteTitle(body) {
+  if (!body) return 'New Note';
+  const clean = stripHtml(body);
+  const first = clean.split('\n')[0].trim();
+  return first.length > 0 ? first.slice(0, 80) : 'New Note';
+}
 
-  function toggleSelect(id) {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+function noteSnippet(body) {
+  if (!body) return '';
+  const clean = stripHtml(body);
+  const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+  const snippet = lines.slice(1).join(' ') || lines[0] || '';
+  return snippet.slice(0, 100);
+}
+
+function relativeDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z');
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const noteDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = today - noteDay;
+  if (diff === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (diff === 86400000) return 'Yesterday';
+  if (diff < 7 * 86400000) return d.toLocaleDateString([], { weekday: 'long' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+// --- Note row with swipe actions: Pin | Move | Delete ---
+function IosNoteRow({ note, onOpen, onDelete, onPin, onMove }) {
+  const [swiped, setSwiped] = useState(false);
+  const touchStartX = useRef(null);
+  const rowRef = useRef(null);
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function handleTouchMove(e) {
+    if (touchStartX.current === null) return;
+    const dx = e.touches[0].clientX - touchStartX.current;
+    if (dx < -50) setSwiped(true);
+    else if (dx > 20) setSwiped(false);
+  }
+  function handleTouchEnd() {
+    touchStartX.current = null;
+  }
+  // Desktop: right-click or long-press shows actions
+  function handleContextMenu(e) {
+    e.preventDefault();
+    setSwiped(v => !v);
   }
 
-  function selectAll() {
-    if (selected.size === notes.length) setSelected(new Set());
-    else setSelected(new Set(notes.map(n => n.id)));
-  }
-
-  async function openAddToPlan() {
-    try {
-      const d = await api(`/api/projects/${projectId}/plans`);
-      setPlans(d.plans.filter(p => p.status !== 'completed'));
-    } catch { setPlans([]); }
-    setAddMode('new');
-    setNewPlanTitle('');
-    setSelectedPlanId('');
-    setShowAddToPlan(true);
-  }
-
-  async function doAddToPlan() {
-    const noteIds = [...selected];
-    const body = addMode === 'new'
-      ? { noteIds, projectId: Number(projectId), newPlanTitle: newPlanTitle.trim() }
-      : { noteIds, projectId: Number(projectId), planId: Number(selectedPlanId) };
-
-    if (addMode === 'new' && !newPlanTitle.trim()) return;
-    if (addMode === 'existing' && !selectedPlanId) return;
-
-    try {
-      await api('/api/notes/add-to-plan', { method: 'POST', body: JSON.stringify(body) });
-      setShowAddToPlan(false);
-      setSelected(new Set());
-      load();
-    } catch (e) { alert(e.message); }
-  }
-
-  if (loading) return html`<div class="loading">Loading...</div>`;
+  const title = noteTitle(note.body);
+  const snippet = noteSnippet(note.body);
+  const date = relativeDate(note.updated_at || note.created_at);
 
   return html`
-    <div>
-      ${showAddToPlan && html`
-        <div class="modal-overlay" onclick=${() => setShowAddToPlan(false)}>
-          <div class="modal" style="max-width:450px" onclick=${e => e.stopPropagation()}>
-            <h3>Add ${selected.size} note${selected.size > 1 ? 's' : ''} to plan</h3>
-            <div style="display:flex;gap:8px;margin-bottom:16px">
-              <button class="btn btn-sm ${addMode === 'new' ? 'btn-primary' : ''}" onclick=${() => setAddMode('new')}>New Plan</button>
-              <button class="btn btn-sm ${addMode === 'existing' ? 'btn-primary' : ''}" onclick=${() => setAddMode('existing')}>Existing Plan</button>
-            </div>
-            ${addMode === 'new' ? html`
-              <div class="form-group">
-                <label>Plan Title</label>
-                <input value=${newPlanTitle} onInput=${e => setNewPlanTitle(e.target.value)}
-                       onKeyDown=${e => e.key === 'Enter' && doAddToPlan()}
-                       placeholder="Enter plan title..." autofocus />
-              </div>
-            ` : html`
-              <div class="form-group">
-                <label>Select Plan</label>
-                ${plans.length > 0 ? html`
-                  <select value=${selectedPlanId} onChange=${e => setSelectedPlanId(e.target.value)}>
-                    <option value="">Choose a plan...</option>
-                    ${plans.map(p => html`<option value=${p.id}>${p.title} (${p.status})</option>`)}
-                  </select>
-                ` : html`<p style="color:var(--text-secondary);font-size:13px">No active plans. Create a new one instead.</p>`}
-              </div>
-            `}
-            <div class="modal-actions">
-              <button class="btn" onclick=${() => setShowAddToPlan(false)}>Cancel</button>
-              <button class="btn btn-primary" onclick=${doAddToPlan}
-                      disabled=${addMode === 'new' ? !newPlanTitle.trim() : !selectedPlanId}>
-                Add to Plan
-              </button>
-            </div>
+    <div class="ios-note-row-wrap" ref=${rowRef}>
+      <div class=${'ios-note-row' + (swiped ? ' swiped-actions' : '')}
+           ontouchstart=${handleTouchStart}
+           ontouchmove=${handleTouchMove}
+           ontouchend=${handleTouchEnd}
+           oncontextmenu=${handleContextMenu}
+           onclick=${() => { if (!swiped) onOpen(note); }}>
+        <div class="ios-note-row-content">
+          <div class="ios-note-row-top">
+            <span class="ios-note-title">${note.pinned ? html`<span class="ios-pin-indicator">📌 </span>` : ''}${title}</span>
+            <span class="ios-note-date">${date}</span>
           </div>
-        </div>
-      `}
-
-      <div class="action-bar">
-        <div style="display:flex;align-items:center;gap:12px">
-          <h3>${notes.length} Notes</h3>
-          ${notes.length > 0 && html`
-            <label style="font-size:12px;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:4px">
-              <input type="checkbox" checked=${selected.size === notes.length && notes.length > 0} onchange=${selectAll} />
-              Select all
-            </label>
-          `}
-        </div>
-        <div style="display:flex;gap:8px">
-          ${selected.size > 0 && html`
-            <button class="btn btn-sm" onclick=${openAddToPlan}>Add to Plan (${selected.size})</button>
-          `}
-          <button class="btn btn-sm btn-primary" onclick=${() => setShowForm(!showForm)}>${showForm ? 'Cancel' : 'New Note'}</button>
+          <div class="ios-note-snippet">${snippet || html`<span style="color:var(--text-secondary);font-style:italic">No additional text</span>`}</div>
         </div>
       </div>
-      ${showForm && html`
-        <div class="item-card" style="margin-bottom:16px">
-          <div class="form-group"><label>Title (optional)</label><input id="noteTitle" /></div>
-          <div class="form-group"><label>Body</label><textarea id="noteBody" rows="4"></textarea></div>
-          <button class="btn btn-primary" onclick=${async () => {
-            const title = document.getElementById('noteTitle').value;
-            const body = document.getElementById('noteBody').value;
-            if (!body) return;
-            await api(`/api/projects/${projectId}/notes`, { method: 'POST', body: JSON.stringify({ title, body }) });
-            setShowForm(false); load();
-          }}>Save Note</button>
+      <div class="ios-swipe-actions">
+        ${onPin && html`
+          <button class="ios-swipe-action-btn ios-swipe-pin-btn"
+                  onclick=${(e) => { e.stopPropagation(); setSwiped(false); onPin(note); }}>
+            ${note.pinned ? 'Unpin' : 'Pin'}
+          </button>
+        `}
+        ${onMove && html`
+          <button class="ios-swipe-action-btn ios-swipe-move-btn"
+                  onclick=${(e) => { e.stopPropagation(); setSwiped(false); onMove(note); }}>
+            Move
+          </button>
+        `}
+        <button class="ios-swipe-action-btn ios-swipe-delete-btn"
+                onclick=${(e) => { e.stopPropagation(); setSwiped(false); onDelete(note); }}>
+          Delete
+        </button>
+      </div>
+    </div>
+    <div class="ios-list-divider"></div>
+  `;
+}
+
+// --- Move-to-folder bottom sheet ---
+function IosMoveFolderSheet({ note, folders, currentFolderId, onMove, onClose }) {
+  const others = folders.filter(f => f.id !== currentFolderId);
+  return html`
+    <div class="ios-sheet-backdrop" onclick=${onClose}>
+      <div class="ios-sheet" onclick=${e => e.stopPropagation()}>
+        <div class="ios-sheet-handle"></div>
+        <div class="ios-sheet-title">Move to Folder</div>
+        <div class="ios-sheet-list">
+          ${others.length === 0 && html`<div class="ios-sheet-empty">No other folders.</div>`}
+          ${others.map(f => html`
+            <button key=${f.id} class="ios-sheet-row" onclick=${() => onMove(note, f)}>
+              <span class="ios-folder-icon">📁</span>
+              <span class="ios-sheet-row-name">${f.name}</span>
+            </button>
+          `)}
         </div>
-      `}
-      <div class="item-list">
-        ${notes.map(n => html`
-          <${NoteCard} key=${n.id} note=${n} selected=${selected.has(n.id)}
-            onToggle=${() => toggleSelect(n.id)}
-            onDelete=${async () => {
-              if (!confirm('Delete this note?')) return;
-              await api(`/api/notes/${n.id}`, { method: 'DELETE' });
-              setSelected(prev => { const next = new Set(prev); next.delete(n.id); return next; });
-              load();
-            }}
-            onSave=${async (updates) => {
-              await api(`/api/notes/${n.id}`, { method: 'PATCH', body: JSON.stringify(updates) });
-              load();
-            }}
-          />
-        `)}
-        ${notes.length === 0 && html`<div class="empty-state">No open notes. Notes added to plans are moved out.</div>`}
+        <button class="ios-sheet-cancel" onclick=${onClose}>Cancel</button>
       </div>
     </div>
   `;
 }
 
-// ===================== STANDALONE NOTES PAGE =====================
-
-function NotesPage() {
+// --- Notes list screen (within a folder) ---
+function IosNotesList({ folder, folders, onBack, onOpenNote, onNewNote, onPinNote }) {
   const [notes, setNotes] = useState([]);
-  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('open');
-  const [sort, setSort] = useState('newest');
   const [search, setSearch] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [showForm, setShowForm] = useState(false);
-  const [formBody, setFormBody] = useState('');
-  const [formTitle, setFormTitle] = useState('');
-  const [formProject, setFormProject] = useState('');
-  const [formTags, setFormTags] = useState('');
-  // Detail view state
-  const [selectedNote, setSelectedNote] = useState(null);
-  const [editing, setEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState('');
-  const [editBody, setEditBody] = useState('');
-  const [editProject, setEditProject] = useState('');
-  const [editTags, setEditTags] = useState('');
-  const bodyRef = useRef(null);
-  const [perPage, setPerPage] = useState(10);
-  // Bulk select state
-  const [selected, setSelected] = useState(new Set());
-  const [showMoveModal, setShowMoveModal] = useState(false);
-  const [moveTargetProject, setMoveTargetProject] = useState('');
-  // Project filter dropdown state
-  const [showProjectFilter, setShowProjectFilter] = useState(false);
-  const [activeGroupOpen, setActiveGroupOpen] = useState(true);
-  const [inactiveGroupOpen, setInactiveGroupOpen] = useState(false);
-  const projectFilterRef = useRef(null);
-
-  // Close project filter dropdown on outside click
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (projectFilterRef.current && !projectFilterRef.current.contains(e.target)) {
-        setShowProjectFilter(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const [moveNote, setMoveNote] = useState(null);
+  const searchRef = useRef(null);
 
   useEffect(() => {
-    const t = setTimeout(() => { setSearchDebounced(search); setPage(1); }, 300);
+    const t = setTimeout(() => setSearchDebounced(search), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { setPage(1); }, [filter, statusFilter, sort, perPage]);
-
-  useEffect(() => {
-    api('/api/projects').then(d => setProjects(d.projects || [])).catch(() => {});
-    // Restore draft if available
-    const draft = loadDraft();
-    if (draft) {
-      if (draft.type === 'new') {
-        setShowForm(true);
-        setFormBody(draft.formBody || '');
-        setFormTitle(draft.formTitle || '');
-      } else if (draft.type === 'edit') {
-        setEditBody(draft.editBody || '');
-        setEditTitle(draft.editTitle || '');
-        setEditing(true);
-      }
-      clearDraft();
-    }
-  }, []);
-
   const loadNotes = useCallback(() => {
-    const params = new URLSearchParams();
-    if (filter === 'unattached') params.set('unattached', '1');
-    else if (filter !== 'all') params.set('project_id', filter);
-    if (statusFilter) params.set('status', statusFilter);
-    if (searchDebounced) params.set('search', searchDebounced);
-    params.set('sort', sort);
-    params.set('page', String(page));
-    params.set('limit', String(perPage));
-    api(`/api/notes?${params.toString()}`).then(d => {
+    setLoading(true);
+    let url;
+    if (searchDebounced) {
+      url = `/api/notes?search=${encodeURIComponent(searchDebounced)}`;
+    } else {
+      url = `/api/notes?folder_id=${folder.id}`;
+    }
+    api(url).then(d => {
       setNotes(d.notes || []);
-      setTotal(d.total || 0);
-      setTotalPages(d.totalPages || 1);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [filter, statusFilter, searchDebounced, sort, page, perPage]);
+  }, [folder.id, searchDebounced]);
 
-  useEffect(() => { setLoading(true); loadNotes(); }, [loadNotes]);
+  useEffect(() => { loadNotes(); }, [loadNotes]);
 
-  async function createNote() {
-    if (!formBody.trim()) return;
-    const body = {
-      body: formBody.trim(),
-      title: formTitle.trim() || undefined,
-      project_id: formProject ? Number(formProject) : null,
-      tags: formTags.trim() ? formTags.split(',').map(t => t.trim()).filter(Boolean) : undefined
-    };
-    await api('/api/notes', { method: 'POST', body: JSON.stringify(body) });
-    setFormBody(''); setFormTitle(''); setFormProject(''); setFormTags('');
-    setShowForm(false);
-    setPage(1);
-    loadNotes();
-  }
-
-  async function saveEdit() {
-    if (!selectedNote) return;
-    const updates = {
-      title: editTitle.trim() || null,
-      body: editBody.trim(),
-      project_id: editProject ? Number(editProject) : null,
-      tags: editTags.trim() ? editTags.split(',').map(t => t.trim()).filter(Boolean) : []
-    };
-    if (!updates.body) return;
-    await api(`/api/notes/${selectedNote.id}`, { method: 'PATCH', body: JSON.stringify(updates) });
-    const refreshed = await api(`/api/notes/${selectedNote.id}`);
-    setSelectedNote(refreshed.note);
-    setEditing(false);
-    loadNotes();
-  }
-
-  async function deleteNote(id) {
+  async function handleDelete(note) {
     if (!confirm('Delete this note?')) return;
-    await api(`/api/notes/${id}`, { method: 'DELETE' });
-    setSelectedNote(null);
-    loadNotes();
-  }
-
-  async function archiveNote(id) {
-    await api(`/api/notes/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'archived' }) });
-    const refreshed = await api(`/api/notes/${id}`);
-    setSelectedNote(refreshed.note);
-    loadNotes();
-  }
-
-  async function reopenNote(id) {
-    await api(`/api/notes/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'open' }) });
-    const refreshed = await api(`/api/notes/${id}`);
-    setSelectedNote(refreshed.note);
-    loadNotes();
-  }
-
-  function openNote(n) {
-    setSelectedNote(n);
-    setEditing(false);
-  }
-
-  function startEdit() {
-    if (!selectedNote) return;
-    setEditTitle(selectedNote.title || '');
-    setEditBody(selectedNote.body);
-    setEditProject(selectedNote.project_id != null ? String(selectedNote.project_id) : '');
-    setEditTags(selectedNote.tags ? JSON.parse(selectedNote.tags).join(', ') : '');
-    setEditing(true);
-  }
-
-  function startEditDirect(n) {
-    setSelectedNote(n);
-    setEditTitle(n.title || '');
-    setEditBody(n.body);
-    setEditProject(n.project_id != null ? String(n.project_id) : '');
-    setEditTags(n.tags ? JSON.parse(n.tags).join(', ') : '');
-    setEditing(true);
-  }
-
-  function toggleSelect(id) {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  function selectAllNotes() {
-    if (selected.size === notes.length) setSelected(new Set());
-    else setSelected(new Set(notes.map(n => n.id)));
-  }
-
-  async function moveToProject() {
-    if (!moveTargetProject) return;
-    const pid = Number(moveTargetProject);
     try {
-      await Promise.all([...selected].map(id =>
-        api(`/api/notes/${id}`, { method: 'PATCH', body: JSON.stringify({ project_id: pid, status: 'promoted' }) })
-      ));
-      setShowMoveModal(false);
-      setSelected(new Set());
-      setMoveTargetProject('');
+      await api(`/api/notes/${note.id}`, { method: 'DELETE' });
       loadNotes();
     } catch (e) { alert(e.message); }
   }
 
-  async function moveToOpen() {
-    if (!confirm('Move ' + selected.size + ' note(s) back to open/unattached?')) return;
+  async function handlePin(note) {
     try {
-      await Promise.all([...selected].map(id =>
-        api(`/api/notes/${id}`, { method: 'PATCH', body: JSON.stringify({ project_id: null, status: 'open' }) })
-      ));
-      setSelected(new Set());
+      const newPinned = !note.pinned;
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ pinned: newPinned }) });
+      loadNotes();
+      if (onPinNote) onPinNote();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleMoveConfirm(note, targetFolder) {
+    setMoveNote(null);
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ folder_id: targetFolder.id }) });
       loadNotes();
     } catch (e) { alert(e.message); }
   }
 
-  function getFilterLabel() {
-    if (filter === 'all') return 'All Projects';
-    if (filter === 'unattached') return 'Unattached';
-    const p = projects.find(pr => String(pr.id) === String(filter));
-    return p ? (p.display_name || p.directory_name) : 'Project #' + filter;
+  async function handleNewNote() {
+    try {
+      const d = await api('/api/notes', { method: 'POST', body: JSON.stringify({ folder_id: folder.id, body: '' }) });
+      const newNote = d.note || d;
+      loadNotes();
+      onOpenNote(newNote, loadNotes);
+    } catch (e) { alert(e.message); }
   }
 
-  function getProjectName(pid) {
-    if (!pid) return null;
-    const p = projects.find(pr => pr.id === pid);
-    return p ? (p.display_name || p.directory_name) : `Project #${pid}`;
-  }
-
-  function parseTags(tagsStr) {
-    if (!tagsStr) return [];
-    try { return JSON.parse(tagsStr); } catch { return []; }
-  }
-
-  // ── Detail View ──
-  if (selectedNote) {
-    const n = selectedNote;
-    const projName = getProjectName(n.project_id);
-    const tags = parseTags(n.tags);
-
-    if (editing) {
-      return html`
-        <div style="display:flex;flex-direction:column;height:calc(100vh - 120px);min-height:400px">
-          <div style="flex-shrink:0;margin-bottom:12px">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-              <button class="btn btn-sm" onclick=${() => setEditing(false)}>Cancel</button>
-              <button class="btn btn-sm btn-primary" onclick=${saveEdit}>Save</button>
-            </div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px">
-              <div class="form-group" style="flex:1;min-width:200px;margin:0">
-                <label style="font-size:11px;color:var(--text-secondary)">Title</label>
-                <input value=${editTitle} onInput=${e => setEditTitle(e.target.value)} placeholder="Title (optional)" />
-              </div>
-              <div class="form-group" style="flex:0 0 180px;margin:0">
-                <label style="font-size:11px;color:var(--text-secondary)">Project</label>
-                <select value=${editProject} onChange=${e => setEditProject(e.target.value)}>
-                  <option value="">No project</option>
-                  ${projects.map(p => html`<option value=${p.id}>${p.display_name || p.directory_name}</option>`)}
-                </select>
-              </div>
-              <div class="form-group" style="flex:1;min-width:150px;margin:0">
-                <label style="font-size:11px;color:var(--text-secondary)">Tags</label>
-                <input value=${editTags} onInput=${e => setEditTags(e.target.value)}
-                       placeholder="Tags (comma separated)" />
-              </div>
-            </div>
-          </div>
-          <div style="flex:1;display:flex;flex-direction:column;min-height:0">
-            <textarea value=${editBody} onInput=${e => setEditBody(e.target.value)}
-                      style="flex:1;padding:12px;font-size:14px;line-height:1.6;resize:none;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-family:inherit"
-                      placeholder="Note content..."></textarea>
-          </div>
-        </div>
-      `;
-    }
-
-    return html`
-      <div style="display:flex;flex-direction:column;height:calc(100vh - 120px);min-height:400px">
-        <div style="flex-shrink:0;margin-bottom:12px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-            <button class="btn btn-sm" onclick=${() => setSelectedNote(null)}>Back</button>
-            <button class="btn btn-sm" onclick=${startEdit}>Edit</button>
-            ${n.status === 'open' && html`
-              <button class="btn btn-sm" onclick=${() => archiveNote(n.id)}>Archive</button>
-            `}
-            ${n.status === 'archived' && html`
-              <button class="btn btn-sm" onclick=${() => reopenNote(n.id)}>Reopen</button>
-            `}
-            <button class="btn btn-sm btn-danger" onclick=${() => deleteNote(n.id)}>Delete</button>
-          </div>
-          <h3 style="margin:0 0 6px 0;font-size:16px;color:var(--text)">${n.title || 'Untitled Note'}</h3>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            ${n.status !== 'open' && html`
-              <span class="badge badge-${n.status === 'promoted' ? 'active' : 'draft'}" style="font-size:10px">${n.status}</span>
-            `}
-            ${projName && html`
-              <span class="badge badge-open" style="font-size:11px">${projName}</span>
-            `}
-            ${!n.project_id && html`
-              <span class="badge badge-draft" style="font-size:11px">unattached</span>
-            `}
-            ${tags.map(tag => html`
-              <span style="font-size:11px;padding:2px 8px;background:rgba(63,185,80,0.15);color:var(--success);border-radius:10px">#${tag}</span>
-            `)}
-            <span style="font-size:11px;color:var(--text-secondary)">Created ${new Date(n.created_at).toLocaleString()}</span>
-            ${n.updated_at !== n.created_at && html`
-              <span style="font-size:11px;color:var(--text-secondary)">Updated ${new Date(n.updated_at).toLocaleString()}</span>
-            `}
-          </div>
-        </div>
-        <div class="item-card" style="flex:1;overflow-y:auto;padding:16px;min-height:0">
-          <div style="white-space:pre-wrap;font-size:14px;line-height:1.7;color:var(--text)">${n.body}</div>
-        </div>
-      </div>
-    `;
-  }
-
-  // ── List View ──
-  if (loading && notes.length === 0) return html`<div class="loading">Loading...</div>`;
+  // Split pinned / regular
+  const pinned = notes.filter(n => n.pinned);
+  const regular = notes.filter(n => !n.pinned);
 
   return html`
-    <div>
-      <div class="action-bar" style="flex-wrap:wrap;gap:12px">
-        <h2 style="color:var(--text)">Notes <span style="font-size:13px;font-weight:400;color:var(--text-secondary)">(${total})</span></h2>
-        <button class="btn btn-primary" onclick=${() => { setShowForm(!showForm); if (!showForm) setTimeout(() => bodyRef.current?.focus(), 50); }}>
-          ${showForm ? 'Cancel' : '+ New Note'}
+    <div class="ios-notes-screen">
+      <div class="ios-notes-header">
+        <button class="ios-back-btn" onclick=${onBack}>
+          <span class="ios-back-chevron">‹</span>
+          <span>Folders</span>
         </button>
+        <h1 class="ios-screen-title">${folder.name}</h1>
       </div>
 
-      ${showForm && html`
-        <div class="item-card" style="margin-bottom:16px;padding:16px">
-          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-            <div class="form-group" style="flex:1;min-width:200px;margin:0">
-              <label style="font-size:11px;color:var(--text-secondary)">Title (optional)</label>
-              <input value=${formTitle} onInput=${e => setFormTitle(e.target.value)}
-                     placeholder="Note title..." style="padding:8px 10px" />
-            </div>
-            <div class="form-group" style="flex:0 0 180px;margin:0">
-              <label style="font-size:11px;color:var(--text-secondary)">Project (optional)</label>
-              <select value=${formProject} onChange=${e => setFormProject(e.target.value)} style="padding:8px 10px">
-                <option value="">No project</option>
-                ${projects.filter(p => p.active !== 0).map(p => html`<option value=${p.id}>${p.display_name || p.directory_name}</option>`)}
-              </select>
-            </div>
-          </div>
-          <div class="form-group" style="margin-bottom:12px">
-            <textarea ref=${bodyRef} value=${formBody} onInput=${e => setFormBody(e.target.value)}
-                      placeholder="Write your note..." rows="4"
-                      onKeyDown=${e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) createNote(); }}
-                      style="padding:10px;font-size:14px;resize:vertical"></textarea>
-          </div>
-          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-            <div class="form-group" style="flex:1;min-width:150px;margin:0">
-              <input value=${formTags} onInput=${e => setFormTags(e.target.value)}
-                     placeholder="Tags (comma separated)" style="padding:8px 10px;font-size:12px" />
-            </div>
-            <button class="btn btn-primary" onclick=${createNote} disabled=${!formBody.trim()}>
-              Save Note
-            </button>
-            <span style="font-size:11px;color:var(--text-secondary)">Ctrl+Enter to save</span>
-          </div>
+      <div class="ios-search-bar-wrap">
+        <div class="ios-search-bar">
+          <span class="ios-search-icon">⌕</span>
+          <input ref=${searchRef} type="text" value=${search}
+                 onInput=${e => setSearch(e.target.value)}
+                 placeholder="Search"
+                 class="ios-search-input" />
+          ${search && html`<button class="ios-search-clear" onclick=${() => setSearch('')}>✕</button>`}
         </div>
-      `}
+      </div>
 
-      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-        <div ref=${projectFilterRef} style="position:relative;flex-shrink:0">
-          <button onclick=${() => setShowProjectFilter(!showProjectFilter)}
-                  style="padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);cursor:pointer;font-size:13px;min-width:150px;text-align:left;display:flex;justify-content:space-between;align-items:center">
-            <span>${getFilterLabel()}</span>
-            <span style="margin-left:8px;font-size:10px">${showProjectFilter ? '\u25B2' : '\u25BC'}</span>
-          </button>
-          ${showProjectFilter && html`
-            <div style="position:absolute;top:100%;left:0;z-index:100;margin-top:4px;min-width:220px;max-height:350px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,0.3)">
-              <div onclick=${() => { setFilter('all'); setShowProjectFilter(false); }}
-                   style=${'padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text);border-bottom:1px solid var(--border)' + (filter === 'all' ? ';background:rgba(88,166,255,0.15)' : '')}>
-                All Projects
-              </div>
-              <div onclick=${() => { setFilter('unattached'); setShowProjectFilter(false); }}
-                   style=${'padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text);border-bottom:1px solid var(--border)' + (filter === 'unattached' ? ';background:rgba(88,166,255,0.15)' : '')}>
-                Unattached
-              </div>
-              ${(() => {
-                const activeProjs = projects.filter(p => p.active !== 0);
-                const inactiveProjs = projects.filter(p => p.active === 0);
-                return html`
-                  ${activeProjs.length > 0 && html`
-                    <div onclick=${() => setActiveGroupOpen(!activeGroupOpen)}
-                         style="padding:6px 12px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.1)">
-                      <span style="font-size:9px">${activeGroupOpen ? '\u25BC' : '\u25B6'}</span> Active (${activeProjs.length})
-                    </div>
-                    ${activeGroupOpen && activeProjs.map(p => html`
-                      <div onclick=${() => { setFilter(String(p.id)); setShowProjectFilter(false); }}
-                           style=${'padding:8px 12px 8px 24px;cursor:pointer;font-size:13px;color:var(--text)' + (String(filter) === String(p.id) ? ';background:rgba(88,166,255,0.15)' : '')}>
-                        ${p.display_name || p.directory_name}
-                      </div>
-                    `)}
-                  `}
-                  ${inactiveProjs.length > 0 && html`
-                    <div onclick=${() => setInactiveGroupOpen(!inactiveGroupOpen)}
-                         style="padding:6px 12px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.1)">
-                      <span style="font-size:9px">${inactiveGroupOpen ? '\u25BC' : '\u25B6'}</span> Inactive (${inactiveProjs.length})
-                    </div>
-                    ${inactiveGroupOpen && inactiveProjs.map(p => html`
-                      <div onclick=${() => { setFilter(String(p.id)); setShowProjectFilter(false); }}
-                           style=${'padding:8px 12px 8px 24px;cursor:pointer;font-size:13px;color:var(--text);opacity:0.7' + (String(filter) === String(p.id) ? ';background:rgba(88,166,255,0.15)' : '')}>
-                        ${p.display_name || p.directory_name}
-                      </div>
-                    `)}
-                  `}
-                `;
-              })()}
+      ${loading ? html`<div class="ios-loading">Loading...</div>` : html`
+        <div class="ios-list-body">
+          ${pinned.length > 0 && html`
+            <div class="ios-section-header">Pinned</div>
+            <div class="ios-list-group">
+              ${pinned.map(n => html`
+                <${IosNoteRow} key=${n.id} note=${n}
+                  onOpen=${(note) => onOpenNote(note, loadNotes)}
+                  onDelete=${handleDelete}
+                  onPin=${handlePin}
+                  onMove=${(folders && folders.length > 1) ? (note) => setMoveNote(note) : null}
+                />
+              `)}
+            </div>
+          `}
+
+          ${regular.length > 0 && html`
+            <div class="ios-section-header">Notes</div>
+            <div class="ios-list-group">
+              ${regular.map(n => html`
+                <${IosNoteRow} key=${n.id} note=${n}
+                  onOpen=${(note) => onOpenNote(note, loadNotes)}
+                  onDelete=${handleDelete}
+                  onPin=${handlePin}
+                  onMove=${(folders && folders.length > 1) ? (note) => setMoveNote(note) : null}
+                />
+              `)}
+            </div>
+          `}
+
+          ${notes.length === 0 && html`
+            <div class="ios-empty-state">
+              ${searchDebounced ? 'No notes match your search.' : 'No notes in this folder yet.'}
             </div>
           `}
         </div>
-
-        <div style="display:flex;gap:4px">
-          ${[{key: 'open', label: 'Open'}, {key: 'promoted', label: 'Promoted'}, {key: 'archived', label: 'Archived'}].map(s => html`
-            <button class=${'btn btn-sm' + (statusFilter === s.key ? ' btn-primary' : '')}
-                    onclick=${() => setStatusFilter(s.key)}
-                    style="font-size:12px">${s.label}</button>
-          `)}
-        </div>
-      </div>
-
-      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-        ${notes.length > 0 && html`
-          <label style="font-size:12px;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:4px;flex-shrink:0">
-            <input type="checkbox" checked=${selected.size === notes.length && notes.length > 0} onchange=${selectAllNotes} />
-            Select all
-          </label>
-        `}
-        ${selected.size > 0 && statusFilter === 'open' && html`
-          <button class="btn btn-sm btn-primary" onclick=${() => { setMoveTargetProject(''); setShowMoveModal(true); }}
-                  style="font-size:12px;flex-shrink:0">Move to Project (${selected.size})</button>
-        `}
-        ${selected.size > 0 && (statusFilter === 'promoted' || statusFilter === 'archived') && html`
-          <button class="btn btn-sm btn-primary" onclick=${moveToOpen}
-                  style="font-size:12px;flex-shrink:0">Move to Open (${selected.size})</button>
-        `}
-
-        <div style="display:flex;gap:2px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:2px;flex-shrink:0">
-          ${[10, 20, 50].map(n => html`
-            <button onclick=${() => setPerPage(n)}
-                    style="padding:4px 8px;font-size:11px;border:none;border-radius:4px;cursor:pointer;background:${perPage === n ? 'var(--accent)' : 'transparent'};color:${perPage === n ? '#fff' : 'var(--text-secondary)'}">${n}</button>
-          `)}
-        </div>
-
-        <select value=${sort} onChange=${e => setSort(e.target.value)}
-                style="padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:12px;flex-shrink:0">
-          <option value="newest">Newest First</option>
-          <option value="oldest">Oldest First</option>
-          <option value="updated">Recently Updated</option>
-          <option value="title">Title A-Z</option>
-        </select>
-
-        <input type="text" value=${search} onInput=${e => setSearch(e.target.value)}
-               placeholder="Search notes..."
-               style="flex:1;min-width:120px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)" />
-      </div>
-
-      ${showMoveModal && html`
-        <div class="modal-overlay" onclick=${() => setShowMoveModal(false)}>
-          <div class="modal" style="max-width:400px" onclick=${e => e.stopPropagation()}>
-            <h3 style="color:var(--text);margin-bottom:12px">Move ${selected.size} note${selected.size > 1 ? 's' : ''} to project</h3>
-            <div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
-              ${projects.filter(p => p.active !== 0).map(p => {
-                const isSel = moveTargetProject === String(p.id);
-                return html`
-                  <div onclick=${() => setMoveTargetProject(String(p.id))}
-                       style=${'padding:10px 12px;border-radius:6px;cursor:pointer;font-size:14px;color:#e6edf3;border:2px solid ' + (isSel ? '#58a6ff' : '#30363d') + ';background:' + (isSel ? 'rgba(88,166,255,0.15)' : '#161b22')}>
-                    <span style="color:#e6edf3">${p.display_name || p.directory_name}</span>
-                  </div>
-                `;
-              })}
-            </div>
-            <div class="modal-actions">
-              <button class="btn" onclick=${() => setShowMoveModal(false)}>Cancel</button>
-              <button class="btn btn-primary" onclick=${moveToProject} disabled=${!moveTargetProject}>Move</button>
-            </div>
-          </div>
-        </div>
       `}
 
-      <div class="item-list">
-        ${notes.map(n => {
-          const projName = getProjectName(n.project_id);
-          const preview = n.title ? n.body.slice(0, 100) : (n.body.length > 80 ? n.body.slice(80, 180) : '');
-          return html`
-            <div class="item-card" style="padding:10px 16px;cursor:pointer" onclick=${() => openNote(n)}>
-              <div style="display:flex;align-items:center;gap:8px;min-width:0">
-                <input type="checkbox" checked=${selected.has(n.id)}
-                       onclick=${e => e.stopPropagation()}
-                       onchange=${() => toggleSelect(n.id)}
-                       style="flex-shrink:0;cursor:pointer" />
-                <div style="display:flex;gap:4px;flex-shrink:0" onclick=${e => e.stopPropagation()}>
-                  <button class="btn btn-sm" onclick=${() => { openNote(n); startEditDirect(n); }} style="padding:2px 6px;font-size:11px">Edit</button>
-                  <button class="btn btn-sm btn-danger" onclick=${() => deleteNote(n.id)} style="padding:2px 6px;font-size:11px">Del</button>
-                </div>
-                <div style="flex:1;min-width:0">
-                  <div style="display:flex;align-items:center;gap:6px">
-                    <span style="font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.title || n.body.slice(0, 80)}</span>
-                    ${n.status === 'promoted' && html`<span class="badge badge-active" style="font-size:9px;flex-shrink:0">promoted</span>`}
-                    ${n.status === 'archived' && html`<span class="badge badge-draft" style="font-size:9px;flex-shrink:0">archived</span>`}
-                  </div>
-                  ${preview && html`<div style="font-size:12px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">${preview}</div>`}
-                </div>
-                <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
-                  ${projName && html`<span style="font-size:10px;padding:2px 6px;background:rgba(88,166,255,0.15);color:var(--accent);border-radius:8px;white-space:nowrap">${projName}</span>`}
-                  <span style="font-size:10px;color:var(--text-secondary);white-space:nowrap">${new Date(n.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
-            </div>
-          `;
-        })}
-        ${notes.length === 0 && html`
-          <div class="empty-state" style="padding:40px 20px;text-align:center">
-            <p style="font-size:16px;margin-bottom:8px;color:var(--text)">No notes found</p>
-            <p style="color:var(--text-secondary);font-size:13px">
-              ${statusFilter === 'open' ? 'Create your first note using the button above.' : `No ${statusFilter} notes match your filters.`}
-            </p>
-          </div>
-        `}
+      <div class="ios-note-count-bar">
+        ${loading ? '' : `${notes.length} Note${notes.length !== 1 ? 's' : ''}`}
       </div>
 
-      ${totalPages > 1 && html`
-        <div class="pagination">
-          <button onclick=${() => setPage(p => Math.max(1, p - 1))} disabled=${page <= 1}>Prev</button>
-          ${Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-            let p;
-            if (totalPages <= 7) {
-              p = i + 1;
-            } else if (page <= 4) {
-              p = i + 1;
-            } else if (page >= totalPages - 3) {
-              p = totalPages - 6 + i;
-            } else {
-              p = page - 3 + i;
-            }
-            return html`<button class=${p === page ? 'active' : ''} onclick=${() => setPage(p)}>${p}</button>`;
-          })}
-          <button onclick=${() => setPage(p => Math.min(totalPages, p + 1))} disabled=${page >= totalPages}>Next</button>
-          <span class="page-info">${total} notes</span>
+      <button class="ios-compose-btn" onclick=${handleNewNote}>
+        <span class="ios-compose-icon">✏</span>
+      </button>
+
+      ${moveNote && html`
+        <${IosMoveFolderSheet}
+          note=${moveNote}
+          folders=${folders || []}
+          currentFolderId=${folder.id}
+          onMove=${handleMoveConfirm}
+          onClose=${() => setMoveNote(null)}
+        />
+      `}
+    </div>
+  `;
+}
+
+// --- Rich Note Editor (N3: iPhone Notes-style) ---
+
+// Normalize empty contenteditable to empty string for comparison
+function getEditorHtml(el) {
+  if (!el) return '';
+  const html = el.innerHTML;
+  // contenteditable reports '<br>' for empty state in some browsers
+  if (html === '<br>' || html === '' ) return '';
+  return html;
+}
+
+// Build initial HTML for contenteditable from stored body.
+// If the stored body is plain text (no tags), wrap in a <p> so the first line
+// becomes a proper block for title styling.
+function prepareInitialHtml(body) {
+  if (!body) return '';
+  // Already contains HTML tags — use as-is
+  if (/<[a-zA-Z]/.test(body)) return body;
+  // Plain text: wrap each newline-separated line in <p>
+  return body.split('\n').map(l => `<p>${l || '<br>'}</p>`).join('');
+}
+
+function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) {
+  const [pinned, setPinned] = useState(!!note.pinned);
+  const [showMoveSheet, setShowMoveSheet] = useState(false);
+  // Track whether this is a brand-new empty note (for discard-on-back logic)
+  const isNewEmpty = useRef(!note.body || note.body.trim() === '');
+  const saveTimer = useRef(null);
+  const editorRef = useRef(null);
+  // Keep a live ref to current HTML so handleBack always sees latest value
+  const currentHtmlRef = useRef(note.body || '');
+
+  // Set initial content on mount (once; bypass Preact diffing)
+  useEffect(() => {
+    if (!editorRef.current) return;
+    const initial = prepareInitialHtml(note.body || '');
+    editorRef.current.innerHTML = initial;
+    currentHtmlRef.current = initial;
+    // Place cursor at end
+    const range = document.createRange();
+    const sel = window.getSelection();
+    range.selectNodeContents(editorRef.current);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    editorRef.current.focus();
+  }, []);
+
+  // Debounced auto-save
+  function scheduleAutoSave(html) {
+    currentHtmlRef.current = html;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ body: html }) });
+        if (onReload) onReload();
+      } catch {}
+    }, 800);
+  }
+
+  function handleEditorInput() {
+    if (!editorRef.current) return;
+    const html = getEditorHtml(editorRef.current);
+    scheduleAutoSave(html);
+  }
+
+  async function handlePinToggle() {
+    const newPinned = !pinned;
+    setPinned(newPinned);
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ pinned: newPinned }) });
+      if (onReload) onReload();
+    } catch {}
+  }
+
+  async function handleDelete() {
+    if (!confirm('Delete this note?')) return;
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'DELETE' });
+      if (onReload) onReload();
+      onBack();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleMoveToFolder(targetFolder) {
+    setShowMoveSheet(false);
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ folder_id: targetFolder.id }) });
+      if (onReload) onReload();
+      if (onMoveNote) onMoveNote(targetFolder);
+      onBack();
+    } catch (e) { alert(e.message); }
+  }
+
+  // Flush pending save on back; discard brand-new empty note (iPhone behavior)
+  async function handleBack() {
+    clearTimeout(saveTimer.current);
+    const html = editorRef.current ? getEditorHtml(editorRef.current) : currentHtmlRef.current;
+    const isEmpty = !html || html.replace(/<[^>]*>/g, '').replace(/\s/g, '') === '';
+    if (isNewEmpty.current && isEmpty) {
+      // Discard: delete the empty new note silently
+      try { await api(`/api/notes/${note.id}`, { method: 'DELETE' }); } catch {}
+      if (onReload) onReload();
+      onBack();
+      return;
+    }
+    // Flush unsaved changes
+    if (html !== (note.body || '')) {
+      try {
+        await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ body: html }) });
+        if (onReload) onReload();
+      } catch {}
+    }
+    onBack();
+  }
+
+  // ---- Formatting toolbar commands ----
+
+  function cmdExec(cmd, value) {
+    editorRef.current && editorRef.current.focus();
+    document.execCommand(cmd, false, value || null);
+    handleEditorInput();
+  }
+
+  function fmtBold() { cmdExec('bold'); }
+  function fmtItalic() { cmdExec('italic'); }
+  function fmtUnderline() { cmdExec('underline'); }
+
+  // Heading: wrap the current block in <h1> if not already; else convert back to <p>
+  function fmtHeading() {
+    editorRef.current && editorRef.current.focus();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    // Walk up from anchor to find block-level container inside editor
+    let node = sel.anchorNode;
+    while (node && node !== editorRef.current) {
+      if (node.nodeType === 1 && /^(P|DIV|H[1-6]|LI)$/.test(node.tagName)) break;
+      node = node.parentNode;
+    }
+    if (!node || node === editorRef.current) {
+      // Fallback: formatBlock
+      document.execCommand('formatBlock', false, 'h1');
+    } else if (/^H[1-6]$/.test(node.tagName)) {
+      document.execCommand('formatBlock', false, 'p');
+    } else {
+      document.execCommand('formatBlock', false, 'h1');
+    }
+    handleEditorInput();
+  }
+
+  function fmtBullet() {
+    editorRef.current && editorRef.current.focus();
+    document.execCommand('insertUnorderedList', false, null);
+    handleEditorInput();
+  }
+
+  // Insert a checklist item at current cursor position
+  function fmtChecklist() {
+    editorRef.current && editorRef.current.focus();
+    // Insert a checklist row as HTML
+    const clHtml = '<div class="cl-item" data-checked="false"><button class="cl-btn" tabindex="-1" type="button">◯</button><span class="cl-text"> </span></div>';
+    document.execCommand('insertHTML', false, clHtml);
+    handleEditorInput();
+  }
+
+  // Checklist toggle — event delegation on editor div
+  function handleEditorClick(e) {
+    const btn = e.target.closest('.cl-btn');
+    if (!btn) return;
+    const item = btn.closest('.cl-item');
+    if (!item) return;
+    const checked = item.getAttribute('data-checked') === 'true';
+    item.setAttribute('data-checked', (!checked).toString());
+    btn.textContent = checked ? '◯' : '◉';
+    handleEditorInput();
+  }
+
+  // Same handler for touch (prevent double-fire)
+  function handleEditorTouchEnd(e) {
+    const btn = e.target.closest('.cl-btn');
+    if (!btn) return;
+    e.preventDefault();
+    handleEditorClick(e);
+  }
+
+  const otherFolders = (folders || []).filter(f => f.id !== (folder && folder.id));
+
+  return html`
+    <div class="ios-editor-screen">
+      <div class="ios-notes-header ios-editor-header">
+        <button class="ios-back-btn" onclick=${handleBack}>
+          <span class="ios-back-chevron">‹</span>
+          <span>${folder ? folder.name : 'Notes'}</span>
+        </button>
+        <div class="ios-editor-actions">
+          <button class="ios-editor-action-btn" onclick=${handlePinToggle}
+                  title=${pinned ? 'Unpin' : 'Pin'}>
+            ${pinned ? '📌' : '📍'}
+          </button>
+          ${otherFolders.length > 0 && html`
+            <button class="ios-editor-action-btn" onclick=${() => setShowMoveSheet(true)}
+                    title="Move to folder">📂</button>
+          `}
+          <button class="ios-editor-action-btn ios-delete-btn" onclick=${handleDelete}
+                  title="Delete">🗑</button>
+        </div>
+      </div>
+
+      <div class="ios-format-toolbar">
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtBold(); }} title="Bold"><b>B</b></button>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtItalic(); }} title="Italic"><i>I</i></button>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtUnderline(); }} title="Underline"><u>U</u></button>
+        <div class="ios-fmt-divider"></div>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtHeading(); }} title="Heading">H</button>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtBullet(); }} title="Bullet list">• ≡</button>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtChecklist(); }} title="Checklist">◯✓</button>
+      </div>
+
+      <div class="ios-editor-body">
+        <div ref=${editorRef}
+             class="ios-editor-rich"
+             contenteditable="true"
+             spellcheck="true"
+             data-placeholder="Start typing…"
+             onInput=${handleEditorInput}
+             onclick=${handleEditorClick}
+             ontouchend=${handleEditorTouchEnd}
+        ></div>
+      </div>
+
+      ${showMoveSheet && html`
+        <${IosMoveFolderSheet}
+          note=${note}
+          folders=${folders || []}
+          currentFolderId=${folder && folder.id}
+          onMove=${handleMoveToFolder}
+          onClose=${() => setShowMoveSheet(false)}
+        />
+      `}
+    </div>
+  `;
+}
+
+// --- Folders screen ---
+function IosNotesPage() {
+  const [folders, setFolders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  // nav state: null = folders screen, {folder} = notes list, {folder, note} = editor
+  const [currentFolder, setCurrentFolder] = useState(null);
+  const [currentNote, setCurrentNote] = useState(null);
+  const reloadNotesRef = useRef(null);
+
+  const loadFolders = useCallback(() => {
+    setLoading(true);
+    api('/api/note-folders').then(d => {
+      setFolders(d.folders || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { loadFolders(); }, [loadFolders]);
+
+  // --- Folder CRUD ---
+  async function handleCreateFolder() {
+    const name = window.prompt('Folder name:');
+    if (!name || !name.trim()) return;
+    try {
+      await api('/api/note-folders', { method: 'POST', body: JSON.stringify({ name: name.trim() }) });
+      loadFolders();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleRenameFolder(f) {
+    // Default "Notes" folder is protected — match iPhone behavior: skip rename
+    if (f.is_default) { alert('The default "Notes" folder cannot be renamed.'); return; }
+    const name = window.prompt('Rename folder:', f.name);
+    if (!name || !name.trim() || name.trim() === f.name) return;
+    try {
+      await api(`/api/note-folders/${f.id}`, { method: 'PATCH', body: JSON.stringify({ name: name.trim() }) });
+      loadFolders();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleDeleteFolder(f) {
+    if (f.is_default) { alert('The default "Notes" folder cannot be deleted.'); return; }
+    if (!confirm(`Delete folder "${f.name}"?\nIts notes will be moved to the default Notes folder.`)) return;
+    try {
+      await api(`/api/note-folders/${f.id}`, { method: 'DELETE' });
+      loadFolders();
+    } catch (e) {
+      // 4xx from API (e.g. default folder guard on server side)
+      alert(e.message || 'Cannot delete this folder.');
+    }
+  }
+
+  // --- Routing within the notes stack ---
+  if (currentNote && currentFolder) {
+    return html`<${IosNoteEditor}
+      note=${currentNote}
+      folder=${currentFolder}
+      folders=${folders}
+      onBack=${() => setCurrentNote(null)}
+      onReload=${reloadNotesRef.current || null}
+      onMoveNote=${(targetFolder) => {
+        // After moving from editor, go back to the list screen (note left current folder)
+        if (reloadNotesRef.current) reloadNotesRef.current();
+      }}
+    />`;
+  }
+
+  if (currentFolder) {
+    return html`<${IosNotesList}
+      folder=${currentFolder}
+      folders=${folders}
+      onBack=${() => { setCurrentFolder(null); loadFolders(); }}
+      onOpenNote=${(note, reloadFn) => {
+        reloadNotesRef.current = reloadFn;
+        setCurrentNote(note);
+      }}
+      onNewNote=${() => {}}
+      onPinNote=${loadFolders}
+    />`;
+  }
+
+  // --- Folders screen ---
+  return html`
+    <div class="ios-notes-screen">
+      <div class="ios-folders-header ios-folders-header--row">
+        <h1 class="ios-folders-title">Notes</h1>
+        <div class="ios-folders-header-actions">
+          <button class="ios-folder-edit-toggle" onclick=${() => setEditMode(v => !v)}>
+            ${editMode ? 'Done' : 'Edit'}
+          </button>
+          <button class="ios-folder-new-btn" onclick=${handleCreateFolder} title="New Folder">
+            <span class="ios-folder-new-icon">📁+</span>
+          </button>
+        </div>
+      </div>
+
+      ${loading ? html`<div class="ios-loading">Loading...</div>` : html`
+        <div class="ios-list-body">
+          <div class="ios-section-header">iCloud</div>
+          <div class="ios-list-group">
+            ${folders.map(f => html`
+              <div key=${f.id} class=${'ios-folder-row' + (editMode ? ' ios-folder-row--edit' : '')}
+                   onclick=${() => { if (!editMode) setCurrentFolder(f); }}>
+                ${editMode && !f.is_default && html`
+                  <button class="ios-folder-delete-circle" title="Delete folder"
+                          onclick=${(e) => { e.stopPropagation(); handleDeleteFolder(f); }}>
+                    <span>–</span>
+                  </button>
+                `}
+                ${editMode && f.is_default && html`
+                  <span class="ios-folder-delete-circle ios-folder-delete-circle--disabled" title="Default folder">–</span>
+                `}
+                <span class="ios-folder-icon">📁</span>
+                <span class="ios-folder-name">${f.name}${f.is_default ? '' : ''}</span>
+                <span class="ios-folder-count">${f.note_count ?? ''}</span>
+                ${editMode && !f.is_default
+                  ? html`<button class="ios-folder-rename-btn" onclick=${(e) => { e.stopPropagation(); handleRenameFolder(f); }}>Rename</button>`
+                  : html`<span class="ios-folder-chevron">${editMode ? '' : '›'}</span>`
+                }
+              </div>
+              <div class="ios-list-divider ios-list-divider--indent"></div>
+            `)}
+            ${folders.length === 0 && html`
+              <div class="ios-empty-state">No folders found.</div>
+            `}
+          </div>
+
+          ${!editMode && html`
+            <div class="ios-folder-new-row" onclick=${handleCreateFolder}>
+              <span class="ios-folder-new-row-icon">📁</span>
+              <span class="ios-folder-new-row-label">New Folder</span>
+            </div>
+          `}
         </div>
       `}
     </div>
   `;
 }
+
 
 // Plans Tab
 function PlansTab({ projectId }) {
@@ -4734,7 +5386,7 @@ function LlmHealthCheck() {
   `;
 }
 
-function Settings() {
+function Settings({ onEditBottomNav } = {}) {
   const [patterns, setPatterns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userInfo, setUserInfo] = useState(null);
@@ -4749,6 +5401,12 @@ function Settings() {
   return html`
     <div>
       <h2 style="margin-bottom:16px">Settings</h2>
+
+      ${onEditBottomNav && html`
+        <${SettingsSection} title="Bottom Navigation" defaultOpen=${true}>
+          <button class="btn btn-sm" onclick=${onEditBottomNav}>Edit bottom nav</button>
+        </${SettingsSection}>
+      `}
 
       <${SettingsSection} title="Account" defaultOpen=${true}>
         <div style="margin-bottom:16px">
@@ -4844,8 +5502,51 @@ function Settings() {
 
 // ========== Telegram Mini App Components ==========
 
-function TgDashboard() {
-  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, conversations: 0, notes: 0 });
+function BottomNavEditor({ tabIds, onChange, onClose }) {
+  const [addId, setAddId] = useState('');
+  const currentTabs = getBottomNavTabs(tabIds);
+  const hiddenTabs = AVAILABLE_BOTTOM_NAV_TABS.filter(tab => !tabIds.includes(tab.id));
+  const selectedAddId = hiddenTabs.some(tab => tab.id === addId) ? addId : (hiddenTabs[0]?.id || '');
+
+  return html`
+    <div class="tg-nav-editor">
+      <div class="tg-nav-editor-header">
+        <h3>Bottom Nav</h3>
+        <button class="tg-icon-button" title="Close" onclick=${onClose}>×</button>
+      </div>
+      <div class="tg-nav-editor-list">
+        ${currentTabs.map((tab, index) => html`
+          <div class="tg-nav-editor-row" key=${tab.id}>
+            <span class="tg-nav-editor-icon">${tab.icon}</span>
+            <span class="tg-nav-editor-label">${tab.label}</span>
+            <div class="tg-nav-editor-actions">
+              <button class="tg-icon-button" title="Move up" disabled=${index === 0}
+                      onclick=${() => onChange(moveBottomNavTab(tabIds, tab.id, -1))}>↑</button>
+              <button class="tg-icon-button" title="Move down" disabled=${index === currentTabs.length - 1}
+                      onclick=${() => onChange(moveBottomNavTab(tabIds, tab.id, 1))}>↓</button>
+              <button class="tg-icon-button tg-danger-icon" title="Remove tab" disabled=${currentTabs.length <= 1}
+                      onclick=${() => onChange(removeBottomNavTab(tabIds, tab.id))}>×</button>
+            </div>
+          </div>
+        `)}
+      </div>
+      <div class="tg-nav-editor-add">
+        <select value=${selectedAddId} disabled=${hiddenTabs.length === 0}
+                onchange=${e => setAddId(e.target.value)}>
+          ${hiddenTabs.length === 0
+            ? html`<option value="">All tabs shown</option>`
+            : hiddenTabs.map(tab => html`<option value=${tab.id} key=${tab.id}>${tab.label}</option>`)}
+        </select>
+        <button class="btn btn-sm" disabled=${!selectedAddId}
+                onclick=${() => onChange(addBottomNavTab(tabIds, selectedAddId))}>+ Add</button>
+        <button class="btn btn-sm" onclick=${() => onChange(DEFAULT_BOTTOM_NAV_TAB_IDS)}>Reset</button>
+      </div>
+    </div>
+  `;
+}
+
+function TgDashboard({ onEditBottomNav }) {
+  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, conversations: 0, notes: 0, workflows: 0, activeWorkflows: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -4854,14 +5555,18 @@ function TgDashboard() {
       api('/api/personal-tasks').catch(() => ({ tasks: [] })),
       api('/api/reminders').catch(() => ({ reminders: [] })),
       api('/api/conversations').catch(() => ({ conversations: [] })),
-      api('/api/notes?status=open').catch(() => ({ notes: [] }))
-    ]).then(([p, t, r, c, n]) => {
+      api('/api/notes?status=open').catch(() => ({ notes: [] })),
+      api('/api/overmind/workflows').catch(() => ({ workflows: [] }))
+    ]).then(([p, t, r, c, n, w]) => {
+      const workflowSummary = summarizeWorkflows(w.workflows);
       setStats({
         projects: p.projects?.length || 0,
         tasks: t.tasks?.length || 0,
         reminders: r.reminders?.length || 0,
         conversations: c.conversations?.length || 0,
-        notes: n.notes?.length || 0
+        notes: n.notes?.length || 0,
+        workflows: workflowSummary.total,
+        activeWorkflows: workflowSummary.active
       });
       setLoading(false);
     });
@@ -4874,6 +5579,7 @@ function TgDashboard() {
     { icon: '\u{1F4DD}', label: 'Notes', count: stats.notes, route: '/notes', desc: 'Quick notes' },
     { icon: '\u{1F4AC}', label: 'Chat', count: stats.conversations, route: '/conversations', desc: 'LLM conversations' },
     { icon: '\u{1F5A5}', label: 'Terminals', count: null, route: '/terminals', desc: 'Tmux sessions' },
+    { icon: '\u{25B6}', label: 'Workflows', count: stats.workflows, route: '/overmind', desc: `${stats.workflows} workflows · ${stats.activeWorkflows} active` },
     { icon: '\u{1F4C1}', label: 'Projects', count: stats.projects, route: '/projects', desc: 'Dev projects' },
     { icon: '\u{23F0}', label: 'Reminders', count: stats.reminders, route: '/tasks', desc: 'Upcoming events' },
     { icon: '\u{2699}', label: 'Settings', count: null, route: '/settings', desc: 'Config & templates' }
@@ -4881,7 +5587,10 @@ function TgDashboard() {
 
   return html`
     <div>
-      <div class="tg-page-title">AGJAssist</div>
+      <div class="tg-page-title-row">
+        <div class="tg-page-title">AGJAssist</div>
+        <button class="tg-icon-button tg-title-action" title="Edit bottom navigation" onclick=${onEditBottomNav}>✎</button>
+      </div>
       <div class="tg-dashboard-grid">
         ${cards.map(c => html`
           <div class="tg-dash-card" onclick=${() => {
@@ -4902,33 +5611,34 @@ function TgDashboard() {
 function TgApp() {
   const route = useRoute();
   const user = JSON.parse(localStorage.getItem('agj_user') || 'null');
+  const [bottomNavTabIds, setBottomNavTabIds] = useState(() => readBottomNavTabIds());
+  const [editingBottomNav, setEditingBottomNav] = useState(false);
 
   if (!authToken || !user) return html`<${Login} />`;
 
-  const tabs = [
-    { id: '/', icon: '\u{1F3E0}', label: 'Home' },
-    { id: '/tasks', icon: '\u{2705}', label: 'Tasks' },
-    { id: '/notes', icon: '\u{1F4DD}', label: 'Notes' },
-    { id: '/terminals', icon: '\u{1F5A5}', label: 'Terminal' },
-    { id: '/conversations', icon: '\u{1F4AC}', label: 'Chat' },
-    { id: '/settings', icon: '\u{2699}', label: 'Settings' }
-  ];
+  function applyBottomNavTabIds(nextIds) {
+    setBottomNavTabIds(writeBottomNavTabIds(nextIds));
+  }
+
+  const tabs = getBottomNavTabs(bottomNavTabIds);
 
   let content;
   if (route === '/' || route === '') {
-    content = html`<${TgDashboard} />`;
+    content = html`<${TgDashboard} onEditBottomNav=${() => setEditingBottomNav(true)} />`;
   } else if (route === '/projects') {
     content = html`<${Projects} />`;
   } else if (route === '/terminals') {
     content = html`<${Terminals} />`;
+  } else if (route === '/overmind') {
+    content = html`<${OvermindWorkflows} />`;
   } else if (route === '/tasks') {
     content = html`<${TasksSection} />`;
   } else if (route === '/notes') {
-    content = html`<${NotesPage} />`;
+    content = html`<${IosNotesPage} />`;
   } else if (route === '/conversations') {
-    content = html`<${Conversations} />`;
+    content = html`<${OvmConsole} />`;
   } else if (route === '/settings') {
-    content = html`<${Settings} />`;
+    content = html`<${Settings} onEditBottomNav=${() => setEditingBottomNav(true)} />`;
   } else if (route.startsWith('/project/')) {
     const id = route.split('/')[2];
     content = html`<${ProjectDetail} id=${id} key=${id} />`;
@@ -4940,6 +5650,13 @@ function TgApp() {
 
   return html`
     <main class="main">${content}</main>
+    ${editingBottomNav && html`
+      <${BottomNavEditor}
+        tabIds=${bottomNavTabIds}
+        onChange=${applyBottomNavTabIds}
+        onClose=${() => setEditingBottomNav(false)}
+      />
+    `}
     <nav class="tg-tab-bar">
       ${tabs.map(t => html`
         <button class=${'tg-tab-item' + (activeTab === t.id ? ' active' : '')}
@@ -4971,12 +5688,14 @@ function App() {
     content = html`<${Projects} />`;
   } else if (route === '/terminals') {
     content = html`<${Terminals} />`;
+  } else if (route === '/overmind') {
+    content = html`<${OvermindWorkflows} />`;
   } else if (route === '/tasks') {
     content = html`<${TasksSection} />`;
   } else if (route === '/notes') {
-    content = html`<${NotesPage} />`;
+    content = html`<${IosNotesPage} />`;
   } else if (route === '/conversations') {
-    content = html`<${Conversations} />`;
+    content = html`<${OvmConsole} />`;
   } else if (route === '/settings') {
     content = html`<${Settings} />`;
   } else if (route.startsWith('/project/')) {

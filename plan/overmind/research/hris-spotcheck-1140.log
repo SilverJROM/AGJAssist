@@ -1,0 +1,619 @@
+==================== SAMPLE 1 @ 11:40:39 ====================
+PARENT hris-d-22: hash=c1dc2d5230f6 (CHANGED) markers=[Cooked,]
+--- parent pane (last 45) ---
+
+● Bash(tmux send-keys -t hrcdx Enter)
+  ⎿  (No output)
+
+● Monitor(B3a iter2 terminal-state watcher)
+  ⎿  Monitor started · task ba51tvc25 · timeout 3600s
+
+● B3a iter2 APPROVED. Codex executing the 4 bounded actions (orphan delete → docs → benefits UI enrollment → reset×2).
+  Monitor armed. Silent.
+
+✻ Cooked for 21s · 3 shells, 5 monitors still running
+
+※ recap: Promoting 0516_chg follow-on (3 modules + DEV/QA prep) before DEV; B1+B2 PASS, B3a iter2 running now to delete
+  an orphan employee, enroll 33 emps in a Health Insurance plan, and reset Jan-Feb data. Waiting on codex DONE to
+  validate, then dispatch B3b (Jan P1 sweep).
+
+  12 tasks (7 done, 1 in progress, 4 open)
+  ◼ B3: Full payroll E2E sweep — Jan/Feb 2026, COMP-00000-LOKALHUB, 34 emps
+  ◻ Post-0518 worktree+branch cleanup sweep
+  ◻ B4: DEV promotion plan (codex consultation + double-check)
+  ◻ B5: Execute DEV deploy + validate (per dev-promote-plan)
+  ◻ B6: QA promotion prep (less-destructive variant — JROM auth required)
+   … +7 completed
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 3 shells, 5 monitors · ctrl+t to hide tasks · ↓ to manage
+CHILD hrcdx: hash=a17b28d469a4 (CHANGED) markers=[Working (,esc to interrupt,]
+--- child pane (last 45) ---
+    46  | `payroll_computation_lines` | 33 |
+    47 +| `loan_payroll_deductions` | 0 |
+    48 +| `recurring_claims` | 0 |
+    49 +| `service_charge_periods` | 0 |
+    50  | `time_record_entry_adj_detail` | 0 |
+    42 -| `time_record_entries` | 1435 |
+    43 -| `time_log_punch_events` | 4142 |
+    44 -| `time_logs` | 1724 |
+    51 +| `time_record_entries` | 1394 |
+    52 +| `time_log_punch_events` | 3978 |
+    53 +| `time_logs` | 1683 |
+    54  | `leave_applications` | 0 |
+       ⋮
+    57  | `ot_candidates` | 306 |
+    58 +| `ot_requests` | 0 |
+    59  | `time_log_correction_requests` | 0 |
+
+• Edited plan/WK_0516/0516_chg/projcore-run-2026-05-21/batch-b3a/fixtures-readiness.md (+1 -1)
+    36
+    37 -Iter 1 Jan-Feb rows in scope before reset:
+    37 +Iter 2 Jan-Feb rows in scope before reset, after deleting the orphan employee:
+    38
+
+◦ Working (9m 00s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to close
+
+
+› Summarize recent commits
+
+  gpt-5.5 high · ~/websites/HRIS
+
+==================== SAMPLE 2 @ 11:42:39 ====================
+PARENT hris-d-22: hash=c1dc2d5230f6 (same) markers=[Cooked,]
+--- parent pane (last 45) ---
+
+● Bash(tmux send-keys -t hrcdx Enter)
+  ⎿  (No output)
+
+● Monitor(B3a iter2 terminal-state watcher)
+  ⎿  Monitor started · task ba51tvc25 · timeout 3600s
+
+● B3a iter2 APPROVED. Codex executing the 4 bounded actions (orphan delete → docs → benefits UI enrollment → reset×2).
+  Monitor armed. Silent.
+
+✻ Cooked for 21s · 3 shells, 5 monitors still running
+
+※ recap: Promoting 0516_chg follow-on (3 modules + DEV/QA prep) before DEV; B1+B2 PASS, B3a iter2 running now to delete
+  an orphan employee, enroll 33 emps in a Health Insurance plan, and reset Jan-Feb data. Waiting on codex DONE to
+  validate, then dispatch B3b (Jan P1 sweep).
+
+  12 tasks (7 done, 1 in progress, 4 open)
+  ◼ B3: Full payroll E2E sweep — Jan/Feb 2026, COMP-00000-LOKALHUB, 34 emps
+  ◻ Post-0518 worktree+branch cleanup sweep
+  ◻ B4: DEV promotion plan (codex consultation + double-check)
+  ◻ B5: Execute DEV deploy + validate (per dev-promote-plan)
+  ◻ B6: QA promotion prep (less-destructive variant — JROM auth required)
+   … +7 completed
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 3 shells, 5 monitors · ctrl+t to hide tasks · ↓ to manage
+CHILD hrcdx: hash=93a0dacef4ad (CHANGED) markers=[Waiting for,esc to interrupt,]
+--- child pane (last 45) ---
+    137    (SELECT COUNT(*) FROM time_logs WHERE company_id = '${TENANT_ID}' AND log_date BETWEEN '${START_DATE}' AND '$
+         {END_DATE}') AS time_logs,
+        ⋮
+    257   WHERE company_id = '${TENANT_ID}'
+    258 -   AND log_date BETWEEN '${START_DATE}' AND '${END_DATE}';
+    258 +   AND (
+    259 +     log_date BETWEEN '${START_DATE}' AND '${END_DATE}'
+    260 +     OR EXISTS (
+    261 +       SELECT 1 FROM time_logs tl
+    262 +        WHERE tl.id = time_log_punch_events.time_log_id
+    263 +          AND tl.company_id = time_log_punch_events.company_id
+    264 +          AND tl.log_date BETWEEN '${START_DATE}' AND '${END_DATE}'
+    265 +     )
+    266 +     OR (
+    267 +       time_log_id IS NOT NULL
+    268 +       AND NOT EXISTS (
+    269 +         SELECT 1 FROM time_logs tl
+    270 +          WHERE tl.id = time_log_punch_events.time_log_id
+    271 +       )
+    272 +     )
+    273 +   );
+    274
+
+◦ Waiting for background terminal (11m 00s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to…
+
+
+› Summarize recent commits
+
+  gpt-5.5 high · ~/websites/HRIS
+
+==================== SAMPLE 3 @ 11:44:39 ====================
+PARENT hris-d-22: hash=ff9704feed64 (CHANGED) markers=[esc to interrupt,]
+--- parent pane (last 45) ---
+● B3a iter 2 DONE. Running 7-gate.
+
+● Bash(git log --oneline -3 && echo "---FILE STAT---" && git show --stat HEAD 2>&1 | head -30)
+  ⎿  a5eec977 [0516-B2] payroll review hide zero collapse
+     6428c226 [0519-B6-T4] LOCAL migration drift repairs + T4 artifacts
+     091b2181 [0519-B7-T4] sweep artifact refresh from full e2e sanity run
+     … +21 lines (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+● Bash(ls /home/agjrom/websites/HRIS/plan/WK_0516/0516_chg/projcore-run-2026-05-21/batch-b3a/screenshots/ 2>/dev/null;
+      echo "---ACTIVE EMP COUNT---"; cd /home/agjrom/w…)
+  ⎿  health-insurance-plan-enrolled-33.png
+     ---ACTIVE EMP COUNT---
+     … +9 lines (ctrl+o to expand)
+
+✽ Running full payroll E2E sweep… (22s · ↓ 763 tokens · still thinking with high effort)
+  ⎿  ◼ B3: Full payroll E2E sweep — Jan/Feb 2026, COMP-00000-LOKALHUB, 34 emps
+     ◻ Post-0518 worktree+branch cleanup sweep
+     ◻ B4: DEV promotion plan (codex consultation + double-check)
+     ◻ B5: Execute DEV deploy + validate (per dev-promote-plan)
+     ◻ B6: QA promotion prep (less-destructive variant — JROM auth required)
+      … +7 completed
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 3 shells, 5 monitors · esc to interrupt · ctrl+t to hide tasks · ↓ to manage
+CHILD hrcdx: hash=3e91c65ddb48 (CHANGED) markers=[Working (,esc to interrupt,]
+--- child pane (last 45) ---
+     9 files changed, 940 insertions(+)
+
+• Ran git status --short
+  └ A  e2e/lead-eyes/b3a-benefits-enrollment.config.ts
+    A  e2e/lead-eyes/b3a-benefits-enrollment.spec.ts
+    … +14 lines (ctrl + t to view transcript)
+    ?? plan/WK_0516/0516_chg/projcore-run-2026-05-21/req-matrix.md
+    ?? plan/WK_0516/0516_chg/projcore-run-2026-05-21/validation/
+
+• Ran git diff --cached --name-only
+  └ e2e/lead-eyes/b3a-benefits-enrollment.config.ts
+    e2e/lead-eyes/b3a-benefits-enrollment.spec.ts
+    … +5 lines (ctrl + t to view transcript)
+    plan/WK_0516/0516_chg/projcore-run-2026-05-21/callbacks.md
+    worker/scripts/b3a-reset-jan-feb-2026.ts
+
+• Ran git commit -m "[0516-B3a] prepare payroll sweep fixtures"
+  └ [feat/0516-followon-b3-prep bb74583f] [0516-B3a] prepare payroll sweep fixtures
+     9 files changed, 940 insertions(+)
+    … +8 lines (ctrl + t to view transcript)
+    health-insurance-plan-enrolled-33.png
+     create mode 100644 worker/scripts/b3a-reset-jan-feb-2026.ts
+
+◦ Working (13m 00s • esc to interrupt)
+
+
+› Summarize recent commits
+
+  gpt-5.5 high · ~/websites/HRIS
+
+==================== SAMPLE 4 @ 11:46:39 ====================
+PARENT hris-d-22: hash=46282988a9da (CHANGED) markers=[esc to interrupt,]
+--- parent pane (last 45) ---
+         + 2 | iter 1 NEEDS-INFO (4 fixture gaps); iter 2 commit bb74583f resolved all 4; reset idempotent; 33-em
+         +p baseline confirmed; benefits plan + 33 enrollments via UI |
+      20  | B3b | Jan P1 sweep | pending | — | 60-90min | — | |
+      21  | B3c | Jan P2 sweep | pending | — | 60min | — | |
+      22  | B3d | Feb P1 sweep + leaves + adj | pending | — | 90min | — | |
+
+● Bash(tmux send-keys -t hrcdx "/clear")
+  ⎿  (No output)
+
+● Bash(TOKEN=$(grep '^OVERMIND_TOKEN=' /home/agjrom/TGBOTS/AGJAssist/.env | cut -d= -f2); curl -s -m 5 -X POST
+      http://127.0.0.1:3101/api/overmind/tasks -H 'Content-Typ…)
+  ⎿  HTTP 200
+
+● Bash(tmux send-keys -t hrcdx Enter)
+  ⎿  (No output)
+
+✶ Running full payroll E2E sweep… (2m 22s · ↓ 6.4k tokens)
+  ⎿  ◼ B3: Full payroll E2E sweep — Jan/Feb 2026, COMP-00000-LOKALHUB, 34 emps
+     ◻ Post-0518 worktree+branch cleanup sweep
+     ◻ B4: DEV promotion plan (codex consultation + double-check)
+     ◻ B5: Execute DEV deploy + validate (per dev-promote-plan)
+     ◻ B6: QA promotion prep (less-destructive variant — JROM auth required)
+      … +7 completed
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 3 shells, 5 monitors · esc to interrupt · ctrl+t to hide tasks · ↓ to manage
+CHILD hrcdx: hash=caeda8307ab2 (CHANGED) markers=[]
+--- child pane (last 45) ---
+╭──────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.130.0)                   │
+│                                              │
+│ model:       gpt-5.5 high   /model to change │
+│ directory:   ~/websites/HRIS                 │
+│ permissions: YOLO mode                       │
+╰──────────────────────────────────────────────╯
+
+  Tip: New Use /fast to enable our fastest inference with increased plan usage.
+
+Token usage: total=568,274 input=514,186 (+ 15,423,488 cached) output=54,088 (reasoning 13,007)
+To continue this session, run codex resume 019e4a07-70a6-7991-a16c-63c906dbad77
+
+
+› Summarize recent commits
+
+  gpt-5.5 high · ~/websites/HRIS
+
+==================== SAMPLE 5 @ 11:48:39 ====================
+PARENT hris-d-22: hash=4592603ceee2 (CHANGED) markers=[Cooked,]
+--- parent pane (last 45) ---
+  (1360 orphan punch events) mid-execution and fixed it cleanly. JROM/decisions/ mirror logged.
+
+  B3b dispatched — first destructive period sweep (Jan 1-15): add Jan 1 holiday via UI → batch-import 33-emp TRs with OT
+   → supervisor 70/30 approve-reject cascade → manager confirm → payroll review → finalize → process → verify
+  benefits/pay-comp deductions on payslips → spot-check 3 emp My Records → idempotency check. TEST-HEAVY 60-90min
+  budget. Monitor armed. Silent.
+
+✻ Cooked for 2m 58s · 3 shells, 6 monitors still running
+
+● Monitor event: "B3b state-change watcher"
+
+● Monitor(B3b PROPOSED prose ready)
+  ⎿  Monitor started · task bycc40f8d · timeout 600s
+
+✻ Baked for 6s · 3 shells, 7 monitors still running
+
+  12 tasks (7 done, 1 in progress, 4 open)
+  ◼ B3: Full payroll E2E sweep — Jan/Feb 2026, COMP-00000-LOKALHUB, 34 emps
+  ◻ Post-0518 worktree+branch cleanup sweep
+  ◻ B4: DEV promotion plan (codex consultation + double-check)
+  ◻ B5: Execute DEV deploy + validate (per dev-promote-plan)
+  ◻ B6: QA promotion prep (less-destructive variant — JROM auth required)
+   … +7 completed
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 3 shells, 7 monitors · ctrl+t to hide tasks · ↓ to manage
+CHILD hrcdx: hash=4004cd37b2ea (CHANGED) markers=[Working (,esc to interrupt,]
+--- child pane (last 45) ---
+    Search import-csv|employee_number|time_in|regular_hours|overtime|ot_hours|hours_worked|clock_in|clock_out in worker
+    Read attendance-import.ts, process-payroll.component.ts, payroll.page.html, process-payroll.component.html
+    Search approveTimeLogs|managerApproveTimeLog|supervisorApprove|rejectTimeLog|approvalStatus|approval_status|Approve
+           selected|Reject in attendance
+    Search Holiday Definition|holiday.*definition|Add Holiday|createHoliday|Holiday in pages
+    Search login\(|admin@lokalhub|payroll@test|spv01@test|am@test|employeePage|storageState in e2e
+    Read attendance.page.html, attendance.page.ts
+    Search runProcessBatch|processPreview|processablePeriods|processStartDate|processEndDate|activeTopTab|markRange in
+           payroll.page.ts
+    Read holidays.page.ts, holidays.page.html, payroll.page.ts, callbacks.md
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I have enough for the handshake. I’m appending the required b3b PROPOSED callback first so projcore’s watcher sees the
+  state transition before the prose response.
+
+• Edited plan/WK_0516/0516_chg/projcore-run-2026-05-21/callbacks.md (+1 -0)
+    14  [projcore callback] b3a-iter2 DONE orphan removed; holiday and maternity deferrals documented; Health Insurance
+        2026 created/enrolled for 33 active employees via UI with screenshot; LOCAL reset script exact-tenant guard veri
+        fied and final corrected reset run idempotent with all B3a tenant-scoped counts zero
+    15 +[projcore callback] b3b PROPOSED UI-only Jan P1 sweep: add Jan 1 holiday, generate/import 330-row attendance CSV
+        , deterministic approval split, payroll review/finalize/process, payslip/idempotency evidence, no code fixes
+
+◦ Working (1m 34s • esc to interrupt)
+
+
+› Summarize recent commits
+
+  gpt-5.5 high · ~/websites/HRIS
+
+==================== SAMPLE 6 @ 11:50:39 ====================
+PARENT hris-d-22: hash=3b22323896cc (CHANGED) markers=[]
+--- parent pane (last 45) ---
+
+● Bash(tmux send-keys -t hrcdx "STATUS: APPROVED-PLAN. One adjustment: change clock_out cycle to 18:00 / 18:30 / 19:00
+      (instead of 17:00 / 17:30 / 18:00). This yields…)
+  ⎿  (No output)
+
+● Bash(tmux send-keys -t hrcdx Enter)
+  ⎿  (No output)
+
+● Monitor(B3b terminal-state watcher)
+  ⎿  Monitor started · task b3ueobcdw · timeout 3600s
+
+● B3b APPROVED with the OT clock adjustment. Codex executing the 60-90min Jan P1 sweep (holiday + batch import + 70/30
+  approval cascade + payroll review/finalize/process + payslip verification + idempotency check). Silent.
+
+✻ Crunched for 42s · 3 shells, 7 monitors still running
+
+  12 tasks (7 done, 1 in progress, 4 open)
+  ◼ B3: Full payroll E2E sweep — Jan/Feb 2026, COMP-00000-LOKALHUB, 34 emps
+  ◻ Post-0518 worktree+branch cleanup sweep
+  ◻ B4: DEV promotion plan (codex consultation + double-check)
+  ◻ B5: Execute DEV deploy + validate (per dev-promote-plan)
+  ◻ B6: QA promotion prep (less-destructive variant — JROM auth required)
+   … +7 completed
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 3 shells, 7 monitors · ctrl+t to hide tasks · ↓ to manage
+CHILD hrcdx: hash=4a139744033a (CHANGED) markers=[Waiting for,esc to interrupt,]
+--- child pane (last 45) ---
+  └ LISTEN 0      4096         0.0.0.0:4400       0.0.0.0:*    users:(("workerd",pid=4008361,fd=12))
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Only the Worker is already listening on 4400; the frontend is not. I’m starting the local Angular/Ionic dev server on
+  4401, matching the B3a config and the dispatch’s LOCAL-only scope.
+
+• Ran npm run dev:frontend -- --host 0.0.0.0 --port 4401
+  └ Error: Unknown argument: 4401
+    npm error Lifecycle script `start` failed with error:
+    … +4 lines (ctrl + t to view transcript)
+    npm error command failed
+    npm error command sh -c ng serve 0.0.0.0 4401
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• That npm script passes CLI flags poorly, so I’m starting the frontend from the frontend workspace directly with
+  explicit Angular flags.
+
+↳ Interacted with background terminal · npx ng serve --host 0.0.0.0 --port 4401
+  └ N
+
+• Waiting for background terminal (1m 07s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to …
+  └ npx ng serve --host 0.0.0.0 --port 4401
+
+
+› Summarize recent commits
+
+  gpt-5.5 high · ~/websites/HRIS
+
+==================== SAMPLE 7 @ 11:52:39 ====================
+PARENT hris-d-22: hash=3b22323896cc (same) markers=[]
+--- parent pane (last 45) ---
+
+● Bash(tmux send-keys -t hrcdx "STATUS: APPROVED-PLAN. One adjustment: change clock_out cycle to 18:00 / 18:30 / 19:00
+      (instead of 17:00 / 17:30 / 18:00). This yields…)
+  ⎿  (No output)
+
+● Bash(tmux send-keys -t hrcdx Enter)
+  ⎿  (No output)
+
+● Monitor(B3b terminal-state watcher)
+  ⎿  Monitor started · task b3ueobcdw · timeout 3600s
+
+● B3b APPROVED with the OT clock adjustment. Codex executing the 60-90min Jan P1 sweep (holiday + batch import + 70/30
+  approval cascade + payroll review/finalize/process + payslip verification + idempotency check). Silent.
+
+✻ Crunched for 42s · 3 shells, 7 monitors still running
+
+  12 tasks (7 done, 1 in progress, 4 open)
+  ◼ B3: Full payroll E2E sweep — Jan/Feb 2026, COMP-00000-LOKALHUB, 34 emps
+  ◻ Post-0518 worktree+branch cleanup sweep
+  ◻ B4: DEV promotion plan (codex consultation + double-check)
+  ◻ B5: Execute DEV deploy + validate (per dev-promote-plan)
+  ◻ B6: QA promotion prep (less-destructive variant — JROM auth required)
+   … +7 completed
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 3 shells, 7 monitors · ctrl+t to hide tasks · ↓ to manage
+CHILD hrcdx: hash=1eacd8f4ffe1 (CHANGED) markers=[Working (,esc to interrupt,]
+--- child pane (last 45) ---
+  adding the B3b Playwright sweep spec and config.
+
+• Added e2e/lead-eyes/b3b-jan-p1-payroll-sweep.config.ts (+19 -0)
+     1 +import { defineConfig, devices } from '@playwright/test';
+     2 +
+     3 +export default defineConfig({
+     4 +  testDir: __dirname,
+     5 +  testMatch: 'b3b-jan-p1-payroll-sweep.spec.ts',
+     6 +  fullyParallel: false,
+     7 +  workers: 1,
+     8 +  retries: 0,
+     9 +  reporter: 'list',
+    10 +  timeout: 540_000,
+    11 +  use: {
+    12 +    baseURL: process.env.APP_URL || 'http://localhost:4401',
+    13 +    viewport: { width: 1440, height: 900 },
+    14 +    actionTimeout: 30_000,
+    15 +    navigationTimeout: 60_000,
+    16 +    trace: 'retain-on-failure',
+    17 +  },
+    18 +  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+    19 +});
+
+• Working (3m 07s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to close
+
+
+› Summarize recent commits
+
+  gpt-5.5 high · ~/websites/HRIS
+
+==================== SAMPLE 8 @ 11:54:39 ====================
+PARENT hris-d-22: hash=ccf49bd3b177 (CHANGED) markers=[]
+--- parent pane (last 45) ---
+
+● Bash(tmux send-keys -t hrcdx Enter)
+  ⎿  (No output)
+
+● Monitor(B3b terminal-state watcher)
+  ⎿  Monitor started · task b3ueobcdw · timeout 3600s
+
+● B3b APPROVED with the OT clock adjustment. Codex executing the 60-90min Jan P1 sweep (holiday + batch import + 70/30
+  approval cascade + payroll review/finalize/process + payslip verification + idempotency check). Silent.
+
+✻ Crunched for 42s · 3 shells, 7 monitors still running
+
+※ recap: Goal: ship 3 follow-on fixes for 0516_chg (day-card lock, hide-zero, full payroll E2E sweep) on LOCAL then
+  promote to DEV. B1+B2+B3a PASS; codex is now running B3b, the Jan 1-15 payroll sweep, in the background. Next:
+  validate B3b when it lands.
+
+  12 tasks (7 done, 1 in progress, 4 open)
+  ◼ B3: Full payroll E2E sweep — Jan/Feb 2026, COMP-00000-LOKALHUB, 34 emps
+  ◻ Post-0518 worktree+branch cleanup sweep
+  ◻ B4: DEV promotion plan (codex consultation + double-check)
+  ◻ B5: Execute DEV deploy + validate (per dev-promote-plan)
+  ◻ B6: QA promotion prep (less-destructive variant — JROM auth required)
+   … +7 completed
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 3 shells, 7 monitors · ctrl+t to hide tasks · ↓ to manage
+CHILD hrcdx: hash=f0b8c3a0d72e (CHANGED) markers=[Working (,esc to interrupt,]
+--- child pane (last 45) ---
+  adding the B3b Playwright sweep spec and config.
+
+• Added e2e/lead-eyes/b3b-jan-p1-payroll-sweep.config.ts (+19 -0)
+     1 +import { defineConfig, devices } from '@playwright/test';
+     2 +
+     3 +export default defineConfig({
+     4 +  testDir: __dirname,
+     5 +  testMatch: 'b3b-jan-p1-payroll-sweep.spec.ts',
+     6 +  fullyParallel: false,
+     7 +  workers: 1,
+     8 +  retries: 0,
+     9 +  reporter: 'list',
+    10 +  timeout: 540_000,
+    11 +  use: {
+    12 +    baseURL: process.env.APP_URL || 'http://localhost:4401',
+    13 +    viewport: { width: 1440, height: 900 },
+    14 +    actionTimeout: 30_000,
+    15 +    navigationTimeout: 60_000,
+    16 +    trace: 'retain-on-failure',
+    17 +  },
+    18 +  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+    19 +});
+
+• Working (5m 07s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to close
+
+
+› Summarize recent commits
+
+  gpt-5.5 high · ~/websites/HRIS
+
+==================== SAMPLE 9 @ 11:56:39 ====================
+PARENT hris-d-22: hash=ccf49bd3b177 (same) markers=[]
+--- parent pane (last 45) ---
+
+● Bash(tmux send-keys -t hrcdx Enter)
+  ⎿  (No output)
+
+● Monitor(B3b terminal-state watcher)
+  ⎿  Monitor started · task b3ueobcdw · timeout 3600s
+
+● B3b APPROVED with the OT clock adjustment. Codex executing the 60-90min Jan P1 sweep (holiday + batch import + 70/30
+  approval cascade + payroll review/finalize/process + payslip verification + idempotency check). Silent.
+
+✻ Crunched for 42s · 3 shells, 7 monitors still running
+
+※ recap: Goal: ship 3 follow-on fixes for 0516_chg (day-card lock, hide-zero, full payroll E2E sweep) on LOCAL then
+  promote to DEV. B1+B2+B3a PASS; codex is now running B3b, the Jan 1-15 payroll sweep, in the background. Next:
+  validate B3b when it lands.
+
+  12 tasks (7 done, 1 in progress, 4 open)
+  ◼ B3: Full payroll E2E sweep — Jan/Feb 2026, COMP-00000-LOKALHUB, 34 emps
+  ◻ Post-0518 worktree+branch cleanup sweep
+  ◻ B4: DEV promotion plan (codex consultation + double-check)
+  ◻ B5: Execute DEV deploy + validate (per dev-promote-plan)
+  ◻ B6: QA promotion prep (less-destructive variant — JROM auth required)
+   … +7 completed
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 3 shells, 7 monitors · ctrl+t to hide tasks · ↓ to manage
+CHILD hrcdx: hash=d957a3cd485d (CHANGED) markers=[Working (,esc to interrupt,]
+--- child pane (last 45) ---
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• The first run reached the Attendance import page and failed on a Playwright selector typo in the harness, not product
+  behavior. I’m patching that selector and checking nearby assertions so the long run doesn’t die on the same class of
+  issue.
+
+• Explored
+  └ Search text=|summary-chip|locator\('.*,' in b3b-jan-p1-payroll-sweep.spec.ts
+    Read b3b-jan-p1-payroll-sweep.spec.ts
+
+• Edited e2e/lead-eyes/b3b-jan-p1-payroll-sweep.spec.ts (+1 -1)
+    273      await fileChooser.setFiles(chunkFiles[i]);
+    274 -    await expect(page.locator('.summary-chip.valid, text=All valid')).toBeVisible({ timeout: 45_000 });
+    274 +    await expect(page.locator('.summary-chip.valid', { hasText: 'All valid' })).toBeVisible({ timeout: 45_000 }
+         );
+    275      await page.locator('ion-button:has-text("Execute Import")').click();
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• That patch is narrowly in the Playwright harness. I’m rerunning the sweep from the start; the UI import is
+  idempotency-sensitive, so the report will capture whether the previous partial chunk affects the rerun.
+
+• Working (7m 07s • esc to interrupt) · 2 background terminals running · /ps to view · /stop to close
+
+
+› Summarize recent commits
+
+  gpt-5.5 high · ~/websites/HRIS
+
+==================== SAMPLE 10 @ 11:58:39 ====================
+PARENT hris-d-22: hash=ccf49bd3b177 (same) markers=[]
+--- parent pane (last 45) ---
+
+● Bash(tmux send-keys -t hrcdx Enter)
+  ⎿  (No output)
+
+● Monitor(B3b terminal-state watcher)
+  ⎿  Monitor started · task b3ueobcdw · timeout 3600s
+
+● B3b APPROVED with the OT clock adjustment. Codex executing the 60-90min Jan P1 sweep (holiday + batch import + 70/30
+  approval cascade + payroll review/finalize/process + payslip verification + idempotency check). Silent.
+
+✻ Crunched for 42s · 3 shells, 7 monitors still running
+
+※ recap: Goal: ship 3 follow-on fixes for 0516_chg (day-card lock, hide-zero, full payroll E2E sweep) on LOCAL then
+  promote to DEV. B1+B2+B3a PASS; codex is now running B3b, the Jan 1-15 payroll sweep, in the background. Next:
+  validate B3b when it lands.
+
+  12 tasks (7 done, 1 in progress, 4 open)
+  ◼ B3: Full payroll E2E sweep — Jan/Feb 2026, COMP-00000-LOKALHUB, 34 emps
+  ◻ Post-0518 worktree+branch cleanup sweep
+  ◻ B4: DEV promotion plan (codex consultation + double-check)
+  ◻ B5: Execute DEV deploy + validate (per dev-promote-plan)
+  ◻ B6: QA promotion prep (less-destructive variant — JROM auth required)
+   … +7 completed
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 3 shells, 7 monitors · ctrl+t to hide tasks · ↓ to manage
+CHILD hrcdx: hash=a701ad19055b (CHANGED) markers=[Working (,esc to interrupt,]
+--- child pane (last 45) ---
+    275      await page.locator('ion-button:has-text("Execute Import")').click();
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• That patch is narrowly in the Playwright harness. I’m rerunning the sweep from the start; the UI import is
+  idempotency-sensitive, so the report will capture whether the previous partial chunk affects the rerun.
+
+• Waited for background terminal · APP_URL=http://localhost:4401 GQL_URL=http://localhost:4400/graphql npx playwright
+test --config e2e/lead-eyes/b3b-jan-p1-payroll-sweep.config.ts
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• The rerun is past startup and still executing in the browser. No new failure output yet, so I’m letting it continue
+  rather than interrupting a long UI path.
+
+• Waited for background terminal · APP_URL=http://localhost:4401 GQL_URL=http://localhost:4400/graphql npx playwright
+test --config e2e/lead-eyes/b3b-jan-p1-payroll-sweep.config.ts
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• The sweep is still running with no failure emitted. Given the batch import and approval loops, this is expected
+  runtime; I’m monitoring until Playwright returns a concrete pass/fail.
+
+• Working (9m 07s • esc to interrupt) · 2 background terminals running · /ps to view · /stop to close
+
+
+› Summarize recent commits
+
+  gpt-5.5 high · ~/websites/HRIS
+
+SPOTCHECK COMPLETE

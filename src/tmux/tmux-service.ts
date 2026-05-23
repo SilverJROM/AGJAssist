@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { setTimeout as setTimeoutPromise } from "node:timers/promises";
 import { promisify } from "node:util";
 import { SafetyService, SafetyCheckResult } from "../services/safety-service.js";
 
@@ -76,6 +77,17 @@ export class TmuxService {
     return stdout.trim() || "<empty pane output>";
   }
 
+  async sessionExists(target: string): Promise<boolean> {
+    this.ensureValidTarget(target);
+    const sessionName = target.split(":")[0];
+    try {
+      await execFileAsync("tmux", ["has-session", "-t", sessionName]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async sendCommand(
     target: string,
     command: string,
@@ -111,6 +123,66 @@ export class TmuxService {
       message: `Sent command to ${target}${pressEnter ? " and pressed Enter" : ""}: ${trimmed}`,
       blocked: false
     };
+  }
+
+  // Send text literally then verify submission, re-pressing Enter up to 3 times total if
+  // the TUI treats a long paste as "Pasted Content" and does not auto-submit on the first
+  // C-m. Returns true when submitted (composer no longer holds the text), false after 3
+  // attempts (still stuck). Best-effort: never throws.
+  async sendAndSubmit(target: string, text: string): Promise<boolean> {
+    try {
+      this.ensureValidTarget(target);
+      const trimmed = text.trim();
+      if (!trimmed) return false;
+
+      // Initial send: literal text + first Enter (two separate execFile calls).
+      await execFileAsync("tmux", ["send-keys", "-l", "-t", target, "--", trimmed]);
+      await execFileAsync("tmux", ["send-keys", "-t", target, "C-m"]);
+
+      // Distinctive chunk used to detect the message still sitting in the composer.
+      const chunk = trimmed.replace(/\s+/g, "").slice(0, 40);
+
+      const MAX_PRESSES = 3;
+      let pressCount = 1;
+
+      while (pressCount < MAX_PRESSES) {
+        await setTimeoutPromise(500);
+        const pane = await this.capturePane(target);
+        if (this.isTextSubmitted(pane, chunk)) {
+          return true;
+        }
+        // Still un-submitted — press Enter again.
+        await execFileAsync("tmux", ["send-keys", "-t", target, "C-m"]);
+        pressCount += 1;
+      }
+
+      // Final check after the last press.
+      await setTimeoutPromise(500);
+      const pane = await this.capturePane(target);
+      return this.isTextSubmitted(pane, chunk);
+    } catch {
+      return false;
+    }
+  }
+
+  // Returns true when the text is no longer sitting un-submitted in the composer.
+  // Un-submitted heuristic: a line starting with ❯ or › still contains `chunk`,
+  // OR the pane shows a paste indicator.
+  private isTextSubmitted(pane: string, chunk: string): boolean {
+    const pasteIndicator = /\[Pasted Content|tab to queue/i.test(pane);
+    if (pasteIndicator) return false;
+    const lines = pane.replace(/\r\n/g, "\n").split("\n");
+    // Find the last composer line (starts with ❯ or ›).
+    let composerLine: string | undefined;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (/^[❯›]/u.test(lines[i].trimStart())) {
+        composerLine = lines[i];
+        break;
+      }
+    }
+    if (!composerLine) return true;
+    const composerChunk = composerLine.replace(/\s+/g, "");
+    return !composerChunk.includes(chunk);
   }
 
   async sendEnter(target: string): Promise<SendCommandResult> {
@@ -178,9 +250,30 @@ export class TmuxService {
     }
   }
 
+  // Current working directory of a session's active pane. Used to resolve a coordinator's
+  // relative run_dir (registered relative to ITS cwd, not ours). Returns null if unknown.
+  async paneCurrentPath(session: string): Promise<string | null> {
+    this.ensureValidTarget(session);
+    try {
+      const { stdout } = await execFileAsync("tmux", [
+        "display-message",
+        "-p",
+        "-t",
+        session,
+        "#{pane_current_path}"
+      ]);
+      const dir = stdout.trim();
+      return dir || null;
+    } catch {
+      return null;
+    }
+  }
+
   ensureValidTarget(target: string): void {
-    if (!/^[a-zA-Z0-9_.-]+:[0-9]+\.[0-9]+$/.test(target)) {
-      throw new Error("Invalid tmux target. Use format session:window.pane");
+    const bareSession = /^[a-zA-Z0-9_.-]+$/.test(target);
+    const paneTarget = /^[a-zA-Z0-9_.-]+:[0-9]+\.[0-9]+$/.test(target);
+    if (!bareSession && !paneTarget) {
+      throw new Error("Invalid tmux target. Use format session or session:window.pane");
     }
   }
 

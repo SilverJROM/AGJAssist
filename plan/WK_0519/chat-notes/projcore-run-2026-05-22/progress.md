@@ -1,0 +1,35 @@
+# progress.md — live batch states + check-in log
+
+Run start: 2026-05-22 · Pattern 1 (in-process Agent, Sonnet implementer per NS-6) · Branch: feat/chat-decommission-notes-ios (base commit 88c363c) · Overmind: registered id 4 (coordinator AGJ-51).
+
+## Plan
+8 atomic batches: D1–D4 (decommission all non-OVM chat), N1–N4 (Notes iPhone parity). One at a time; build+targeted tests per batch; deploy (tsc + static copy + pm2 restart) after each validated batch; full suite at Phase 2.
+
+## Log
+- 2026-05-22 — Run scaffolded. north-star locked (NS-1..7). req-matrix built (R1–R9). Overmind register OK (id 4). Dispatching D1.
+- D1 dispatched_at: 2026-05-22 estimate_min: 20 bucket: SHORT
+- D1 iter1 (56fd287): prod removal DONE, tsc clean. Gate-4 FAIL: test files used old AssistantCore ctor signature → cascade fails.
+- D1 iter2 (85637df): tests fixed (new ctor + dropped obsolete chat-flow tests). Suite 287/1 (1 = known Ollama test, D4 removes). 7-gate PASS. R1 VERIFIED. Deployed (build+pm2, GET / =200). Overmind: D1 done, D2 processing.
+- D2 dispatched_at: 2026-05-22 estimate_min: 20 bucket: SHORT
+- INJECTED (§1.4b) 2026-05-22: JROM flagged OVM chat flood ("brain every 10s?" — diagnosed: NO, pure pane-relay display bug) + "make it a true chat room, not a terminal." → R10 re-scoped (NS-8→NS-9).
+- D2 (e430b37): groundwork — cleanTerminalOutput helper + stop bubble-flood. Superseded UI by D2.1.
+- D2.1 (72f6dce): OVM web chat → true request/response chat. sendAndAwaitReply on OvmSessionManager (reuses relay, hasActiveTurn turn-detection, 28s sync window + pending/poll for long work); POST /ovm/send + GET /ovm/reply; OvmConsole = chat bubbles + "thinking…", WS stream/picker removed; TG relay refactored to share (TG tests green). tsc clean, suite 297/1 (Ollama only). 7-gate PASS. R10 VERIFIED (pending JROM live eyeball). Deployed (GET / =200, OVM session alive). Overmind: D1+D2 done, D2b processing.
+- D2.1 iter2 (Telegram-style): JROM disliked the generic bubbles → "simulate how telegram is functioning on messaging" (tmp/chat.png). Frontend-only restyle (OvmConsole + style.css): green patterned bg, white-left/green-right bubbles w/ tails, in-bubble timestamps + ✓✓, 3-dot typing bubble, Telegram message bar. Logic untouched. tsc clean, scope = app.js + style.css only. Deployed (GET / =200). Decision logged: decisions/2026-05-22-ovm-telegram-style-ui.md. (Note: Anthropic API 529 overloads delayed this; resumed when cleared — no false BLOCKED sent.)
+- NEXT: D2b (promote OVM to the 💬 Chat tab) — HELD pending JROM re-eyeball of the Telegram-style OVM chat.
+- N1a dispatched_at: 2026-05-22 estimate_min: 25 bucket: SHORT (migration)
+- N1a (384ba3e): schema v23 (note_folders + folder_id/pinned/position), NoteService folder/note/pin/move/search methods, 18 tests. Fresh-DB tests green.
+- N1a INCIDENT: deploy crashed live app on boot — idx_notes_folder/idx_notes_pinned were in always-run SCHEMA_SQL → indexed ALTER-added columns before the v23 ALTER → "no such column folder_id" fatal on the existing v22 DB. (Fresh-DB tests passed → gap.) Caught via pre/post data-safety check. Emergency fix 67402a4 (move indexes to fresh-path + v23 block). DB backed up pre-migration. Recovered: v23, 20/20 notes preserved, default "Notes" folder seeded, all assigned, dormant data intact. Suite 315/316 (Ollama only). Decision: decisions/2026-05-22-n1a-migration-incident.md.
+- N1b (c01e923): ADDITIVE note-folders CRUD endpoints + folder-aware GET/POST/PATCH /api/notes + default-folder fallback on create + the v22→v23 upgrade regression test (tests/notes-migration.test.ts, exercises an OLD-schema DB — passes). Old endpoints kept (N5 cleanup). tsc clean, suite 316/1. Deployed (GET / =200, /api/note-folders=401 wired). Overmind: N1 done, N2 processing. R5 IN-PROGRESS (UI pending).
+- N2 dispatched_at: 2026-05-22 estimate_min: 30 bucket: SHORT — iOS Notes list UI.
+- N2 (deployed): IosNotesPage (folders screen) + IosNotesList (search, pinned section, rows) + IosNoteRow (first-line title + snippet + relative date, swipe-delete) + compose button + IosNoteEditor stub (textarea, debounced auto-save, pin toggle). /notes route swapped to IosNotesPage; old NotesPage unrouted (N5 removes). tsc+build clean, suite 316/1, GET / =200. R6 VERIFIED.
+- N3 (deployed): IosNoteEditor rich contenteditable — B/I/U + heading + bullet list + tappable checklists (event-delegated toggle, touch-safe), first-line=title via CSS, HTML auto-save round-trip, empty-new-note discard on back. tsc+build clean, suite 316/1, GET / =200. R7 VERIFIED. (JROM said "continue" — proceeded past the optional eyeball hold.)
+- N4 dispatched_at: 2026-05-22 estimate_min: 25 bucket: SHORT — folder mgmt UI + pin/move.
+- N4 (deployed): folders create/rename/delete (Edit mode), move-to-folder (row swipe + editor sheet), pin/unpin (swipe + editor). iter2 fix: API now returns is_default (default "Notes" folder protected in UI; rename server-guarded). tsc clean, suite 319/1, GET / =200. R5 + R8 VERIFIED. iPhone Notes redesign (N1–N4) functionally COMPLETE + live.
+- REMAINING: N5 (cleanup: remove old notes endpoints/UI + adapt TG /note → R9) ; then finish chat decommission: D2b (OVM→Chat tab) → D3 (remove chat/conv/local-llm routes) → D4 (remove LLM providers + config + Ollama test). Order: D2b before D3 (D2b removes the ConversationsTab that calls the chat routes).
+- N5 dispatched_at: 2026-05-22 estimate_min: 25 bucket: SHORT
+- N5 (deployed): removed add-to-plan/promote routes+methods, project-scoped note routes, old NotesPage + ProjectDetail NotesTab, title/tags/status/project from notes API; TG /note→default folder + setMyCommands updated. DB columns dormant (no drop). No dangling refs. tsc/build clean, suite 314/1, GET / =200. R9 VERIFIED. **Notes track (N1–N5) COMPLETE + live.**
+- Resuming chat decommission: D2b (OVM→💬 Chat tab, remove ConversationsTab) → D3 (remove /api/chat,/conversations,/local-llm,/chat-settings routes) → D4 (remove ollama/openrouter/local-relay providers + ToolAgent + config.llm + the failing Ollama test). Order D2b→D3→D4 (D2b removes the ConversationsTab that calls the chat routes, so D3 doesn't leave a broken tab).
+- D2b (ae31077, deployed): /conversations route (TgApp + App) renders OvmConsole; old Conversations dead-code (unrouted). tsc/build clean, GET / =200. R2 VERIFIED. (Minor follow-up: web header nav link still labeled "Conversations" — rename in D3.)
+- D3 dispatched_at: 2026-05-22 estimate_min: 20 bucket: SHORT — remove chat ROUTES + nav rename.
+- D3 (b550744, deployed): deleted chat-routes/conversation-routes/local-llm-routes/chat-settings-routes + server.ts registration; nav link "Conversations"→"Chat". Smoke: removed routes 404, OVM/notes 401, app boots. tsc/build clean, suite 314/1. R3 VERIFIED.
+- D4 dispatched_at: 2026-05-22 estimate_min: 25 bucket: SHORT — remove ollama/openrouter/local-relay providers + ToolAgent/tool-registry (if orphaned) + conversation-service/chat-settings-service (if orphaned) + config.llm keys + index.ts/server.ts wiring + the failing Ollama conversation-memory test (suite → fully green). Capstone of chat decommission.

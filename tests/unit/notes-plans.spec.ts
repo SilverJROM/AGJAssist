@@ -116,94 +116,6 @@ describe("NoteService", () => {
   });
 });
 
-// ===================== ADD TO PLAN TESTS =====================
-
-describe("NoteService.addToPlan", () => {
-  it("creates a new plan and links notes, marking them as promoted", () => {
-    const n1 = noteService.create("note A", userId, projectId);
-    const n2 = noteService.create("note B", userId, projectId);
-
-    const result = noteService.addToPlan(
-      [n1.id, n2.id],
-      projectId,
-      userId,
-      undefined,
-      "My New Plan"
-    );
-
-    expect(result).not.toBeNull();
-    expect(result!.addedCount).toBe(2);
-
-    // Notes should be promoted
-    const updatedN1 = noteService.getById(n1.id);
-    const updatedN2 = noteService.getById(n2.id);
-    expect(updatedN1?.status).toBe("promoted");
-    expect(updatedN2?.status).toBe("promoted");
-
-    // Notes should NOT appear in open list
-    const openNotes = noteService.list(projectId, "open");
-    expect(openNotes).toHaveLength(0);
-
-    // Plan should exist
-    const plan = planService.getById(result!.planId);
-    expect(plan).not.toBeNull();
-    expect(plan!.title).toBe("My New Plan");
-    expect(plan!.note_ids).toContain(n1.id);
-    expect(plan!.note_ids).toContain(n2.id);
-  });
-
-  it("links notes to an existing plan", () => {
-    const existingPlan = planService.create(projectId, "Existing Plan", null, userId);
-    const n1 = noteService.create("note C", userId, projectId);
-
-    const result = noteService.addToPlan(
-      [n1.id],
-      projectId,
-      userId,
-      existingPlan.id,
-      undefined
-    );
-
-    expect(result).not.toBeNull();
-    expect(result!.planId).toBe(existingPlan.id);
-
-    const note = noteService.getById(n1.id);
-    expect(note?.status).toBe("promoted");
-  });
-
-  it("rejects already promoted notes", () => {
-    const n1 = noteService.create("note D", userId, projectId);
-    noteService.update(n1.id, { status: "promoted" }, userId);
-
-    const result = noteService.addToPlan(
-      [n1.id],
-      projectId,
-      userId,
-      undefined,
-      "Fail Plan"
-    );
-
-    expect(result).toBeNull();
-  });
-
-  it("rejects notes from a different project", () => {
-    db.prepare("INSERT INTO projects (directory_name) VALUES (?)").run("other-project");
-    const otherProjectId = (db.prepare("SELECT id FROM projects WHERE directory_name = 'other-project'").get() as { id: number }).id;
-
-    const n1 = noteService.create("wrong project note", userId, otherProjectId);
-
-    const result = noteService.addToPlan(
-      [n1.id],
-      projectId,
-      userId,
-      undefined,
-      "Should Fail"
-    );
-
-    expect(result).toBeNull();
-  });
-});
-
 // ===================== PLAN SERVICE TESTS =====================
 
 describe("PlanService", () => {
@@ -255,10 +167,11 @@ describe("PlanService", () => {
 
   it("getById includes linked note IDs", () => {
     const n1 = noteService.create("linked note", userId, projectId);
-    const result = noteService.addToPlan([n1.id], projectId, userId, undefined, "Noted Plan");
+    const plan = planService.create(projectId, "Noted Plan", null, userId);
+    db.prepare("INSERT INTO plan_notes (plan_id, note_id) VALUES (?, ?)").run(plan.id, n1.id);
 
-    const plan = planService.getById(result!.planId);
-    expect(plan!.note_ids).toContain(n1.id);
+    const fetched = planService.getById(plan.id);
+    expect(fetched!.note_ids).toContain(n1.id);
   });
 
   it("updates plan status", () => {
@@ -305,9 +218,10 @@ describe("PlanService", () => {
 
   it("getLinkedNotes returns linked notes with content", () => {
     const n1 = noteService.create("note body here", userId, projectId, "Note Title");
-    const result = noteService.addToPlan([n1.id], projectId, userId, undefined, "Notes Plan");
+    const plan = planService.create(projectId, "Notes Plan", null, userId);
+    db.prepare("INSERT INTO plan_notes (plan_id, note_id) VALUES (?, ?)").run(plan.id, n1.id);
 
-    const linkedNotes = planService.getLinkedNotes(result!.planId);
+    const linkedNotes = planService.getLinkedNotes(plan.id);
     expect(linkedNotes).toHaveLength(1);
     expect(linkedNotes[0].title).toBe("Note Title");
     expect(linkedNotes[0].body).toBe("note body here");
@@ -383,8 +297,9 @@ describe("PlanService.insertToProject", () => {
 
   it("includes linked notes in markdown output", () => {
     const n1 = noteService.create("Important insight", userId, projectId, "Research Note");
-    const addResult = noteService.addToPlan([n1.id], projectId, userId, undefined, "Noted Plan");
-    const planId = addResult!.planId;
+    const linkedPlan = planService.create(projectId, "Noted Plan", null, userId);
+    db.prepare("INSERT INTO plan_notes (plan_id, note_id) VALUES (?, ?)").run(linkedPlan.id, n1.id);
+    const planId = linkedPlan.id;
 
     planService.addStep(planId, "Follow up on research");
 
@@ -419,32 +334,22 @@ describe("PlanService.insertToProject", () => {
 
 // ===================== FULL WORKFLOW TEST =====================
 
-describe("Full notes-to-plan workflow", () => {
-  it("create notes -> add to plan -> add steps -> insert to project", () => {
-    // 1. Create notes
+describe("Full plan workflow (notes linked via plan_notes)", () => {
+  it("create plan with linked notes -> add steps -> insert to project", () => {
+    // 1. Create notes (dormant project_id/status columns are preserved per N5 spec)
     const n1 = noteService.create("Design the API", userId, projectId, "API Design");
     const n2 = noteService.create("Setup database schema", userId, projectId, "DB Schema");
-    const n3 = noteService.create("Unrelated note", userId, projectId);
+    noteService.create("Unrelated note", userId, projectId);
 
     expect(noteService.list(projectId, "open")).toHaveLength(3);
 
-    // 2. Add selected notes to a new plan
-    const result = noteService.addToPlan(
-      [n1.id, n2.id],
-      projectId,
-      userId,
-      undefined,
-      "Sprint 1 Plan"
-    );
-    expect(result).not.toBeNull();
-
-    // Only unrelated note should remain open
-    const openNotes = noteService.list(projectId, "open");
-    expect(openNotes).toHaveLength(1);
-    expect(openNotes[0].body).toBe("Unrelated note");
+    // 2. Create plan and link notes directly (promotion path removed in N5)
+    const plan0 = planService.create(projectId, "Sprint 1 Plan", null, userId);
+    db.prepare("INSERT INTO plan_notes (plan_id, note_id) VALUES (?, ?)").run(plan0.id, n1.id);
+    db.prepare("INSERT INTO plan_notes (plan_id, note_id) VALUES (?, ?)").run(plan0.id, n2.id);
+    const planId = plan0.id;
 
     // 3. Add steps to the plan
-    const planId = result!.planId;
     planService.addStep(planId, "Implement REST endpoints");
     planService.addStep(planId, "Write migration scripts");
     planService.addStep(planId, "Integration tests");

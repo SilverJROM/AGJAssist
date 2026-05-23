@@ -1,26 +1,42 @@
 import path from "node:path";
 import fs from "node:fs";
 import { AppConfig } from "../config/config.js";
-import { LlmProvider } from "../llm/base-provider.js";
-import { OllamaProvider } from "../llm/ollama-provider.js";
-import { ClaudeCliProvider } from "../llm/claude-cli-provider.js";
-import { CodexCliProvider } from "../llm/codex-cli-provider.js";
-import { ToolAgent } from "../orchestration/tool-agent.js";
 import { TmuxService } from "../tmux/tmux-service.js";
-import { AgentCliRunner } from "../cli/agent-cli-runner.js";
 import { ProjectService } from "../services/project-service.js";
 import { NoteService } from "../services/note-service.js";
-import { ConversationService } from "../services/conversation-service.js";
-import { ChatSettingsService } from "../services/chat-settings-service.js";
 import { AuthService } from "../auth/auth-service.js";
+import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "../services/overmind-service.js";
+import type { OvmSessionManager } from "../services/ovm-session.js";
 
-const ALLOWED_OM_MODELS = new Set(["qwek32k:latest", "granite4:64k"]);
 const WEBSITES_ROOT = "/home/agjrom/websites";
+const OVERMIND_ACTIVE_STATUSES: OvermindWorkflowStatus[] = [
+  "active",
+  "working",
+  "waiting_human",
+  "awaiting_decision",
+  "stuck",
+  "paused"
+];
+const OVERMIND_STATUS_ICONS: Record<OvermindWorkflowStatus, string> = {
+  active: "•",
+  working: "▶",
+  waiting_human: "⏸",
+  awaiting_decision: "❓",
+  stuck: "⚠",
+  paused: "⏯",
+  completed: "•",
+  failed: "•"
+};
+const OVERMIND_TASK_GLYPHS = {
+  done: "[x]",
+  processing: "[~]",
+  pending: "[ ]"
+} as const;
+const OVM_RELAY_FALLBACK = "OVM is taking a while / still working.";
 
 interface UserState {
   cwd: string;
-  activeConversationId: number | null;
-  activeProvider: string | null;
+  ovmChatMode: boolean;
 }
 
 export class AssistantCore {
@@ -29,21 +45,15 @@ export class AssistantCore {
   private noteService: NoteService | null = null;
   private authService: AuthService | null = null;
   private ownerUserId: number | null = null;
-  private conversationService: ConversationService | null = null;
-  private chatSettingsService: ChatSettingsService | null = null;
-  private claudeCliProvider: ClaudeCliProvider | null = null;
-  private codexCliProvider: CodexCliProvider | null = null;
+  private overmindService: OvermindService | null = null;
+  private ovmSessionService: OvmSessionManager | null = null;
 
   // Per-user state for TG conversations
   private userState: Map<number, UserState> = new Map();
 
   constructor(
     private readonly config: AppConfig,
-    private readonly openRouterAgent: ToolAgent,
-    private readonly ollamaToolAgent: ToolAgent,
-    private readonly ollamaProvider: OllamaProvider,
-    private readonly tmuxService: TmuxService,
-    private readonly agentCliRunner: AgentCliRunner
+    private readonly tmuxService: TmuxService
   ) {
     this.timeoutMinutes = config.runtime.defaultTimeoutMinutes;
   }
@@ -55,21 +65,20 @@ export class AssistantCore {
     this.ownerUserId = ownerUserId;
   }
 
-  setChatServices(
-    conversationService: ConversationService,
-    chatSettingsService: ChatSettingsService,
-    claudeCliProvider: ClaudeCliProvider,
-    codexCliProvider: CodexCliProvider
-  ): void {
-    this.conversationService = conversationService;
-    this.chatSettingsService = chatSettingsService;
-    this.claudeCliProvider = claudeCliProvider;
-    this.codexCliProvider = codexCliProvider;
+  setOvermindService(overmindService: OvermindService): void {
+    this.overmindService = overmindService;
+  }
+
+  setOvmSessionService(ovmSessionService: OvmSessionManager): void {
+    this.ovmSessionService = ovmSessionService;
   }
 
   private getState(userId: number): UserState {
     if (!this.userState.has(userId)) {
-      this.userState.set(userId, { cwd: WEBSITES_ROOT, activeConversationId: null, activeProvider: null });
+      this.userState.set(userId, {
+        cwd: WEBSITES_ROOT,
+        ovmChatMode: false
+      });
     }
     return this.userState.get(userId)!;
   }
@@ -87,9 +96,14 @@ export class AssistantCore {
     return Boolean(userId) && userId === this.config.telegram.authorizedUserId;
   }
 
-  async handleCommand(input: string): Promise<string> {
+  isOvmChatMode(userId: number): boolean {
+    return this.getState(userId).ovmChatMode;
+  }
+
+  async handleCommand(input: string, userId?: number): Promise<string> {
     const parts = input.trim().split(/\s+/);
     const command = (parts[0] || "").toLowerCase();
+    const uid = userId || this.config.telegram.authorizedUserId;
 
     switch (command) {
       case "/start":
@@ -102,28 +116,24 @@ export class AssistantCore {
           "/tmux_create <project> [name] - create tmux session for project",
           "/tmux_kill <session> - terminate tmux session",
           "/projects - list all projects",
-          "/note <project> <text> - create a quick note",
-          "/notes <project> - list recent notes",
+          "/note <text> - create a quick note in Notes folder",
+          "/notes - list recent notes from Notes folder",
           "/weblogin - generate a login code for the web app",
           "/app - open the web app",
-          "/llm - show LLM routing info",
           "/timeout [minutes] - show or set command timeout (default 60)",
-          "/ommodel [qwek32k:latest|granite4:64k] - show or set OM model",
-          "",
-          "Chat commands:",
-          "new haiku|sonnet|opus|codex <prompt> - start new conversation",
-          "cont haiku|sonnet|opus|codex <prompt> - continue last conversation",
-          "haiku|sonnet|opus|claude|codex <prompt> - auto (continues if active)",
+          "/overmind - show active Overmind workflows",
+          "/om_tasks <id> - show an Overmind workflow tasklist",
+          "/om_pause <id> - pause Overmind checks (no interrupts while you talk to it)",
+          "/om_resume <id> - resume Overmind checks",
+          "/om_drop <id> - drop an Overmind workflow",
+          "/ovm_start - enter OVM chat mode",
+          "/ovm_end - exit OVM chat mode",
           "",
           "Directory commands:",
           "cd <dir> - change directory (within /home/agjrom/websites/)",
           "cd - return to /home/agjrom/websites/",
           "ls - list current directory",
-          "pwd - show current directory",
-          "",
-          "Tool agent modes:",
-          "op <prompt> - OpenRouter + tools",
-          "om <prompt> - Ollama + tools"
+          "pwd - show current directory"
         ].join("\n");
 
       case "/jobs":
@@ -166,17 +176,6 @@ export class AssistantCore {
         return result.message;
       }
 
-      case "/llm":
-        return [
-          `OpenRouter model: ${this.config.llm.openrouterModel}`,
-          `Ollama chat model: ${this.ollamaProvider.getModel()}`,
-          `OM tool models: ${Array.from(ALLOWED_OM_MODELS).join(", ")}`,
-          `Current timeout: ${this.timeoutMinutes} minutes`,
-          "Headless prefixes: new/cont haiku|sonnet|opus|codex",
-          "Prefix with 'op ' to force OpenRouter + tools",
-          "Prefix with 'om ' to force Ollama + tools"
-        ].join("\n");
-
       case "/timeout": {
         const minutesRaw = parts[1];
         if (!minutesRaw) {
@@ -190,24 +189,26 @@ export class AssistantCore {
         return `Timeout updated: ${this.timeoutMinutes} minutes`;
       }
 
-      case "/ommodel":
-      case "/om_model": {
-        const requested = parts[1];
-        if (!requested) {
-          return [
-            `Current OM model: ${this.ollamaProvider.getModel()}`,
-            `Allowed: ${Array.from(ALLOWED_OM_MODELS).join(", ")}`,
-            "Usage: /ommodel <qwek32k:latest|granite4:64k>"
-          ].join("\n");
-        }
+      case "/overmind":
+        return this.handleOvermindStatusCommand();
 
-        if (!ALLOWED_OM_MODELS.has(requested)) {
-          return `Invalid OM model. Allowed: ${Array.from(ALLOWED_OM_MODELS).join(", ")}`;
-        }
+      case "/om_tasks":
+        return this.handleOvermindTasksCommand(parts[1]);
 
-        this.ollamaProvider.setModel(requested);
-        return `OM model updated to: ${requested}`;
-      }
+      case "/om_pause":
+        return this.handleOvermindPauseMutation(parts[1], true);
+
+      case "/om_resume":
+        return this.handleOvermindPauseMutation(parts[1], false);
+
+      case "/om_drop":
+        return this.handleOvermindDropCommand(parts[1]);
+
+      case "/ovm_start":
+        return this.handleOvmStartCommand(uid);
+
+      case "/ovm_end":
+        return this.handleOvmEndCommand(uid);
 
       case "/tmux_create": {
         const projectName = parts[1];
@@ -248,17 +249,13 @@ export class AssistantCore {
       }
 
       case "/note": {
-        if (!this.noteService || !this.projectService) return "Note service not available.";
-        const projectName = parts[1];
-        if (!projectName) return "Usage: /note <project> <text>";
-        const noteText = parts.slice(2).join(" ").trim();
-        if (!noteText) return "Usage: /note <project> <text>";
+        if (!this.noteService) return "Note service not available.";
+        const noteText = parts.slice(1).join(" ").trim();
+        if (!noteText) return "Usage: /note <text>";
 
-        const project = this.projectService.getByName(projectName);
-        if (!project) return `Project not found: ${projectName}`;
-
-        const note = this.noteService.create(noteText, this.ownerUserId || 1, project.id);
-        return `Note #${note.id} created on ${projectName}`;
+        const folderId = this.noteService.defaultFolderId();
+        const note = this.noteService.createNote(folderId, noteText, this.ownerUserId || 1);
+        return `Note #${note.id} saved to Notes folder`;
       }
 
       case "/weblogin": {
@@ -274,18 +271,14 @@ export class AssistantCore {
         return "Open AGJAssist: https://agjasst.silverjrom.app";
 
       case "/notes": {
-        if (!this.noteService || !this.projectService) return "Note service not available.";
-        const projectName = parts[1];
-        if (!projectName) return "Usage: /notes <project>";
+        if (!this.noteService) return "Note service not available.";
 
-        const project = this.projectService.getByName(projectName);
-        if (!project) return `Project not found: ${projectName}`;
-
-        const notes = this.noteService.list(project.id, "open");
-        if (!notes.length) return `No open notes for ${projectName}`;
+        const folderId = this.noteService.defaultFolderId();
+        const notes = this.noteService.listByFolder(folderId);
+        if (!notes.length) return "No notes in Notes folder";
         return notes
           .slice(0, 10)
-          .map((n) => `#${n.id} [${n.status}] ${n.title || n.body.slice(0, 60)}`)
+          .map((n) => `#${n.id}${n.pinned ? " 📌" : ""} ${n.body.slice(0, 60)}`)
           .join("\n");
       }
 
@@ -294,11 +287,112 @@ export class AssistantCore {
     }
   }
 
+  private handleOvermindStatusCommand(): string {
+    if (!this.overmindService) return "Overmind service not available.";
+    const workflows = this.overmindService
+      .list()
+      .filter((workflow) => OVERMIND_ACTIVE_STATUSES.includes(workflow.status));
+    if (!workflows.length) return "No active workflows.";
+    return workflows.map((workflow) => this.formatOvermindWorkflowLine(workflow)).join("\n");
+  }
+
+  private handleOvermindTasksCommand(rawId: string | undefined): string {
+    const id = this.parseOvermindId(rawId, "/om_tasks <id>");
+    if (typeof id === "string") return id;
+    if (!this.overmindService) return "Overmind service not available.";
+    const workflow = this.overmindService.get(id);
+    if (!workflow) return `Workflow not found: ${id}`;
+
+    const lines = [`${this.overmindDisplayName(workflow)} ${OVERMIND_STATUS_ICONS[workflow.status]} ${workflow.status}`];
+    if (!workflow.tasks.length) {
+      lines.push("No tasks.");
+      return lines.join("\n");
+    }
+
+    lines.push(
+      ...workflow.tasks.map((task) => `${OVERMIND_TASK_GLYPHS[task.state]} ${task.label}`)
+    );
+    return lines.join("\n");
+  }
+
+  // Pause/resume overmind's monitoring of a workflow (suppresses nudges/requests/brain
+  // while JROM talks to the coordinator). Separate from status — the card stays visible.
+  private handleOvermindPauseMutation(rawId: string | undefined, paused: boolean): string {
+    const id = this.parseOvermindId(rawId, paused ? "/om_pause <id>" : "/om_resume <id>");
+    if (typeof id === "string") return id;
+    if (!this.overmindService) return "Overmind service not available.";
+    const workflow = this.overmindService.setMonitoringPaused(id, paused, paused ? "jrom" : null);
+    if (!workflow) return `Workflow not found: ${id}`;
+    const name = this.overmindDisplayName(workflow);
+    return paused
+      ? `⏸ Paused overmind checks for ${id}: ${name}. I won't interrupt — /om_resume ${id} when done.`
+      : `▶ Resumed overmind checks for ${id}: ${name}.`;
+  }
+
+  private handleOvermindDropCommand(rawId: string | undefined): string {
+    const id = this.parseOvermindId(rawId, "/om_drop <id>");
+    if (typeof id === "string") return id;
+    if (!this.overmindService) return "Overmind service not available.";
+    const workflow = this.overmindService.get(id);
+    if (!workflow) return `Workflow not found: ${id}`;
+    this.overmindService.delete(id);
+    return `Dropped workflow ${id}: ${this.overmindDisplayName(workflow)}`;
+  }
+
+  private async handleOvmStartCommand(userId: number): Promise<string> {
+    if (!this.ovmSessionService) return "OVM session service not available.";
+    await this.ovmSessionService.open();
+    this.getState(userId).ovmChatMode = true;
+    return "OVM chat on - talk to me; /ovm_end to stop";
+  }
+
+  private handleOvmEndCommand(userId: number): string {
+    this.getState(userId).ovmChatMode = false;
+    return "OVM chat off.";
+  }
+
+  private formatOvermindWorkflowLine(workflow: OvermindWorkflow): string {
+    const doneCount = workflow.tasks.filter((task) => task.state === "done").length;
+    const currentTask = workflow.current_task || "—";
+    return `${this.overmindDisplayName(workflow)} ${OVERMIND_STATUS_ICONS[workflow.status]} ${workflow.status} · "${currentTask}" · ${doneCount}/${workflow.tasks.length}`;
+  }
+
+  private overmindDisplayName(workflow: OvermindWorkflow): string {
+    return workflow.display_name || workflow.label;
+  }
+
+  private parseOvermindId(rawId: string | undefined, usage: string): number | string {
+    if (!rawId) return `Usage: ${usage}`;
+    const id = Number(rawId);
+    if (!Number.isInteger(id) || id < 1) return `Usage: ${usage}`;
+    return id;
+  }
+
+  private async relayOvmMessage(input: string): Promise<string> {
+    if (!this.ovmSessionService) return "OVM session service not available.";
+
+    try {
+      const result = await this.ovmSessionService.sendAndAwaitReply(input);
+      if (result.pending) return OVM_RELAY_FALLBACK;
+      return result.reply || OVM_RELAY_FALLBACK;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return `OVM relay error: ${message}`;
+    }
+  }
+
+    private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async handleText(input: string, userId?: number): Promise<string> {
     const trimmed = input.trim();
-    const timeoutMs = this.timeoutMinutes * 60 * 1000;
     const uid = userId || this.config.telegram.authorizedUserId;
     const state = this.getState(uid);
+
+    if (state.ovmChatMode) {
+      return this.relayOvmMessage(trimmed);
+    }
 
     // --- Directory commands ---
     if (/^cd(\s|$)/i.test(trimmed)) {
@@ -311,14 +405,8 @@ export class AssistantCore {
       } catch {
         return `Directory not found: ${newCwd}`;
       }
-      const oldCwd = state.cwd;
       state.cwd = newCwd;
-      // Directory change resets active conversation
-      if (oldCwd !== newCwd) {
-        state.activeConversationId = null;
-        state.activeProvider = null;
-      }
-      return `📂 ${newCwd}\n(new conversation will start on next message)`;
+      return `📂 ${newCwd}`;
     }
 
     if (/^pwd$/i.test(trimmed)) {
@@ -346,202 +434,8 @@ export class AssistantCore {
       }
     }
 
-    // --- new/cont conversation commands ---
-    const newMatch = trimmed.match(/^new\s+(haiku|sonnet|opus|claude|codex)\s+(.+)/is);
-    if (newMatch) {
-      const provider = newMatch[1].toLowerCase();
-      const prompt = newMatch[2].trim();
-      return this.handleConversationChat(uid, provider, prompt, true, timeoutMs);
-    }
-
-    const contMatch = trimmed.match(/^cont\s+(haiku|sonnet|opus|claude|codex)\s+(.+)/is);
-    if (contMatch) {
-      const provider = contMatch[1].toLowerCase();
-      const prompt = contMatch[2].trim();
-      return this.handleConversationChat(uid, provider, prompt, false, timeoutMs);
-    }
-
-    // --- Existing CLI prefixes (auto-continue if active conversation matches) ---
-    if (/^claude\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^claude\b[\s,:-]*/i, "").trim();
-      if (!prompt) return "Usage: claude <prompt>";
-      return this.handleConversationChat(uid, "claude", prompt, false, timeoutMs);
-    }
-
-    if (/^opus\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^opus\b[\s,:-]*/i, "").trim();
-      if (!prompt) return "Usage: opus <prompt>";
-      return this.handleConversationChat(uid, "opus", prompt, false, timeoutMs);
-    }
-
-    if (/^sonnet\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^sonnet\b[\s,:-]*/i, "").trim();
-      if (!prompt) return "Usage: sonnet <prompt>";
-      return this.handleConversationChat(uid, "sonnet", prompt, false, timeoutMs);
-    }
-
-    if (/^haiku\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^haiku\b[\s,:-]*/i, "").trim();
-      if (!prompt) return "Usage: haiku <prompt>";
-      return this.handleConversationChat(uid, "haiku", prompt, false, timeoutMs);
-    }
-
-    if (/^codex\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^codex\b[\s,:-]*/i, "").trim();
-      if (!prompt) return "Usage: codex <prompt>";
-      return this.handleConversationChat(uid, "codex", prompt, false, timeoutMs);
-    }
-
-    if (/^op\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^op\b[\s,:-]*/i, "").trim();
-      if (!prompt) {
-        return "Usage: op <your request>";
-      }
-      return this.openRouterAgent.run(prompt);
-    }
-
-    if (/^om\b/i.test(trimmed)) {
-      const prompt = trimmed.replace(/^om\b[\s,:-]*/i, "").trim();
-      if (!prompt) {
-        return "Usage: om <your request>";
-      }
-      return this.ollamaToolAgent.run(prompt);
-    }
-
-    // Default simple local chat path.
-    return this.ollamaProvider.chat([
-      {
-        role: "system",
-        content: "You are AGJAssist local helper. Keep responses short and practical."
-      },
-      { role: "user", content: trimmed }
-    ], 600);
+    // Not in OVM chat mode — return a short hint.
+    return "Use /ovm_start to chat with OVM, or a slash command. /help for the list.";
   }
 
-  private async handleConversationChat(
-    userId: number,
-    provider: string,
-    prompt: string,
-    forceNew: boolean,
-    timeoutMs: number
-  ): Promise<string> {
-    if (!this.conversationService || !this.chatSettingsService) {
-      // Fallback: no conversation service, use stateless CLI
-      return this.statelessCliChat(provider, prompt, timeoutMs);
-    }
-
-    const state = this.getState(userId);
-    const dbUserId = this.ownerUserId || 1;
-
-    // Normalize provider name for agent_name
-    const agentName = provider === "claude" ? "claude" : (["haiku", "sonnet", "opus"].includes(provider) ? "claude" : "codex");
-    const model = ["haiku", "sonnet", "opus"].includes(provider) ? provider : undefined;
-
-    // Determine if we should continue or start new
-    let convId = state.activeConversationId;
-    let isNew = forceNew;
-
-    if (!forceNew && convId) {
-      // Check if the conversation still exists and matches provider
-      const existing = this.conversationService.getById(convId);
-      if (!existing || existing.agent_name !== agentName) {
-        isNew = true;
-      }
-    } else if (!forceNew && !convId) {
-      isNew = true;
-    }
-
-    if (isNew) {
-      const conv = this.conversationService.create(agentName, dbUserId);
-      convId = conv.id;
-      this.conversationService.setCwd(convId, state.cwd);
-      state.activeConversationId = convId;
-      state.activeProvider = provider;
-    }
-
-    // Save user message
-    this.conversationService.addMessage(convId!, {
-      role: "user",
-      content: prompt,
-      timestamp: new Date().toISOString()
-    }, dbUserId);
-
-    // Build history
-    const conversation = this.conversationService.getById(convId!);
-    if (!conversation) return "Error: conversation not found after creation";
-
-    const history = conversation.messages
-      .filter(msg => (msg.role === "user" || msg.role === "assistant") && !msg.content.startsWith("Error:"))
-      .slice(-20);
-
-    const soulMd = this.chatSettingsService.get("soul_md") || "";
-    const contextMd = this.chatSettingsService.get("context_md") || "";
-
-    try {
-      let responseText: string;
-
-      if (agentName === "claude" && this.claudeCliProvider) {
-        if (model) this.claudeCliProvider.setModel(model);
-        const existingSessionId = this.conversationService.getCliSessionId(convId!);
-        const result = await this.claudeCliProvider.chatWithSession(
-          [
-            { role: "system", content: [soulMd, contextMd].filter(Boolean).join("\n\n") || "Be concise." },
-            ...history.map(m => ({ role: m.role as "user" | "assistant", content: m.content }))
-          ],
-          undefined,
-          existingSessionId || undefined,
-          state.cwd
-        );
-        responseText = result.content;
-        if (result.sessionId) {
-          this.conversationService.setCliSessionId(convId!, result.sessionId);
-        }
-      } else if (agentName === "codex" && this.codexCliProvider) {
-        const existingSessionId = this.conversationService.getCliSessionId(convId!);
-        const result = await this.codexCliProvider.chatWithSession(
-          [
-            { role: "system", content: [soulMd, contextMd].filter(Boolean).join("\n\n") || "Be concise." },
-            ...history.map(m => ({ role: m.role as "user" | "assistant", content: m.content }))
-          ],
-          undefined,
-          existingSessionId || undefined,
-          state.cwd
-        );
-        responseText = result.content;
-        if (result.sessionId) {
-          this.conversationService.setCliSessionId(convId!, result.sessionId);
-        }
-      } else {
-        // Fallback to stateless
-        return this.statelessCliChat(provider, prompt, timeoutMs);
-      }
-
-      // Clean and save assistant response
-      const cleanResponse = responseText.replace(/<ACTION>[\s\S]*?<\/ACTION>/g, "").trim();
-      this.conversationService.addMessage(convId!, {
-        role: "assistant",
-        content: cleanResponse,
-        timestamp: new Date().toISOString()
-      }, dbUserId);
-
-      const prefix = isNew ? `🆕 Conv #${convId} | 📂 ${state.cwd}\n\n` : `💬 Conv #${convId}\n\n`;
-      return prefix + cleanResponse;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      this.conversationService.addMessage(convId!, {
-        role: "system",
-        content: `Error: ${errorMessage}`,
-        timestamp: new Date().toISOString()
-      }, dbUserId);
-      return `Error: ${errorMessage}`;
-    }
-  }
-
-  private async statelessCliChat(provider: string, prompt: string, timeoutMs: number): Promise<string> {
-    const model = ["haiku", "sonnet", "opus"].includes(provider) ? provider as "haiku" | "sonnet" | "opus" : undefined;
-    if (provider === "codex") {
-      return this.agentCliRunner.runCodex(prompt, { timeoutMs });
-    }
-    return this.agentCliRunner.runClaude(prompt, { model, timeoutMs });
-  }
 }

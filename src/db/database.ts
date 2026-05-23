@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 23;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -79,6 +79,15 @@ CREATE TABLE IF NOT EXISTS agent_delegations (
 CREATE INDEX IF NOT EXISTS idx_delegations_agent ON agent_delegations(agent_name);
 CREATE INDEX IF NOT EXISTS idx_delegations_session ON agent_delegations(tmux_session_id);
 
+CREATE TABLE IF NOT EXISTS note_folders (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS notes (
   id INTEGER PRIMARY KEY,
   project_id INTEGER REFERENCES projects(id),
@@ -87,12 +96,18 @@ CREATE TABLE IF NOT EXISTS notes (
   status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'promoted', 'archived')),
   tags TEXT,
   created_by INTEGER NOT NULL REFERENCES users(id),
+  folder_id INTEGER REFERENCES note_folders(id),
+  pinned INTEGER NOT NULL DEFAULT 0,
+  position INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_notes_project ON notes(project_id);
 CREATE INDEX IF NOT EXISTS idx_notes_status ON notes(status);
 CREATE INDEX IF NOT EXISTS idx_notes_created_by ON notes(created_by);
+-- NOTE: idx_notes_folder / idx_notes_pinned are NOT created here. SCHEMA_SQL runs against
+-- existing tables before the v23 ALTER adds folder_id/pinned, so indexing them here crashes
+-- an upgrading DB. They are created in the fresh-DB path and the v22→v23 migration block instead.
 
 CREATE TABLE IF NOT EXISTS plans (
   id INTEGER PRIMARY KEY,
@@ -281,6 +296,55 @@ CREATE TABLE IF NOT EXISTS reminder_alerts (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ra_reminder ON reminder_alerts(reminder_id);
+
+CREATE TABLE IF NOT EXISTS overmind_workflows (
+  id INTEGER PRIMARY KEY,
+  label TEXT NOT NULL,
+  display_name TEXT,
+  coordinator_session TEXT NOT NULL UNIQUE,
+  child_sessions TEXT NOT NULL DEFAULT '[]',
+  child_roles TEXT NOT NULL DEFAULT '[]',
+  run_dir TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'working', 'waiting_human', 'awaiting_decision', 'stuck', 'paused', 'completed', 'failed')),
+  current_task TEXT,
+  tasks TEXT NOT NULL DEFAULT '[]',
+  pending_decision TEXT,
+  active_session TEXT,
+  active_role TEXT CHECK(active_role IN ('parent', 'child') OR active_role IS NULL),
+  ended_at TEXT,
+  task_log TEXT NOT NULL DEFAULT '[]',
+  last_pane_hash TEXT,
+  last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
+  stuck_since TEXT,
+  nudge_count INTEGER NOT NULL DEFAULT 0,
+  tier INTEGER NOT NULL DEFAULT 0,
+  last_notified_transition TEXT,
+  run_started_at TEXT,
+  accumulated_ms INTEGER NOT NULL DEFAULT 0,
+  completion_check TEXT,
+  parent_status TEXT,
+  child_statuses TEXT NOT NULL DEFAULT '[]',
+  info_request TEXT,
+  info_check TEXT,
+  monitoring_paused INTEGER NOT NULL DEFAULT 0,
+  paused_at TEXT,
+  paused_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_overmind_workflows_coordinator_session ON overmind_workflows(coordinator_session);
+CREATE INDEX IF NOT EXISTS idx_overmind_workflows_status ON overmind_workflows(status);
+
+CREATE TABLE IF NOT EXISTS overmind_task_history (
+  id INTEGER PRIMARY KEY,
+  coordinator_session TEXT NOT NULL,
+  name TEXT NOT NULL,
+  at TEXT NOT NULL,
+  current_task TEXT,
+  done INTEGER NOT NULL,
+  total INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_overmind_task_history_coordinator_session ON overmind_task_history(coordinator_session);
 `;
 
 const DEFAULT_SAFETY_PATTERNS = [
@@ -319,8 +383,12 @@ export class DatabaseService {
 
     if (!versionRow) {
       this.db.exec(SCHEMA_SQL);
+      // New-column indexes live outside SCHEMA_SQL (see note there); create them for fresh DBs.
+      this.db.exec("CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folder_id)");
+      this.db.exec("CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned)");
       this.db.prepare("INSERT INTO schema_version (version) VALUES (?)").run(SCHEMA_VERSION);
       this.seedSafetyPatterns();
+      this.seedDefaultNotesFolder();
       return;
     }
 
@@ -485,6 +553,176 @@ export class DatabaseService {
         this.db.exec("PRAGMA foreign_keys = ON");
       }
 
+      // Migration: v10 → v11: add overmind_workflows table
+      if (current && current.version < 11) {
+        this.db.exec(SCHEMA_SQL);
+      }
+
+      // Migration: v11 → v12: add active-session attribution to overmind_workflows
+      if (current && current.version < 12) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("active_session")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN active_session TEXT");
+        }
+        if (!colNames.has("active_role")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN active_role TEXT CHECK(active_role IN ('parent', 'child') OR active_role IS NULL)");
+        }
+      }
+
+      // Migration: v12 → v13: add workflow completion timestamp and task history log
+      if (current && current.version < 13) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("ended_at")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN ended_at TEXT");
+        }
+        if (!colNames.has("task_log")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN task_log TEXT NOT NULL DEFAULT '[]'");
+        }
+      }
+
+      // Migration: v13 → v14: persist once-per-transition overmind notifications
+      if (current && current.version < 14) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("last_notified_transition")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN last_notified_transition TEXT");
+        }
+      }
+
+      // Migration: v14 → v15: track current overmind run start and accumulated elapsed time
+      if (current && current.version < 15) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("run_started_at")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN run_started_at TEXT");
+        }
+        if (!colNames.has("accumulated_ms")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN accumulated_ms INTEGER NOT NULL DEFAULT 0");
+        }
+        this.db.exec("UPDATE overmind_workflows SET run_started_at = created_at WHERE run_started_at IS NULL");
+      }
+
+      // Migration: v15 → v16: add user-controlled overmind workflow display name
+      if (current && current.version < 16) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("display_name")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN display_name TEXT");
+        }
+      }
+
+      // Migration: v16 → v17: add persistent overmind task history archive
+      if (current && current.version < 17) {
+        this.db.exec(SCHEMA_SQL);
+      }
+
+      // Migration: v17 → v18: gate Sonnet completion-edge check once per all-done state
+      if (current && current.version < 18) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("completion_check")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN completion_check TEXT");
+        }
+      }
+
+      // Migration: v18 → v19: persist independent parent/child session statuses
+      if (current && current.version < 19) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("parent_status")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN parent_status TEXT");
+        }
+        if (!colNames.has("child_statuses")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN child_statuses TEXT NOT NULL DEFAULT '[]'");
+        }
+      }
+
+      // Migration: v19 → v20: per-child role labels (e.g. coder/tester) for multi-agent workflows
+      if (current && current.version < 20) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("child_roles")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN child_roles TEXT NOT NULL DEFAULT '[]'");
+        }
+      }
+
+      // Migration: v20 → v21: registration completeness badge (info_request) + dedupe signature (info_check)
+      if (current && current.version < 21) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("info_request")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN info_request TEXT");
+        }
+        if (!colNames.has("info_check")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN info_check TEXT");
+        }
+      }
+
+      // Migration: v21 → v22: JROM-initiated monitoring pause (suppresses all interrupts
+      // while he talks to a coordinator) — flag is separate from status so the card stays visible.
+      if (current && current.version < 22) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("monitoring_paused")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN monitoring_paused INTEGER NOT NULL DEFAULT 0");
+        }
+        if (!colNames.has("paused_at")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN paused_at TEXT");
+        }
+        if (!colNames.has("paused_by")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN paused_by TEXT");
+        }
+      }
+
+      // Migration: v22 → v23: iPhone Notes model — note_folders table + folder_id/pinned/position
+      // columns on notes. Data-safe: seeds default "Notes" folder (owner user) and assigns all
+      // existing notes (folder_id IS NULL) to that folder. project_id/status/tags left dormant.
+      if (current && current.version < 23) {
+        // Create note_folders table if it doesn't exist yet
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS note_folders (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
+            created_by INTEGER REFERENCES users(id),
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `);
+
+        // Add new columns to notes (guarded PRAGMA table_info pattern)
+        const noteCols = this.db.pragma("table_info(notes)") as { name: string }[];
+        const noteColNames = new Set(noteCols.map((c) => c.name));
+        if (!noteColNames.has("folder_id")) {
+          this.db.exec("ALTER TABLE notes ADD COLUMN folder_id INTEGER REFERENCES note_folders(id)");
+        }
+        if (!noteColNames.has("pinned")) {
+          this.db.exec("ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0");
+        }
+        if (!noteColNames.has("position")) {
+          this.db.exec("ALTER TABLE notes ADD COLUMN position INTEGER NOT NULL DEFAULT 0");
+        }
+
+        // Indexes
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folder_id)");
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned)");
+
+        // Seed default "Notes" folder (idempotent helper handles exists-check)
+        this.seedDefaultNotesFolder();
+
+        // Assign all existing notes with no folder to the default folder
+        const defaultFolder = this.db.prepare(
+          "SELECT id FROM note_folders WHERE name = 'Notes' LIMIT 1"
+        ).get() as { id: number } | undefined;
+        if (defaultFolder) {
+          this.db.prepare(
+            "UPDATE notes SET folder_id = ? WHERE folder_id IS NULL"
+          ).run(defaultFolder.id);
+        }
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);
@@ -501,6 +739,25 @@ export class DatabaseService {
       }
     });
     tx();
+  }
+
+  /** Seed the default "Notes" folder if it doesn't already exist.
+   *  Called for fresh DBs and idempotently after v23 migration.
+   *  created_by is set to the owner user if one exists, otherwise null. */
+  private seedDefaultNotesFolder(): void {
+    const existing = this.db
+      .prepare("SELECT id FROM note_folders WHERE name = 'Notes' LIMIT 1")
+      .get() as { id: number } | undefined;
+    if (existing) return;
+
+    const ownerUser = this.db
+      .prepare("SELECT id FROM users WHERE role = 'owner' LIMIT 1")
+      .get() as { id: number } | undefined;
+    const ownerUserId = ownerUser?.id ?? null;
+
+    this.db
+      .prepare("INSERT INTO note_folders (name, position, created_by) VALUES ('Notes', 0, ?)")
+      .run(ownerUserId);
   }
 
   ensureOwner(telegramId: number): void {

@@ -3,7 +3,6 @@ import { DatabaseService } from "../../src/db/database.js";
 import { AuditService } from "../../src/services/audit-service.js";
 import { PersonalTaskService } from "../../src/services/personal-task-service.js";
 import { ReminderService } from "../../src/services/reminder-service.js";
-import { ChatSettingsService } from "../../src/services/chat-settings-service.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -19,7 +18,6 @@ let db: DatabaseService;
 let auditService: AuditService;
 let taskService: PersonalTaskService;
 let reminderService: ReminderService;
-let chatSettingsService: ChatSettingsService;
 let userId: number;
 
 beforeEach(() => {
@@ -28,8 +26,6 @@ beforeEach(() => {
   auditService = new AuditService(db);
   taskService = new PersonalTaskService(db, auditService);
   reminderService = new ReminderService(db, auditService);
-  chatSettingsService = new ChatSettingsService(db);
-
   db.prepare(
     "INSERT INTO users (telegram_id, username, role, active) VALUES (?, ?, ?, ?)"
   ).run(12345, "testuser", "owner", 1);
@@ -214,42 +210,6 @@ describe("ReminderService", () => {
     const updated = reminderService.getById(r.id);
     expect(updated?.sent_1).toBe(1);
     expect(updated?.sent_event).toBe(0);
-  });
-});
-
-// ===================== CHAT SETTINGS TESTS =====================
-
-describe("ChatSettingsService", () => {
-  it("sets and gets a value", () => {
-    chatSettingsService.set("soul_md", "You are helpful");
-    expect(chatSettingsService.get("soul_md")).toBe("You are helpful");
-  });
-
-  it("upserts on set", () => {
-    chatSettingsService.set("key1", "value1");
-    chatSettingsService.set("key1", "value2");
-    expect(chatSettingsService.get("key1")).toBe("value2");
-  });
-
-  it("returns null for missing key", () => {
-    expect(chatSettingsService.get("nonexistent")).toBeNull();
-  });
-
-  it("lists all settings", () => {
-    chatSettingsService.set("a", "1");
-    chatSettingsService.set("b", "2");
-    const all = chatSettingsService.getAll();
-    expect(all).toHaveLength(2);
-  });
-
-  it("deletes a setting", () => {
-    chatSettingsService.set("del", "me");
-    expect(chatSettingsService.delete("del")).toBe(true);
-    expect(chatSettingsService.get("del")).toBeNull();
-  });
-
-  it("returns false when deleting nonexistent", () => {
-    expect(chatSettingsService.delete("nope")).toBe(false);
   });
 });
 

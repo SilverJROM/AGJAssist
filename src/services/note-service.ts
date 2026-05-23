@@ -9,8 +9,21 @@ export interface Note {
   status: string;
   tags: string | null;
   created_by: number;
+  folder_id: number | null;
+  pinned: number;
+  position: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface NoteFolder {
+  id: number;
+  name: string;
+  position: number;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  is_default: boolean;
 }
 
 export class NoteService {
@@ -174,105 +187,161 @@ export class NoteService {
     return result.changes > 0;
   }
 
-  addToPlan(
-    noteIds: number[],
-    projectId: number,
-    userId: number,
-    planId?: number,
-    newPlanTitle?: string
-  ): { planId: number; addedCount: number } | null {
-    const notes: Note[] = [];
-    for (const nid of noteIds) {
-      const note = this.getById(nid);
-      if (!note || note.status !== "open") return null;
-      // Allow unattached notes to be added to any project's plan
-      if (note.project_id !== null && note.project_id !== projectId) return null;
-      notes.push(note);
-    }
+  // -----------------------------------------------------------------------
+  // iPhone Notes model — folders + folder-aware note operations
+  // -----------------------------------------------------------------------
 
-    let targetPlanId: number;
-
-    if (planId) {
-      const plan = this.db
-        .prepare("SELECT id, project_id FROM plans WHERE id = ?")
-        .get(planId) as { id: number; project_id: number } | undefined;
-      if (!plan || plan.project_id !== projectId) return null;
-      targetPlanId = planId;
-    } else if (newPlanTitle) {
-      const plan = this.db
-        .prepare(
-          "INSERT INTO plans (project_id, title, created_by) VALUES (?, ?, ?) RETURNING id"
-        )
-        .get(projectId, newPlanTitle, userId) as { id: number };
-      targetPlanId = plan.id;
-
-      this.auditService.log({
-        userId,
-        actionType: "plan_create",
-        resourceType: "plan",
-        resourceId: String(targetPlanId),
-        details: { project_id: projectId, title: newPlanTitle, from_notes: noteIds }
-      });
-    } else {
-      return null;
-    }
-
-    const insertLink = this.db.prepare(
-      "INSERT OR IGNORE INTO plan_notes (plan_id, note_id) VALUES (?, ?)"
-    );
-    const markPromoted = this.db.prepare(
-      "UPDATE notes SET status = 'promoted', updated_at = datetime('now') WHERE id = ?"
-    );
-
-    let addedCount = 0;
-    this.db.transaction(() => {
-      for (const note of notes) {
-        insertLink.run(targetPlanId, note.id);
-        markPromoted.run(note.id);
-        addedCount++;
-      }
-    });
-
-    this.auditService.log({
-      userId,
-      actionType: "notes_add_to_plan",
-      resourceType: "plan",
-      resourceId: String(targetPlanId),
-      details: { note_ids: noteIds, added_count: addedCount }
-    });
-
-    return { planId: targetPlanId, addedCount };
+  /** Return the id of the default "Notes" folder (throws if not seeded). */
+  defaultFolderId(): number {
+    const row = this.db
+      .prepare("SELECT id FROM note_folders WHERE name = 'Notes' ORDER BY id ASC LIMIT 1")
+      .get() as { id: number } | undefined;
+    if (!row) throw new Error("Default 'Notes' folder not found — migration v23 may not have run");
+    return row.id;
   }
 
-  promote(id: number, planTitle: string, userId: number, targetProjectId?: number): { noteId: number; planId: number } | null {
-    const note = this.getById(id);
-    if (!note || note.status !== "open") return null;
+  listFolders(): NoteFolder[] {
+    const defaultId = this.defaultFolderId();
+    const rows = this.db
+      .prepare("SELECT * FROM note_folders ORDER BY position ASC, id ASC")
+      .all() as Omit<NoteFolder, "is_default">[];
+    return rows.map((row) => ({ ...row, is_default: row.id === defaultId }));
+  }
 
-    const projectId = note.project_id ?? targetProjectId;
-    if (!projectId) return null;
-
-    const plan = this.db
+  createFolder(name: string, userId: number): NoteFolder {
+    const result = this.db
       .prepare(
-        "INSERT INTO plans (project_id, title, description, created_by) VALUES (?, ?, ?, ?) RETURNING id"
+        "INSERT INTO note_folders (name, created_by) VALUES (?, ?) RETURNING *"
       )
-      .get(projectId, planTitle, note.body, userId) as { id: number };
+      .get(name, userId) as Omit<NoteFolder, "is_default">;
+    this.auditService.log({
+      userId,
+      actionType: "note_folder_create",
+      resourceType: "note_folder",
+      resourceId: String(result.id),
+      details: { name }
+    });
+    // Newly created folders are never the default (default is pre-seeded)
+    return { ...result, is_default: false };
+  }
+
+  renameFolder(id: number, name: string): { ok: boolean; reason?: string; folder?: NoteFolder } {
+    const existing = this.db
+      .prepare("SELECT * FROM note_folders WHERE id = ?")
+      .get(id) as Omit<NoteFolder, "is_default"> | undefined;
+    if (!existing) return { ok: false, reason: "not_found" };
+
+    const defaultId = this.defaultFolderId();
+    if (id === defaultId) return { ok: false, reason: "cannot_rename_default" };
 
     this.db
-      .prepare("INSERT INTO plan_notes (plan_id, note_id) VALUES (?, ?)")
-      .run(plan.id, id);
+      .prepare("UPDATE note_folders SET name = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(name, id);
+    const updated = this.db.prepare("SELECT * FROM note_folders WHERE id = ?").get(id) as Omit<NoteFolder, "is_default">;
+    return { ok: true, folder: { ...updated, is_default: false } };
+  }
+
+  /** Delete a folder. Moves all its notes to the default "Notes" folder.
+   *  Refuses to delete the default "Notes" folder. */
+  deleteFolder(id: number): { ok: boolean; reason?: string } {
+    const folder = this.db
+      .prepare("SELECT * FROM note_folders WHERE id = ?")
+      .get(id) as NoteFolder | undefined;
+    if (!folder) return { ok: false, reason: "not_found" };
+
+    const defaultId = this.defaultFolderId();
+    if (id === defaultId) return { ok: false, reason: "cannot_delete_default" };
+
+    this.db.transaction(() => {
+      this.db
+        .prepare("UPDATE notes SET folder_id = ? WHERE folder_id = ?")
+        .run(defaultId, id);
+      this.db.prepare("DELETE FROM note_folders WHERE id = ?").run(id);
+    });
+    return { ok: true };
+  }
+
+  /** List notes in a folder, optionally filtered by search, ordered pinned DESC, updated_at DESC. */
+  listByFolder(folderId: number, search?: string): Note[] {
+    if (search) {
+      const term = `%${search}%`;
+      return this.db
+        .prepare(
+          "SELECT * FROM notes WHERE folder_id = ? AND (title LIKE ? OR body LIKE ?) ORDER BY pinned DESC, updated_at DESC"
+        )
+        .all(folderId, term, term) as Note[];
+    }
+    return this.db
+      .prepare(
+        "SELECT * FROM notes WHERE folder_id = ? ORDER BY pinned DESC, updated_at DESC"
+      )
+      .all(folderId) as Note[];
+  }
+
+  createNote(folderId: number, body: string, userId: number): Note {
+    const result = this.db
+      .prepare(
+        "INSERT INTO notes (folder_id, body, created_by) VALUES (?, ?, ?) RETURNING *"
+      )
+      .get(folderId, body, userId) as Note;
+    this.auditService.log({
+      userId,
+      actionType: "note_create",
+      resourceType: "note",
+      resourceId: String(result.id),
+      details: { folder_id: folderId }
+    });
+    return result;
+  }
+
+  updateNote(
+    id: number,
+    updates: { body?: string; pinned?: number; folder_id?: number },
+    userId: number
+  ): Note | null {
+    const existing = this.getById(id);
+    if (!existing) return null;
+
+    const body = updates.body ?? existing.body;
+    const pinned = updates.pinned ?? existing.pinned;
+    const folderId = updates.folder_id ?? existing.folder_id;
 
     this.db
-      .prepare("UPDATE notes SET status = 'promoted', updated_at = datetime('now') WHERE id = ?")
-      .run(id);
+      .prepare(
+        "UPDATE notes SET body = ?, pinned = ?, folder_id = ?, updated_at = datetime('now') WHERE id = ?"
+      )
+      .run(body, pinned, folderId, id);
 
     this.auditService.log({
       userId,
-      actionType: "note_promote",
+      actionType: "note_update",
       resourceType: "note",
       resourceId: String(id),
-      details: { plan_id: plan.id, plan_title: planTitle }
+      details: updates
     });
 
-    return { noteId: id, planId: plan.id };
+    return this.getById(id);
+  }
+
+  deleteNote(id: number, userId: number): boolean {
+    return this.delete(id, userId);
+  }
+
+  setPinned(id: number, pinned: number, userId: number): Note | null {
+    return this.updateNote(id, { pinned }, userId);
+  }
+
+  moveToFolder(id: number, folderId: number, userId: number): Note | null {
+    return this.updateNote(id, { folder_id: folderId }, userId);
+  }
+
+  /** Full-text search across all folders (title + body). */
+  searchAll(query: string): Note[] {
+    const term = `%${query}%`;
+    return this.db
+      .prepare(
+        "SELECT * FROM notes WHERE title LIKE ? OR body LIKE ? ORDER BY pinned DESC, updated_at DESC"
+      )
+      .all(term, term) as Note[];
   }
 }
