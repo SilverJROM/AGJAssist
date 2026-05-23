@@ -29,16 +29,17 @@ describe("Telegram command menu", () => {
     const commands = telegramMock.setMyCommands.mock.calls[0][0].map(
       (entry: { command: string }) => entry.command
     );
+    // Menu trimmed to 10 essentials (om_tasks/om_drop removed from the menu — handlers still work).
     expect(commands).toEqual(
       expect.arrayContaining([
         "overmind",
-        "om_tasks",
         "om_pause",
         "om_resume",
-        "om_drop",
         "ovm_start",
         "ovm_end"
       ])
     );
+    expect(commands).not.toContain("om_tasks");
+    expect(commands).not.toContain("om_drop");
   });
 });
