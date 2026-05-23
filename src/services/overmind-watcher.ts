@@ -28,6 +28,55 @@ import {
 export const POLL_MS = 30_000;
 export const RECONCILE_MS = 1_800_000;
 export const STUCK_THRESHOLD_MS = 90_000;
+
+// ─── In-process sub-agent suppression constants ──────────────────────────────
+export const SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS = 10 * 60 * 1000; // 10 min
+export const SUBAGENT_REASK_GRACE_MS = 2 * 60 * 60 * 1000; // 2 h
+export const SUBAGENT_DURATION_GRACE_MS = 10 * 60 * 1000; // 10 min grace past expectedEndAt
+
+// Tunable patterns — JROM will refine once a real sub-agent pane is captured.
+// Primary (TUI inference):
+//   ● Task(...)  or  ⏺ Task(...)  — Claude Code in-process Task tool invocation header
+//   ● Agent(...)  or  ⏺ Agent(...)  — Claude Code in-process Agent tool invocation header
+//   Running '<name>' agent  — another TUI form that may appear
+// Secondary (parent-emitted explicit marker):
+//   [OVERMIND] subagent <name>  — parent explicitly marks a sub-agent (also the Tier-2 ack)
+export const SUBAGENT_PATTERNS: RegExp[] = [
+  /^\s*[●⏺]\s*Task\(/m,
+  /^\s*[●⏺]\s*Agent\(/m,
+  /Running\s+'[^']+'\s+agent\b/i,
+  /\[OVERMIND\]\s+subagent\s+\S+/i
+];
+
+/** Returns true if ANY sub-agent indicator pattern matches the pane text. */
+export function subAgentInFlight(paneText: string): boolean {
+  return SUBAGENT_PATTERNS.some((re) => re.test(paneText));
+}
+
+/** Returns true when the parent explicitly signals the sub-agent is done. */
+export function paneShowsSubagentDone(paneText: string): boolean {
+  return /\[OVERMIND\]\s+subagent\s+done\b/i.test(paneText);
+}
+
+/**
+ * Extracts sub-agent name + optional expected minutes from the last
+ * `[OVERMIND] subagent <name> ~<N>min` marker in the pane text.
+ * Returns null if no match.
+ */
+export function parseSubagentAckFromPane(
+  paneText: string
+): { name: string; expectedMinutes?: number } | null {
+  const re = /\[OVERMIND\]\s+subagent\s+(\S+)(?:\s+~?(\d+)\s*min)?/gi;
+  let last: RegExpExecArray | null = null;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(paneText)) !== null) {
+    last = match;
+  }
+  if (!last) return null;
+  const name = last[1];
+  const minutes = last[2] ? parseInt(last[2], 10) : undefined;
+  return { name, expectedMinutes: minutes };
+}
 export const CAPTURE_LINES = 200;
 export const MAX_CANNED_NUDGES = 2;
 export const BRAIN_COORDINATOR_TAIL_LINES = 40;
@@ -230,8 +279,10 @@ export function classifyWorkflow(input: ClassifyWorkflowInput): ClassifyResult {
     input.coordinatorHashPrev !== null && coordinatorHash !== input.coordinatorHashPrev;
   const childPaneHashChanged = input.childPaneHashChanged === true;
   const activeTurn = hasActiveTurn(input.coordinatorPane) || input.childPanes.some((pane) => hasActiveTurn(pane));
+  // In-process sub-agent running inside the coordinator counts as active work.
+  const subAgentRunning = subAgentInFlight(input.coordinatorPane);
 
-  if (activeTurn || coordinatorHashChanged || input.mtimeAdvanced || childPaneHashChanged) {
+  if (activeTurn || coordinatorHashChanged || input.mtimeAdvanced || childPaneHashChanged || subAgentRunning) {
     return {
       status: "working",
       coordinatorHash,
@@ -547,6 +598,17 @@ export class OvermindWatcher {
   // Throttle: tracks when the last tasks_stale-bearing ask was sent per workflow.
   private readonly lastTaskStaleNudgeAt = new Map<number, number>();
 
+  // ── In-process sub-agent suppression state ────────────────────────────────
+  // subagentInFlight: when set for a workflow, all parent-facing interrupts are suppressed.
+  private readonly subagentInFlight = new Map<
+    number,
+    { source: "tui" | "ack"; since: number; name?: string; expectedEndAt?: number }
+  >();
+  // First timestamp at which "parent not-working AND every child idle/closed" was observed.
+  private readonly apparentIdleSince = new Map<number, number>();
+  // When the one-time Tier-2 ask was sent (for re-ask rate cap).
+  private readonly lastSubagentAskAt = new Map<number, number>();
+
   constructor(
     private readonly overmindService: OvermindService,
     private readonly tmuxService: TmuxService,
@@ -609,6 +671,9 @@ export class OvermindWatcher {
         if (workflow.monitoring_paused) continue;
         continue;
       }
+
+      // Sub-agent in flight: skip reconcile sends (parent is legitimately working).
+      if (this.subagentInFlight.has(workflow.id)) continue;
 
       try {
         const parentAlive = await this.sessionExistsSafe(workflow.coordinator_session);
@@ -713,6 +778,116 @@ export class OvermindWatcher {
       return;
     }
 
+    // ── In-process sub-agent detection + suppression (Tier-1/2/3) ─────────────
+    const nowMs = Date.now();
+    const wid = workflow.id;
+
+    // Detect parent ack from pane text first (runs regardless of current state).
+    // An explicit named marker is richer than TUI inference; process it before Tier-1
+    // so it always wins when the pane contains both a TUI indicator and an ack marker.
+    const ackMatch = parseSubagentAckFromPane(coordinatorPane);
+    if (ackMatch && !this.subagentInFlight.has(wid)) {
+      // Only set on first detection to avoid repeated overwrites on subsequent ticks.
+      const expectedEndAt = ackMatch.expectedMinutes
+        ? nowMs + ackMatch.expectedMinutes * 60_000
+        : undefined;
+      this.subagentInFlight.set(wid, {
+        source: "ack",
+        since: nowMs,
+        name: ackMatch.name,
+        expectedEndAt
+      });
+      this.apparentIdleSince.delete(wid);
+    }
+
+    // Tier-1: TUI inference — detect sub-agent indicator in the pane.
+    if (subAgentInFlight(coordinatorPane)) {
+      const existing = this.subagentInFlight.get(wid);
+      if (!existing || existing.source !== "ack") {
+        // Set/refresh with TUI source; don't overwrite a richer "ack" entry.
+        this.subagentInFlight.set(wid, { source: "tui", since: nowMs });
+      }
+    }
+
+    // Tier-3 resolution — run regardless of how the entry got set.
+    const saEntry = this.subagentInFlight.get(wid);
+    if (saEntry) {
+      if (paneShowsSubagentDone(coordinatorPane)) {
+        this.subagentInFlight.delete(wid);
+      } else if (
+        saEntry.source === "tui" &&
+        !subAgentInFlight(coordinatorPane) &&
+        workflow.last_pane_hash !== null &&
+        result.coordinatorHash !== workflow.last_pane_hash
+      ) {
+        // Indicator gone AND pane has substantive change since entry was set.
+        this.subagentInFlight.delete(wid);
+      } else if (
+        saEntry.expectedEndAt &&
+        nowMs > saEntry.expectedEndAt + SUBAGENT_DURATION_GRACE_MS
+      ) {
+        // Expected duration + grace elapsed.
+        this.subagentInFlight.delete(wid);
+        this.lastSubagentAskAt.delete(wid); // allow a fresh ask after another 10 min idle
+      }
+    }
+
+    // Tier-2 ask trigger — only when no suppression entry is active.
+    const currentSaEntry = this.subagentInFlight.get(wid);
+    if (!currentSaEntry) {
+      // "Apparent idle": parent is not working AND every registered child is idle/closed.
+      const parentNotWorking = parentStatus !== "working";
+      const allChildrenQuiet = childStatuses.every(
+        (c) => c.status === "idle" || c.status === "closed"
+      );
+      const apparentIdle = parentNotWorking && allChildrenQuiet;
+
+      if (apparentIdle) {
+        if (!this.apparentIdleSince.has(wid)) {
+          this.apparentIdleSince.set(wid, nowMs);
+        }
+      } else {
+        this.apparentIdleSince.delete(wid);
+      }
+
+      const idleSince = this.apparentIdleSince.get(wid);
+      const lastAskedAt = this.lastSubagentAskAt.get(wid) ?? 0;
+      if (
+        idleSince !== undefined &&
+        nowMs - idleSince > SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS &&
+        nowMs - lastAskedAt > SUBAGENT_REASK_GRACE_MS
+      ) {
+        try {
+          await this.tmuxService.sendAndSubmit(
+            workflow.coordinator_session,
+            "Overmind: you appear idle but no child session is working — are you running an in-process sub-agent? " +
+            "If yes, reply with: [OVERMIND] subagent <name> ~<N>min (and I'll stop nudging until you return). " +
+            "Otherwise resume work or report STATUS."
+          );
+        } catch (err) {
+          console.error("Overmind sub-agent ask failed:", err);
+        }
+        this.lastSubagentAskAt.set(wid, nowMs);
+      }
+    }
+
+    // SUPPRESSION: if a sub-agent is in flight, skip all parent-facing sends this tick
+    // and force status to "working" so the dashboard doesn't show "stuck".
+    if (this.subagentInFlight.has(wid)) {
+      this.overmindService.update(workflow.id, {
+        status: "working",
+        pending_decision: result.pendingDecision,
+        last_pane_hash: result.coordinatorHash,
+        stuck_since: null,
+        active_session: activeAttribution.active_session,
+        active_role: activeAttribution.active_role,
+        parent_status: parentStatus,
+        child_statuses: childStatuses,
+        ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
+      });
+      return;
+    }
+
     // Edge case (the lkvc-38 situation): the task list shows every task done but the
     // coordinator never reported /complete. A clean /complete is trusted and never lands
     // here — this branch ONLY guards the unreported all-done state. Sonnet verifies it
@@ -735,6 +910,9 @@ export class OvermindWatcher {
     // that asks the COORDINATOR (projcore) for missing pieces, ~90% without Sonnet. When
     // a request is sent this tick we own the pane hash and skip the status nudge so we
     // never double-type into the coordinator in one tick.
+    // tasks_stale gap is suppressed (omitted from derivedTaskState) while a sub-agent is
+    // in flight. Since we already returned above for the suppressed case, reaching here
+    // means no sub-agent in flight — pass derivedTaskState as-is.
     const info = await this.applyCompleteness(workflow, {
       childStatuses,
       runDirExists,
@@ -1154,6 +1332,10 @@ export class OvermindWatcher {
     this.lastProgressMtimeMs.delete(workflowId);
     this.sparkTaskUsageWindow.delete(workflowId);
     this.lastTaskStaleNudgeAt.delete(workflowId);
+    // Sub-agent suppression state
+    this.subagentInFlight.delete(workflowId);
+    this.apparentIdleSince.delete(workflowId);
+    this.lastSubagentAskAt.delete(workflowId);
   }
 
   // Async derivation of per-task states from local files + pane text. Best-effort:
