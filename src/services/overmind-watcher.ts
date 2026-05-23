@@ -37,6 +37,10 @@ export const PRIOR_DECISION_FILE_CHAR_LIMIT = 1000;
 export const PRIOR_DECISION_MAX_FILES = 5;
 export const CANNED_NUDGE =
   "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS.";
+// Used when the workflow has no child sessions registered — probes for an unregistered
+// child rather than asking the parent to check callbacks.
+export const CANNED_NUDGE_NO_CHILD =
+  "Overmind: you appear idle — are you actually idle, or do you have an unregistered child session? If you spawned one, please register it (POST /api/overmind/register with the updated child_sessions + child_roles). Otherwise resume work or report STATUS.";
 // Deterministic fallback consult text when the Sonnet completion brain is unavailable.
 export const ALL_DONE_CONFIRM_NUDGE = DEFAULT_COMPLETION_CONSULT_TEXT;
 export const FRONTLOAD_CORRECTION_NOTE =
@@ -844,7 +848,10 @@ export class OvermindWatcher {
     }
 
     const nextNudgeCount = workflow.nudge_count + 1;
-    await this.tmuxService.sendAndSubmit(workflow.coordinator_session, CANNED_NUDGE);
+    // No-child workflows can be legitimately registered without children. In that case
+    // the nudge probes for an unregistered child instead of asking about callbacks.
+    const nudgeText = (workflow.child_sessions?.length ?? 0) === 0 ? CANNED_NUDGE_NO_CHILD : CANNED_NUDGE;
+    await this.tmuxService.sendAndSubmit(workflow.coordinator_session, nudgeText);
     const postNudgePane = await this.capturePaneSafe(workflow.coordinator_session);
     return {
       nudge_count: nextNudgeCount,
