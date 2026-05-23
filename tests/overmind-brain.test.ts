@@ -251,11 +251,18 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     const waitingPane = "NEEDS-INFO: please confirm the next step.";
     const decisionPane = ["Which option?", "1. Continue", "2. Stop", "Enter to select"].join("\n");
     const waitingWorkflow = registerTier3Workflow(waitingPane);
+    // Distinct on-disk run_dir per workflow — the DuplicateRunDirError guard (added in
+     // the same-day overmind bug fix) rejects two active workflows sharing a run_dir under
+     // different coordinator_sessions. makeRunDir() also seeds the brain's expected file
+     // tree (decisions/, north-star.md, progress.md, callbacks.md), without which
+     // completeness fails and decision interception never fires.
+    const decisionRunDir = makeRunDir();
+    runDirs.push(decisionRunDir);
     const decisionWorkflow = service.register({
       label: "decision workflow",
       coordinator_session: "coord-2",
       child_sessions: ["child-2"],
-      run_dir: waitingWorkflow.run_dir
+      run_dir: decisionRunDir
     });
     service.update(decisionWorkflow.id, {
       status: "stuck",
