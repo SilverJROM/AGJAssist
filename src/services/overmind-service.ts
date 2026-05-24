@@ -88,6 +88,13 @@ interface OvermindTaskHistoryRow {
 
 const PROJECT_TREE_TERMINAL_STATUSES = new Set<OvermindWorkflowStatus>(["completed", "failed", "paused"]);
 
+// Depth of components shared between two run_dirs that counts as "same project".
+// pathComponents returns [root, ...nonEmpty]; for /home/agjrom/<bucket>/<proj>/...
+// that's [/, home, agjrom, bucket, proj, ...] — so depth 5 means the project
+// leaf is the same. Two sub-trees with at least this much shared ancestry are
+// the same project; less = truly different projects (e.g. AGJAssist vs RS).
+const PROJECT_ROOT_DEPTH = 5;
+
 export class OvermindService {
   constructor(private readonly db: DatabaseService) {}
 
@@ -166,19 +173,29 @@ export class OvermindService {
   }
 
   /**
-   * Returns true when two run_dirs sit in the same project tree — i.e. one is a
-   * component-aligned path-prefix of the other (after canonicalization). False
-   * when they're sibling paths under a common ancestor (e.g. /RS/experiments/A
-   * vs /RS/plan/WK_0518/B — both under /RS/ but neither prefixes the other).
+   * Returns true when two run_dirs sit in the same project tree.
    *
-   * Used by /register's cross-project upsert guard (JROM 2026-05-24): if a
-   * parent re-registers their coordinator_session pointing at a different
-   * project tree, that's the receiptbot-on-AGJ-51 destructive-overwrite bug.
+   * Two cases mean "same project":
+   *   1. One path is a component-aligned prefix of the other (deeper sub-dir of
+   *      the same root — e.g. /lokalcamp vs /lokalcamp/plan/cwa).
+   *   2. They share a common ancestor at least PROJECT_ROOT_DEPTH deep — i.e.
+   *      both run_dirs are inside the same project's tree even if neither
+   *      path-prefixes the other (e.g. /lokalcamp/plan/cwa AND
+   *      /lokalcamp/plan/home-dnd are siblings under /home/agjrom/websites/lokalcamp/
+   *      = depth 5 with the leading root — both belong to project 'lokalcamp').
+   *      Cross-project paths like /TGBOTS/AGJAssist vs /TGBOTS/RS share only
+   *      4 components (root + home + agjrom + TGBOTS), below threshold → false.
+   *
+   * JROM 2026-05-24 (second pass): the original strict rule was too tight —
+   * it 409-blocked a parent (lkcamp-12) from re-registering on the same
+   * coord_session for a NEW phase of the SAME project. Allow same-project-root
+   * reuse while still rejecting truly cross-project upserts.
    */
   async sharesProjectTree(runDirA: string, runDirB: string): Promise<boolean> {
     const a = this.pathComponents(await this.canonicalizeRunDir(runDirA));
     const b = this.pathComponents(await this.canonicalizeRunDir(runDirB));
-    return this.pathPrefixDepth(a, b) > 0 || this.pathPrefixDepth(b, a) > 0;
+    if (this.pathPrefixDepth(a, b) > 0 || this.pathPrefixDepth(b, a) > 0) return true;
+    return this.commonPrefixDepth(a, b) >= PROJECT_ROOT_DEPTH;
   }
 
   async findProjectTreeMatch(incomingRunDir: string): Promise<OvermindWorkflow | null> {
@@ -194,7 +211,13 @@ export class OvermindService {
       const workflowComponents = this.pathComponents(workflowCanonical);
       const existingPrefixDepth = this.pathPrefixDepth(workflowComponents, incomingComponents);
       const incomingPrefixDepth = this.pathPrefixDepth(incomingComponents, workflowComponents);
-      const depth = Math.max(existingPrefixDepth, incomingPrefixDepth);
+      // Either direction's prefix match counts; otherwise siblings under a
+      // deep-enough shared project root also count (project_root_depth gate).
+      let depth = Math.max(existingPrefixDepth, incomingPrefixDepth);
+      if (depth <= 0) {
+        const common = this.commonPrefixDepth(workflowComponents, incomingComponents);
+        if (common >= PROJECT_ROOT_DEPTH) depth = common;
+      }
       if (depth <= 0) continue;
       candidates.push({
         workflow,
@@ -654,6 +677,17 @@ export class OvermindService {
     const root = path.parse(normalized).root;
     const tail = normalized.slice(root.length).split(path.sep).filter(Boolean);
     return [root, ...tail];
+  }
+
+  /** Number of leading components shared between two path-component arrays. */
+  private commonPrefixDepth(a: string[], b: string[]): number {
+    const limit = Math.min(a.length, b.length);
+    let depth = 0;
+    for (let i = 0; i < limit; i++) {
+      if (a[i] === b[i]) depth++;
+      else break;
+    }
+    return depth;
   }
 
   private pathPrefixDepth(prefix: string[], full: string[]): number {

@@ -919,15 +919,33 @@ describe("OvermindService", () => {
     expect(service.list()).toHaveLength(1);
   });
 
-  it("findProjectTreeMatch returns null when there is no project-tree prefix match", async () => {
+  it("findProjectTreeMatch returns null when run_dirs share no project root (truly different projects)", async () => {
     service.register({
       label: "HRIS",
       coordinator_session: "hris-d-22",
       run_dir: "/home/agjrom/websites/HRIS/code",
       tasks: []
     });
+    // Different bucket entirely (TGBOTS vs websites) — share only 4 ancestors
+    // (/, home, agjrom, then bucket name diverges). Below PROJECT_ROOT_DEPTH=5.
+    const noMatch = await service.findProjectTreeMatch("/home/agjrom/TGBOTS/AGJAssist/code");
+    expect(noMatch).toBeNull();
+  });
+
+  it("findProjectTreeMatch matches sibling sub-paths under the same project root (JROM 2026-05-24 relaxation)", async () => {
+    // Before today's relaxation, '/HRIS/code' and '/HRIS/codebase' didn't match
+    // (neither path-prefixes the other). JROM's "1 workflow per parent for the
+    // same project" intent requires both to be recognised as the same HRIS
+    // project tree — common ancestor depth=5 ('/'+home+agjrom+websites+HRIS)
+    // hits the PROJECT_ROOT_DEPTH threshold.
+    const wf = service.register({
+      label: "HRIS",
+      coordinator_session: "hris-d-22",
+      run_dir: "/home/agjrom/websites/HRIS/code",
+      tasks: []
+    });
     const match = await service.findProjectTreeMatch("/home/agjrom/websites/HRIS/codebase");
-    expect(match).toBeNull();
+    expect(match?.id).toBe(wf.id);
   });
 
   it("findProjectTreeMatch prefers active workflows over terminal ones; falls back to terminal when needed", async () => {
