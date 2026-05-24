@@ -28,9 +28,9 @@ afterEach(() => {
 });
 
 describe("OvermindService", () => {
-  it("creates the schema v24 tables, display name, active attribution, history, notification, elapsed, completion-check, per-session status, child roles, info-request, parent-update, and monitoring-pause columns", () => {
+  it("creates the schema v25 tables, display name, active attribution, history, notification, elapsed, completion-check, per-session status, child roles, info-request, parent-update, and monitoring-pause columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(24);
+    expect(version.version).toBe(25);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -72,7 +72,7 @@ describe("OvermindService", () => {
     expect(colNames).toContain("paused_at");
     expect(colNames).toContain("paused_by");
     expect(colNames).toContain("last_parent_update_at");
-    expect(colNames).toContain("ask_update_cooldown_override_minutes");
+    expect(colNames).toContain("evidence_idle_threshold_override_minutes");
 
     const historyCols = db.raw.pragma("table_info(overmind_task_history)") as { name: string }[];
     expect(historyCols.map((col) => col.name)).toEqual([
@@ -266,22 +266,22 @@ describe("OvermindService", () => {
     expect(after!.task_log.length).toBe(initialLogLen);
   });
 
-  it("setAskUpdateCooldownOverride accepts null and positive multiples of 5 between 5 and 240; rejects other values", () => {
+  it("setEvidenceIdleThresholdOverride accepts null and positive multiples of 5 between 5 and 240; rejects other values", () => {
     const created = service.register({
       label: "cooldown-override",
       coordinator_session: "cooldown-override-parent",
       run_dir: "/tmp/overmind/cooldown-override"
     });
 
-    expect(service.setAskUpdateCooldownOverride(created.id, 45)?.ask_update_cooldown_override_minutes).toBe(45);
-    expect(service.setAskUpdateCooldownOverride(created.id, null)?.ask_update_cooldown_override_minutes).toBeNull();
-    expect(service.setAskUpdateCooldownOverride(created.id, 5)?.ask_update_cooldown_override_minutes).toBe(5);
-    expect(service.setAskUpdateCooldownOverride(created.id, 240)?.ask_update_cooldown_override_minutes).toBe(240);
+    expect(service.setEvidenceIdleThresholdOverride(created.id, 45)?.evidence_idle_threshold_override_minutes).toBe(45);
+    expect(service.setEvidenceIdleThresholdOverride(created.id, null)?.evidence_idle_threshold_override_minutes).toBeNull();
+    expect(service.setEvidenceIdleThresholdOverride(created.id, 5)?.evidence_idle_threshold_override_minutes).toBe(5);
+    expect(service.setEvidenceIdleThresholdOverride(created.id, 240)?.evidence_idle_threshold_override_minutes).toBe(240);
 
-    expect(() => service.setAskUpdateCooldownOverride(created.id, 7)).toThrow(/multiple of 5/i);
-    expect(() => service.setAskUpdateCooldownOverride(created.id, -5)).toThrow(/between 5 and 240/i);
-    expect(() => service.setAskUpdateCooldownOverride(created.id, 245)).toThrow(/between 5 and 240/i);
-    expect(() => service.setAskUpdateCooldownOverride(created.id, 4.5)).toThrow(/integer multiple/i);
+    expect(() => service.setEvidenceIdleThresholdOverride(created.id, 7)).toThrow(/multiple of 5/i);
+    expect(() => service.setEvidenceIdleThresholdOverride(created.id, -5)).toThrow(/between 5 and 240/i);
+    expect(() => service.setEvidenceIdleThresholdOverride(created.id, 245)).toThrow(/between 5 and 240/i);
+    expect(() => service.setEvidenceIdleThresholdOverride(created.id, 4.5)).toThrow(/integer multiple/i);
   });
 
   it("stamps ended_at when a workflow is registered with all tasks done", () => {
@@ -654,7 +654,7 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(24);
+    expect(version.version).toBe(25);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("display_name");
@@ -672,7 +672,7 @@ describe("OvermindService", () => {
     expect(cols.map((col) => col.name)).toContain("info_request");
     expect(cols.map((col) => col.name)).toContain("info_check");
     expect(cols.map((col) => col.name)).toContain("last_parent_update_at");
-    expect(cols.map((col) => col.name)).toContain("ask_update_cooldown_override_minutes");
+    expect(cols.map((col) => col.name)).toContain("evidence_idle_threshold_override_minutes");
     expect(service.getBySession("legacy-parent")?.child_roles).toEqual([]);
     expect(service.getBySession("legacy-parent")?.info_request).toBeNull();
     expect(service.getBySession("legacy-parent")?.info_check).toBeNull();
@@ -706,7 +706,7 @@ describe("OvermindService", () => {
     expect(cols.filter((col) => col.name === "parent_status")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "child_statuses")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "last_parent_update_at")).toHaveLength(1);
-    expect(cols.filter((col) => col.name === "ask_update_cooldown_override_minutes")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "evidence_idle_threshold_override_minutes")).toHaveLength(1);
     expect(historyCols.filter((col) => col.name === "coordinator_session")).toHaveLength(1);
   });
 

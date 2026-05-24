@@ -997,8 +997,8 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       payload: { override_minutes: 25 }
     });
     expect(authenticatedSet.statusCode).toBe(200);
-    expect(authenticatedSet.json().workflow.ask_update_cooldown_override_minutes).toBe(25);
-    expect(overmindService.get(workflowId)?.ask_update_cooldown_override_minutes).toBe(25);
+    expect(authenticatedSet.json().workflow.evidence_idle_threshold_override_minutes).toBe(25);
+    expect(overmindService.get(workflowId)?.evidence_idle_threshold_override_minutes).toBe(25);
 
     const authenticatedClear = await app.inject({
       method: "POST",
@@ -1007,8 +1007,8 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       payload: { override_minutes: null }
     });
     expect(authenticatedClear.statusCode).toBe(200);
-    expect(authenticatedClear.json().workflow.ask_update_cooldown_override_minutes).toBeNull();
-    expect(overmindService.get(workflowId)?.ask_update_cooldown_override_minutes).toBeNull();
+    expect(authenticatedClear.json().workflow.evidence_idle_threshold_override_minutes).toBeNull();
+    expect(overmindService.get(workflowId)?.evidence_idle_threshold_override_minutes).toBeNull();
   });
 
   it("POST /api/overmind/workflows/:id/ask-update-cooldown validation rejects 7, -5, 245, 4.5", async () => {

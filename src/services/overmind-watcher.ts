@@ -26,10 +26,9 @@ import {
 } from "./overmind-notifications.js";
 import {
   AppSettingsService,
-  DEFAULT_ASK_UPDATE_COOLDOWN_MIN,
-  DEFAULT_IDLE_NUDGE_COOLDOWN_MIN,
-  DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN,
-  DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN
+  DEFAULT_EVIDENCE_IDLE_THRESHOLD_MIN,
+  DEFAULT_EVIDENCE_READ_CADENCE_MIN,
+  DEFAULT_IDLE_NUDGE_COOLDOWN_MIN
 } from "./app-settings-service.js";
 import { NudgeStateService } from "./nudge-state-service.js";
 
@@ -71,12 +70,21 @@ export const FRONTLOAD_CORRECTION_NOTE =
   "Overmind: that decision should have been frontloaded at intake (projcore §1.4a) — please put such decisions in the north-star next time.";
 
 // ─── Task-staleness detector constants ──────────────────────────────────────
-export const TASK_STALE_CHECK_MS = 5 * 60 * 1000; // 5 min between checks
-export const TASK_STALE_NAG_COOLDOWN_MS = 30 * 60 * 1000; // 30 min between tasks_stale asks
-export const TASK_RECENT_UPDATE_GRACE_MS = 45 * 60 * 1000; // skip derivation if parent updated within 45 min
-export const SPARK_TASK_FALLBACK_PER_HOUR = 1; // max Tier-3 LLM calls per workflow/hour (counts once regardless of which model)
-export const SPARK_TASK_CMD = process.env["OVM_SPARK_CMD"] ?? "codex exec --model gpt-5.3-codex --skip-git-repo-check";
-export const SONNET_TASK_CMD = process.env["OVM_SONNET_FALLBACK_CMD"] ?? "claude -p --dangerously-skip-permissions --model sonnet";
+// JROM 2026-05-24 v2.1 — renamed from TASK_STALE_CHECK_MS (the 'tasks_stale'
+// gap is gone; this is now the read-cadence floor for progress.md/callbacks.md).
+// The mtime-advanced shortcut in assessTaskStaleness still triggers an
+// immediate re-read on any file change; this floor only applies when nothing
+// changed and we're still polling. Settings-overridable via
+// `evidence_read_cadence_minutes` (default 3).
+export const EVIDENCE_READ_CADENCE_MS = 3 * 60 * 1000;
+/** @deprecated Renamed to EVIDENCE_READ_CADENCE_MS — kept as alias for any
+ *  downstream code still importing the old name. */
+export const TASK_STALE_CHECK_MS = EVIDENCE_READ_CADENCE_MS;
+// JROM 2026-05-24 v2.2: TASK_STALE_NAG_COOLDOWN_MS, TASK_RECENT_UPDATE_GRACE_MS,
+// SPARK_TASK_FALLBACK_PER_HOUR, SPARK_TASK_CMD, SONNET_TASK_CMD all REMOVED
+// along with the Tier-3 LLM fallback inside assessTaskStaleness. The
+// evidence-read loop is now pure algorithm (regex over progress.md +
+// callbacks.md + pane text) — zero LLM calls, zero token spend per tick.
 
 // Classifier symbols are owned by ./overmind/classifier.ts (B4). The B9 cleanup
 // dropped the barrel re-exports — call sites now import from the new direct
@@ -124,67 +132,8 @@ import { determineActiveSessionAttribution } from "./overmind/active-session-att
 import { assessRegistrationCompleteness } from "./overmind/completeness.js";
 import type { CompletenessResult } from "./overmind/completeness.js";
 
-// ─── Judge-with-fallback helper (task-staleness Tier-3) ─────────────────────
-// Tries primaryCmd first. On any failure (spawn error / non-zero / timeout /
-// parse fail) tries fallbackCmd once. Returns null if both fail.
-export async function invokeJudgeWithFallback(
-  prompt: string,
-  primaryCmd: string,
-  fallbackCmd: string,
-  timeoutMs: number
-): Promise<{ json: object; model: "primary" | "fallback" } | null> {
-  const trySpawn = (cmd: string): Promise<object | null> =>
-    new Promise((resolve) => {
-      let stdout = "";
-      let timedOut = false;
-      const [bin, ...args] = cmd.split(/\s+/);
-      let child: ReturnType<typeof spawn>;
-      try {
-        child = spawn(bin, args, { stdio: ["pipe", "pipe", "ignore"] });
-      } catch {
-        resolve(null);
-        return;
-      }
-
-      const timer = setTimeout(() => {
-        timedOut = true;
-        child.kill();
-        resolve(null);
-      }, timeoutMs);
-
-      child.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
-
-      child.on("close", (code: number | null) => {
-        clearTimeout(timer);
-        if (timedOut) { resolve(null); return; }
-        if (code !== 0) { resolve(null); return; }
-        try {
-          const clean = stdout.replace(/^```[^\n]*\n?|```$/gm, "").trim();
-          resolve(JSON.parse(clean));
-        } catch {
-          resolve(null);
-        }
-      });
-
-      child.on("error", () => { clearTimeout(timer); resolve(null); });
-
-      try {
-        child.stdin?.write(prompt);
-        child.stdin?.end();
-      } catch {
-        clearTimeout(timer);
-        resolve(null);
-      }
-    });
-
-  const primary = await trySpawn(primaryCmd);
-  if (primary !== null) return { json: primary, model: "primary" };
-
-  const fallback = await trySpawn(fallbackCmd);
-  if (fallback !== null) return { json: fallback, model: "fallback" };
-
-  return null;
-}
+// JROM 2026-05-24 v2.2: invokeJudgeWithFallback REMOVED along with the
+// task-staleness Tier-3 fallback. Evidence-read loop is zero-token regex.
 
 export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
@@ -197,8 +146,9 @@ export class OvermindWatcher {
   // Task-staleness detector state — per workflow, keyed by workflow.id
   private readonly lastTaskStaleCheckAt = new Map<number, number>();
   private readonly lastProgressMtimeMs = new Map<number, number>();
-  private readonly sparkTaskUsageWindow = new Map<number, number[]>();
-  // Throttle: tracks when the last tasks_stale-bearing ask was sent per workflow.
+  // JROM v2.2: sparkTaskUsageWindow removed with the Tier-3 LLM fallback.
+  // JROM v2: lastTaskStaleNudgeAt kept ONLY for forgetWorkflow back-compat —
+  // the tasks_stale nag itself is gone (auto-promote handles state now).
   private readonly lastTaskStaleNudgeAt = new Map<number, number>();
 
   // ── In-process sub-agent suppression state ────────────────────────────────
@@ -662,21 +612,11 @@ export class OvermindWatcher {
 
     // New gap set. Deterministic by default; Sonnet only for the contradictory case.
     let requestText = assessment.requestText;
-    let requestLabel = assessment.requestLabel;
-    if (assessment.needsBrain && this.brain?.reviewRegistration) {
-      const verdict = await this.reviewRegistration(workflow, assessment, ctx.resolvedRunDir);
-      if (verdict.action === "false-alarm") {
-        return { info_request: null, info_check: assessment.signature, requestedThisTick: false };
-      }
-      if (verdict.action === "escalate") {
-        if (verdict.escalateText) {
-          await this.notify?.(verdict.escalateText).catch(() => undefined);
-        }
-        return { info_request: requestLabel, info_check: assessment.signature, requestedThisTick: false };
-      }
-      requestText = verdict.requestText ?? requestText;
-      requestLabel = verdict.requestLabel ?? requestLabel;
-    }
+    const requestLabel = assessment.requestLabel;
+    // JROM v2.2: reviewRegistration Sonnet path REMOVED. The deterministic
+    // assessment is final — `needsBrain` is dead in the new pure-algorithm
+    // world (task_mismatch silently ignored; dashboard's current_task field
+    // already surfaces it to the human, no token-spend brain consult needed).
 
     if (!requestText) {
       return { info_request: requestLabel, info_check: assessment.signature, requestedThisTick: false };
@@ -686,14 +626,6 @@ export class OvermindWatcher {
     try {
       await this.tmuxService.sendAndSubmit(workflow.coordinator_session, requestText);
       lastPaneHash = hashPane(await this.capturePaneSafe(workflow.coordinator_session));
-      // Record nag timestamp for tasks_stale throttle (per-workflow, in-memory).
-      // Done here (after send success) so the cooldown is based on "when was the
-      // last tasks_stale-bearing ask actually sent," not "when was staleness detected."
-      if (assessment.missing.includes("tasks_stale")) {
-        const sendTs = Date.now();
-        this.lastTaskStaleNudgeAt.set(workflow.id, sendTs);
-        this.nudgeState?.setLastTaskStaleNudge(workflow.id, sendTs);
-      }
     } catch (error) {
       console.error("Overmind completeness request failed:", error);
     }
@@ -704,31 +636,6 @@ export class OvermindWatcher {
       last_pane_hash: lastPaneHash,
       requestedThisTick: true
     };
-  }
-
-  private async reviewRegistration(
-    workflow: OvermindWorkflow,
-    assessment: CompletenessResult,
-    resolvedRunDir: string
-  ): Promise<RegistrationReviewVerdict> {
-    if (!this.brain?.reviewRegistration) {
-      return { action: "request", requestText: assessment.requestText ?? undefined, reason: "deterministic fallback" };
-    }
-    try {
-      return await this.brain.reviewRegistration({
-        label: workflow.label,
-        missing: assessment.missing,
-        currentTask: workflow.current_task,
-        tasksSummary: summarizeTasks(workflow.tasks),
-        childSessions: workflow.child_sessions,
-        childRoles: workflow.child_roles,
-        progressTail: await readRunFileTail(resolvedRunDir, "progress.md", BRAIN_RUN_FILE_TAIL_LINES),
-        callbacksTail: await readRunFileTail(resolvedRunDir, "callbacks.md", BRAIN_RUN_FILE_TAIL_LINES)
-      });
-    } catch (error) {
-      console.error("Overmind registration review brain failed:", error);
-      return { action: "request", requestText: assessment.requestText ?? undefined, reason: "deterministic fallback" };
-    }
   }
 
   private async handleAllTasksDone(
@@ -1015,7 +922,6 @@ export class OvermindWatcher {
   private cleanupStalenessState(workflowId: number): void {
     this.lastTaskStaleCheckAt.delete(workflowId);
     this.lastProgressMtimeMs.delete(workflowId);
-    this.sparkTaskUsageWindow.delete(workflowId);
     this.lastTaskStaleNudgeAt.delete(workflowId);
     this.lastReconcileAsk.delete(workflowId);
     // Sub-agent suppression state
@@ -1064,7 +970,7 @@ export class OvermindWatcher {
     if (lastActivityMs === 0) return; // brand-new workflow, no signal yet — wait
 
     const nowMs = Date.now();
-    const cooldownMs = this.effectiveAskUpdateCooldownMs(workflow);
+    const cooldownMs = this.effectiveEvidenceIdleThresholdMs(workflow);
     if (nowMs - lastActivityMs <= cooldownMs) return;
 
     const lastNudgeAt =
@@ -1098,20 +1004,22 @@ export class OvermindWatcher {
     }
   }
 
-  private effectiveAskUpdateCooldownMs(workflow: OvermindWorkflow): number {
-    const overrideMin = workflow.ask_update_cooldown_override_minutes;
-    const systemMin = this.appSettings?.get().ask_update_cooldown_minutes ?? DEFAULT_ASK_UPDATE_COOLDOWN_MIN;
+  private effectiveEvidenceIdleThresholdMs(workflow: OvermindWorkflow): number {
+    const overrideMin = workflow.evidence_idle_threshold_override_minutes;
+    const systemMin =
+      this.appSettings?.get().evidence_idle_threshold_minutes ?? DEFAULT_EVIDENCE_IDLE_THRESHOLD_MIN;
     return (overrideMin ?? systemMin) * 60_000;
   }
 
-  // Async derivation of per-task states from local files + pane text. Best-effort:
-  // returns undefined on any unrecoverable failure. Never throws.
+  // Async derivation of per-task states from local files + pane text. PURE
+  // ALGORITHM — no LLM calls (JROM 2026-05-24 v2.2). Best-effort: returns
+  // undefined when nothing parseable found; never throws.
   //
-  // Tier 1:  progress.md + callbacks.md regex scan (deterministic, ~90%)
-  // Tier 1b: coordinator pane text (if Tier-1 files yielded nothing, pane >200 chars)
-  // Tier 3:  bounded spark call (≤SPARK_TASK_FALLBACK_PER_HOUR/workflow/hour) when Tier-1
-  //          and 1b both yielded nothing AND the pane changed since the last tick.
-  //          Gated by OVM_SPARK_CMD env var and the SPARK_TASK_FALLBACK_PER_HOUR cap.
+  // Tier 1:  progress.md + callbacks.md regex scan (deterministic).
+  // Tier 1b: coordinator pane text (if Tier-1 files yielded nothing, pane >200 chars).
+  // (Tier-3 spark/sonnet fallback removed — this loop runs every 3 min × every
+  // active workflow, token cost is unbounded for what's fundamentally a regex
+  // problem.)
   private async assessTaskStaleness(
     workflow: OvermindWorkflow,
     coordinatorPane: string,
@@ -1123,34 +1031,13 @@ export class OvermindWatcher {
     const tasks = (workflow.tasks ?? []) as Array<{ id: string; state: string }>;
     if (tasks.length === 0) return undefined;
 
-    // ── Throttle gates (cheap, no I/O — bail before any file reads) ─────────
-    // Read settings-driven cooldown values (fall back to exported constants for back-compat).
+    // Settings-driven read cadence (default 3 min). The mtime-advanced shortcut
+    // still triggers immediate re-reads on any file change; this floor only
+    // applies when nothing has changed and we're still polling.
     const settings = this.appSettings?.get();
-    const taskStaleGraceMs =
-      (settings?.task_stale_recent_update_grace_minutes ?? DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN) * 60_000;
-    const taskStaleNagCooldownMs =
-      (settings?.task_stale_ask_cooldown_minutes ?? DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN) * 60_000;
+    const evidenceReadCadenceMs =
+      (settings?.evidence_read_cadence_minutes ?? DEFAULT_EVIDENCE_READ_CADENCE_MIN) * 60_000;
 
-    // 1. Recent-update grace: if the parent posted a /tasks update in the last
-    //    N min (settings-driven, default 45), the agents are actively working — skip derivation entirely.
-    const lastTaskLogEntry = workflow.task_log?.[workflow.task_log.length - 1];
-    if (lastTaskLogEntry?.at) {
-      const lastTaskUpdateMs = Date.parse(lastTaskLogEntry.at);
-      if (!Number.isNaN(lastTaskUpdateMs) && now - lastTaskUpdateMs < taskStaleGraceMs) {
-        return undefined;
-      }
-    }
-    // 2. Nag cooldown: even when staleness is detected, don't re-ask within N min
-    //    (settings-driven, default 30) of the last tasks_stale-bearing ask. Other gaps are unaffected.
-    const lastNagAt =
-      this.nudgeState?.getLastTaskStaleNudge(wid) ??
-      this.lastTaskStaleNudgeAt.get(wid) ??
-      0;
-    if (now - lastNagAt < taskStaleNagCooldownMs) {
-      return undefined;
-    }
-
-    // Gate: skip unless 5 min elapsed OR progress.md has a newer mtime.
     const lastCheck = this.lastTaskStaleCheckAt.get(wid) ?? 0;
     let progressMtime = 0;
     let progressText = "";
@@ -1163,7 +1050,7 @@ export class OvermindWatcher {
 
     const lastKnownMtime = this.lastProgressMtimeMs.get(wid) ?? 0;
     const mtimeAdvanced = progressMtime > lastKnownMtime;
-    const checkDue = now - lastCheck >= TASK_STALE_CHECK_MS;
+    const checkDue = now - lastCheck >= evidenceReadCadenceMs;
 
     if (!checkDue && !mtimeAdvanced) return undefined;
 
@@ -1195,22 +1082,14 @@ export class OvermindWatcher {
       derived = deriveTaskStateFromText(coordinatorPane, tasks);
     }
 
-    // Tier 3: bounded spark fallback — only when Tier-1/1b yielded nothing, pane changed,
-    // and we have budget left this hour. Gate on env var presence so unit tests never fire.
-    if (derived.size === 0 && paneChanged && process.env["OVM_SPARK_CMD"] !== undefined) {
-      const window = this.sparkTaskUsageWindow.get(wid) ?? [];
-      const oneHourAgo = now - 60 * 60 * 1000;
-      const pruned = window.filter((ts) => ts > oneHourAgo);
-      if (pruned.length < SPARK_TASK_FALLBACK_PER_HOUR) {
-        const sparkResult = await this.runSparkTaskDerivation(coordinatorPane, tasks);
-        if (sparkResult) {
-          derived = sparkResult;
-          pruned.push(now);
-          this.sparkTaskUsageWindow.set(wid, pruned);
-        }
-      }
-    } else if (derived.size === 0) {
-      // Update timestamps even when we return nothing, so we don't spin.
+    // JROM 2026-05-24 v2.2: Tier-3 LLM fallback REMOVED. This loop runs every
+    // 3 min × every active workflow × forever — token cost is unbounded for
+    // what is fundamentally a regex problem. If Tier-1/1b yielded nothing,
+    // return undefined; the next tick will retry. Better to miss a derivation
+    // than to burn tokens guessing. (The other watcher brain paths —
+    // completion consult, decision-match, subagent — fire on rare structural
+    // events, not on every poll, and stay.)
+    if (derived.size === 0) {
       this.lastTaskStaleCheckAt.set(wid, now);
       if (progressMtime > 0) this.lastProgressMtimeMs.set(wid, progressMtime);
       return undefined;
@@ -1220,47 +1099,10 @@ export class OvermindWatcher {
     this.lastTaskStaleCheckAt.set(wid, now);
     if (progressMtime > 0) this.lastProgressMtimeMs.set(wid, progressMtime);
 
-    if (derived.size === 0) return undefined;
-
     // Convert Map to plain Record.
     const record: Record<string, "done" | "in-progress" | "unknown"> = {};
     for (const [id, state] of derived) record[id] = state;
     return record;
-  }
-
-  // Tier-3 spark invocation with Sonnet fallback. Tries OVM_SPARK_CMD first; on any
-  // failure (spawn error / non-zero / timeout / parse fail) retries once against
-  // OVM_SONNET_FALLBACK_CMD. Timeout 60s per attempt. Returns undefined on both fail.
-  // The hourly budget counter is bumped ONCE at attempt-start (not per-model).
-  private async runSparkTaskDerivation(
-    coordinatorPane: string,
-    tasks: Array<{ id: string; state: string }>
-  ): Promise<Map<string, "done" | "in-progress" | "unknown"> | undefined> {
-    const taskIds = tasks.map((t) => t.id).join(", ");
-    const paneSnippet = tailLines(coordinatorPane, BRAIN_COORDINATOR_TAIL_LINES);
-    const prompt =
-      `Given this coordinator pane and the registered task ids, return STRICT JSON: ` +
-      `{"sessions":[{"id":"<task-id>","status":"done|in-progress|pending|unknown","reason":"<short>"}]} ` +
-      `— one entry per task id. ` +
-      `Status 'done' if the pane shows that batch finished/passed/merged. ` +
-      `'in-progress' if it's the active batch. 'unknown' if not clearly indicated.\n\n` +
-      `Task ids: ${taskIds}\n\nCoordinator pane:\n${paneSnippet}`;
-
-    const result = await invokeJudgeWithFallback(prompt, SPARK_TASK_CMD, SONNET_TASK_CMD, 60_000);
-    if (!result) return undefined;
-
-    const judgedBy = result.model === "primary" ? "spark" : "sonnet";
-    console.log(`task-stale: judged by ${judgedBy}`);
-
-    const parsed = result.json as { sessions?: Array<{ id: string; status: string }> };
-    const derived = new Map<string, "done" | "in-progress" | "unknown">();
-    for (const entry of parsed.sessions ?? []) {
-      const s = entry.status;
-      if (s === "done" || s === "in-progress" || s === "unknown") {
-        derived.set(entry.id, s);
-      }
-    }
-    return derived.size > 0 ? derived : undefined;
   }
 
   async notifyBlocked(workflow: OvermindWorkflow, issue: string, reason: string): Promise<void> {

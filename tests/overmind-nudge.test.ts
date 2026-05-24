@@ -393,14 +393,14 @@ describe("Overmind watcher nudge ladder", () => {
 
 function makeSettingsStub(
   idle_nudge_cooldown_minutes: number,
-  ask_update_cooldown_minutes = 45
+  evidence_idle_threshold_minutes = 30,
+  evidence_read_cadence_minutes = 3
 ): AppSettingsService {
   return {
     get: () => ({
       idle_nudge_cooldown_minutes,
-      task_stale_ask_cooldown_minutes: 30,
-      ask_update_cooldown_minutes,
-      task_stale_recent_update_grace_minutes: 45
+      evidence_read_cadence_minutes,
+      evidence_idle_threshold_minutes
     } satisfies OvermindCooldowns),
     load: async () => {},
     setOvermindCooldown: async () => {}
@@ -549,7 +549,7 @@ describe("Ask-update cooldown nudge", () => {
       tasks: [{ id: "A1", label: "Work", state: "processing" }]
     });
     service.update(workflow.id, { last_pane_hash: hashPane("old override pane") });
-    service.setAskUpdateCooldownOverride(workflow.id, 5);
+    service.setEvidenceIdleThresholdOverride(workflow.id, 5);
     setLastParentUpdate(workflow.id, new Date(Date.now() - 10 * 60 * 1000).toISOString());
 
     const tmux = makeTmuxMock({

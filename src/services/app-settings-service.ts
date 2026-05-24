@@ -3,15 +3,27 @@ import path from "node:path";
 
 // ─── Defaults (exported so watcher/tests can fall back without injecting the service) ───
 export const DEFAULT_IDLE_NUDGE_COOLDOWN_MIN = 20;
-export const DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN = 30;
-export const DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN = 45;
-export const DEFAULT_ASK_UPDATE_COOLDOWN_MIN = 45;
+// JROM 2026-05-24 v2.1 — file-read cadence floor. The mtime-advanced shortcut
+// in assessTaskStaleness still triggers an immediate re-read on file changes;
+// this only applies when nothing has changed.
+export const DEFAULT_EVIDENCE_READ_CADENCE_MIN = 3;
+// JROM 2026-05-24 v2.3 — replaces the old DEFAULT_ASK_UPDATE_COOLDOWN_MIN
+// (was 45). How long MAX(last_parent_update_at, progress.md mtime,
+// callbacks.md mtime) must remain unchanged before the idle-detection nag
+// fires.
+export const DEFAULT_EVIDENCE_IDLE_THRESHOLD_MIN = 30;
+
+/** @deprecated Kept only as a const for callers that haven't migrated yet.
+ *  Use DEFAULT_EVIDENCE_IDLE_THRESHOLD_MIN. */
+export const DEFAULT_ASK_UPDATE_COOLDOWN_MIN = DEFAULT_EVIDENCE_IDLE_THRESHOLD_MIN;
 
 export interface OvermindCooldowns {
   idle_nudge_cooldown_minutes: number;
-  task_stale_ask_cooldown_minutes: number;
-  ask_update_cooldown_minutes: number;
-  task_stale_recent_update_grace_minutes: number;
+  // JROM v2.1 — read cadence (default 3 min) for progress.md + callbacks.md.
+  evidence_read_cadence_minutes: number;
+  // JROM v2.3 — idle threshold (default 30 min) before idle-nag fires.
+  //  Renamed from ask_update_cooldown_minutes; old key auto-migrated on load.
+  evidence_idle_threshold_minutes: number;
 }
 
 interface AppSettingsShape {
@@ -21,9 +33,8 @@ interface AppSettingsShape {
 const DEFAULTS: AppSettingsShape = {
   overmind: {
     idle_nudge_cooldown_minutes: DEFAULT_IDLE_NUDGE_COOLDOWN_MIN,
-    task_stale_ask_cooldown_minutes: DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN,
-    ask_update_cooldown_minutes: DEFAULT_ASK_UPDATE_COOLDOWN_MIN,
-    task_stale_recent_update_grace_minutes: DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN
+    evidence_read_cadence_minutes: DEFAULT_EVIDENCE_READ_CADENCE_MIN,
+    evidence_idle_threshold_minutes: DEFAULT_EVIDENCE_IDLE_THRESHOLD_MIN
   }
 };
 
@@ -108,26 +119,31 @@ export class AppSettingsService {
     }
   }
 
-  private mergeDefaults(overmind: Partial<OvermindCooldowns> | undefined): OvermindCooldowns {
+  private mergeDefaults(
+    overmind: Partial<OvermindCooldowns> & { ask_update_cooldown_minutes?: number } | undefined
+  ): OvermindCooldowns {
     const d = DEFAULTS.overmind;
     const o = overmind ?? {};
+    // JROM v2.3 backward-read: pick up the old `ask_update_cooldown_minutes`
+    // value from settings.json saved before the rename, so a user who'd set
+    // 60 min there doesn't get reset to the new 30-min default on next load.
+    const idleThresholdFromOldKey =
+      typeof o.ask_update_cooldown_minutes === "number" && o.ask_update_cooldown_minutes >= 0
+        ? o.ask_update_cooldown_minutes
+        : undefined;
     return {
       idle_nudge_cooldown_minutes:
         typeof o.idle_nudge_cooldown_minutes === "number" && o.idle_nudge_cooldown_minutes >= 0
           ? o.idle_nudge_cooldown_minutes
           : d.idle_nudge_cooldown_minutes,
-      task_stale_ask_cooldown_minutes:
-        typeof o.task_stale_ask_cooldown_minutes === "number" && o.task_stale_ask_cooldown_minutes >= 0
-          ? o.task_stale_ask_cooldown_minutes
-          : d.task_stale_ask_cooldown_minutes,
-      ask_update_cooldown_minutes:
-        typeof o.ask_update_cooldown_minutes === "number" && o.ask_update_cooldown_minutes >= 0
-          ? o.ask_update_cooldown_minutes
-          : d.ask_update_cooldown_minutes,
-      task_stale_recent_update_grace_minutes:
-        typeof o.task_stale_recent_update_grace_minutes === "number" && o.task_stale_recent_update_grace_minutes >= 0
-          ? o.task_stale_recent_update_grace_minutes
-          : d.task_stale_recent_update_grace_minutes
+      evidence_read_cadence_minutes:
+        typeof o.evidence_read_cadence_minutes === "number" && o.evidence_read_cadence_minutes > 0
+          ? o.evidence_read_cadence_minutes
+          : d.evidence_read_cadence_minutes,
+      evidence_idle_threshold_minutes:
+        typeof o.evidence_idle_threshold_minutes === "number" && o.evidence_idle_threshold_minutes > 0
+          ? o.evidence_idle_threshold_minutes
+          : (idleThresholdFromOldKey ?? d.evidence_idle_threshold_minutes)
     };
   }
 

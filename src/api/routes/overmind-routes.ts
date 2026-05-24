@@ -673,7 +673,7 @@ export function registerOvermindRoutes(
 
       let workflow = null;
       try {
-        workflow = overmindService.setAskUpdateCooldownOverride(id, overrideMinutes ?? null);
+        workflow = overmindService.setEvidenceIdleThresholdOverride(id, overrideMinutes ?? null);
       } catch (error) {
         return reply.code(400).send({ error: (error as Error).message });
       }

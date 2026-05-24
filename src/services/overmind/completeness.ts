@@ -45,11 +45,12 @@ export interface CompletenessResult {
   missing: string[];
   // short badge text for the dashboard (e.g. "tasklist, roles"); null when complete
   requestLabel: string | null;
-  // canned coordinator-pane request listing the gaps; null when complete or brain-only
+  // canned coordinator-pane request listing the gaps; null when complete
   requestText: string | null;
   // re-arm key: identical signature => same gap set => don't re-ask
   signature: string;
-  // present-but-contradictory: deterministic check can't phrase a confident ask -> Sonnet
+  // JROM v2.2 — needsBrain kept on the result type for back-compat with any
+  // unmigrated callers, but the routing branch is gone. Always false now.
   needsBrain: boolean;
 }
 
@@ -164,24 +165,10 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
   // flag. derivedTaskState is still passed in (and could be reintroduced for
   // a different policy later), but for now it has no effect on the result.
 
-  // Inconsistency the canned checks can't resolve: current_task names a batch token
-  // (e.g. "B3"/"A2") but no task in the published list matches it. Defer to Sonnet.
-  let needsBrain = false;
-  if (input.tasks.length > 0 && input.currentTask) {
-    const token = input.currentTask.trim().match(/^([A-Za-z]?\d+)\b/)?.[1];
-    if (token) {
-      const tasksAny = input.tasks as Array<{ id?: string; label?: string }>;
-      const matched = tasksAny.some(
-        (t) =>
-          (t.id && t.id.toLowerCase() === token.toLowerCase()) ||
-          (t.label && t.label.toLowerCase().includes(token.toLowerCase()))
-      );
-      if (!matched) {
-        needsBrain = true;
-        if (!missing.includes("task_mismatch")) missing.push("task_mismatch");
-      }
-    }
-  }
+  // JROM v2.2: task_mismatch needsBrain branch REMOVED. When current_task
+  // names a batch token (e.g. "B3") that isn't in the registered list, that's
+  // a deterministic string-mismatch — the dashboard's current_task field
+  // already shows it to the human, no Sonnet routing needed. Pure deletion.
 
   // Signature: sorted missing keys. (Used to dedupe re-asks — same gap set
   // means we already asked.) The old `tasks_stale` suffix is gone with the
@@ -190,12 +177,12 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
 
   return {
     missing,
-    requestLabel: labels.length ? labels.join(", ") : (needsBrain ? "task mismatch" : null),
+    requestLabel: labels.length ? labels.join(", ") : null,
     requestText: lines.length
       ? `Overmind: your overmind registration looks incomplete — please re-register/update so I can track this run:\n- ${lines.join("\n- ")}`
       : null,
     signature,
-    needsBrain
+    needsBrain: false
   };
 }
 

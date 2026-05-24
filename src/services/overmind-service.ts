@@ -71,7 +71,7 @@ interface OvermindWorkflowRow {
   paused_at: string | null;
   paused_by: string | null;
   last_parent_update_at: string | null;
-  ask_update_cooldown_override_minutes: number | null;
+  evidence_idle_threshold_override_minutes: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -577,7 +577,7 @@ export class OvermindService {
     return this.get(id);
   }
 
-  setAskUpdateCooldownOverride(id: number, minutes: number | null): OvermindWorkflow | null {
+  setEvidenceIdleThresholdOverride(id: number, minutes: number | null): OvermindWorkflow | null {
     if (minutes !== null) {
       if (
         !Number.isInteger(minutes) ||
@@ -585,12 +585,12 @@ export class OvermindService {
         minutes > 240 ||
         minutes % 5 !== 0
       ) {
-        throw new Error("ask_update_cooldown_override_minutes must be null or an integer multiple of 5 between 5 and 240");
+        throw new Error("evidence_idle_threshold_override_minutes must be null or an integer multiple of 5 between 5 and 240");
       }
     }
     const result = this.db
       .prepare(
-        "UPDATE overmind_workflows SET ask_update_cooldown_override_minutes = ?, updated_at = datetime('now') WHERE id = ?"
+        "UPDATE overmind_workflows SET evidence_idle_threshold_override_minutes = ?, updated_at = datetime('now') WHERE id = ?"
       )
       .run(minutes, id);
     if (result.changes === 0) return null;

@@ -129,7 +129,7 @@ describe("assessRegistrationCompleteness", () => {
     expect(c.signature).not.toBe(a.signature);
   });
 
-  it("routes a current_task that names a batch absent from the tasklist to the brain", () => {
+  it("does NOT route current_task / task-list mismatch to the brain (JROM v2.2 — deterministic-only)", () => {
     const r = assessRegistrationCompleteness(
       base({
         currentTask: "B3 raise cap",
@@ -139,8 +139,10 @@ describe("assessRegistrationCompleteness", () => {
         ]
       })
     );
-    expect(r.needsBrain).toBe(true);
-    expect(r.missing).toContain("task_mismatch");
+    // The mismatch is a string-match fact, surfaced via the dashboard's
+    // current_task field — no Sonnet routing needed. needsBrain is dead.
+    expect(r.needsBrain).toBe(false);
+    expect(r.missing).not.toContain("task_mismatch");
   });
 
   it("does not flag a mismatch when a task matches the current_task token", () => {

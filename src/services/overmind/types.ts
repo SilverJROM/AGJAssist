@@ -99,7 +99,7 @@ export interface OvermindWorkflow {
   paused_at: string | null;
   paused_by: string | null;
   last_parent_update_at: string | null;
-  ask_update_cooldown_override_minutes: number | null;
+  evidence_idle_threshold_override_minutes: number | null;
   created_at: string;
   updated_at: string;
 }

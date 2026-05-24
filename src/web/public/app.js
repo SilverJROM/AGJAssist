@@ -914,10 +914,10 @@ function OvermindWorkflows() {
   }, [loadWorkflows, loadAskUpdateSettings]);
 
   const updateAskUpdateCooldownOverride = useCallback(async (workflow, nextOverrideMinutes) => {
-    const previousOverride = workflow.ask_update_cooldown_override_minutes ?? null;
+    const previousOverride = workflow.evidence_idle_threshold_override_minutes ?? null;
     setWorkflows(prev => prev.map(item =>
       item.id === workflow.id
-        ? { ...item, ask_update_cooldown_override_minutes: nextOverrideMinutes }
+        ? { ...item, evidence_idle_threshold_override_minutes: nextOverrideMinutes }
         : item
     ));
     try {
@@ -932,7 +932,7 @@ function OvermindWorkflows() {
     } catch (e) {
       setWorkflows(prev => prev.map(item =>
         item.id === workflow.id
-          ? { ...item, ask_update_cooldown_override_minutes: previousOverride }
+          ? { ...item, evidence_idle_threshold_override_minutes: previousOverride }
           : item
       ));
       setAskUpdateToast(e.message || 'Failed to save ask-update cooldown override.');
@@ -1161,9 +1161,9 @@ function OvermindWorkflows() {
             const lastParentUpdateLabel = Number.isFinite(lastParentUpdateMs)
               ? Math.max(0, Math.floor((now - lastParentUpdateMs) / 60000)) + ' min ago'
               : '—';
-            const askUpdateOverrideValue = workflow.ask_update_cooldown_override_minutes == null
+            const askUpdateOverrideValue = workflow.evidence_idle_threshold_override_minutes == null
               ? 'system'
-              : String(workflow.ask_update_cooldown_override_minutes);
+              : String(workflow.evidence_idle_threshold_override_minutes);
             const askUpdateOptions = [];
             for (let min = 5; min <= 180; min += 5) askUpdateOptions.push(min);
             return html`

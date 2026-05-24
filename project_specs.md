@@ -1,5 +1,7 @@
 # AGJAssist - Project Specifications
 
+**projcore_session:** AGJ
+
 ## Overview
 
 AGJAssist is a Telegram bot + web dashboard for development project management, terminal access, task tracking, LLM conversations, and personal productivity.

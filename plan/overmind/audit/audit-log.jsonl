@@ -6,3 +6,49 @@
 {"at":"2026-05-23T13:30:01.647Z","tick_n":5,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
 {"at":"2026-05-23T13:50:01.737Z","tick_n":6,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
 {"at":"2026-05-23T14:10:01.826Z","tick_n":7,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T14:30:01.916Z","tick_n":8,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T14:50:02.005Z","tick_n":9,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T15:20:01.136Z","tick_n":10,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T15:50:01.264Z","tick_n":11,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T16:10:01.353Z","tick_n":12,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T16:30:01.449Z","tick_n":13,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T17:00:01.571Z","tick_n":14,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T17:20:01.664Z","tick_n":15,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T17:50:01.788Z","tick_n":16,"workflow_id":1,"workflow_label":"WK_0522 A6 sweep — comprehensive A6.3-FK-HOTFIX cleanup (21 batches)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T22:50:01.949Z","tick_n":28,"workflow_id":2,"workflow_label":"client-writes-attachments","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T22:50:01.964Z","tick_n":28,"workflow_id":6,"workflow_label":"HRIS · trapprove · bulk-approve + auto-approve-on-upload","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T23:30:01.121Z","tick_n":29,"workflow_id":1,"workflow_label":"HRIS · trapprove · bulk-approve + auto-approve-on-upload + batch_name + A6 group_id","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T23:30:01.139Z","tick_n":29,"workflow_id":2,"workflow_label":"client-writes-attachments","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-23T23:30:01.147Z","tick_n":29,"workflow_id":6,"workflow_label":"AGJAssist · modularization refactor","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T00:00:01.281Z","tick_n":30,"workflow_id":1,"workflow_label":"HRIS · trapprove · bulk-approve + auto-approve-on-upload + batch_name + A6 group_id","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T00:00:01.299Z","tick_n":30,"workflow_id":2,"workflow_label":"client-writes-attachments","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T00:20:01.399Z","tick_n":31,"workflow_id":1,"workflow_label":"HRIS · trapprove · bulk-approve + auto-approve-on-upload + batch_name + A6 group_id","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T00:20:01.420Z","tick_n":31,"workflow_id":2,"workflow_label":"client-writes-attachments","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T00:20:01.440Z","tick_n":31,"workflow_id":4,"workflow_label":"receiptbot","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T00:50:01.575Z","tick_n":32,"workflow_id":1,"workflow_label":"HRIS (joanne)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T00:50:01.596Z","tick_n":32,"workflow_id":2,"workflow_label":"client-writes-attachments","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T00:50:01.614Z","tick_n":32,"workflow_id":7,"workflow_label":"receiptbot","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T01:10:01.741Z","tick_n":33,"workflow_id":1,"workflow_label":"HRIS (joanne)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T01:10:01.770Z","tick_n":33,"workflow_id":2,"workflow_label":"client-writes-attachments","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T01:30:01.866Z","tick_n":34,"workflow_id":1,"workflow_label":"HRIS (joanne)","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T01:30:01.886Z","tick_n":34,"workflow_id":2,"workflow_label":"client-writes-attachments","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T03:00:01.230Z","tick_n":37,"workflow_id":6,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T03:20:01.321Z","tick_n":38,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T03:40:01.407Z","tick_n":39,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T04:10:01.533Z","tick_n":40,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T04:40:01.666Z","tick_n":41,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T05:00:01.754Z","tick_n":42,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T05:20:01.849Z","tick_n":43,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T05:40:01.940Z","tick_n":44,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T06:20:01.104Z","tick_n":45,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T06:40:01.208Z","tick_n":46,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T07:10:01.349Z","tick_n":47,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T07:30:01.443Z","tick_n":48,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T07:50:01.529Z","tick_n":49,"workflow_id":2,"workflow_label":"lokal-home-dnd","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T09:00:01.820Z","tick_n":52,"workflow_id":2,"workflow_label":"lokal-tg-bot-mini-app","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T09:20:01.913Z","tick_n":53,"workflow_id":2,"workflow_label":"lokal-tg-bot-mini-app","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T09:40:02.006Z","tick_n":54,"workflow_id":2,"workflow_label":"lokal-tg-bot-mini-app","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T10:10:01.120Z","tick_n":55,"workflow_id":2,"workflow_label":"lokal-tg-bot-mini-app","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T10:40:01.249Z","tick_n":56,"workflow_id":2,"workflow_label":"lokal-tg-bot-mini-app","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T11:00:01.333Z","tick_n":57,"workflow_id":2,"workflow_label":"lokal-tg-bot-mini-app","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-24T11:30:01.461Z","tick_n":58,"workflow_id":2,"workflow_label":"lokal-tg-bot-mini-app","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}

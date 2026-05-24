@@ -33,7 +33,7 @@ afterEach(() => {
 describe("migration v23", () => {
   it("creates latest schema version", () => {
     const row = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(row.version).toBe(24);
+    expect(row.version).toBe(25);
   });
 
   it("creates the note_folders table", () => {

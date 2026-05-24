@@ -69,7 +69,7 @@ describe("DatabaseService", () => {
       .prepare("SELECT version FROM schema_version")
       .get() as { version: number };
 
-    expect(version.version).toBe(24);
+    expect(version.version).toBe(25);
     db.close();
   });
 
@@ -121,7 +121,7 @@ describe("DatabaseService", () => {
     db.close();
   });
 
-  it("upgrades a v23 snapshot DB to v24 and adds last_parent_update_at + ask_update_cooldown_override_minutes", () => {
+  it("upgrades a v23 snapshot DB to v25 and adds last_parent_update_at + evidence_idle_threshold_override_minutes", () => {
     cleanup();
     const raw = new Database(TEST_DB);
     raw.exec(`
@@ -166,11 +166,11 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(24);
+    expect(version.version).toBe(25);
     const upgradedCols = upgraded.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     const upgradedColNames = upgradedCols.map((c) => c.name);
     expect(upgradedColNames).toContain("last_parent_update_at");
-    expect(upgradedColNames).toContain("ask_update_cooldown_override_minutes");
+    expect(upgradedColNames).toContain("evidence_idle_threshold_override_minutes");
     upgraded.close();
   });
 });

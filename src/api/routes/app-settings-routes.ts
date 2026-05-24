@@ -5,9 +5,13 @@ import { AppSettingsService, OvermindCooldowns } from "../../services/app-settin
 
 interface PatchOvermindBody {
   idle_nudge_cooldown_minutes?: number;
-  task_stale_ask_cooldown_minutes?: number;
+  evidence_read_cadence_minutes?: number;
+  evidence_idle_threshold_minutes?: number;
+  // JROM v2.3 back-compat: dashboard clients may still send the old key on the
+  // first request after a deploy. Accept it and treat it as the new field —
+  // mergeDefaults() inside AppSettings handles the JSON-file side; the route
+  // handler maps it here on the PATCH side.
   ask_update_cooldown_minutes?: number;
-  task_stale_recent_update_grace_minutes?: number;
 }
 
 export function registerAppSettingsRoutes(
@@ -37,11 +41,14 @@ export function registerAppSettingsRoutes(
       }
 
       const body = request.body ?? {};
+      // Normalise deprecated `ask_update_cooldown_minutes` → new name.
+      if (body.ask_update_cooldown_minutes !== undefined && body.evidence_idle_threshold_minutes === undefined) {
+        body.evidence_idle_threshold_minutes = body.ask_update_cooldown_minutes;
+      }
       const validKeys: Array<keyof OvermindCooldowns> = [
         "idle_nudge_cooldown_minutes",
-        "task_stale_ask_cooldown_minutes",
-        "ask_update_cooldown_minutes",
-        "task_stale_recent_update_grace_minutes"
+        "evidence_read_cadence_minutes",
+        "evidence_idle_threshold_minutes"
       ];
 
       // Validate all provided keys before writing any.

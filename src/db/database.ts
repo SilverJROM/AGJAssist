@@ -382,6 +382,30 @@ export class DatabaseService {
         }
       }
 
+      // Migration: v24 → v25 (JROM 2026-05-24): rename the per-workflow idle
+      // cooldown override column. SQLite < 3.25 had no RENAME COLUMN; we use
+      // the canonical ADD-COPY-leave-old pattern so older runtimes can apply
+      // the migration safely and downstream code can read from either column
+      // during a deploy window. The OLD column is left in place (NOT dropped)
+      // — preserves rollback safety + avoids a table rebuild.
+      if (current && current.version < 25) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("evidence_idle_threshold_override_minutes")) {
+          this.db.exec(
+            "ALTER TABLE overmind_workflows ADD COLUMN evidence_idle_threshold_override_minutes INTEGER"
+          );
+        }
+        if (colNames.has("ask_update_cooldown_override_minutes")) {
+          this.db.exec(
+            `UPDATE overmind_workflows
+             SET evidence_idle_threshold_override_minutes = ask_update_cooldown_override_minutes
+             WHERE ask_update_cooldown_override_minutes IS NOT NULL
+               AND evidence_idle_threshold_override_minutes IS NULL`
+          );
+        }
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);
