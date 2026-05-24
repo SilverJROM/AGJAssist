@@ -214,6 +214,58 @@ describe("OvermindService", () => {
     expect(Date.parse(updated?.last_parent_update_at || "")).toBeGreaterThan(Date.parse(stale));
   });
 
+  it("setTasks tags task_log entry with source='evidence-derived' when called from auto-promote (JROM 2026-05-24)", () => {
+    const created = service.register({
+      label: "auto-promote",
+      coordinator_session: "auto-promote-parent",
+      run_dir: "/tmp/overmind/auto-promote",
+      tasks: [
+        { id: "B1", label: "Setup", state: "processing" },
+        { id: "B2", label: "Implement", state: "pending" }
+      ]
+    });
+
+    // Default source ('parent') — log entry has no source field OR source='parent'.
+    const fromParent = service.setTasks(created.id, "B1", [
+      { id: "B1", label: "Setup", state: "done" },
+      { id: "B2", label: "Implement", state: "pending" }
+    ]);
+    const parentEntry = fromParent!.task_log[fromParent!.task_log.length - 1];
+    expect(parentEntry.source).toBe("parent");
+
+    // Evidence-derived path — log entry tagged accordingly.
+    const fromEvidence = service.setTasks(
+      created.id,
+      "B1",
+      [
+        { id: "B1", label: "Setup", state: "done" },
+        { id: "B2", label: "Implement", state: "done" }
+      ],
+      "evidence-derived"
+    );
+    const evidenceEntry = fromEvidence!.task_log[fromEvidence!.task_log.length - 1];
+    expect(evidenceEntry.source).toBe("evidence-derived");
+  });
+
+  it("setTasks is a no-op (no duplicate task_log entry) when the state is unchanged", () => {
+    const created = service.register({
+      label: "noop-promote",
+      coordinator_session: "noop-promote-parent",
+      run_dir: "/tmp/overmind/noop-promote",
+      tasks: [{ id: "B1", label: "Setup", state: "done" }]
+    });
+    const initialLogLen = created.task_log.length;
+
+    // Same state, same currentTask — should not append.
+    const after = service.setTasks(
+      created.id,
+      created.current_task,
+      [{ id: "B1", label: "Setup", state: "done" }],
+      "evidence-derived"
+    );
+    expect(after!.task_log.length).toBe(initialLogLen);
+  });
+
   it("setAskUpdateCooldownOverride accepts null and positive multiples of 5 between 5 and 240; rejects other values", () => {
     const created = service.register({
       label: "cooldown-override",

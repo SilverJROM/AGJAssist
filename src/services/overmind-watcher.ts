@@ -383,6 +383,33 @@ export class OvermindWatcher {
       derivedTaskState = undefined;
     }
 
+    // JROM 2026-05-24 lazy-supervisor fix — auto-promote tasks where the
+    // derivation says "done" but the registered state isn't. Silent, audit
+    // trail in task_log via source='evidence-derived'. After this step the
+    // registered state matches the derivation, so the tasks_stale gap in
+    // completeness.ts has nothing left to flag (and is now removed).
+    if (derivedTaskState && workflow.tasks?.length) {
+      const promotedTasks = workflow.tasks.map((t) =>
+        t.id && t.state !== "done" && derivedTaskState[t.id] === "done"
+          ? { ...t, state: "done" as const }
+          : t
+      );
+      const changedAny = promotedTasks.some((t, i) => t.state !== workflow.tasks[i].state);
+      if (changedAny) {
+        const refreshed = this.overmindService.setTasks(
+          workflow.id,
+          workflow.current_task,
+          promotedTasks,
+          "evidence-derived"
+        );
+        if (refreshed) {
+          // Re-read so the rest of this tick (applyCompleteness, nudge ladder)
+          // sees the post-promotion state, not the stale snapshot.
+          workflow = refreshed;
+        }
+      }
+    }
+
     // Monitoring paused (JROM is talking to this coordinator): keep the display live
     // (status, parent/child, attribution) so overmind stays AWARE, but suppress every
     // interrupt — no completion consult, no completeness request, no nudge, no brain,
@@ -403,7 +430,7 @@ export class OvermindWatcher {
       return;
     }
 
-    await this.maybeAskForParentUpdate(workflow);
+    await this.maybeAskForParentUpdate(workflow, resolvedRunDir);
 
     // ── In-process sub-agent detection + suppression (Tier-1/2/3) ─────────────
     const nowMs = Date.now();
@@ -1001,21 +1028,44 @@ export class OvermindWatcher {
     this.nudgeState?.forgetWorkflow(workflowId);
   }
 
-  private async maybeAskForParentUpdate(workflow: OvermindWorkflow): Promise<void> {
-    if (
-      workflow.monitoring_paused ||
-      TERMINAL_STATUSES.includes(workflow.status) ||
-      !workflow.last_parent_update_at
-    ) {
+  /**
+   * JROM 2026-05-24 v2 — only nag when EVERYTHING is idle.
+   * Freshness = MAX of (last_parent_update_at, progress.md mtime, callbacks.md mtime).
+   * The parent doesn't need to POST /tasks — overmind reads files. So as long as
+   * the parent writes to its normal work-evidence files, no nag fires. Only when
+   * all three signals go silent past the cooldown does the ask fire — and the new
+   * message asks for an evidence-file update, not an API POST.
+   */
+  private async maybeAskForParentUpdate(
+    workflow: OvermindWorkflow,
+    resolvedRunDir: string
+  ): Promise<void> {
+    if (workflow.monitoring_paused || TERMINAL_STATUSES.includes(workflow.status)) {
       return;
     }
 
-    const lastParentUpdateMs = Date.parse(workflow.last_parent_update_at);
-    if (!Number.isFinite(lastParentUpdateMs)) return;
+    // Build the MAX-of-three freshness signal. Missing files / unparseable
+    // timestamps contribute 0, so a parent that's never POSTed and has no
+    // evidence files yet naturally fails the cooldown check and gets nagged.
+    const parentApiMs = workflow.last_parent_update_at
+      ? Date.parse(workflow.last_parent_update_at)
+      : NaN;
+    const progressMtimeMs = await this.fileMtimeMsBestEffort(
+      path.join(resolvedRunDir, "progress.md")
+    );
+    const callbacksMtimeMs = await this.fileMtimeMsBestEffort(
+      path.join(resolvedRunDir, "callbacks.md")
+    );
+    const lastActivityMs = Math.max(
+      Number.isFinite(parentApiMs) ? parentApiMs : 0,
+      progressMtimeMs,
+      callbacksMtimeMs
+    );
+    if (lastActivityMs === 0) return; // brand-new workflow, no signal yet — wait
 
     const nowMs = Date.now();
     const cooldownMs = this.effectiveAskUpdateCooldownMs(workflow);
-    if (nowMs - lastParentUpdateMs <= cooldownMs) return;
+    if (nowMs - lastActivityMs <= cooldownMs) return;
 
     const lastNudgeAt =
       this.nudgeState?.getLastAskUpdateNudge(workflow.id) ??
@@ -1023,16 +1073,28 @@ export class OvermindWatcher {
       0;
     if (nowMs - lastNudgeAt < cooldownMs) return;
 
-    const staleMinutes = Math.max(1, Math.round((nowMs - lastParentUpdateMs) / 60_000));
+    const staleMinutes = Math.max(1, Math.round((nowMs - lastActivityMs) / 60_000));
     const message =
-      `Overmind: you haven't sent any update via the API in ~${staleMinutes} minutes — ` +
-      "please POST /api/overmind/tasks (or /complete if you're done) so I can track this run.";
+      `Overmind: I haven't seen any activity in ~${staleMinutes} minutes — ` +
+      "no progress.md / callbacks.md updates, no task-state changes. Are you still working? " +
+      "Please update progress.md (or callbacks.md) with current status and I'll read it from there. " +
+      "If the run is finished, POST /api/overmind/complete to close it out.";
     try {
       await this.tmuxService.sendAndSubmit(workflow.coordinator_session, message);
       this.lastAskUpdateNudgeAt.set(workflow.id, nowMs);
       this.nudgeState?.setLastAskUpdateNudge(workflow.id, nowMs);
     } catch (error) {
       console.error("Overmind ask-update nudge failed:", error);
+    }
+  }
+
+  /** Best-effort file mtime in ms; returns 0 when the file is missing or unstat-able. */
+  private async fileMtimeMsBestEffort(filePath: string): Promise<number> {
+    try {
+      const s = await stat(filePath);
+      return s.mtimeMs;
+    } catch {
+      return 0;
     }
   }
 

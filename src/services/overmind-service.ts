@@ -508,7 +508,17 @@ export class OvermindService {
     return this.get(id);
   }
 
-  setTasks(id: number, currentTask: string | null, tasks: OvermindTask[]): OvermindWorkflow | null {
+  /**
+   * Update the workflow's task list and current_task. `source` audits whether
+   * the change came from a parent /api/overmind/tasks call (default) or from
+   * overmind's own evidence-derived auto-promote (JROM 2026-05-24 fix).
+   */
+  setTasks(
+    id: number,
+    currentTask: string | null,
+    tasks: OvermindTask[],
+    source: "parent" | "evidence-derived" = "parent"
+  ): OvermindWorkflow | null {
     const existing = this.get(id);
     if (!existing) return null;
     // Same defensive filter as register — strips markdown table chrome ("| # | Batch | …"
@@ -528,7 +538,8 @@ export class OvermindService {
             current_task: currentTask,
             done: doneCount,
             total: tasks.length,
-            note: this.taskLogNote(existing.current_task, currentTask, existingDoneCount, doneCount)
+            note: this.taskLogNote(existing.current_task, currentTask, existingDoneCount, doneCount),
+            source
           }
         ].slice(-50)
       : existing.task_log;

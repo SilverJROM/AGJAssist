@@ -153,27 +153,16 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
     }
   }
 
-  // Tasks-staleness: deterministic evidence from progress.md / callbacks.md shows tasks as
-  // done that the registered list still marks not-done. Ask the parent to POST /tasks.
-  let staleIds: string[] = [];
-  if (input.derivedTaskState && Object.keys(input.derivedTaskState).length > 0) {
-    const tasksAny = input.tasks as Array<{ id?: string; state?: string }>;
-    staleIds = tasksAny
-      .filter(
-        (t) =>
-          t.id &&
-          t.state !== "done" &&
-          input.derivedTaskState![t.id] === "done"
-      )
-      .map((t) => t.id as string);
-    if (staleIds.length > 0) {
-      missing.push("tasks_stale");
-      labels.push("tasks-stale");
-      lines.push(
-        `your tasks list looks out of date — evidence shows ${staleIds.join(", ")} appear to be done, but my registered list still shows them not-done. Please POST /api/overmind/tasks with your current state.`
-      );
-    }
-  }
+  // JROM 2026-05-24 lazy-supervisor fix: the previous 'tasks_stale' branch
+  // nagged the parent to POST /tasks for the same staleIds we already derived
+  // from progress.md / callbacks.md. That was structurally lazy — supervisor
+  // asking the worker to restate what the supervisor already knows.
+  //
+  // The watcher now auto-promotes derivedTaskState='done' tasks BEFORE
+  // calling assessRegistrationCompleteness, so by the time we get here the
+  // registered state already matches the evidence. No 'tasks_stale' gap to
+  // flag. derivedTaskState is still passed in (and could be reintroduced for
+  // a different policy later), but for now it has no effect on the result.
 
   // Inconsistency the canned checks can't resolve: current_task names a batch token
   // (e.g. "B3"/"A2") but no task in the published list matches it. Defer to Sonnet.
@@ -194,11 +183,10 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
     }
   }
 
-  // Signature: sorted missing keys, plus stale-ids suffix so changing the stale set re-arms.
-  const baseSig = [...missing].sort().join("|");
-  const signature = staleIds.length > 0
-    ? `${baseSig}::${[...staleIds].sort().join(",")}`
-    : baseSig;
+  // Signature: sorted missing keys. (Used to dedupe re-asks — same gap set
+  // means we already asked.) The old `tasks_stale` suffix is gone with the
+  // auto-promote fix above.
+  const signature = [...missing].sort().join("|");
 
   return {
     missing,

@@ -474,7 +474,10 @@ describe("Idle-nudge cooldown", () => {
 });
 
 describe("Ask-update cooldown nudge", () => {
-  const ASK_UPDATE_TEXT = "you haven't sent any update via the API";
+  // JROM 2026-05-24 v2 — message now asks for progress.md/callbacks.md updates,
+  // not POSTs to /api/overmind/tasks. The cooldown trigger is also the MAX of
+  // (last_parent_update_at, progress.md mtime, callbacks.md mtime).
+  const ASK_UPDATE_TEXT = "I haven't seen any activity";
 
   function setLastParentUpdate(workflowId: number, iso: string): void {
     db.prepare("UPDATE overmind_workflows SET last_parent_update_at = ? WHERE id = ?").run(iso, workflowId);
@@ -598,6 +601,110 @@ describe("Ask-update cooldown nudge", () => {
     await watcher.tick();
     expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT))).toHaveLength(0);
   });
+
+  // ── JROM 2026-05-24 v2: MAX-of-three freshness + new message text ──────────
+
+  it("MAX-of-three: progress.md mtime recent → no nag even when last_parent_update_at is stale", async () => {
+    // Set up a real run_dir with a freshly-written progress.md
+    const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-nudge-v2-progress-"));
+    fs.writeFileSync(path.join(runDir, "progress.md"), "B1 done — fresh\n");
+    try {
+      const workflow = service.register({
+        label: "v2-progress-fresh",
+        coordinator_session: "coord-v2-pf",
+        child_sessions: ["child-v2-pf"],
+        child_roles: ["coder"],
+        run_dir: runDir,
+        current_task: "B1",
+        tasks: [{ id: "B1", label: "Work", state: "processing" }]
+      });
+      service.update(workflow.id, { last_pane_hash: hashPane("old pane") });
+      // last_parent_update_at = 90min ago (stale by itself), but progress.md was
+      // just written (current mtime) so MAX-of-three = now → no nag.
+      setLastParentUpdate(workflow.id, new Date(Date.now() - 90 * 60 * 1000).toISOString());
+
+      const tmux = makeTmuxMock({
+        "coord-v2-pf": "fresh pane output",
+        "child-v2-pf": "child quiet pane"
+      });
+      const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 45));
+      await watcher.tick();
+      const asks = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT));
+      expect(asks).toHaveLength(0);
+    } finally {
+      fs.rmSync(runDir, { recursive: true, force: true });
+    }
+  });
+
+  it("MAX-of-three: ALL signals stale → nag fires with new message mentioning progress.md and callbacks.md", async () => {
+    // run_dir exists but progress.md / callbacks.md are old (created and back-dated)
+    const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-nudge-v2-all-stale-"));
+    fs.writeFileSync(path.join(runDir, "progress.md"), "old work\n");
+    fs.writeFileSync(path.join(runDir, "callbacks.md"), "old callback\n");
+    const oldDate = new Date(Date.now() - 90 * 60 * 1000);
+    fs.utimesSync(path.join(runDir, "progress.md"), oldDate, oldDate);
+    fs.utimesSync(path.join(runDir, "callbacks.md"), oldDate, oldDate);
+    try {
+      const workflow = service.register({
+        label: "v2-all-stale",
+        coordinator_session: "coord-v2-as",
+        child_sessions: ["child-v2-as"],
+        child_roles: ["coder"],
+        run_dir: runDir,
+        current_task: "B1",
+        tasks: [{ id: "B1", label: "Work", state: "processing" }]
+      });
+      service.update(workflow.id, { last_pane_hash: hashPane("old pane") });
+      setLastParentUpdate(workflow.id, oldDate.toISOString());
+
+      const tmux = makeTmuxMock({
+        "coord-v2-as": "new pane output",
+        "child-v2-as": "child quiet pane"
+      });
+      const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 45));
+      await watcher.tick();
+      const asks = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT));
+      expect(asks).toHaveLength(1);
+      const msg = asks[0][1];
+      expect(msg).toContain("progress.md");
+      expect(msg).toContain("callbacks.md");
+      expect(msg).toContain("POST /api/overmind/complete");
+      // The legacy "POST /api/overmind/tasks" wording is GONE in v2.
+      expect(msg).not.toContain("POST /api/overmind/tasks");
+    } finally {
+      fs.rmSync(runDir, { recursive: true, force: true });
+    }
+  });
+
+  it("Files-missing fallback: progress.md/callbacks.md absent → use last_parent_update_at alone", async () => {
+    // run_dir exists but neither evidence file does — fileMtimeMsBestEffort
+    // returns 0 for both, so MAX falls back to last_parent_update_at.
+    const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-nudge-v2-no-files-"));
+    try {
+      const workflow = service.register({
+        label: "v2-no-files",
+        coordinator_session: "coord-v2-nf",
+        child_sessions: ["child-v2-nf"],
+        child_roles: ["coder"],
+        run_dir: runDir,
+        current_task: "B1",
+        tasks: [{ id: "B1", label: "Work", state: "processing" }]
+      });
+      service.update(workflow.id, { last_pane_hash: hashPane("old pane") });
+      setLastParentUpdate(workflow.id, new Date(Date.now() - 90 * 60 * 1000).toISOString());
+
+      const tmux = makeTmuxMock({
+        "coord-v2-nf": "new pane output",
+        "child-v2-nf": "child quiet pane"
+      });
+      const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 45));
+      await watcher.tick();
+      const asks = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT));
+      expect(asks).toHaveLength(1); // falls back to last_parent_update_at being stale
+    } finally {
+      fs.rmSync(runDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ─── Persisted cooldown survives watcher restart ─────────────────────────────
@@ -692,7 +799,7 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
     await watcher1.tick();
     expect(
       tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) =>
-        call[1].includes("you haven't sent any update via the API")
+        call[1].includes("I haven't seen any activity")
       )
     ).toHaveLength(1);
 
@@ -706,7 +813,7 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
     await watcher2.tick();
     expect(
       tmux2.sendAndSubmit.mock.calls.filter((call: [string, string]) =>
-        call[1].includes("you haven't sent any update via the API")
+        call[1].includes("I haven't seen any activity")
       )
     ).toHaveLength(0);
   });

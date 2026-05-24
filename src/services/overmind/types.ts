@@ -34,6 +34,11 @@ export interface OvermindTaskLogEntry {
   done: number;
   total: number;
   note?: string;
+  /** Origin of the task-state change: 'parent' means the parent session called
+   *  POST /api/overmind/tasks; 'evidence-derived' means overmind auto-promoted
+   *  tasks based on progress.md / callbacks.md / pane evidence (JROM 2026-05-24
+   *  lazy-supervisor fix). Default omitted = 'parent'. */
+  source?: "parent" | "evidence-derived";
 }
 
 export interface OvermindTaskHistoryEntry {
