@@ -21,4 +21,13 @@ export class WatcherCooldowns {
   forget(workflowId: number): void {
     this.firedAt.delete(workflowId);
   }
+
+  forgetKey(workflowId: number, key: string): void {
+    const workflowCooldowns = this.firedAt.get(workflowId);
+    if (!workflowCooldowns) return;
+    workflowCooldowns.delete(key);
+    if (workflowCooldowns.size === 0) {
+      this.firedAt.delete(workflowId);
+    }
+  }
 }

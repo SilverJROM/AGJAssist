@@ -35,9 +35,8 @@ import { NudgeStateService } from "./nudge-state-service.js";
 export const POLL_MS = 30_000;
 export const RECONCILE_MS = 1_800_000;
 // STUCK_THRESHOLD_MS owned by ./overmind/classifier.ts (B4 + B9). Imported below.
+// Sub-modules live under ./overmind/ — see each import below for which file owns what.
 
-// Sub-agent detection lives in ./overmind/subagent-detection.ts (B3). Local
-// imports for the watcher class methods.
 import {
   SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS,
   SUBAGENT_REASK_GRACE_MS,
@@ -51,8 +50,6 @@ export const MAX_CANNED_NUDGES = 2;
 export const BRAIN_COORDINATOR_TAIL_LINES = 40;
 export const BRAIN_RUN_FILE_TAIL_LINES = 80;
 export const DECISION_HANDLED_TIER = 4;
-// Prior-decision matching + ALWAYS_ESCALATE guardrail live in
-// ./overmind/decision-match.ts (B6). Local imports for the watcher's use.
 import {
   applyAlwaysEscalateGuardrail,
   collectPriorDecisions,
@@ -69,26 +66,9 @@ export const ALL_DONE_CONFIRM_NUDGE = DEFAULT_COMPLETION_CONSULT_TEXT;
 export const FRONTLOAD_CORRECTION_NOTE =
   "Overmind: that decision should have been frontloaded at intake (projcore §1.4a) — please put such decisions in the north-star next time.";
 
-// ─── Task-staleness detector constants ──────────────────────────────────────
-// JROM 2026-05-24 v2.1 — renamed from TASK_STALE_CHECK_MS (the 'tasks_stale'
-// gap is gone; this is now the read-cadence floor for progress.md/callbacks.md).
-// The mtime-advanced shortcut in assessTaskStaleness still triggers an
-// immediate re-read on any file change; this floor only applies when nothing
-// changed and we're still polling. Settings-overridable via
-// `evidence_read_cadence_minutes` (default 3).
+// Floor cadence for progress.md/callbacks.md reads; mtime change triggers immediate re-read.
+// Settings-overridable via `evidence_read_cadence_minutes` (default 3).
 export const EVIDENCE_READ_CADENCE_MS = 3 * 60 * 1000;
-/** @deprecated Renamed to EVIDENCE_READ_CADENCE_MS — kept as alias for any
- *  downstream code still importing the old name. */
-export const TASK_STALE_CHECK_MS = EVIDENCE_READ_CADENCE_MS;
-// JROM 2026-05-24 v2.2: TASK_STALE_NAG_COOLDOWN_MS, TASK_RECENT_UPDATE_GRACE_MS,
-// SPARK_TASK_FALLBACK_PER_HOUR, SPARK_TASK_CMD, SONNET_TASK_CMD all REMOVED
-// along with the Tier-3 LLM fallback inside assessTaskStaleness. The
-// evidence-read loop is now pure algorithm (regex over progress.md +
-// callbacks.md + pane text) — zero LLM calls, zero token spend per tick.
-
-// Classifier symbols are owned by ./overmind/classifier.ts (B4). The B9 cleanup
-// dropped the barrel re-exports — call sites now import from the new direct
-// paths. Local imports below for the watcher's own usage.
 import { STUCK_THRESHOLD_MS } from "./overmind/classifier.js";
 
 const RUN_DIR_ACTIVITY_FILES = ["callbacks.md", "progress.md", "queue.md"] as const;
@@ -97,9 +77,6 @@ const TERMINAL_STATUSES: OvermindWorkflowStatus[] = ["paused", "completed", "fai
 export type OvermindNotify = (text: string) => Promise<void>;
 export type OvermindUpdate = (workflows: OvermindWorkflow[]) => void | Promise<void>;
 
-// Classifier inputs/outputs + ActiveSessionAttribution are owned by
-// ./overmind/classifier.ts + active-session-attribution.ts (B4 + B4a). The
-// watcher class uses them locally.
 import type {
   ClassifyWorkflowInput,
   ClassifyResult,
@@ -123,17 +100,38 @@ interface NudgeLadderFields {
   pending_decision?: string | null;
 }
 
-// Pure pane-text utilities live in ./overmind/pane-utils.ts (B2). Watcher
-// class methods use them locally.
+class CooldownTimestampStore {
+  constructor(
+    private readonly cooldowns: WatcherCooldowns,
+    private readonly key: string
+  ) {}
+
+  get(workflowId: number): number | undefined {
+    const lastFired = this.cooldowns.getLastFired(workflowId, this.key);
+    return lastFired === 0 ? undefined : lastFired;
+  }
+
+  set(workflowId: number, timestampMs: number): this {
+    this.cooldowns.recordFired(workflowId, this.key, timestampMs);
+    return this;
+  }
+
+  has(workflowId: number): boolean {
+    return this.cooldowns.getLastFired(workflowId, this.key) !== 0;
+  }
+
+  delete(workflowId: number): boolean {
+    const hadValue = this.has(workflowId);
+    this.cooldowns.forgetKey(workflowId, this.key);
+    return hadValue;
+  }
+}
+
 import { hashPane, hasActiveTurn } from "./overmind/pane-utils.js";
 import { determineActiveSessionAttribution } from "./overmind/active-session-attribution.js";
-
-// Completeness assessment lives in ./overmind/completeness.ts (B5).
 import { assessRegistrationCompleteness } from "./overmind/completeness.js";
 import type { CompletenessResult } from "./overmind/completeness.js";
-
-// JROM 2026-05-24 v2.2: invokeJudgeWithFallback REMOVED along with the
-// task-staleness Tier-3 fallback. Evidence-read loop is zero-token regex.
+import { WatcherCooldowns } from "./overmind/cooldowns.js";
 
 export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
@@ -143,13 +141,13 @@ export class OvermindWatcher {
   // same unchanged gap every 30-min cycle. Cleared when the gap resolves so a fresh
   // recurrence triggers a new ask.
   private readonly lastReconcileAsk = new Map<number, string>();
+  private readonly cooldowns = new WatcherCooldowns();
+  private readonly lastTaskStaleCheckAt = new CooldownTimestampStore(this.cooldowns, "evidence_read");
+  private readonly lastSubagentAskAt = new CooldownTimestampStore(this.cooldowns, "subagent_ask");
+  private readonly lastIdleNudgeAt = new CooldownTimestampStore(this.cooldowns, "idle_nudge");
+  private readonly lastAskUpdateNudgeAt = new CooldownTimestampStore(this.cooldowns, "ask_update");
   // Task-staleness detector state — per workflow, keyed by workflow.id
-  private readonly lastTaskStaleCheckAt = new Map<number, number>();
   private readonly lastProgressMtimeMs = new Map<number, number>();
-  // JROM v2.2: sparkTaskUsageWindow removed with the Tier-3 LLM fallback.
-  // JROM v2: lastTaskStaleNudgeAt kept ONLY for forgetWorkflow back-compat —
-  // the tasks_stale nag itself is gone (auto-promote handles state now).
-  private readonly lastTaskStaleNudgeAt = new Map<number, number>();
 
   // ── In-process sub-agent suppression state ────────────────────────────────
   // subagentInFlight: when set for a workflow, all parent-facing interrupts are suppressed.
@@ -164,17 +162,6 @@ export class OvermindWatcher {
   // resets that debounce window and does not corrupt durable workflow state.
   // First timestamp at which "parent not-working AND every child idle/closed" was observed.
   private readonly apparentIdleSince = new Map<number, number>();
-  // Intentionally in-memory for the same reason as apparentIdleSince.
-  // When the one-time Tier-2 ask was sent (for re-ask rate cap).
-  private readonly lastSubagentAskAt = new Map<number, number>();
-
-  // ── Idle-nudge cooldown (CANNED_NUDGE / CANNED_NUDGE_NO_CHILD) ────────────
-  // Per-workflow timestamp of the last successfully-sent canned idle nudge.
-  // Rate-limits nudges regardless of whether the parent replied.
-  private readonly lastIdleNudgeAt = new Map<number, number>();
-  // Per-workflow timestamp for "please update via API" asks.
-  private readonly lastAskUpdateNudgeAt = new Map<number, number>();
-
   constructor(
     private readonly overmindService: OvermindService,
     private readonly tmuxService: TmuxService,
@@ -432,7 +419,7 @@ export class OvermindWatcher {
       ) {
         // Expected duration + grace elapsed.
         this.subagentInFlight.delete(wid);
-        this.lastSubagentAskAt.delete(wid); // allow a fresh ask after another 10 min idle
+        this.cooldowns.forgetKey(wid, "subagent_ask");
       }
     }
 
@@ -455,11 +442,10 @@ export class OvermindWatcher {
       }
 
       const idleSince = this.apparentIdleSince.get(wid);
-      const lastAskedAt = this.lastSubagentAskAt.get(wid) ?? 0;
       if (
         idleSince !== undefined &&
         nowMs - idleSince > SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS &&
-        nowMs - lastAskedAt > SUBAGENT_REASK_GRACE_MS
+        this.cooldowns.shouldFire(wid, "subagent_ask", SUBAGENT_REASK_GRACE_MS, nowMs)
       ) {
         try {
           await this.tmuxService.sendAndSubmit(
@@ -471,7 +457,7 @@ export class OvermindWatcher {
         } catch (err) {
           console.error("Overmind sub-agent ask failed:", err);
         }
-        this.lastSubagentAskAt.set(wid, nowMs);
+        this.cooldowns.recordFired(wid, "subagent_ask", nowMs);
       }
     }
 
@@ -788,8 +774,7 @@ export class OvermindWatcher {
       // that don't inject nudgeState.
       const lastIdleNudge =
         this.nudgeState?.getLastIdleNudge(workflow.id) ??
-        this.lastIdleNudgeAt.get(workflow.id) ??
-        0;
+        this.cooldowns.getLastFired(workflow.id, "idle_nudge");
       if (nowMs - lastIdleNudge < idleCooldownMs) {
         // Still in cooldown — return current state unchanged (no increment, no send).
         return { nudge_count: workflow.nudge_count, tier: workflow.tier };
@@ -804,7 +789,7 @@ export class OvermindWatcher {
     // Record the send time AFTER successful sendAndSubmit — both in-memory (for tests
     // that don't inject nudgeState) and in the persisted store (survives restarts).
     const sendTs = Date.now();
-    this.lastIdleNudgeAt.set(workflow.id, sendTs);
+    this.cooldowns.recordFired(workflow.id, "idle_nudge", sendTs);
     this.nudgeState?.setLastIdleNudge(workflow.id, sendTs);
     const postNudgePane = await this.capturePaneSafe(workflow.coordinator_session);
     return {
@@ -920,17 +905,12 @@ export class OvermindWatcher {
   // Clean up staleness-detector Maps for a workflow that has gone terminal or paused.
   // Defensive: silently skips if the id isn't present.
   private cleanupStalenessState(workflowId: number): void {
-    this.lastTaskStaleCheckAt.delete(workflowId);
+    this.cooldowns.forget(workflowId);
     this.lastProgressMtimeMs.delete(workflowId);
-    this.lastTaskStaleNudgeAt.delete(workflowId);
     this.lastReconcileAsk.delete(workflowId);
     // Sub-agent suppression state
     this.subagentInFlight.delete(workflowId);
     this.apparentIdleSince.delete(workflowId);
-    this.lastSubagentAskAt.delete(workflowId);
-    // Idle-nudge cooldown (in-memory + persisted)
-    this.lastIdleNudgeAt.delete(workflowId);
-    this.lastAskUpdateNudgeAt.delete(workflowId);
     this.nudgeState?.forgetWorkflow(workflowId);
   }
 
@@ -975,8 +955,7 @@ export class OvermindWatcher {
 
     const lastNudgeAt =
       this.nudgeState?.getLastAskUpdateNudge(workflow.id) ??
-      this.lastAskUpdateNudgeAt.get(workflow.id) ??
-      0;
+      this.cooldowns.getLastFired(workflow.id, "ask_update");
     if (nowMs - lastNudgeAt < cooldownMs) return;
 
     const staleMinutes = Math.max(1, Math.round((nowMs - lastActivityMs) / 60_000));
@@ -987,7 +966,7 @@ export class OvermindWatcher {
       "If the run is finished, POST /api/overmind/complete to close it out.";
     try {
       await this.tmuxService.sendAndSubmit(workflow.coordinator_session, message);
-      this.lastAskUpdateNudgeAt.set(workflow.id, nowMs);
+      this.cooldowns.recordFired(workflow.id, "ask_update", nowMs);
       this.nudgeState?.setLastAskUpdateNudge(workflow.id, nowMs);
     } catch (error) {
       console.error("Overmind ask-update nudge failed:", error);
@@ -1038,7 +1017,7 @@ export class OvermindWatcher {
     const evidenceReadCadenceMs =
       (settings?.evidence_read_cadence_minutes ?? DEFAULT_EVIDENCE_READ_CADENCE_MIN) * 60_000;
 
-    const lastCheck = this.lastTaskStaleCheckAt.get(wid) ?? 0;
+    const lastCheck = this.cooldowns.getLastFired(wid, "evidence_read");
     let progressMtime = 0;
     let progressText = "";
     let callbacksText = "";
@@ -1090,13 +1069,13 @@ export class OvermindWatcher {
     // completion consult, decision-match, subagent — fire on rare structural
     // events, not on every poll, and stay.)
     if (derived.size === 0) {
-      this.lastTaskStaleCheckAt.set(wid, now);
+      this.cooldowns.recordFired(wid, "evidence_read", now);
       if (progressMtime > 0) this.lastProgressMtimeMs.set(wid, progressMtime);
       return undefined;
     }
 
     // Update timestamps.
-    this.lastTaskStaleCheckAt.set(wid, now);
+    this.cooldowns.recordFired(wid, "evidence_read", now);
     if (progressMtime > 0) this.lastProgressMtimeMs.set(wid, progressMtime);
 
     // Convert Map to plain Record.
