@@ -5922,6 +5922,9 @@ function TgDashboard({ onEditBottomNav }) {
           </div>
         `)}
       </div>
+      <div class="tg-home-preferences">
+        <${LandingPagePreference} />
+      </div>
     </div>
   `;
 }
