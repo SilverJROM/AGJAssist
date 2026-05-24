@@ -330,6 +330,9 @@ describe("Overmind routes", () => {
     function makeRegisterTmuxMock(aliveIncoming: boolean): TmuxService {
       return {
         sessionExists: vi.fn(async (target: string) => {
+          // owner-parent is always alive (the OWNING workflow's session — must pass
+          // the new /register session-existence validation, JROM 2026-05-24).
+          if (target === "owner-parent") return true;
           if (target === "bad-parent") return aliveIncoming;
           return false;
         }),
@@ -404,7 +407,7 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       }
     });
 
-    it("does NOT send corrective advice when the incoming coordinator_session is not alive", async () => {
+    it("400-rejects (BEFORE the project-tree check) when the incoming coordinator_session is not alive — no corrective tmux send (JROM 2026-05-24 validation)", async () => {
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-register-advice-dead-"));
       const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
       fs.mkdirSync(path.join(tmpDir, "data"), { recursive: true });
@@ -440,7 +443,11 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
 }
         });
 
-        expect(dup.statusCode).toBe(409);
+        // A dead incoming coordinator_session is now rejected at the
+        // session-existence guard with 400 — short-circuits before the
+        // project-tree match even runs, so no corrective tmux send is attempted.
+        expect(dup.statusCode).toBe(400);
+        expect(dup.json().error).toContain("not an alive tmux session");
         expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
       } finally {
         await a.close();
@@ -1026,9 +1033,13 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
   });
 
   describe("child-close reminder on /complete", () => {
-    function makeTmuxMock(aliveSet: Set<string>): TmuxService {
+    // After the register-validates-parent-session-is-alive guard (JROM 2026-05-24),
+    // tests that hit /register through this mock must report their parent session
+    // as alive. Each test passes its parent name(s) in `extraAlive`.
+    function makeTmuxMock(aliveSet: Set<string>, extraAlive: string[] = []): TmuxService {
+      const merged = new Set([...aliveSet, ...extraAlive]);
       return {
-        sessionExists: vi.fn(async (target: string) => aliveSet.has(target)),
+        sessionExists: vi.fn(async (target: string) => merged.has(target)),
         sendCommand: vi.fn(async () => ({ message: "sent", blocked: false })),
         sendAndSubmit: vi.fn(async () => true),
         capturePane: vi.fn(async () => "")
@@ -1043,7 +1054,7 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     }
 
     it("sends one sendCommand to coordinator_session containing child name + kill-session when ≥1 child is alive", async () => {
-      const tmux = makeTmuxMock(new Set(["child-alive-1"]));
+      const tmux = makeTmuxMock(new Set(["child-alive-1"]), ["parent-coord"]);
       const a = await buildAppWithTmux(tmux);
       try {
         await a.inject({
@@ -1080,7 +1091,7 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
     it("does NOT call sendCommand when workflow has no child_sessions", async () => {
-      const tmux = makeTmuxMock(new Set());
+      const tmux = makeTmuxMock(new Set(), ["parent-no-children"]);
       const a = await buildAppWithTmux(tmux);
       try {
         await a.inject({
@@ -1112,7 +1123,7 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
     it("does NOT call sendCommand when all children are dead (sessionExists → false)", async () => {
-      const tmux = makeTmuxMock(new Set()); // nothing alive
+      const tmux = makeTmuxMock(new Set(), ["parent-dead-children"]); // nothing alive
       const a = await buildAppWithTmux(tmux);
       try {
         await a.inject({
@@ -1173,7 +1184,7 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
     it("(a) alive child + not-all-tasks-done → ONE sendAndSubmit with BOTH kill-session AND task-list ask", async () => {
-      const tmux = makeTmuxMock(new Set(["child-alive-x"]));
+      const tmux = makeTmuxMock(new Set(["child-alive-x"]), ["hris-partial-coord"]);
       const a = await buildAppWithTmux(tmux);
       try {
         await a.inject({
@@ -1221,7 +1232,7 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
     it("(b) no alive children + not-all-tasks-done → sendAndSubmit fires with ONLY the task-list ask", async () => {
-      const tmux = makeTmuxMock(new Set()); // no alive children
+      const tmux = makeTmuxMock(new Set(), ["hris-ncp-coord"]); // no alive children
       const a = await buildAppWithTmux(tmux);
       try {
         await a.inject({
@@ -1267,7 +1278,7 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
     it("(c) alive child + all-tasks-done → sendAndSubmit fires with ONLY the kill-session ask (no task-list line)", async () => {
-      const tmux = makeTmuxMock(new Set(["child-alive-y"]));
+      const tmux = makeTmuxMock(new Set(["child-alive-y"]), ["hris-ad-coord"]);
       const a = await buildAppWithTmux(tmux);
       try {
         await a.inject({
@@ -1312,7 +1323,7 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
     it("(d) no alive children + all tasks done → NO sendAndSubmit at all", async () => {
-      const tmux = makeTmuxMock(new Set()); // all dead
+      const tmux = makeTmuxMock(new Set(), ["hris-adnc-coord"]); // all dead
       const a = await buildAppWithTmux(tmux);
       try {
         await a.inject({

@@ -144,8 +144,114 @@ export function registerOvermindRoutes(
       if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
 
       const { label, session, child_sessions, child_roles, run_dir, current_task, tasks } = request.body || {};
-      if (!label || !session || !run_dir) {
-        return reply.code(400).send({ error: "label, session, and run_dir are required" });
+
+      // JROM 2026-05-24: "we must validate all ... not some lame ass lazy not
+      // checking always accepting what is given to him". Full payload validation
+      // before we touch the database.
+
+      // Required string fields — type + non-empty (explicit checks so TS narrows).
+      if (typeof label !== "string" || !label.trim()) {
+        return reply.code(400).send({ error: "'label' must be a non-empty string" });
+      }
+      if (typeof session !== "string" || !session.trim()) {
+        return reply.code(400).send({ error: "'session' must be a non-empty string" });
+      }
+      if (typeof run_dir !== "string" || !run_dir.trim()) {
+        return reply.code(400).send({ error: "'run_dir' must be a non-empty string" });
+      }
+
+      // tmux session name shape — must match a valid identifier (alphanumeric + . _ -).
+      // tmux's own grammar rejects whitespace, ':', and a few other chars; we tighten further.
+      const SESSION_NAME_RE = /^[A-Za-z0-9._-]{1,80}$/;
+      if (!SESSION_NAME_RE.test(session)) {
+        return reply.code(400).send({
+          error: `'session' must be a tmux-safe identifier (letters, digits, dots, underscores, dashes; ≤80 chars). Got: '${session}'`
+        });
+      }
+      if (child_sessions !== undefined) {
+        if (!Array.isArray(child_sessions)) {
+          return reply.code(400).send({ error: "'child_sessions' must be an array of strings" });
+        }
+        for (const s of child_sessions) {
+          if (typeof s !== "string" || !SESSION_NAME_RE.test(s)) {
+            return reply.code(400).send({ error: `child_sessions entry '${s}' is not a tmux-safe identifier` });
+          }
+        }
+      }
+      if (child_roles !== undefined) {
+        if (!Array.isArray(child_roles)) {
+          return reply.code(400).send({ error: "'child_roles' must be an array of strings" });
+        }
+        for (const r of child_roles) {
+          if (typeof r !== "string" || !r.trim()) {
+            return reply.code(400).send({ error: "every child_roles entry must be a non-empty string" });
+          }
+        }
+        if (Array.isArray(child_sessions) && child_roles.length !== child_sessions.length) {
+          return reply.code(400).send({
+            error: `child_roles length (${child_roles.length}) must match child_sessions length (${child_sessions.length}) — overmind labels them by index`
+          });
+        }
+      }
+
+      // run_dir must be an absolute path. (Existence is checked by the watcher's
+      // completeness layer; we don't require it on disk at register time because
+      // projcore may register before the run_dir is created — but it MUST be absolute,
+      // otherwise the watcher can't resolve it consistently across cwds.)
+      if (!path.isAbsolute(run_dir)) {
+        return reply.code(400).send({
+          error: `'run_dir' must be an absolute path. Got: '${run_dir}'. Use the canonical path on disk; relative paths are ambiguous because overmind and the caller may have different cwds.`
+        });
+      }
+
+      // tasks shape: array of { id: string, label: string, state: "done"|"processing"|"pending" }
+      if (tasks !== undefined) {
+        if (!Array.isArray(tasks)) {
+          return reply.code(400).send({ error: "'tasks' must be an array" });
+        }
+        const VALID_TASK_STATES = new Set(["done", "processing", "pending"]);
+        for (let i = 0; i < tasks.length; i++) {
+          const t = tasks[i] as { id?: unknown; label?: unknown; state?: unknown };
+          if (typeof t?.id !== "string" || !t.id.trim()) {
+            return reply.code(400).send({ error: `tasks[${i}].id must be a non-empty string` });
+          }
+          if (typeof t.label !== "string" || !t.label.trim()) {
+            return reply.code(400).send({ error: `tasks[${i}].label must be a non-empty string` });
+          }
+          if (typeof t.state !== "string" || !VALID_TASK_STATES.has(t.state)) {
+            return reply.code(400).send({
+              error: `tasks[${i}].state must be one of done|processing|pending. Got: '${t.state}'`
+            });
+          }
+        }
+      }
+
+      // current_task is optional, but if present must be a string.
+      if (current_task !== undefined && current_task !== null && typeof current_task !== "string") {
+        return reply.code(400).send({ error: "'current_task' must be a string or null" });
+      }
+
+      // JROM 2026-05-24: "why the fuck do we allow a fake parent session" — validate
+      // the coordinator_session is a live tmux session BEFORE accepting the register.
+      // A fake session is unreachable for nudges and silently rots as "stuck". Only
+      // enforced when tmuxService is wired (always in prod; tests pass a mock).
+      if (tmuxService && typeof tmuxService.sessionExists === "function") {
+        let isAlive = false;
+        try {
+          isAlive = await tmuxService.sessionExists(session as string);
+        } catch {
+          isAlive = false;
+        }
+        if (!isAlive) {
+          return reply.code(400).send({
+            error:
+              `Overmind: coordinator_session '${session}' is not an alive tmux session. ` +
+              `Overmind tracks ACTIVE tmux sessions only — a non-existent parent is unreachable ` +
+              `for nudges and would silently sit as 'stuck' on the dashboard forever. ` +
+              `Run \`tmux new-session -d -s ${session}\` first (or use the session you actually want ` +
+              `overmind to track), then re-POST /api/overmind/register.`
+          });
+        }
       }
 
       // Step 1: existing coordinator_session keeps the current upsert behavior.

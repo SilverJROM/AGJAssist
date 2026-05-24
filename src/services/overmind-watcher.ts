@@ -330,11 +330,12 @@ export class OvermindWatcher {
     // COORDINATOR's cwd, not ours. Resolving against the coordinator pane's cwd avoids a
     // false "run_dir not found" and keeps the run_dir mtime activity signal working.
     const resolvedRunDir = await this.resolveRunDir(workflow);
-    const [coordinatorPane, childSnapshots, mtimeAdvanced, runDirExists] = await Promise.all([
+    const [coordinatorPane, childSnapshots, mtimeAdvanced, runDirExists, coordinatorSessionExists] = await Promise.all([
       this.capturePaneSafe(workflow.coordinator_session),
       Promise.all(workflow.child_sessions.map((target) => this.captureChildSession(target))),
       runDirMtimeAdvanced(resolvedRunDir, workflow.last_activity_at),
-      pathExists(resolvedRunDir)
+      pathExists(resolvedRunDir),
+      this.sessionExistsSafe(workflow.coordinator_session)
     ]);
     const childPanes = childSnapshots.map((child) => child.pane);
     const childHashChanges = this.updateChildPaneHashes(
@@ -542,6 +543,7 @@ export class OvermindWatcher {
     const info = await this.applyCompleteness(workflow, {
       childStatuses,
       runDirExists,
+      coordinatorSessionExists,
       resolvedRunDir,
       now,
       derivedTaskState
@@ -589,6 +591,7 @@ export class OvermindWatcher {
     ctx: {
       childStatuses: OvermindChildSessionStatus[];
       runDirExists: boolean;
+      coordinatorSessionExists: boolean;
       resolvedRunDir: string;
       now: string;
       derivedTaskState?: Record<string, "done" | "in-progress" | "unknown">;
@@ -608,6 +611,8 @@ export class OvermindWatcher {
       childSessions: workflow.child_sessions ?? [],
       childRoles: workflow.child_roles ?? [],
       childStatuses: ctx.childStatuses,
+      coordinatorSession: workflow.coordinator_session,
+      coordinatorSessionExists: ctx.coordinatorSessionExists,
       runDir: workflow.run_dir,
       runDirExists: ctx.runDirExists,
       ageMs,

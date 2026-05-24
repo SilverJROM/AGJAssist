@@ -24,6 +24,8 @@ function base(overrides: Partial<CompletenessInput> = {}): CompletenessInput {
     childSessions: [],
     childRoles: [],
     childStatuses: [],
+    coordinatorSession: "test-parent",
+    coordinatorSessionExists: true,
     runDir: "/tmp/run",
     runDirExists: true,
     ageMs: PAST_GRACE,
@@ -42,6 +44,18 @@ describe("assessRegistrationCompleteness", () => {
     expect(r.requestLabel).toBeNull();
     expect(r.requestText).toBeNull();
     expect(r.needsBrain).toBe(false);
+  });
+
+  it("flags a dead coordinator tmux session as 'coordinator_dead' with actionable text (JROM 2026-05-24)", () => {
+    const r = assessRegistrationCompleteness(base({
+      coordinatorSession: "receiptbot-vat-24",
+      coordinatorSessionExists: false
+    }));
+    expect(r.missing).toContain("coordinator_dead");
+    expect(r.requestLabel).toContain("coord session dead");
+    expect(r.requestText).toContain("'receiptbot-vat-24'");
+    expect(r.requestText).toContain("re-register");
+    expect(r.requestText).toContain("complete");
   });
 
   it("flags an empty tasklist past the grace window", () => {

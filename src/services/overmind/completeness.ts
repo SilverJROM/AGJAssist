@@ -20,6 +20,11 @@ export interface CompletenessInput {
   childSessions: string[];
   childRoles: string[];
   childStatuses: { session: string; status: string }[];
+  /** The workflow's coordinator_session name (for the dead-coord error text). */
+  coordinatorSession: string;
+  /** False when `tmux has-session -t coordinator_session` failed — i.e. the
+   *  parent tmux session that owns this workflow does not exist. */
+  coordinatorSessionExists: boolean;
   runDir: string;
   runDirExists: boolean;
   ageMs: number;
@@ -57,10 +62,39 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
   const labels: string[] = [];
   const lines: string[] = [];
 
+  // JROM 2026-05-24: when the coordinator tmux session itself is dead, no
+  // amount of nudging will reach a parent — surface this as a high-visibility
+  // gap so JROM sees it on the dashboard and can re-point or /complete.
+  // Watcher uses this signal to skip the nudge ladder entirely (no point
+  // sending tmux messages to a non-existent target).
+  if (!input.coordinatorSessionExists) {
+    missing.push("coordinator_dead");
+    labels.push("coord session dead");
+    lines.push(
+      `your coordinator tmux session '${input.coordinatorSession}' is not alive — overmind cannot reach this workflow. ` +
+        `Either re-register with the correct coordinator_session, or POST /api/overmind/complete if the run is finished.`
+    );
+  }
+
   if (input.tasks.length === 0 && input.ageMs >= EMPTY_TASKLIST_GRACE_MS) {
     missing.push("tasklist");
     labels.push("tasklist");
     lines.push("push your batch tasklist — it is empty, so the dashboard shows 0/0 (build it from queue.md or your batch plan / req-matrix.md)");
+  }
+
+  // JROM 2026-05-24: trash-tasklist detector. Some callers pipe a queue.md
+  // line-by-line into POST /tasks, producing labels like
+  //   "1. ~~**B1** — math_validation.py rewrite + new tests · R1 + R6-slice · SHORT 30min~~ ✅ DONE 2026-05-24T00:21Z (R1 VERIFI"
+  // and auto-generated IDs like "row-1", "row-2" — unreadable on the dashboard.
+  // Detect and demand a clean structured tasklist.
+  const trashSignals = detectTrashTasklist(input.tasks as Array<{ id?: string; label?: string; state?: string }>);
+  if (trashSignals.isTrash) {
+    missing.push("trash_tasklist");
+    labels.push("trash tasklist");
+    lines.push(
+      `your tasklist looks like raw queue.md prose — ${trashSignals.reasons.join("; ")}. ` +
+        `Re-POST /api/overmind/tasks with a CLEAN structured list: each task = { id: short token like "B1"/"R3", label: clean short title (no markdown strikethrough, no embedded DONE/✅ markers, no R-row dump, ≤120 chars), state: "done"|"processing"|"pending" }. Track done-ness via the state field, NOT by editing the label.`
+    );
   }
 
   if (!input.runDirExists) {
@@ -175,4 +209,49 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
     signature,
     needsBrain
   };
+}
+
+/**
+ * Trash-tasklist detector. Heuristic signals that a tasklist was constructed by
+ * pasting queue.md / batch-plan prose lines verbatim instead of building a
+ * structured list. Triggers when ANY of these high-confidence signs fire:
+ *
+ *   - >50% of task IDs match `^row-\d+$` (auto-generated row IDs from a
+ *     naive line-by-line parse).
+ *   - >40% of labels contain markdown strikethrough `~~...~~` (used in
+ *     queue.md to mark tasks done — should be reflected in state, not label).
+ *   - >40% of labels embed a DONE/✅ marker (same reason).
+ *   - any label exceeds 200 characters (a task title is not a paragraph).
+ *
+ * Returns the offenders so the corrective message can name them.
+ */
+export function detectTrashTasklist(
+  tasks: Array<{ id?: string; label?: string; state?: string }>
+): { isTrash: boolean; reasons: string[] } {
+  if (tasks.length === 0) return { isTrash: false, reasons: [] };
+  const reasons: string[] = [];
+  const total = tasks.length;
+  const autoIds = tasks.filter((t) => typeof t.id === "string" && /^row-\d+$/i.test(t.id)).length;
+  const strikethrough = tasks.filter(
+    (t) => typeof t.label === "string" && /~~[^~]+~~/.test(t.label)
+  ).length;
+  const embeddedDone = tasks.filter(
+    (t) => typeof t.label === "string" && /\b(DONE|✅)\b/.test(t.label)
+  ).length;
+  const overlong = tasks.filter((t) => typeof t.label === "string" && t.label.length > 200);
+
+  if (autoIds / total > 0.5) {
+    reasons.push(`${autoIds}/${total} task ids are auto-generated 'row-N' tokens`);
+  }
+  if (strikethrough / total > 0.4) {
+    reasons.push(`${strikethrough}/${total} labels contain markdown strikethrough '~~…~~'`);
+  }
+  if (embeddedDone / total > 0.4) {
+    reasons.push(`${embeddedDone}/${total} labels embed DONE/✅ markers (use the state field instead)`);
+  }
+  if (overlong.length > 0) {
+    reasons.push(`${overlong.length} label(s) exceed 200 chars (a task title is not a paragraph)`);
+  }
+
+  return { isTrash: reasons.length > 0, reasons };
 }
