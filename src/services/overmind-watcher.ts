@@ -131,6 +131,7 @@ import type { CompletenessResult } from "./overmind/completeness.js";
 import { WatcherCooldowns } from "./overmind/cooldowns.js";
 import { maybeAskForParentUpdate } from "./overmind/idle-detector.js";
 import { EvidenceReader } from "./overmind/evidence-reader.js";
+import { cleanupWorkflowState } from "./overmind/workflow-cleanup.js";
 
 export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
@@ -185,7 +186,15 @@ export class OvermindWatcher {
     // Clean up staleness state for any workflow that just became terminal/paused.
     for (const workflow of allWorkflows) {
       if (TERMINAL_STATUSES.includes(workflow.status)) {
-        this.cleanupStalenessState(workflow.id);
+        cleanupWorkflowState(workflow.id, {
+          cooldowns: this.cooldowns,
+          nudgeState: this.nudgeState,
+          childPaneHashes: this.childPaneHashes,
+          lastReconcileAsk: this.lastReconcileAsk,
+          subagentInFlight: this.subagentInFlight,
+          apparentIdleSince: this.apparentIdleSince,
+          evidenceReader: this.evidenceReader
+        });
       }
     }
 
@@ -330,7 +339,15 @@ export class OvermindWatcher {
     // interrupt — no completion consult, no completeness request, no nudge, no brain,
     // no notification. Resume re-arms everything on the next tick.
     if (workflow.monitoring_paused) {
-      this.cleanupStalenessState(workflow.id);
+      cleanupWorkflowState(workflow.id, {
+        cooldowns: this.cooldowns,
+        nudgeState: this.nudgeState,
+        childPaneHashes: this.childPaneHashes,
+        lastReconcileAsk: this.lastReconcileAsk,
+        subagentInFlight: this.subagentInFlight,
+        apparentIdleSince: this.apparentIdleSince,
+        evidenceReader: this.evidenceReader
+      });
       this.overmindService.update(workflow.id, {
         status: result.status,
         pending_decision: result.pendingDecision,
@@ -884,18 +901,6 @@ export class OvermindWatcher {
       status: "waiting_human",
       stuck_since: null
     };
-  }
-
-  // Clean up staleness-detector Maps for a workflow that has gone terminal or paused.
-  // Defensive: silently skips if the id isn't present.
-  private cleanupStalenessState(workflowId: number): void {
-    this.cooldowns.forget(workflowId);
-    this.evidenceReader.forget(workflowId);
-    this.lastReconcileAsk.delete(workflowId);
-    // Sub-agent suppression state
-    this.subagentInFlight.delete(workflowId);
-    this.apparentIdleSince.delete(workflowId);
-    this.nudgeState?.forgetWorkflow(workflowId);
   }
 
   async notifyBlocked(workflow: OvermindWorkflow, issue: string, reason: string): Promise<void> {
