@@ -26,7 +26,6 @@ import {
 } from "./overmind-notifications.js";
 import {
   AppSettingsService,
-  DEFAULT_EVIDENCE_READ_CADENCE_MIN,
   DEFAULT_IDLE_NUDGE_COOLDOWN_MIN
 } from "./app-settings-service.js";
 import { NudgeStateService } from "./nudge-state-service.js";
@@ -85,8 +84,7 @@ import {
   allTasksComplete,
   classifyWorkflow,
   classifyParentSession,
-  classifyChildSessionStatus,
-  deriveTaskStateFromText
+  classifyChildSessionStatus
 } from "./overmind/classifier.js";
 import type { ActiveSessionAttribution } from "./overmind/active-session-attribution.js";
 
@@ -132,6 +130,7 @@ import { assessRegistrationCompleteness } from "./overmind/completeness.js";
 import type { CompletenessResult } from "./overmind/completeness.js";
 import { WatcherCooldowns } from "./overmind/cooldowns.js";
 import { maybeAskForParentUpdate } from "./overmind/idle-detector.js";
+import { EvidenceReader } from "./overmind/evidence-reader.js";
 
 export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
@@ -146,8 +145,7 @@ export class OvermindWatcher {
   private readonly lastSubagentAskAt = new CooldownTimestampStore(this.cooldowns, "subagent_ask");
   private readonly lastIdleNudgeAt = new CooldownTimestampStore(this.cooldowns, "idle_nudge");
   private readonly lastAskUpdateNudgeAt = new CooldownTimestampStore(this.cooldowns, "ask_update");
-  // Task-staleness detector state — per workflow, keyed by workflow.id
-  private readonly lastProgressMtimeMs = new Map<number, number>();
+  private readonly evidenceReader: EvidenceReader;
 
   // ── In-process sub-agent suppression state ────────────────────────────────
   // subagentInFlight: when set for a workflow, all parent-facing interrupts are suppressed.
@@ -170,7 +168,13 @@ export class OvermindWatcher {
     private readonly onUpdate?: OvermindUpdate,
     private readonly appSettings?: AppSettingsService,
     private readonly nudgeState?: NudgeStateService
-  ) {}
+  ) {
+    this.evidenceReader = new EvidenceReader({
+      overmindService: this.overmindService,
+      cooldowns: this.cooldowns,
+      appSettings: this.appSettings
+    });
+  }
 
   async tick(): Promise<void> {
     const allWorkflows = this.overmindService.list();
@@ -311,41 +315,15 @@ export class OvermindWatcher {
       childPanes
     });
 
-    // Task-staleness derivation (best-effort, never throws out of tick).
     const paneChanged = workflow.last_pane_hash !== null && result.coordinatorHash !== workflow.last_pane_hash;
-    let derivedTaskState: Record<string, "done" | "in-progress" | "unknown"> | undefined;
-    try {
-      derivedTaskState = await this.assessTaskStaleness(workflow, coordinatorPane, resolvedRunDir, paneChanged);
-    } catch {
-      derivedTaskState = undefined;
-    }
-
-    // JROM 2026-05-24 lazy-supervisor fix — auto-promote tasks where the
-    // derivation says "done" but the registered state isn't. Silent, audit
-    // trail in task_log via source='evidence-derived'. After this step the
-    // registered state matches the derivation, so the tasks_stale gap in
-    // completeness.ts has nothing left to flag (and is now removed).
-    if (derivedTaskState && workflow.tasks?.length) {
-      const promotedTasks = workflow.tasks.map((t) =>
-        t.id && t.state !== "done" && derivedTaskState[t.id] === "done"
-          ? { ...t, state: "done" as const }
-          : t
-      );
-      const changedAny = promotedTasks.some((t, i) => t.state !== workflow.tasks[i].state);
-      if (changedAny) {
-        const refreshed = this.overmindService.setTasks(
-          workflow.id,
-          workflow.current_task,
-          promotedTasks,
-          "evidence-derived"
-        );
-        if (refreshed) {
-          // Re-read so the rest of this tick (applyCompleteness, nudge ladder)
-          // sees the post-promotion state, not the stale snapshot.
-          workflow = refreshed;
-        }
-      }
-    }
+    const evidence = await this.evidenceReader.readAndPromote(
+      workflow,
+      coordinatorPane,
+      resolvedRunDir,
+      paneChanged
+    );
+    workflow = evidence.workflow;
+    const derivedTaskState = evidence.derivedTaskState;
 
     // Monitoring paused (JROM is talking to this coordinator): keep the display live
     // (status, parent/child, attribution) so overmind stays AWARE, but suppress every
@@ -912,106 +890,12 @@ export class OvermindWatcher {
   // Defensive: silently skips if the id isn't present.
   private cleanupStalenessState(workflowId: number): void {
     this.cooldowns.forget(workflowId);
-    this.lastProgressMtimeMs.delete(workflowId);
+    this.evidenceReader.forget(workflowId);
     this.lastReconcileAsk.delete(workflowId);
     // Sub-agent suppression state
     this.subagentInFlight.delete(workflowId);
     this.apparentIdleSince.delete(workflowId);
     this.nudgeState?.forgetWorkflow(workflowId);
-  }
-
-  // Async derivation of per-task states from local files + pane text. PURE
-  // ALGORITHM — no LLM calls (JROM 2026-05-24 v2.2). Best-effort: returns
-  // undefined when nothing parseable found; never throws.
-  //
-  // Tier 1:  progress.md + callbacks.md regex scan (deterministic).
-  // Tier 1b: coordinator pane text (if Tier-1 files yielded nothing, pane >200 chars).
-  // (Tier-3 spark/sonnet fallback removed — this loop runs every 3 min × every
-  // active workflow, token cost is unbounded for what's fundamentally a regex
-  // problem.)
-  private async assessTaskStaleness(
-    workflow: OvermindWorkflow,
-    coordinatorPane: string,
-    resolvedRunDir: string,
-    paneChanged: boolean
-  ): Promise<Record<string, "done" | "in-progress" | "unknown"> | undefined> {
-    const now = Date.now();
-    const wid = workflow.id;
-    const tasks = (workflow.tasks ?? []) as Array<{ id: string; state: string }>;
-    if (tasks.length === 0) return undefined;
-
-    // Settings-driven read cadence (default 3 min). The mtime-advanced shortcut
-    // still triggers immediate re-reads on any file change; this floor only
-    // applies when nothing has changed and we're still polling.
-    const settings = this.appSettings?.get();
-    const evidenceReadCadenceMs =
-      (settings?.evidence_read_cadence_minutes ?? DEFAULT_EVIDENCE_READ_CADENCE_MIN) * 60_000;
-
-    const lastCheck = this.cooldowns.getLastFired(wid, "evidence_read");
-    let progressMtime = 0;
-    let progressText = "";
-    let callbacksText = "";
-
-    try {
-      const progressStat = await stat(path.join(resolvedRunDir, "progress.md"));
-      progressMtime = progressStat.mtimeMs;
-    } catch { /* no file */ }
-
-    const lastKnownMtime = this.lastProgressMtimeMs.get(wid) ?? 0;
-    const mtimeAdvanced = progressMtime > lastKnownMtime;
-    const checkDue = now - lastCheck >= evidenceReadCadenceMs;
-
-    if (!checkDue && !mtimeAdvanced) return undefined;
-
-    // Read Tier-1 files.
-    try {
-      progressText = await readFile(path.join(resolvedRunDir, "progress.md"), "utf-8");
-    } catch { /* no file */ }
-    try {
-      callbacksText = await readFile(path.join(resolvedRunDir, "callbacks.md"), "utf-8");
-    } catch { /* no file */ }
-
-    // Tier 1: merge derive from both files.
-    let derived = new Map<string, "done" | "in-progress" | "unknown">();
-    if (progressText) {
-      const fromProgress = deriveTaskStateFromText(progressText, tasks);
-      for (const [id, state] of fromProgress) derived.set(id, state);
-    }
-    if (callbacksText) {
-      const fromCallbacks = deriveTaskStateFromText(callbacksText, tasks);
-      for (const [id, state] of fromCallbacks) {
-        // Done takes priority over in-progress; otherwise overwrite.
-        const existing = derived.get(id);
-        if (existing !== "done") derived.set(id, state);
-      }
-    }
-
-    // Tier 1b: fallback to pane text when files yielded nothing and pane is substantive.
-    if (derived.size === 0 && coordinatorPane.length > 200) {
-      derived = deriveTaskStateFromText(coordinatorPane, tasks);
-    }
-
-    // JROM 2026-05-24 v2.2: Tier-3 LLM fallback REMOVED. This loop runs every
-    // 3 min × every active workflow × forever — token cost is unbounded for
-    // what is fundamentally a regex problem. If Tier-1/1b yielded nothing,
-    // return undefined; the next tick will retry. Better to miss a derivation
-    // than to burn tokens guessing. (The other watcher brain paths —
-    // completion consult, decision-match, subagent — fire on rare structural
-    // events, not on every poll, and stay.)
-    if (derived.size === 0) {
-      this.cooldowns.recordFired(wid, "evidence_read", now);
-      if (progressMtime > 0) this.lastProgressMtimeMs.set(wid, progressMtime);
-      return undefined;
-    }
-
-    // Update timestamps.
-    this.cooldowns.recordFired(wid, "evidence_read", now);
-    if (progressMtime > 0) this.lastProgressMtimeMs.set(wid, progressMtime);
-
-    // Convert Map to plain Record.
-    const record: Record<string, "done" | "in-progress" | "unknown"> = {};
-    for (const [id, state] of derived) record[id] = state;
-    return record;
   }
 
   async notifyBlocked(workflow: OvermindWorkflow, issue: string, reason: string): Promise<void> {
