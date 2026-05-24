@@ -1,16 +1,14 @@
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import {
   OvermindChildSessionStatus,
-  OvermindParentStatus,
   OvermindService,
   OvermindWorkflow,
   OvermindWorkflowStatus
 } from "./overmind-service.js";
 import { TmuxService } from "../tmux/tmux-service.js";
 import {
-  CompletionVerdict,
   DEFAULT_COMPLETION_CONSULT_TEXT,
   OvermindBrain,
   RegistrationReviewVerdict,
@@ -37,9 +35,6 @@ export const MAX_CANNED_NUDGES = 2;
 export const BRAIN_COORDINATOR_TAIL_LINES = 40;
 export const BRAIN_RUN_FILE_TAIL_LINES = 80;
 export const DECISION_HANDLED_TIER = 4;
-import {
-  collectPriorDecisions
-} from "./overmind/decision-match.js";
 export const CANNED_NUDGE =
   "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS.";
 // Used when the workflow has no child sessions registered — probes for an unregistered
@@ -69,8 +64,6 @@ import {
   classifyParentSession,
   classifyChildSessionStatus
 } from "./overmind/classifier.js";
-import type { ActiveSessionAttribution } from "./overmind/active-session-attribution.js";
-
 class CooldownTimestampStore {
   constructor(
     private readonly cooldowns: WatcherCooldowns,
@@ -110,6 +103,7 @@ import {
   applyDecisionInterception,
   applyNudgeLadder
 } from "./overmind/nudge-ladder.js";
+import { handleAllTasksDone } from "./overmind/completion-detector.js";
 
 export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
@@ -463,14 +457,19 @@ export class OvermindWatcher {
     // ONCE per distinct all-done signature (token-gated via completion_check), then
     // consults projcore — projcore's own /complete remains where the buck stops.
     if (allTasksComplete(workflow.tasks)) {
-      await this.handleAllTasksDone(
+      await handleAllTasksDone(
         workflow,
         coordinatorPane,
         result.coordinatorHash,
         activeAttribution,
         parentStatus,
         childStatuses,
-        resolvedRunDir
+        resolvedRunDir,
+        {
+          overmindService: this.overmindService,
+          tmuxService: this.tmuxService,
+          brain: this.brain
+        }
       );
       return;
     }
@@ -619,113 +618,6 @@ export class OvermindWatcher {
     };
   }
 
-  private async handleAllTasksDone(
-    workflow: OvermindWorkflow,
-    coordinatorPane: string,
-    coordinatorHash: string,
-    attribution: ActiveSessionAttribution,
-    parentStatus: OvermindParentStatus,
-    childStatuses: OvermindChildSessionStatus[],
-    resolvedRunDir: string
-  ): Promise<void> {
-    const doneCount = workflow.tasks.filter((task) => task.state === "done").length;
-    const signature = `${doneCount}/${workflow.tasks.length}`;
-
-    // Already assessed this exact all-done state — hold quietly: no Sonnet, no nudge
-    // ladder, no token spend. Re-armed only when the task list changes (new signature)
-    // or projcore re-registers (completion_check reset to NULL).
-    if (workflow.completion_check === signature) {
-      this.overmindService.update(workflow.id, {
-        pending_decision: null,
-        last_pane_hash: coordinatorHash,
-        stuck_since: null,
-        nudge_count: 0,
-        tier: 0,
-        active_session: attribution.active_session,
-        active_role: attribution.active_role,
-        parent_status: parentStatus,
-        child_statuses: childStatuses
-      });
-      return;
-    }
-
-    const verdict = await this.assessCompletion(workflow, coordinatorPane, resolvedRunDir);
-
-    if (verdict.action === "working") {
-      // False alarm — Sonnet sees the run is still active despite the all-done list.
-      this.overmindService.update(workflow.id, {
-        status: "working",
-        pending_decision: null,
-        last_pane_hash: coordinatorHash,
-        stuck_since: null,
-        nudge_count: 0,
-        tier: 0,
-        completion_check: signature,
-        active_session: attribution.active_session,
-        active_role: attribution.active_role,
-        parent_status: parentStatus,
-        child_statuses: childStatuses
-      });
-      return;
-    }
-
-    // consult: ask projcore to confirm + POST /complete (or clarify what remains).
-    let lastPaneHash = coordinatorHash;
-    try {
-      await this.tmuxService.sendAndSubmit(workflow.coordinator_session, verdict.consultText!);
-      lastPaneHash = hashPane(await this.capturePaneSafe(workflow.coordinator_session));
-    } catch (error) {
-      console.error("Overmind completion consult nudge failed:", error);
-    }
-
-    this.overmindService.update(workflow.id, {
-      status: "waiting_human",
-      pending_decision: null,
-      last_pane_hash: lastPaneHash,
-      stuck_since: null,
-      nudge_count: 0,
-      tier: 0,
-      completion_check: signature,
-      active_session: attribution.active_session,
-      active_role: attribution.active_role,
-      parent_status: parentStatus,
-      child_statuses: childStatuses
-    });
-  }
-
-  private async assessCompletion(
-    workflow: OvermindWorkflow,
-    coordinatorPane: string,
-    resolvedRunDir: string
-  ): Promise<CompletionVerdict> {
-    if (!this.brain?.verifyCompletion) {
-      return {
-        action: "consult",
-        consultText: ALL_DONE_CONFIRM_NUDGE,
-        reason: "No completion brain available; deterministic consult to projcore."
-      };
-    }
-    const tasksSummary = summarizeTasks(workflow.tasks);
-    try {
-      return await this.brain.verifyCompletion({
-        label: workflow.label,
-        tasksSummary,
-        coordinatorPaneTail: tailLines(coordinatorPane, BRAIN_COORDINATOR_TAIL_LINES),
-        progressTail: await readRunFileTail(resolvedRunDir, "progress.md", BRAIN_RUN_FILE_TAIL_LINES),
-        callbacksTail: await readRunFileTail(resolvedRunDir, "callbacks.md", BRAIN_RUN_FILE_TAIL_LINES),
-        northStar: await readFileBestEffort(path.join(resolvedRunDir, "north-star.md")),
-        priorDecisions: await collectPriorDecisions(resolvedRunDir, `${workflow.label}\ncompletion ${tasksSummary}`)
-      });
-    } catch (error) {
-      console.error("Overmind completion brain failed:", error);
-      return {
-        action: "consult",
-        consultText: ALL_DONE_CONFIRM_NUDGE,
-        reason: "Completion brain failed; deterministic consult to projcore."
-      };
-    }
-  }
-
   private async capturePaneSafe(target: string): Promise<string> {
     try {
       return await this.tmuxService.capturePane(target, CAPTURE_LINES);
@@ -810,38 +702,7 @@ async function runDirMtimeAdvanced(runDir: string, lastActivityAt: string | null
   return Math.max(...mtimes) > lastActivityMs;
 }
 
-// applyAlwaysEscalateGuardrail / collectPriorDecisions / extractDecisionTerms /
-// selectDecisionSnippet / countOccurrences / checkedContextLine all moved to
-// ./overmind/decision-match.ts (B6). Re-exported at top of file.
-
 // isDecisionPrompt + capturePendingDecision moved to ./overmind/classifier.ts (B4)
-
-function summarizeTasks(tasks: { id: string; label: string; state: string }[]): string {
-  if (tasks.length === 0) return "<no tasks>";
-  return tasks.map((task) => `- [${task.state}] ${task.id}: ${task.label}`).join("\n").slice(0, 2000);
-}
-
-function tailLines(text: string, maxLines: number): string {
-  const normalized = text.replace(/\r\n/g, "\n");
-  const lines = normalized.split("\n");
-  return lines.slice(-maxLines).join("\n");
-}
-
-async function readRunFileTail(runDir: string, file: string, maxLines: number): Promise<string> {
-  try {
-    return tailLines(await readFile(path.join(runDir, file), "utf-8"), maxLines);
-  } catch {
-    return "";
-  }
-}
-
-async function readFileBestEffort(filePath: string): Promise<string> {
-  try {
-    return await readFile(filePath, "utf-8");
-  } catch {
-    return "";
-  }
-}
 
 // isPastStuckThreshold moved to ./overmind/classifier.ts (B4)
 
