@@ -16,8 +16,25 @@ export function registerProjectRoutes(
     "/api/projects",
     { preHandler: authMiddleware },
     async (request) => {
-      const includeArchived = (request.query as Record<string, string>).archived === "true";
-      return { projects: projectService.list(includeArchived) };
+      const query = request.query as Record<string, string>;
+      const includeArchived = query.archived === "true";
+      // JROM 2026-05-24: list is dynamic — reconcile against disk on every GET
+      // so newly-created folders surface immediately and deleted folders
+      // auto-archive (no manual cleanup). Caller can pass `?skipReconcile=true`
+      // to bypass when the disk state is known fresh.
+      let reconcile: { added: number; archived: number; reactivated: number } | undefined;
+      if (query.skipReconcile !== "true") {
+        try {
+          reconcile = projectService.scanAndSync();
+        } catch (err) {
+          // disk hiccup shouldn't block the list — surface but don't fail.
+          request.log.warn({ err }, "project scanAndSync failed");
+        }
+      }
+      return {
+        projects: projectService.list(includeArchived),
+        ...(reconcile ? { reconcile } : {})
+      };
     }
   );
 
@@ -67,17 +84,18 @@ export function registerProjectRoutes(
         return reply.code(403).send({ error: "Owner role required" });
       }
 
-      const added = projectService.scanAndSync();
+      const reconcile = projectService.scanAndSync();
 
       auditService.log({
         userId: request.sessionUser!.id,
         actionType: "project_refresh",
         resourceType: "project",
-        details: { added },
+        details: reconcile,
         surface: "web"
       });
 
-      return { added, projects: projectService.list() };
+      // `added` kept for backward-compat with existing callers.
+      return { added: reconcile.added, reconcile, projects: projectService.list() };
     }
   );
 }
