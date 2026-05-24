@@ -72,6 +72,13 @@ function workflow(overrides: Partial<OvermindWorkflow> = {}): OvermindWorkflow {
     completion_check: null,
     parent_status: null,
     child_statuses: [],
+    info_request: null,
+    info_check: null,
+    monitoring_paused: false,
+    paused_at: null,
+    paused_by: null,
+    last_parent_update_at: null,
+    ask_update_cooldown_override_minutes: null,
     created_at: "2026-05-21T00:00:00.000Z",
     updated_at: "2026-05-21T00:00:00.000Z",
     ...overrides

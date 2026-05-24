@@ -28,9 +28,9 @@ afterEach(() => {
 });
 
 describe("OvermindService", () => {
-  it("creates the schema v22 tables, display name, active attribution, history, notification, elapsed, completion-check, per-session status, child roles, info-request, and monitoring-pause columns", () => {
+  it("creates the schema v24 tables, display name, active attribution, history, notification, elapsed, completion-check, per-session status, child roles, info-request, parent-update, and monitoring-pause columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(23);
+    expect(version.version).toBe(24);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -71,6 +71,8 @@ describe("OvermindService", () => {
     expect(colNames).toContain("monitoring_paused");
     expect(colNames).toContain("paused_at");
     expect(colNames).toContain("paused_by");
+    expect(colNames).toContain("last_parent_update_at");
+    expect(colNames).toContain("ask_update_cooldown_override_minutes");
 
     const historyCols = db.raw.pragma("table_info(overmind_task_history)") as { name: string }[];
     expect(historyCols.map((col) => col.name)).toEqual([
@@ -179,6 +181,55 @@ describe("OvermindService", () => {
       name: "lkcamp updated",
       current_task: "A1 verify"
     });
+  });
+
+  it("register sets last_parent_update_at to now", () => {
+    const before = Date.now();
+    const created = service.register({
+      label: "touch-register",
+      coordinator_session: "touch-register-parent",
+      run_dir: "/tmp/overmind/touch-register"
+    });
+    const after = Date.now();
+
+    expect(created.last_parent_update_at).toBeTruthy();
+    const touchedAtMs = Date.parse(created.last_parent_update_at || "");
+    expect(Number.isFinite(touchedAtMs)).toBe(true);
+    expect(touchedAtMs).toBeGreaterThanOrEqual(before - 1000);
+    expect(touchedAtMs).toBeLessThanOrEqual(after + 1000);
+  });
+
+  it("setTasks refreshes last_parent_update_at", () => {
+    const created = service.register({
+      label: "touch-tasks",
+      coordinator_session: "touch-tasks-parent",
+      run_dir: "/tmp/overmind/touch-tasks",
+      tasks: [{ id: "A1", label: "Initial", state: "pending" }]
+    });
+    const stale = "2001-01-01T00:00:00.000Z";
+    db.prepare("UPDATE overmind_workflows SET last_parent_update_at = ? WHERE id = ?").run(stale, created.id);
+
+    const updated = service.setTasks(created.id, "A1", [{ id: "A1", label: "Initial", state: "processing" }]);
+    expect(updated?.last_parent_update_at).toBeTruthy();
+    expect(Date.parse(updated?.last_parent_update_at || "")).toBeGreaterThan(Date.parse(stale));
+  });
+
+  it("setAskUpdateCooldownOverride accepts null and positive multiples of 5 between 5 and 240; rejects other values", () => {
+    const created = service.register({
+      label: "cooldown-override",
+      coordinator_session: "cooldown-override-parent",
+      run_dir: "/tmp/overmind/cooldown-override"
+    });
+
+    expect(service.setAskUpdateCooldownOverride(created.id, 45)?.ask_update_cooldown_override_minutes).toBe(45);
+    expect(service.setAskUpdateCooldownOverride(created.id, null)?.ask_update_cooldown_override_minutes).toBeNull();
+    expect(service.setAskUpdateCooldownOverride(created.id, 5)?.ask_update_cooldown_override_minutes).toBe(5);
+    expect(service.setAskUpdateCooldownOverride(created.id, 240)?.ask_update_cooldown_override_minutes).toBe(240);
+
+    expect(() => service.setAskUpdateCooldownOverride(created.id, 7)).toThrow(/multiple of 5/i);
+    expect(() => service.setAskUpdateCooldownOverride(created.id, -5)).toThrow(/between 5 and 240/i);
+    expect(() => service.setAskUpdateCooldownOverride(created.id, 245)).toThrow(/between 5 and 240/i);
+    expect(() => service.setAskUpdateCooldownOverride(created.id, 4.5)).toThrow(/integer multiple/i);
   });
 
   it("stamps ended_at when a workflow is registered with all tasks done", () => {
@@ -551,7 +602,7 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(23);
+    expect(version.version).toBe(24);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("display_name");
@@ -568,6 +619,8 @@ describe("OvermindService", () => {
     expect(cols.map((col) => col.name)).toContain("child_roles");
     expect(cols.map((col) => col.name)).toContain("info_request");
     expect(cols.map((col) => col.name)).toContain("info_check");
+    expect(cols.map((col) => col.name)).toContain("last_parent_update_at");
+    expect(cols.map((col) => col.name)).toContain("ask_update_cooldown_override_minutes");
     expect(service.getBySession("legacy-parent")?.child_roles).toEqual([]);
     expect(service.getBySession("legacy-parent")?.info_request).toBeNull();
     expect(service.getBySession("legacy-parent")?.info_check).toBeNull();
@@ -600,6 +653,8 @@ describe("OvermindService", () => {
     expect(cols.filter((col) => col.name === "completion_check")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "parent_status")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "child_statuses")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "last_parent_update_at")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "ask_update_cooldown_override_minutes")).toHaveLength(1);
     expect(historyCols.filter((col) => col.name === "coordinator_session")).toHaveLength(1);
   });
 

@@ -69,6 +69,8 @@ interface OvermindWorkflowRow {
   monitoring_paused: number;
   paused_at: string | null;
   paused_by: string | null;
+  last_parent_update_at: string | null;
+  ask_update_cooldown_override_minutes: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -171,7 +173,12 @@ export class OvermindService {
         this.priorRunElapsedMs(input.coordinator_session, now)
       ) as OvermindWorkflowRow;
 
-    return this.mapRow(row);
+    this.touchParentUpdate(row.id);
+    const registered = this.get(row.id);
+    if (!registered) {
+      throw new Error(`Failed to load workflow ${row.id} after register`);
+    }
+    return registered;
   }
 
   list(status?: OvermindWorkflowStatus): OvermindWorkflow[] {
@@ -413,10 +420,15 @@ export class OvermindService {
         paused ? 1 : 0,
         id
       );
+    this.touchParentUpdate(id);
     return this.get(id);
   }
 
-  setStatus(id: number, status: OvermindWorkflowStatus): OvermindWorkflow | null {
+  setStatus(
+    id: number,
+    status: OvermindWorkflowStatus,
+    options?: { touchParentUpdate?: boolean }
+  ): OvermindWorkflow | null {
     const existing = this.get(id);
     if (!existing) return null;
     const endedAt = this.computeEndedAt(existing.tasks, status, existing.ended_at);
@@ -424,6 +436,9 @@ export class OvermindService {
     this.db
       .prepare("UPDATE overmind_workflows SET status = ?, ended_at = ?, updated_at = datetime('now') WHERE id = ?")
       .run(status, endedAt, id);
+    if (options?.touchParentUpdate === true) {
+      this.touchParentUpdate(id);
+    }
     return this.get(id);
   }
 
@@ -481,6 +496,27 @@ export class OvermindService {
       }
     });
     tx();
+    this.touchParentUpdate(id);
+    return this.get(id);
+  }
+
+  setAskUpdateCooldownOverride(id: number, minutes: number | null): OvermindWorkflow | null {
+    if (minutes !== null) {
+      if (
+        !Number.isInteger(minutes) ||
+        minutes < 5 ||
+        minutes > 240 ||
+        minutes % 5 !== 0
+      ) {
+        throw new Error("ask_update_cooldown_override_minutes must be null or an integer multiple of 5 between 5 and 240");
+      }
+    }
+    const result = this.db
+      .prepare(
+        "UPDATE overmind_workflows SET ask_update_cooldown_override_minutes = ?, updated_at = datetime('now') WHERE id = ?"
+      )
+      .run(minutes, id);
+    if (result.changes === 0) return null;
     return this.get(id);
   }
 
@@ -550,6 +586,12 @@ export class OvermindService {
     return Date.parse(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
       ? `${value.replace(" ", "T")}Z`
       : value);
+  }
+
+  private touchParentUpdate(workflowId: number): void {
+    this.db
+      .prepare("UPDATE overmind_workflows SET last_parent_update_at = ? WHERE id = ?")
+      .run(this.isoNow(), workflowId);
   }
 
   private isoNow(): string {

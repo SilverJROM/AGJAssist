@@ -370,6 +370,18 @@ export class DatabaseService {
         }
       }
 
+      // Migration: v23 → v24: parent update timestamp + per-workflow ask-update cooldown override
+      if (current && current.version < 24) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("last_parent_update_at")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN last_parent_update_at TEXT");
+        }
+        if (!colNames.has("ask_update_cooldown_override_minutes")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN ask_update_cooldown_override_minutes INTEGER");
+        }
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);

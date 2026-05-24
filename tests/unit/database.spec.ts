@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { DatabaseService } from "../../src/db/database.js";
 import fs from "node:fs";
 import path from "node:path";
+import Database from "better-sqlite3";
 
 const TEST_DB = path.join("data", "test-db.sqlite");
 
@@ -68,7 +69,7 @@ describe("DatabaseService", () => {
       .prepare("SELECT version FROM schema_version")
       .get() as { version: number };
 
-    expect(version.version).toBe(23);
+    expect(version.version).toBe(24);
     db.close();
   });
 
@@ -118,5 +119,58 @@ describe("DatabaseService", () => {
     expect(colNames).toContain("completed_at");
 
     db.close();
+  });
+
+  it("upgrades a v23 snapshot DB to v24 and adds last_parent_update_at + ask_update_cooldown_override_minutes", () => {
+    cleanup();
+    const raw = new Database(TEST_DB);
+    raw.exec(`
+      CREATE TABLE schema_version (version INTEGER NOT NULL);
+      INSERT INTO schema_version (version) VALUES (23);
+      CREATE TABLE overmind_workflows (
+        id INTEGER PRIMARY KEY,
+        label TEXT NOT NULL,
+        coordinator_session TEXT NOT NULL UNIQUE,
+        child_sessions TEXT NOT NULL DEFAULT '[]',
+        child_roles TEXT NOT NULL DEFAULT '[]',
+        run_dir TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        current_task TEXT,
+        tasks TEXT NOT NULL DEFAULT '[]',
+        pending_decision TEXT,
+        active_session TEXT,
+        active_role TEXT,
+        ended_at TEXT,
+        task_log TEXT NOT NULL DEFAULT '[]',
+        last_pane_hash TEXT,
+        last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
+        stuck_since TEXT,
+        nudge_count INTEGER NOT NULL DEFAULT 0,
+        tier INTEGER NOT NULL DEFAULT 0,
+        last_notified_transition TEXT,
+        run_started_at TEXT,
+        accumulated_ms INTEGER NOT NULL DEFAULT 0,
+        completion_check TEXT,
+        parent_status TEXT,
+        child_statuses TEXT NOT NULL DEFAULT '[]',
+        info_request TEXT,
+        info_check TEXT,
+        monitoring_paused INTEGER NOT NULL DEFAULT 0,
+        paused_at TEXT,
+        paused_by TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+    raw.close();
+
+    const upgraded = new DatabaseService(TEST_DB);
+    const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
+    expect(version.version).toBe(24);
+    const upgradedCols = upgraded.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
+    const upgradedColNames = upgradedCols.map((c) => c.name);
+    expect(upgradedColNames).toContain("last_parent_update_at");
+    expect(upgradedColNames).toContain("ask_update_cooldown_override_minutes");
+    upgraded.close();
   });
 });

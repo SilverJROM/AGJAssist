@@ -391,11 +391,15 @@ describe("Overmind watcher nudge ladder", () => {
 
 // ─── Idle-nudge cooldown tests ───────────────────────────────────────────────
 
-function makeSettingsStub(idle_nudge_cooldown_minutes: number): AppSettingsService {
+function makeSettingsStub(
+  idle_nudge_cooldown_minutes: number,
+  ask_update_cooldown_minutes = 45
+): AppSettingsService {
   return {
     get: () => ({
       idle_nudge_cooldown_minutes,
       task_stale_ask_cooldown_minutes: 30,
+      ask_update_cooldown_minutes,
       task_stale_recent_update_grace_minutes: 45
     } satisfies OvermindCooldowns),
     load: async () => {},
@@ -466,6 +470,133 @@ describe("Idle-nudge cooldown", () => {
     await watcher.tick();
     expect(service.get(workflow.id)?.nudge_count).toBe(2);
     expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("Ask-update cooldown nudge", () => {
+  const ASK_UPDATE_TEXT = "you haven't sent any update via the API";
+
+  function setLastParentUpdate(workflowId: number, iso: string): void {
+    db.prepare("UPDATE overmind_workflows SET last_parent_update_at = ? WHERE id = ?").run(iso, workflowId);
+  }
+
+  it("fires once when last_parent_update_at is older than the effective cooldown", async () => {
+    const workflow = service.register({
+      label: "ask-update-once",
+      coordinator_session: "coord-ask-once",
+      child_sessions: ["child-ask-once"],
+      child_roles: ["coder"],
+      run_dir: "/tmp/overmind-nudge",
+      current_task: "A1",
+      tasks: [{ id: "A1", label: "Work", state: "processing" }]
+    });
+    service.update(workflow.id, { last_pane_hash: hashPane("old coordinator pane") });
+    setLastParentUpdate(workflow.id, new Date(Date.now() - 70 * 60 * 1000).toISOString());
+
+    const tmux = makeTmuxMock({
+      "coord-ask-once": "new coordinator pane output",
+      "child-ask-once": "child quiet pane"
+    });
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 45));
+
+    await watcher.tick();
+    const askCalls = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT));
+    expect(askCalls).toHaveLength(1);
+    expect(askCalls[0][0]).toBe("coord-ask-once");
+  });
+
+  it("re-arms once the in-memory cooldown elapses", async () => {
+    const workflow = service.register({
+      label: "ask-update-rearm",
+      coordinator_session: "coord-ask-rearm",
+      child_sessions: ["child-ask-rearm"],
+      child_roles: ["coder"],
+      run_dir: "/tmp/overmind-nudge",
+      current_task: "A1",
+      tasks: [{ id: "A1", label: "Work", state: "processing" }]
+    });
+    service.update(workflow.id, { last_pane_hash: hashPane("old rearm pane") });
+    setLastParentUpdate(workflow.id, new Date(Date.now() - 90 * 60 * 1000).toISOString());
+
+    const tmux = makeTmuxMock({
+      "coord-ask-rearm": "new rearm pane output",
+      "child-ask-rearm": "child quiet pane"
+    });
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 10));
+
+    await watcher.tick();
+    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT))).toHaveLength(1);
+
+    await watcher.tick();
+    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT))).toHaveLength(1);
+
+    (watcher as any).lastAskUpdateNudgeAt.set(workflow.id, Date.now() - 11 * 60 * 1000);
+    await watcher.tick();
+    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT))).toHaveLength(2);
+  });
+
+  it("respects per-workflow override (override cooldown beats system default)", async () => {
+    const workflow = service.register({
+      label: "ask-update-override",
+      coordinator_session: "coord-ask-override",
+      child_sessions: ["child-ask-override"],
+      child_roles: ["coder"],
+      run_dir: "/tmp/overmind-nudge",
+      current_task: "A1",
+      tasks: [{ id: "A1", label: "Work", state: "processing" }]
+    });
+    service.update(workflow.id, { last_pane_hash: hashPane("old override pane") });
+    service.setAskUpdateCooldownOverride(workflow.id, 5);
+    setLastParentUpdate(workflow.id, new Date(Date.now() - 10 * 60 * 1000).toISOString());
+
+    const tmux = makeTmuxMock({
+      "coord-ask-override": "new override pane output",
+      "child-ask-override": "child quiet pane"
+    });
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 45));
+
+    await watcher.tick();
+    const askCalls = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT));
+    expect(askCalls).toHaveLength(1);
+    expect(askCalls[0][0]).toBe("coord-ask-override");
+  });
+
+  it("does NOT fire for paused or terminal workflows", async () => {
+    fs.mkdirSync("/tmp/overmind-nudge/paused", { recursive: true });
+    fs.mkdirSync("/tmp/overmind-nudge/completed", { recursive: true });
+
+    const pausedWorkflow = service.register({
+      label: "ask-update-paused",
+      coordinator_session: "coord-ask-paused",
+      child_sessions: ["child-ask-paused"],
+      child_roles: ["coder"],
+      run_dir: "/tmp/overmind-nudge/paused"
+    });
+    service.update(pausedWorkflow.id, { last_pane_hash: hashPane("old paused pane") });
+    service.setMonitoringPaused(pausedWorkflow.id, true, "jrom");
+    setLastParentUpdate(pausedWorkflow.id, new Date(Date.now() - 90 * 60 * 1000).toISOString());
+
+    const completedWorkflow = service.register({
+      label: "ask-update-completed",
+      coordinator_session: "coord-ask-completed",
+      child_sessions: ["child-ask-completed"],
+      child_roles: ["coder"],
+      run_dir: "/tmp/overmind-nudge/completed"
+    });
+    service.update(completedWorkflow.id, { last_pane_hash: hashPane("old completed pane") });
+    service.setStatus(completedWorkflow.id, "completed");
+    setLastParentUpdate(completedWorkflow.id, new Date(Date.now() - 90 * 60 * 1000).toISOString());
+
+    const tmux = makeTmuxMock({
+      "coord-ask-paused": "quiet paused pane",
+      "child-ask-paused": "child quiet pane",
+      "coord-ask-completed": "quiet completed pane",
+      "child-ask-completed": "child quiet pane"
+    });
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 10));
+
+    await watcher.tick();
+    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT))).toHaveLength(0);
   });
 });
 

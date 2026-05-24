@@ -55,6 +55,10 @@ interface RenameBody {
   name?: string | null;
 }
 
+interface AskUpdateCooldownBody extends TokenBody {
+  override_minutes?: number | null;
+}
+
 export function isLoopbackAddress(address: string | undefined): boolean {
   if (!address) return false;
   const normalized = address.toLowerCase();
@@ -158,7 +162,7 @@ export function registerOvermindRoutes(
         return reply.code(404).send({ error: "Workflow not found" });
       }
 
-      const completed = overmindService.setStatus(workflow.id, "completed");
+      const completed = overmindService.setStatus(workflow.id, "completed", { touchParentUpdate: true });
       if (
         workflow.status !== "completed" &&
         completed &&
@@ -369,6 +373,47 @@ export function registerOvermindRoutes(
         return reply.code(404).send({ error: "Workflow not found" });
       }
 
+      return { workflow };
+    }
+  );
+
+  app.post<{ Params: WorkflowParams; Body: AskUpdateCooldownBody }>(
+    "/api/overmind/workflows/:id/ask-update-cooldown",
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      if (request.sessionUser?.role !== "owner") {
+        return reply.code(403).send({ error: "Owner role required" });
+      }
+
+      const id = parseWorkflowId(request.params.id);
+      if (id === null) {
+        return reply.code(400).send({ error: "Invalid workflow id" });
+      }
+
+      const overrideMinutes = request.body?.override_minutes;
+      if (overrideMinutes !== undefined && overrideMinutes !== null) {
+        if (
+          !Number.isInteger(overrideMinutes) ||
+          overrideMinutes < 5 ||
+          overrideMinutes > 240 ||
+          overrideMinutes % 5 !== 0
+        ) {
+          return reply.code(400).send({
+            error: "override_minutes must be null or an integer multiple of 5 between 5 and 240"
+          });
+        }
+      }
+
+      let workflow = null;
+      try {
+        workflow = overmindService.setAskUpdateCooldownOverride(id, overrideMinutes ?? null);
+      } catch (error) {
+        return reply.code(400).send({ error: (error as Error).message });
+      }
+      if (!workflow) {
+        return reply.code(404).send({ error: "Workflow not found" });
+      }
+      streamManager?.broadcast();
       return { workflow };
     }
   );

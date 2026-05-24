@@ -534,6 +534,63 @@ describe("Overmind routes", () => {
     expect(second.json().workflow.display_name).toBe("JROM Custom Title");
   });
 
+  it("POST /api/overmind/workflows/:id/ask-update-cooldown sets and clears the override, JWT-authed", async () => {
+    const registered = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "ask-update-override",
+      session: "ask-update-override-parent",
+      run_dir: "/tmp/ask-update-override"
+    });
+    const workflowId = registered.json().workflow.id;
+
+    const unauthenticated = await app.inject({
+      method: "POST",
+      url: `/api/overmind/workflows/${workflowId}/ask-update-cooldown`,
+      payload: { override_minutes: 25 }
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const authenticatedSet = await app.inject({
+      method: "POST",
+      url: `/api/overmind/workflows/${workflowId}/ask-update-cooldown`,
+      headers: authHeader(),
+      payload: { override_minutes: 25 }
+    });
+    expect(authenticatedSet.statusCode).toBe(200);
+    expect(authenticatedSet.json().workflow.ask_update_cooldown_override_minutes).toBe(25);
+    expect(overmindService.get(workflowId)?.ask_update_cooldown_override_minutes).toBe(25);
+
+    const authenticatedClear = await app.inject({
+      method: "POST",
+      url: `/api/overmind/workflows/${workflowId}/ask-update-cooldown`,
+      headers: authHeader(),
+      payload: { override_minutes: null }
+    });
+    expect(authenticatedClear.statusCode).toBe(200);
+    expect(authenticatedClear.json().workflow.ask_update_cooldown_override_minutes).toBeNull();
+    expect(overmindService.get(workflowId)?.ask_update_cooldown_override_minutes).toBeNull();
+  });
+
+  it("POST /api/overmind/workflows/:id/ask-update-cooldown validation rejects 7, -5, 245, 4.5", async () => {
+    const registered = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "ask-update-validation",
+      session: "ask-update-validation-parent",
+      run_dir: "/tmp/ask-update-validation"
+    });
+    const workflowId = registered.json().workflow.id;
+
+    for (const overrideMinutes of [7, -5, 245, 4.5]) {
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/overmind/workflows/${workflowId}/ask-update-cooldown`,
+        headers: authHeader(),
+        payload: { override_minutes: overrideMinutes }
+      });
+      expect(res.statusCode).toBe(400);
+    }
+  });
+
   describe("child-close reminder on /complete", () => {
     function makeTmuxMock(aliveSet: Set<string>): TmuxService {
       return {

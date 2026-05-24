@@ -6,6 +6,7 @@ import { AppSettingsService, OvermindCooldowns } from "../../services/app-settin
 interface PatchOvermindBody {
   idle_nudge_cooldown_minutes?: number;
   task_stale_ask_cooldown_minutes?: number;
+  ask_update_cooldown_minutes?: number;
   task_stale_recent_update_grace_minutes?: number;
 }
 
@@ -39,6 +40,7 @@ export function registerAppSettingsRoutes(
       const validKeys: Array<keyof OvermindCooldowns> = [
         "idle_nudge_cooldown_minutes",
         "task_stale_ask_cooldown_minutes",
+        "ask_update_cooldown_minutes",
         "task_stale_recent_update_grace_minutes"
       ];
 

@@ -743,6 +743,8 @@ function OvermindWorkflows() {
   const [runDrilldown, setRunDrilldown] = useState({});
   const [runDrilldownLoading, setRunDrilldownLoading] = useState({});
   const [workflowTab, setWorkflowTab] = useState('active');
+  const [askUpdateSystemCooldownMin, setAskUpdateSystemCooldownMin] = useState(45);
+  const [askUpdateToast, setAskUpdateToast] = useState('');
   const streamStatusRef = useRef(streamStatus);
 
   useEffect(() => {
@@ -759,6 +761,16 @@ function OvermindWorkflows() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const loadAskUpdateSettings = useCallback(async () => {
+    try {
+      const data = await api('/api/app-settings');
+      const value = data?.overmind?.ask_update_cooldown_minutes;
+      if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+        setAskUpdateSystemCooldownMin(value);
+      }
+    } catch {}
   }, []);
 
   const loadHistory = useCallback(async () => {
@@ -795,6 +807,10 @@ function OvermindWorkflows() {
   useEffect(() => {
     loadWorkflows();
   }, [loadWorkflows]);
+
+  useEffect(() => {
+    loadAskUpdateSettings();
+  }, [loadAskUpdateSettings]);
 
   const toggleWorkflow = useCallback((workflowId) => {
     setExpandedWorkflows(prev => ({ ...prev, [workflowId]: !prev[workflowId] }));
@@ -847,9 +863,37 @@ function OvermindWorkflows() {
       if (streamStatusRef.current !== 'connected') {
         loadWorkflows();
       }
+      loadAskUpdateSettings();
     }, 15000);
     return () => clearInterval(timer);
-  }, [loadWorkflows]);
+  }, [loadWorkflows, loadAskUpdateSettings]);
+
+  const updateAskUpdateCooldownOverride = useCallback(async (workflow, nextOverrideMinutes) => {
+    const previousOverride = workflow.ask_update_cooldown_override_minutes ?? null;
+    setWorkflows(prev => prev.map(item =>
+      item.id === workflow.id
+        ? { ...item, ask_update_cooldown_override_minutes: nextOverrideMinutes }
+        : item
+    ));
+    try {
+      const data = await api(`/api/overmind/workflows/${workflow.id}/ask-update-cooldown`, {
+        method: 'POST',
+        body: JSON.stringify({ override_minutes: nextOverrideMinutes })
+      });
+      if (data.workflow) {
+        setWorkflows(prev => prev.map(item => item.id === data.workflow.id ? data.workflow : item));
+      }
+      setError('');
+    } catch (e) {
+      setWorkflows(prev => prev.map(item =>
+        item.id === workflow.id
+          ? { ...item, ask_update_cooldown_override_minutes: previousOverride }
+          : item
+      ));
+      setAskUpdateToast(e.message || 'Failed to save ask-update cooldown override.');
+      setTimeout(() => setAskUpdateToast(''), 2600);
+    }
+  }, []);
 
   useEffect(() => {
     const wsUrl = buildOvermindWsUrl(authToken);
@@ -905,6 +949,7 @@ function OvermindWorkflows() {
 
       ${error && html`<div class="overmind-alert">${error}</div>`}
       ${historyError && workflowTab === 'history' && html`<div class="overmind-alert">${historyError}</div>`}
+      ${askUpdateToast && html`<div class="toast">${askUpdateToast}</div>`}
 
       <div class="overmind-tabs" role="tablist" aria-label="Workflow status filters">
         <button
@@ -1036,6 +1081,19 @@ function OvermindWorkflows() {
             const totalTasks = tasks.length;
             const doneTasks = tasks.filter(t => t && t.state === 'done').length;
             const pctComplete = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+            const lastActivityMs = workflow.last_activity_at ? Date.parse(workflow.last_activity_at) : NaN;
+            const lastActivityLabel = Number.isFinite(lastActivityMs)
+              ? Math.max(0, Math.floor((now - lastActivityMs) / 60000)) + ' min ago'
+              : '—';
+            const lastParentUpdateMs = workflow.last_parent_update_at ? Date.parse(workflow.last_parent_update_at) : NaN;
+            const lastParentUpdateLabel = Number.isFinite(lastParentUpdateMs)
+              ? Math.max(0, Math.floor((now - lastParentUpdateMs) / 60000)) + ' min ago'
+              : '—';
+            const askUpdateOverrideValue = workflow.ask_update_cooldown_override_minutes == null
+              ? 'system'
+              : String(workflow.ask_update_cooldown_override_minutes);
+            const askUpdateOptions = [];
+            for (let min = 5; min <= 180; min += 5) askUpdateOptions.push(min);
             return html`
               <section class=${'item-card overmind-card ' + colorClass} key=${workflow.id}>
                 <div class="overmind-card-header">
@@ -1131,8 +1189,30 @@ function OvermindWorkflows() {
                           <th scope="row">Stuck</th>
                           <td>${workflow.stuck_since ? formatStuckDuration(workflow.stuck_since, now) : '—'}</td>
                         </tr>
+                        <tr>
+                          <th scope="row">Last activity</th>
+                          <td>${lastActivityLabel}</td>
+                          <th scope="row">Last parent API update</th>
+                          <td>${lastParentUpdateLabel}</td>
+                        </tr>
                       </tbody>
                     </table>
+
+                    <div style="margin:10px 0 12px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                      <label for=${'ask-update-cooldown-' + workflow.id} style="font-size:12px;color:var(--text-secondary)">Ask-update cooldown override:</label>
+                      <select
+                        id=${'ask-update-cooldown-' + workflow.id}
+                        value=${askUpdateOverrideValue}
+                        onChange=${(e) => {
+                          const val = e.target.value;
+                          const override = val === 'system' ? null : Number(val);
+                          updateAskUpdateCooldownOverride(workflow, override);
+                        }}
+                      >
+                        <option value="system">${'System default (' + askUpdateSystemCooldownMin + ' min)'}</option>
+                        ${askUpdateOptions.map(min => html`<option key=${min} value=${String(min)}>${min} min</option>`)}
+                      </select>
+                    </div>
 
                     <details class="overmind-tasklist" open=${tasks.length <= 6}>
                       <summary>Tasks ${doneCount}/${tasks.length}</summary>
@@ -4991,6 +5071,7 @@ function OvermindCooldownsSection() {
   const [vals, setVals] = useState({
     idle_nudge_cooldown_minutes: 20,
     task_stale_ask_cooldown_minutes: 30,
+    ask_update_cooldown_minutes: 45,
     task_stale_recent_update_grace_minutes: 45
   });
   const [saving, setSaving] = useState(false);
@@ -5048,6 +5129,10 @@ function OvermindCooldownsSection() {
       ${field('task_stale_ask_cooldown_minutes',
         'Task-list reminder cooldown (minutes)',
         'Minimum time between task-list staleness reminders sent to the parent.'
+      )}
+      ${field('ask_update_cooldown_minutes',
+        'Ask-update cooldown (minutes)',
+        "Minimum time before Overmind asks the parent for a fresh API update."
       )}
       ${field('task_stale_recent_update_grace_minutes',
         'Skip task-list reminder if parent updated within (minutes)',

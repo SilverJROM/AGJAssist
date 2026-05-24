@@ -264,6 +264,8 @@ function makeMinimalWorkflow(overrides: Partial<OvermindWorkflow> = {}): Overmin
     monitoring_paused: false,
     paused_at: null,
     paused_by: null,
+    last_parent_update_at: null,
+    ask_update_cooldown_override_minutes: null,
     created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides

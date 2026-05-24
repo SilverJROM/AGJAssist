@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import {
   AppSettingsService,
+  DEFAULT_ASK_UPDATE_COOLDOWN_MIN,
   DEFAULT_IDLE_NUDGE_COOLDOWN_MIN,
   DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN,
   DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN
@@ -38,6 +39,7 @@ describe("AppSettingsService", () => {
     const overmind = svc.get();
     expect(overmind.idle_nudge_cooldown_minutes).toBe(DEFAULT_IDLE_NUDGE_COOLDOWN_MIN);
     expect(overmind.task_stale_ask_cooldown_minutes).toBe(DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN);
+    expect(overmind.ask_update_cooldown_minutes).toBe(DEFAULT_ASK_UPDATE_COOLDOWN_MIN);
     expect(overmind.task_stale_recent_update_grace_minutes).toBe(DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN);
   });
 
@@ -82,6 +84,18 @@ describe("AppSettingsService", () => {
     // Write a second time — should override the first.
     await svc.setOvermindCooldown("task_stale_recent_update_grace_minutes", 90);
     expect(svc.get().task_stale_recent_update_grace_minutes).toBe(90);
+  });
+
+  it("round-trips ask_update_cooldown_minutes with default 45", async () => {
+    const svc = makeService();
+    await svc.load();
+
+    expect(svc.get().ask_update_cooldown_minutes).toBe(DEFAULT_ASK_UPDATE_COOLDOWN_MIN);
+    await svc.setOvermindCooldown("ask_update_cooldown_minutes", 65);
+    expect(svc.get().ask_update_cooldown_minutes).toBe(65);
+
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "data", "app-settings.json"), "utf-8"));
+    expect(onDisk.overmind.ask_update_cooldown_minutes).toBe(65);
   });
 
   it("reads fresh values from disk after cache expires", async () => {

@@ -5,10 +5,12 @@ import path from "node:path";
 export const DEFAULT_IDLE_NUDGE_COOLDOWN_MIN = 20;
 export const DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN = 30;
 export const DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN = 45;
+export const DEFAULT_ASK_UPDATE_COOLDOWN_MIN = 45;
 
 export interface OvermindCooldowns {
   idle_nudge_cooldown_minutes: number;
   task_stale_ask_cooldown_minutes: number;
+  ask_update_cooldown_minutes: number;
   task_stale_recent_update_grace_minutes: number;
 }
 
@@ -20,6 +22,7 @@ const DEFAULTS: AppSettingsShape = {
   overmind: {
     idle_nudge_cooldown_minutes: DEFAULT_IDLE_NUDGE_COOLDOWN_MIN,
     task_stale_ask_cooldown_minutes: DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN,
+    ask_update_cooldown_minutes: DEFAULT_ASK_UPDATE_COOLDOWN_MIN,
     task_stale_recent_update_grace_minutes: DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN
   }
 };
@@ -117,6 +120,10 @@ export class AppSettingsService {
         typeof o.task_stale_ask_cooldown_minutes === "number" && o.task_stale_ask_cooldown_minutes >= 0
           ? o.task_stale_ask_cooldown_minutes
           : d.task_stale_ask_cooldown_minutes,
+      ask_update_cooldown_minutes:
+        typeof o.ask_update_cooldown_minutes === "number" && o.ask_update_cooldown_minutes >= 0
+          ? o.ask_update_cooldown_minutes
+          : d.ask_update_cooldown_minutes,
       task_stale_recent_update_grace_minutes:
         typeof o.task_stale_recent_update_grace_minutes === "number" && o.task_stale_recent_update_grace_minutes >= 0
           ? o.task_stale_recent_update_grace_minutes

@@ -26,6 +26,7 @@ import {
 } from "./overmind-notifications.js";
 import {
   AppSettingsService,
+  DEFAULT_ASK_UPDATE_COOLDOWN_MIN,
   DEFAULT_IDLE_NUDGE_COOLDOWN_MIN,
   DEFAULT_TASK_STALE_ASK_COOLDOWN_MIN,
   DEFAULT_TASK_STALE_RECENT_UPDATE_GRACE_MIN
@@ -215,6 +216,8 @@ export class OvermindWatcher {
   // Per-workflow timestamp of the last successfully-sent canned idle nudge.
   // Rate-limits nudges regardless of whether the parent replied.
   private readonly lastIdleNudgeAt = new Map<number, number>();
+  // Per-workflow timestamp for "please update via API" asks.
+  private readonly lastAskUpdateNudgeAt = new Map<number, number>();
 
   constructor(
     private readonly overmindService: OvermindService,
@@ -386,6 +389,8 @@ export class OvermindWatcher {
       });
       return;
     }
+
+    await this.maybeAskForParentUpdate(workflow);
 
     // ── In-process sub-agent detection + suppression (Tier-1/2/3) ─────────────
     const nowMs = Date.now();
@@ -972,7 +977,45 @@ export class OvermindWatcher {
     this.lastSubagentAskAt.delete(workflowId);
     // Idle-nudge cooldown (in-memory + persisted)
     this.lastIdleNudgeAt.delete(workflowId);
+    this.lastAskUpdateNudgeAt.delete(workflowId);
     this.nudgeState?.clearWorkflow(workflowId);
+  }
+
+  private async maybeAskForParentUpdate(workflow: OvermindWorkflow): Promise<void> {
+    if (
+      workflow.monitoring_paused ||
+      TERMINAL_STATUSES.includes(workflow.status) ||
+      !workflow.last_parent_update_at
+    ) {
+      return;
+    }
+
+    const lastParentUpdateMs = Date.parse(workflow.last_parent_update_at);
+    if (!Number.isFinite(lastParentUpdateMs)) return;
+
+    const nowMs = Date.now();
+    const cooldownMs = this.effectiveAskUpdateCooldownMs(workflow);
+    if (nowMs - lastParentUpdateMs <= cooldownMs) return;
+
+    const lastNudgeAt = this.lastAskUpdateNudgeAt.get(workflow.id) ?? 0;
+    if (nowMs - lastNudgeAt < cooldownMs) return;
+
+    const staleMinutes = Math.max(1, Math.round((nowMs - lastParentUpdateMs) / 60_000));
+    const message =
+      `Overmind: you haven't sent any update via the API in ~${staleMinutes} minutes — ` +
+      "please POST /api/overmind/tasks (or /complete if you're done) so I can track this run.";
+    try {
+      await this.tmuxService.sendAndSubmit(workflow.coordinator_session, message);
+      this.lastAskUpdateNudgeAt.set(workflow.id, nowMs);
+    } catch (error) {
+      console.error("Overmind ask-update nudge failed:", error);
+    }
+  }
+
+  private effectiveAskUpdateCooldownMs(workflow: OvermindWorkflow): number {
+    const overrideMin = workflow.ask_update_cooldown_override_minutes;
+    const systemMin = this.appSettings?.get().ask_update_cooldown_minutes ?? DEFAULT_ASK_UPDATE_COOLDOWN_MIN;
+    return (overrideMin ?? systemMin) * 60_000;
   }
 
   // Async derivation of per-task states from local files + pane text. Best-effort:
