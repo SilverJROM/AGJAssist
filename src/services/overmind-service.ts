@@ -1,4 +1,6 @@
 import { DatabaseService } from "../db/database.js";
+import { realpath } from "node:fs/promises";
+import path from "node:path";
 import {
   OvermindChildSessionStatus,
   OvermindParentStatus,
@@ -12,7 +14,6 @@ import {
   UpdateOvermindWorkflowInput
 } from "./overmind/types.js";
 import {
-  DuplicateRunDirError,
   sanitizeCurrentTask,
   sanitizeTaskList
 } from "./overmind/sanitize.js";
@@ -34,8 +35,8 @@ export type {
   UpdateOvermindWorkflowInput
 } from "./overmind/types.js";
 
-// Sanitation + dup-run_dir guard live in ./overmind/sanitize.ts (B7).
-export { DuplicateRunDirError, isTrashTaskLabel, sanitizeTaskList, sanitizeCurrentTask } from "./overmind/sanitize.js";
+// Sanitation helpers live in ./overmind/sanitize.ts (B7).
+export { isTrashTaskLabel, sanitizeTaskList, sanitizeCurrentTask } from "./overmind/sanitize.js";
 
 interface OvermindWorkflowRow {
   id: number;
@@ -85,29 +86,12 @@ interface OvermindTaskHistoryRow {
   total: number;
 }
 
-// DuplicateRunDirError + isTrashTaskLabel / sanitizeTaskList / sanitizeCurrentTask
-// moved to ./overmind/sanitize.ts (B7) — re-exported at top of file. Local
-// imports above give the class direct access.
+const PROJECT_TREE_TERMINAL_STATUSES = new Set<OvermindWorkflowStatus>(["completed", "failed", "paused"]);
 
 export class OvermindService {
   constructor(private readonly db: DatabaseService) {}
 
   register(input: RegisterOvermindWorkflowInput): OvermindWorkflow {
-    // Same-run_dir duplicate check (see DuplicateRunDirError above). Skip terminal rows
-    // so re-running the same project after completion is still allowed.
-    const collision = this.db
-      .prepare(
-        `SELECT * FROM overmind_workflows
-         WHERE run_dir = ?
-           AND coordinator_session != ?
-           AND status NOT IN ('completed','failed')
-         LIMIT 1`
-      )
-      .get(input.run_dir, input.coordinator_session) as OvermindWorkflowRow | undefined;
-    if (collision) {
-      throw new DuplicateRunDirError(this.mapRow(collision));
-    }
-
     const tasks = sanitizeTaskList(input.tasks);
     const currentTask = sanitizeCurrentTask(input.current_task);
     const now = this.isoNow();
@@ -179,6 +163,43 @@ export class OvermindService {
       throw new Error(`Failed to load workflow ${row.id} after register`);
     }
     return registered;
+  }
+
+  async findProjectTreeMatch(incomingRunDir: string): Promise<OvermindWorkflow | null> {
+    const rows = this.list();
+    if (rows.length === 0) return null;
+
+    const incomingCanonical = await this.canonicalizeRunDir(incomingRunDir);
+    const incomingComponents = this.pathComponents(incomingCanonical);
+    const candidates: Array<{ workflow: OvermindWorkflow; depth: number; updatedAtMs: number }> = [];
+
+    for (const workflow of rows) {
+      const workflowCanonical = await this.canonicalizeRunDir(workflow.run_dir);
+      const workflowComponents = this.pathComponents(workflowCanonical);
+      const existingPrefixDepth = this.pathPrefixDepth(workflowComponents, incomingComponents);
+      const incomingPrefixDepth = this.pathPrefixDepth(incomingComponents, workflowComponents);
+      const depth = Math.max(existingPrefixDepth, incomingPrefixDepth);
+      if (depth <= 0) continue;
+      candidates.push({
+        workflow,
+        depth,
+        updatedAtMs: this.parseTimestampMs(workflow.updated_at)
+      });
+    }
+
+    if (candidates.length === 0) return null;
+    const maxDepth = Math.max(...candidates.map((candidate) => candidate.depth));
+    const depthWinners = candidates.filter((candidate) => candidate.depth === maxDepth);
+    const activeWinners = depthWinners.filter(
+      (candidate) => !PROJECT_TREE_TERMINAL_STATUSES.has(candidate.workflow.status)
+    );
+    const pool = activeWinners.length > 0 ? activeWinners : depthWinners;
+    pool.sort((a, b) => {
+      const byUpdated = b.updatedAtMs - a.updatedAtMs;
+      if (byUpdated !== 0) return byUpdated;
+      return b.workflow.id - a.workflow.id;
+    });
+    return pool[0]?.workflow ?? null;
   }
 
   list(status?: OvermindWorkflowStatus): OvermindWorkflow[] {
@@ -586,6 +607,30 @@ export class OvermindService {
     return Date.parse(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
       ? `${value.replace(" ", "T")}Z`
       : value);
+  }
+
+  private async canonicalizeRunDir(runDir: string): Promise<string> {
+    const resolved = path.resolve(runDir);
+    try {
+      return await realpath(resolved);
+    } catch {
+      return resolved;
+    }
+  }
+
+  private pathComponents(target: string): string[] {
+    const normalized = path.resolve(target);
+    const root = path.parse(normalized).root;
+    const tail = normalized.slice(root.length).split(path.sep).filter(Boolean);
+    return [root, ...tail];
+  }
+
+  private pathPrefixDepth(prefix: string[], full: string[]): number {
+    if (prefix.length > full.length) return 0;
+    for (let idx = 0; idx < prefix.length; idx += 1) {
+      if (prefix[idx] !== full[idx]) return 0;
+    }
+    return prefix.length;
   }
 
   private touchParentUpdate(workflowId: number): void {

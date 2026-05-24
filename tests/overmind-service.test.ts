@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DatabaseService } from "../src/db/database.js";
-import { DuplicateRunDirError, OvermindService } from "../src/services/overmind-service.js";
+import { OvermindService } from "../src/services/overmind-service.js";
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
@@ -888,41 +888,17 @@ describe("OvermindService", () => {
     expect(noMatch.length).toBe(0);
   });
 
-  it("rejects register() with DuplicateRunDirError when an active workflow already owns the same run_dir under a different coordinator_session", () => {
-    const first = service.register({
+  it("findProjectTreeMatch returns the matching workflow by component-aligned run_dir prefix", async () => {
+    const existing = service.register({
       label: "HRIS · trapprove",
       coordinator_session: "hris-d-22",
-      run_dir: "/home/agjrom/websites/HRIS/plan/WK_0522/tr-auto-approve/projcore-run-2026-05-23",
+      run_dir: "/home/agjrom/websites/HRIS",
       tasks: [{ id: "B1", label: "Schema migration", state: "processing" }]
     });
-    expect(first.id).toBeGreaterThan(0);
 
-    // Different coord session, same run_dir, existing row still active → reject.
-    expect(() =>
-      service.register({
-        label: "HRIS · trapprove",
-        coordinator_session: "hris-claude-main",
-        run_dir: "/home/agjrom/websites/HRIS/plan/WK_0522/tr-auto-approve/projcore-run-2026-05-23",
-        tasks: []
-      })
-    ).toThrow(DuplicateRunDirError);
-
-    try {
-      service.register({
-        label: "HRIS · trapprove",
-        coordinator_session: "hris-claude-main",
-        run_dir: "/home/agjrom/websites/HRIS/plan/WK_0522/tr-auto-approve/projcore-run-2026-05-23",
-        tasks: []
-      });
-    } catch (err) {
-      expect(err).toBeInstanceOf(DuplicateRunDirError);
-      const existing = (err as DuplicateRunDirError).existing;
-      expect(existing.id).toBe(first.id);
-      expect(existing.coordinator_session).toBe("hris-d-22");
-    }
-
-    // Still only one row — the duplicate did not insert.
-    expect(service.list()).toHaveLength(1);
+    const match = await service.findProjectTreeMatch("/home/agjrom/websites/HRIS/anything-new");
+    expect(match?.id).toBe(existing.id);
+    expect(match?.coordinator_session).toBe("hris-d-22");
   });
 
   it("allows re-register under the same coordinator_session (idempotent upsert path)", () => {
@@ -942,24 +918,60 @@ describe("OvermindService", () => {
     expect(service.list()).toHaveLength(1);
   });
 
-  it("allows a new workflow on the same run_dir once the prior one is completed", () => {
-    const first = service.register({
-      label: "L",
-      coordinator_session: "old-session",
-      run_dir: "/tmp/overmind/reusable-dir",
-      tasks: [{ id: "A", label: "A", state: "done" }]
-    });
-    service.setStatus(first.id, "completed");
-
-    // Completed row no longer blocks a fresh registration under a new coord session.
-    const fresh = service.register({
-      label: "L round 2",
-      coordinator_session: "new-session",
-      run_dir: "/tmp/overmind/reusable-dir",
+  it("findProjectTreeMatch returns null when there is no project-tree prefix match", async () => {
+    service.register({
+      label: "HRIS",
+      coordinator_session: "hris-d-22",
+      run_dir: "/home/agjrom/websites/HRIS/code",
       tasks: []
     });
-    expect(fresh.id).not.toBe(first.id);
-    expect(service.list()).toHaveLength(2);
+    const match = await service.findProjectTreeMatch("/home/agjrom/websites/HRIS/codebase");
+    expect(match).toBeNull();
+  });
+
+  it("findProjectTreeMatch prefers active workflows over terminal ones; falls back to terminal when needed", async () => {
+    const completed = service.register({
+      label: "term",
+      coordinator_session: "term-parent",
+      run_dir: "/tmp/project-x",
+      tasks: []
+    });
+    service.setStatus(completed.id, "completed");
+
+    const active = service.register({
+      label: "active",
+      coordinator_session: "active-parent",
+      run_dir: "/tmp/project-x/subdir",
+      tasks: []
+    });
+
+    const activeMatch = await service.findProjectTreeMatch("/tmp/project-x/subdir/new-work");
+    expect(activeMatch?.id).toBe(active.id);
+
+    service.setStatus(active.id, "failed");
+    const terminalMatch = await service.findProjectTreeMatch("/tmp/project-x/subdir/new-work");
+    expect(terminalMatch).not.toBeNull();
+    expect(["completed", "failed", "paused"]).toContain(terminalMatch?.status);
+  });
+
+  it("findProjectTreeMatch picks the most recently updated active workflow among equal-depth matches", async () => {
+    const older = service.register({
+      label: "older",
+      coordinator_session: "older-parent",
+      run_dir: "/tmp/recency-project",
+      tasks: []
+    });
+    const newer = service.register({
+      label: "newer",
+      coordinator_session: "newer-parent",
+      run_dir: "/tmp/recency-project",
+      tasks: []
+    });
+    db.prepare("UPDATE overmind_workflows SET updated_at = ? WHERE id = ?").run("2026-01-01T00:00:00.000Z", older.id);
+    db.prepare("UPDATE overmind_workflows SET updated_at = ? WHERE id = ?").run("2026-02-01T00:00:00.000Z", newer.id);
+
+    const match = await service.findProjectTreeMatch("/tmp/recency-project/child");
+    expect(match?.id).toBe(newer.id);
   });
 
   it("sanitizes markdown table chrome (header + separator) out of task lists on register()", () => {

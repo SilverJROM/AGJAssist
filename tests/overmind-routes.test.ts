@@ -161,12 +161,12 @@ describe("Overmind routes", () => {
     expect(overmindService.list()).toHaveLength(1);
   });
 
-  it("rejects /register with 409 when a different coordinator_session already owns the same run_dir (1 workflow per parent)", async () => {
+  it("rejects /register with 409 + use_existing when a different coordinator_session matches the same project tree", async () => {
     const first = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
       label: "HRIS · trapprove",
       session: "hris-d-22",
-      run_dir: "/home/agjrom/websites/HRIS/plan/WK_0522/tr-auto-approve/projcore-run-2026-05-23"
+      run_dir: "/home/agjrom/websites/HRIS"
     });
     expect(first.statusCode).toBe(201);
 
@@ -174,15 +174,182 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "HRIS · trapprove",
       session: "hris-claude-main",
-      run_dir: "/home/agjrom/websites/HRIS/plan/WK_0522/tr-auto-approve/projcore-run-2026-05-23"
+      run_dir: "/home/agjrom/websites/HRIS/anything-new"
     });
     expect(dup.statusCode).toBe(409);
     const body = dup.json();
-    expect(body.existing.coordinator_session).toBe("hris-d-22");
-    expect(body.existing.id).toBe(first.json().workflow.id);
+    expect(body.use_existing.coordinator_session).toBe("hris-d-22");
+    expect(body.use_existing.id).toBe(first.json().workflow.id);
+    expect(body.error).toContain("one workflow per project tree");
 
     // Only one workflow row exists — the duplicate did not persist.
     expect(overmindService.list()).toHaveLength(1);
+  });
+
+  it("allows registration when no project-tree match exists", async () => {
+    const first = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "AGJAssist",
+      session: "agjassist-parent",
+      run_dir: "/tmp/project-alpha"
+    });
+    expect(first.statusCode).toBe(201);
+
+    const second = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "Different project",
+      session: "other-parent",
+      run_dir: "/tmp/project-beta"
+    });
+    expect(second.statusCode).toBe(201);
+    expect(overmindService.list()).toHaveLength(2);
+  });
+
+  it("rejects /register with 409 even when the matching workflow is completed", async () => {
+    const first = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "HRIS completed",
+      session: "hris-completed-parent",
+      run_dir: "/tmp/hris-completed-root"
+    });
+    expect(first.statusCode).toBe(201);
+
+    const markCompleted = await lifecyclePost("/api/overmind/complete", {
+      token: OVERMIND_TOKEN,
+      session: "hris-completed-parent"
+    });
+    expect(markCompleted.statusCode).toBe(200);
+    expect(markCompleted.json().workflow.status).toBe("completed");
+
+    const dup = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "HRIS completed retry",
+      session: "hris-other-parent",
+      run_dir: "/tmp/hris-completed-root/new-slice"
+    });
+    expect(dup.statusCode).toBe(409);
+    expect(dup.json().use_existing.coordinator_session).toBe("hris-completed-parent");
+    expect(overmindService.list()).toHaveLength(1);
+  });
+
+  describe("register corrective advice tmux send", () => {
+    function makeRegisterTmuxMock(aliveIncoming: boolean): TmuxService {
+      return {
+        sessionExists: vi.fn(async (target: string) => {
+          if (target === "bad-parent") return aliveIncoming;
+          return false;
+        }),
+        sendAndSubmit: vi.fn(async () => true),
+        sendCommand: vi.fn(async () => ({ message: "sent", blocked: false })),
+        capturePane: vi.fn(async () => "")
+      } as unknown as TmuxService;
+    }
+
+    async function buildAppWithRegisterTmux(tmuxMock: TmuxService, nudgeState: NudgeStateService): Promise<FastifyInstance> {
+      const a = Fastify({ logger: false });
+      registerOvermindRoutes(
+        a,
+        testConfig(),
+        authService,
+        overmindService,
+        undefined,
+        undefined,
+        ovmSession,
+        tmuxMock,
+        nudgeState
+      );
+      await a.ready();
+      return a;
+    }
+
+    it("sends corrective advice via sendAndSubmit when the incoming coordinator_session is alive", async () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-register-advice-live-"));
+      const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
+      fs.mkdirSync(path.join(tmpDir, "data"), { recursive: true });
+      const nudgeState = new NudgeStateService();
+      await nudgeState.load();
+
+      const tmux = makeRegisterTmuxMock(true);
+      const a = await buildAppWithRegisterTmux(tmux, nudgeState);
+      try {
+        await a.inject({
+          method: "POST",
+          url: "/api/overmind/register",
+          remoteAddress: "127.0.0.1",
+          payload: {
+            token: OVERMIND_TOKEN,
+            label: "owner",
+            session: "owner-parent",
+            run_dir: "/tmp/register-owner-root"
+          }
+        });
+
+        const dup = await a.inject({
+          method: "POST",
+          url: "/api/overmind/register",
+          remoteAddress: "127.0.0.1",
+          payload: {
+            token: OVERMIND_TOKEN,
+            label: "dup",
+            session: "bad-parent",
+            run_dir: "/tmp/register-owner-root/new-phase"
+          }
+        });
+
+        expect(dup.statusCode).toBe(409);
+        expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+        const [target, msg] = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
+        expect(target).toBe("bad-parent");
+        expect(msg).toContain("Please use that session name");
+      } finally {
+        await a.close();
+        cwdSpy.mockRestore();
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("does NOT send corrective advice when the incoming coordinator_session is not alive", async () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-register-advice-dead-"));
+      const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
+      fs.mkdirSync(path.join(tmpDir, "data"), { recursive: true });
+      const nudgeState = new NudgeStateService();
+      await nudgeState.load();
+
+      const tmux = makeRegisterTmuxMock(false);
+      const a = await buildAppWithRegisterTmux(tmux, nudgeState);
+      try {
+        await a.inject({
+          method: "POST",
+          url: "/api/overmind/register",
+          remoteAddress: "127.0.0.1",
+          payload: {
+            token: OVERMIND_TOKEN,
+            label: "owner",
+            session: "owner-parent",
+            run_dir: "/tmp/register-owner-root-2"
+          }
+        });
+
+        const dup = await a.inject({
+          method: "POST",
+          url: "/api/overmind/register",
+          remoteAddress: "127.0.0.1",
+          payload: {
+            token: OVERMIND_TOKEN,
+            label: "dup",
+            session: "bad-parent",
+            run_dir: "/tmp/register-owner-root-2/new-phase"
+          }
+        });
+
+        expect(dup.statusCode).toBe(409);
+        expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+      } finally {
+        await a.close();
+        cwdSpy.mockRestore();
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
   });
 
   it("sanitizes markdown table chrome out of tasks on /register and /tasks", async () => {

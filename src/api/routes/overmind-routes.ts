@@ -3,9 +3,9 @@ import { AppConfig } from "../../config/config.js";
 import { createAuthMiddleware } from "../../auth/auth-middleware.js";
 import { AuthService } from "../../auth/auth-service.js";
 import {
-  DuplicateRunDirError,
   OvermindService,
   OvermindTask,
+  OvermindWorkflow,
   OvermindWorkflowStatus,
   RunSummary
 } from "../../services/overmind-service.js";
@@ -58,6 +58,17 @@ interface RenameBody {
 
 interface AskUpdateCooldownBody extends TokenBody {
   override_minutes?: number | null;
+}
+
+const REGISTER_CONFLICT_NUDGE_COOLDOWN_MS = 30 * 60 * 1000;
+
+function buildProjectTreeConflictMessage(existing: OvermindWorkflow): string {
+  return (
+    `Overmind: a workflow for this project tree is already registered as ` +
+    `'${existing.coordinator_session}' (id=${existing.id}). Please use that session name in your next ` +
+    `POST /api/overmind/register, /tasks, /complete, and /pause calls — overmind tracks one workflow per project tree. ` +
+    `Do NOT create new workflows for sub-phases of the same project.`
+  );
 }
 
 export function isLoopbackAddress(address: string | undefined): boolean {
@@ -117,35 +128,57 @@ export function registerOvermindRoutes(
         return reply.code(400).send({ error: "label, session, and run_dir are required" });
       }
 
-      try {
-        const workflow = overmindService.register({
-          label,
-          coordinator_session: session,
-          child_sessions,
-          child_roles,
-          run_dir,
-          current_task,
-          tasks
-        });
-        return reply.code(201).send({ workflow });
-      } catch (err) {
-        // Duplicate-run_dir collision: another active workflow already owns this run_dir
-        // under a different coordinator_session (JROM's "1 workflow per parent session"
-        // rule). Return 409 with the existing row so the caller can recover.
-        if (err instanceof DuplicateRunDirError) {
+      // Step 1: existing coordinator_session keeps the current upsert behavior.
+      const existingBySession = overmindService.getBySession(session);
+      if (!existingBySession) {
+        // Step 2: enforce one workflow per project tree via run_dir prefix matching.
+        const projectTreeMatch = await overmindService.findProjectTreeMatch(run_dir);
+        if (projectTreeMatch && projectTreeMatch.coordinator_session !== session) {
+          const correctiveAdvice = buildProjectTreeConflictMessage(projectTreeMatch);
+
+          if (tmuxService) {
+            try {
+              const parentAlive = typeof tmuxService.sessionExists === "function"
+                ? await tmuxService.sessionExists(session)
+                : true;
+              if (parentAlive) {
+                const nowMs = Date.now();
+                const lastSentAt = nudgeState?.getRegisterAdviceCooldown(session, projectTreeMatch.id) ?? 0;
+                if (nowMs - lastSentAt >= REGISTER_CONFLICT_NUDGE_COOLDOWN_MS) {
+                  const delivered = await tmuxService.sendAndSubmit(session, correctiveAdvice);
+                  if (delivered) {
+                    nudgeState?.setRegisterAdviceCooldown(session, projectTreeMatch.id, nowMs);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error("Overmind register corrective advice send failed:", error);
+            }
+          }
+
           return reply.code(409).send({
-            error: err.message,
-            existing: {
-              id: err.existing.id,
-              coordinator_session: err.existing.coordinator_session,
-              label: err.existing.label,
-              run_dir: err.existing.run_dir,
-              status: err.existing.status
+            error: correctiveAdvice,
+            use_existing: {
+              id: projectTreeMatch.id,
+              coordinator_session: projectTreeMatch.coordinator_session,
+              label: projectTreeMatch.label,
+              run_dir: projectTreeMatch.run_dir
             }
           });
         }
-        throw err;
       }
+
+      // Step 3: brand-new tree OR same-session upsert.
+      const workflow = overmindService.register({
+        label,
+        coordinator_session: session,
+        child_sessions,
+        child_roles,
+        run_dir,
+        current_task,
+        tasks
+      });
+      return reply.code(201).send({ workflow });
     }
   );
 
