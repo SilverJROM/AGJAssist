@@ -41,6 +41,7 @@ import { OvermindStreamManager } from "./websocket/overmind-stream-manager.js";
 import type { OvmSessionManager } from "../services/ovm-session.js";
 import { AppSettingsService } from "../services/app-settings-service.js";
 import { registerAppSettingsRoutes } from "./routes/app-settings-routes.js";
+import type { NudgeStateService } from "../services/nudge-state-service.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -65,6 +66,7 @@ export interface ApiServices {
   overmindStreamManager?: OvermindStreamManager;
   ovmSessionService?: OvmSessionManager;
   appSettingsService?: AppSettingsService;
+  nudgeStateService?: NudgeStateService;
 }
 
 export async function createApiServer(
@@ -134,7 +136,8 @@ export async function createApiServer(
     services.overmindNotify,
     services.overmindStreamManager,
     services.ovmSessionService,
-    services.tmuxService
+    services.tmuxService,
+    services.nudgeStateService
   );
 
   if (services.appSettingsService) {

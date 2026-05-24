@@ -7,10 +7,18 @@ import path from "node:path";
 // can live alongside idle without a schema change.
 interface WorkflowNudgeState {
   lastIdleNudgeAt?: number;
+  lastAskUpdateNudgeAt?: number;
+  lastTaskStaleNudgeAt?: number;
+  lastReconcileAsk?: string;
+}
+
+interface RegisterAdviceCooldownState {
+  lastSentAt?: number;
 }
 
 interface NudgeStateFile {
   workflows: Record<string, WorkflowNudgeState>;
+  registerAdviceCooldowns?: Record<string, RegisterAdviceCooldownState>;
 }
 
 // ─── NudgeStateService ────────────────────────────────────────────────────────
@@ -21,7 +29,7 @@ interface NudgeStateFile {
 export class NudgeStateService {
   private readonly dataDir: string;
   private readonly stateFile: string;
-  private state: NudgeStateFile = { workflows: {} };
+  private state: NudgeStateFile = { workflows: {}, registerAdviceCooldowns: {} };
 
   constructor() {
     this.dataDir = path.resolve(process.cwd(), "data");
@@ -38,16 +46,22 @@ export class NudgeStateService {
           workflows:
             parsed.workflows && typeof parsed.workflows === "object" && !Array.isArray(parsed.workflows)
               ? (parsed.workflows as Record<string, WorkflowNudgeState>)
+              : {},
+          registerAdviceCooldowns:
+            parsed.registerAdviceCooldowns &&
+            typeof parsed.registerAdviceCooldowns === "object" &&
+            !Array.isArray(parsed.registerAdviceCooldowns)
+              ? (parsed.registerAdviceCooldowns as Record<string, RegisterAdviceCooldownState>)
               : {}
         };
       } catch {
         // Malformed JSON — start clean, don't crash.
         console.warn("[NudgeStateService] Malformed JSON in state file — starting with empty state.");
-        this.state = { workflows: {} };
+        this.state = { workflows: {}, registerAdviceCooldowns: {} };
       }
     } catch {
       // File missing — start clean (auto-created on first write).
-      this.state = { workflows: {} };
+      this.state = { workflows: {}, registerAdviceCooldowns: {} };
     }
   }
 
@@ -62,23 +76,115 @@ export class NudgeStateService {
    * (write to <file>.tmp then rename — fire-and-forget, non-throwing).
    */
   setLastIdleNudge(workflowId: number, ms: number): void {
-    const key = String(workflowId);
-    this.state.workflows[key] = {
-      ...this.state.workflows[key],
+    this.upsertWorkflow(workflowId, {
       lastIdleNudgeAt: ms
-    };
+    });
+    this.persistSync();
+  }
+
+  getLastAskUpdateNudge(workflowId: number): number {
+    return this.state.workflows[String(workflowId)]?.lastAskUpdateNudgeAt ?? 0;
+  }
+
+  setLastAskUpdateNudge(workflowId: number, ms: number): void {
+    this.upsertWorkflow(workflowId, {
+      lastAskUpdateNudgeAt: ms
+    });
+    this.persistSync();
+  }
+
+  getLastTaskStaleNudge(workflowId: number): number {
+    return this.state.workflows[String(workflowId)]?.lastTaskStaleNudgeAt ?? 0;
+  }
+
+  setLastTaskStaleNudge(workflowId: number, ms: number): void {
+    this.upsertWorkflow(workflowId, {
+      lastTaskStaleNudgeAt: ms
+    });
+    this.persistSync();
+  }
+
+  getLastReconcileAsk(workflowId: number): string | null {
+    return this.state.workflows[String(workflowId)]?.lastReconcileAsk ?? null;
+  }
+
+  setLastReconcileAsk(workflowId: number, signature: string | null): void {
+    if (signature === null) {
+      this.removeWorkflowField(workflowId, "lastReconcileAsk");
+      return;
+    }
+    this.upsertWorkflow(workflowId, {
+      lastReconcileAsk: signature
+    });
+    this.persistSync();
+  }
+
+  getRegisterAdviceCooldown(incomingSession: string, targetWorkflowId: number): number {
+    const key = this.registerAdviceKey(incomingSession, targetWorkflowId);
+    return this.state.registerAdviceCooldowns?.[key]?.lastSentAt ?? 0;
+  }
+
+  setRegisterAdviceCooldown(incomingSession: string, targetWorkflowId: number, ms: number): void {
+    const key = this.registerAdviceKey(incomingSession, targetWorkflowId);
+    const next = this.state.registerAdviceCooldowns ?? {};
+    next[key] = { lastSentAt: ms };
+    this.state.registerAdviceCooldowns = next;
     this.persistSync();
   }
 
   /**
-   * Remove persisted state for a workflow (called on terminal/paused cleanup).
-   * Deletes the entry in-memory and persists atomically.
+   * Remove persisted state for a workflow across every per-workflow map/key.
+   * Also removes register-advice cooldown keys targeting this workflow.
    */
-  clearWorkflow(workflowId: number): void {
+  forgetWorkflow(workflowId: number): void {
     const key = String(workflowId);
-    if (!(key in this.state.workflows)) return;
-    delete this.state.workflows[key];
+    let changed = false;
+    if (key in this.state.workflows) {
+      delete this.state.workflows[key];
+      changed = true;
+    }
+    const adviceKeys = Object.keys(this.state.registerAdviceCooldowns ?? {});
+    for (const adviceKey of adviceKeys) {
+      if (adviceKey.endsWith(`::${workflowId}`)) {
+        delete this.state.registerAdviceCooldowns![adviceKey];
+        changed = true;
+      }
+    }
+    if (!changed) return;
     this.persistSync();
+  }
+
+  /** Backward-compatible alias. */
+  clearWorkflow(workflowId: number): void {
+    this.forgetWorkflow(workflowId);
+  }
+
+  /** Snapshot used by tests. */
+  getStateSnapshot(): NudgeStateFile {
+    return JSON.parse(JSON.stringify(this.state)) as NudgeStateFile;
+  }
+
+  private upsertWorkflow(workflowId: number, fields: Partial<WorkflowNudgeState>): void {
+    const key = String(workflowId);
+    this.state.workflows[key] = {
+      ...this.state.workflows[key],
+      ...fields
+    };
+  }
+
+  private removeWorkflowField(workflowId: number, field: keyof WorkflowNudgeState): void {
+    const key = String(workflowId);
+    const row = this.state.workflows[key];
+    if (!row || !(field in row)) return;
+    delete row[field];
+    if (Object.keys(row).length === 0) {
+      delete this.state.workflows[key];
+    }
+    this.persistSync();
+  }
+
+  private registerAdviceKey(incomingSession: string, targetWorkflowId: number): string {
+    return `${incomingSession}::${targetWorkflowId}`;
   }
 
   // ─── Private ────────────────────────────────────────────────────────────────

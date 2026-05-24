@@ -14,6 +14,7 @@ import { buildDoneNotification } from "../../services/overmind-notifications.js"
 import { OvermindStreamManager } from "../websocket/overmind-stream-manager.js";
 import type { OvmSessionManager } from "../../services/ovm-session.js";
 import type { TmuxService } from "../../tmux/tmux-service.js";
+import type { NudgeStateService } from "../../services/nudge-state-service.js";
 
 interface TokenBody {
   token?: string;
@@ -101,7 +102,8 @@ export function registerOvermindRoutes(
   notify?: OvermindNotify,
   streamManager?: OvermindStreamManager,
   ovmSession?: OvmSessionManager,
-  tmuxService?: TmuxService
+  tmuxService?: TmuxService,
+  nudgeState?: NudgeStateService
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
 
@@ -348,6 +350,7 @@ export function registerOvermindRoutes(
       if (!overmindService.delete(id)) {
         return reply.code(404).send({ error: "Workflow not found" });
       }
+      nudgeState?.forgetWorkflow(id);
 
       streamManager?.broadcast();
       return { ok: true };

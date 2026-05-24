@@ -7,8 +7,10 @@ import { registerOvermindRoutes } from "../src/api/routes/overmind-routes.js";
 import { AppConfig } from "../src/config/config.js";
 import { OvmSessionManager } from "../src/services/ovm-session.js";
 import type { TmuxService } from "../src/tmux/tmux-service.js";
+import { NudgeStateService } from "../src/services/nudge-state-service.js";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 
 const TEST_DB = path.join("data", "test-overmind-routes.sqlite");
 const BOT_TOKEN = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11";
@@ -312,6 +314,65 @@ describe("Overmind routes", () => {
     expect(dropped.statusCode).toBe(200);
     expect(dropped.json()).toEqual({ ok: true });
     expect(overmindService.get(workflowId)).toBeNull();
+  });
+
+  it("DELETE /api/overmind/workflows/:id also forgets persisted nudge-state entries", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-route-nudge-delete-"));
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
+    fs.mkdirSync(path.join(tmpDir, "data"), { recursive: true });
+
+    const nudgeState = new NudgeStateService();
+    await nudgeState.load();
+
+    const appWithNudge = Fastify({ logger: false });
+    registerOvermindRoutes(
+      appWithNudge,
+      testConfig(),
+      authService,
+      overmindService,
+      undefined,
+      undefined,
+      ovmSession,
+      undefined,
+      nudgeState
+    );
+    await appWithNudge.ready();
+
+    try {
+      const registered = await appWithNudge.inject({
+        method: "POST",
+        url: "/api/overmind/register",
+        remoteAddress: "127.0.0.1",
+        payload: {
+          token: OVERMIND_TOKEN,
+          label: "nudge-delete",
+          session: "nudge-delete-parent",
+          run_dir: "/tmp/nudge-delete"
+        }
+      });
+      expect(registered.statusCode).toBe(201);
+      const workflowId = registered.json().workflow.id as number;
+
+      nudgeState.setLastIdleNudge(workflowId, Date.now() - 1_000);
+      nudgeState.setLastAskUpdateNudge(workflowId, Date.now() - 2_000);
+      nudgeState.setLastTaskStaleNudge(workflowId, Date.now() - 3_000);
+      nudgeState.setLastReconcileAsk(workflowId, "gap:missing");
+
+      const dropped = await appWithNudge.inject({
+        method: "DELETE",
+        url: `/api/overmind/workflows/${workflowId}`,
+        remoteAddress: "127.0.0.1",
+        payload: { token: OVERMIND_TOKEN }
+      });
+      expect(dropped.statusCode).toBe(200);
+      expect(dropped.json()).toEqual({ ok: true });
+
+      expect(nudgeState.getStateSnapshot().workflows[String(workflowId)]).toBeUndefined();
+    } finally {
+      await appWithNudge.close();
+      cwdSpy.mockRestore();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it("rejects operator control requests with missing or invalid token", async () => {

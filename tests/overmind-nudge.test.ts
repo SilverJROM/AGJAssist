@@ -665,6 +665,95 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
     expect(updated?.nudge_count).toBe(1);
     expect(tmux2.sendAndSubmit).not.toHaveBeenCalled();
   });
+
+  it("ask-update cooldown also survives watcher reconstruction with the same persisted state file", async () => {
+    const workflow = service.register({
+      label: "ask-update-restart-persist",
+      coordinator_session: "coord-ask-rp",
+      child_sessions: ["child-ask-rp"],
+      child_roles: ["coder"],
+      run_dir: "/tmp/overmind-nudge",
+      current_task: "A1",
+      tasks: [{ id: "A1", label: "Work", state: "processing" }]
+    });
+    service.update(workflow.id, { last_pane_hash: hashPane("old pane") });
+    db.prepare("UPDATE overmind_workflows SET last_parent_update_at = ? WHERE id = ?")
+      .run(new Date(Date.now() - 120 * 60 * 1000).toISOString(), workflow.id);
+
+    const nudgeState = new NudgeStateService();
+    await nudgeState.load();
+    const settings = makeSettingsStub(30, 30);
+
+    const tmux = makeTmuxMock({
+      "coord-ask-rp": "new pane output",
+      "child-ask-rp": "child quiet pane"
+    });
+    const watcher1 = new OvermindWatcher(service, tmux, undefined, undefined, undefined, settings, nudgeState);
+    await watcher1.tick();
+    expect(
+      tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) =>
+        call[1].includes("you haven't sent any update via the API")
+      )
+    ).toHaveLength(1);
+
+    const nudgeState2 = new NudgeStateService();
+    await nudgeState2.load();
+    const tmux2 = makeTmuxMock({
+      "coord-ask-rp": "new pane output",
+      "child-ask-rp": "child quiet pane"
+    });
+    const watcher2 = new OvermindWatcher(service, tmux2, undefined, undefined, undefined, settings, nudgeState2);
+    await watcher2.tick();
+    expect(
+      tmux2.sendAndSubmit.mock.calls.filter((call: [string, string]) =>
+        call[1].includes("you haven't sent any update via the API")
+      )
+    ).toHaveLength(0);
+  });
+
+  it("terminal status cleanup forgets persisted cooldown entries for completed, failed, and paused workflows", async () => {
+    const completed = service.register({
+      label: "cleanup-completed",
+      coordinator_session: "cleanup-completed-parent",
+      run_dir: "/tmp/overmind-nudge/cleanup-completed"
+    });
+    const failed = service.register({
+      label: "cleanup-failed",
+      coordinator_session: "cleanup-failed-parent",
+      run_dir: "/tmp/overmind-nudge/cleanup-failed"
+    });
+    const paused = service.register({
+      label: "cleanup-paused",
+      coordinator_session: "cleanup-paused-parent",
+      run_dir: "/tmp/overmind-nudge/cleanup-paused"
+    });
+
+    const nudgeState = new NudgeStateService();
+    await nudgeState.load();
+    for (const wf of [completed, failed, paused]) {
+      nudgeState.setLastIdleNudge(wf.id, Date.now() - 1000);
+      nudgeState.setLastAskUpdateNudge(wf.id, Date.now() - 2000);
+      nudgeState.setLastTaskStaleNudge(wf.id, Date.now() - 3000);
+      nudgeState.setLastReconcileAsk(wf.id, "gap:missing");
+    }
+
+    service.setStatus(completed.id, "completed");
+    service.setStatus(failed.id, "failed");
+    service.setStatus(paused.id, "paused");
+
+    const tmux = makeTmuxMock({
+      "cleanup-completed-parent": "quiet",
+      "cleanup-failed-parent": "quiet",
+      "cleanup-paused-parent": "quiet"
+    });
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(30), nudgeState);
+    await watcher.tick();
+
+    const snapshot = nudgeState.getStateSnapshot();
+    expect(snapshot.workflows[String(completed.id)]).toBeUndefined();
+    expect(snapshot.workflows[String(failed.id)]).toBeUndefined();
+    expect(snapshot.workflows[String(paused.id)]).toBeUndefined();
+  });
 });
 
 describe("Overmind completion notifications", () => {

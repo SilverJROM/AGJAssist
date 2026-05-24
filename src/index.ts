@@ -134,7 +134,8 @@ async function main(): Promise<void> {
     overmindNotify,
     overmindStreamManager,
     ovmSessionService,
-    appSettingsService
+    appSettingsService,
+    nudgeStateService
   });
 
   await apiServer.listen({ port: config.api.port, host: config.api.host });

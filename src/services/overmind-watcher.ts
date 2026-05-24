@@ -203,12 +203,18 @@ export class OvermindWatcher {
 
   // ── In-process sub-agent suppression state ────────────────────────────────
   // subagentInFlight: when set for a workflow, all parent-facing interrupts are suppressed.
+  // Intentionally in-memory: this is short-lived live-session attribution derived
+  // from current pane text each tick; restart-loss self-heals on next capture.
   private readonly subagentInFlight = new Map<
     number,
     { source: "tui" | "ack"; since: number; name?: string; expectedEndAt?: number }
   >();
+  // Intentionally in-memory: this is a per-tick debounce marker used to decide
+  // when to ask once about possible in-process sub-agents; restart-loss only
+  // resets that debounce window and does not corrupt durable workflow state.
   // First timestamp at which "parent not-working AND every child idle/closed" was observed.
   private readonly apparentIdleSince = new Map<number, number>();
+  // Intentionally in-memory for the same reason as apparentIdleSince.
   // When the one-time Tier-2 ask was sent (for re-ask rate cap).
   private readonly lastSubagentAskAt = new Map<number, number>();
 
@@ -280,6 +286,7 @@ export class OvermindWatcher {
       // Gap resolved or terminal/paused — clear the dedupe entry so a future recurrence asks.
       if (!workflow.info_request || workflow.monitoring_paused) {
         this.lastReconcileAsk.delete(workflow.id);
+        this.nudgeState?.setLastReconcileAsk(workflow.id, null);
         if (workflow.monitoring_paused) continue;
         continue;
       }
@@ -296,7 +303,11 @@ export class OvermindWatcher {
         const gapSignature = workflow.info_check ?? workflow.info_request;
 
         // Same gap as last ask — do not nag again.
-        if (this.lastReconcileAsk.get(workflow.id) === gapSignature) continue;
+        const lastAskedSignature =
+          this.nudgeState?.getLastReconcileAsk(workflow.id) ??
+          this.lastReconcileAsk.get(workflow.id) ??
+          null;
+        if (lastAskedSignature === gapSignature) continue;
 
         const problemDesc = workflow.info_request;
         const msg =
@@ -306,6 +317,7 @@ export class OvermindWatcher {
 
         // Record the signature we just asked so future cycles with the same gap skip.
         this.lastReconcileAsk.set(workflow.id, gapSignature);
+        this.nudgeState?.setLastReconcileAsk(workflow.id, gapSignature);
       } catch (error) {
         console.error(`Overmind reconcile failed for workflow ${workflow.id}:`, error);
       }
@@ -646,7 +658,9 @@ export class OvermindWatcher {
       // Done here (after send success) so the cooldown is based on "when was the
       // last tasks_stale-bearing ask actually sent," not "when was staleness detected."
       if (assessment.missing.includes("tasks_stale")) {
-        this.lastTaskStaleNudgeAt.set(workflow.id, Date.now());
+        const sendTs = Date.now();
+        this.lastTaskStaleNudgeAt.set(workflow.id, sendTs);
+        this.nudgeState?.setLastTaskStaleNudge(workflow.id, sendTs);
       }
     } catch (error) {
       console.error("Overmind completeness request failed:", error);
@@ -971,6 +985,7 @@ export class OvermindWatcher {
     this.lastProgressMtimeMs.delete(workflowId);
     this.sparkTaskUsageWindow.delete(workflowId);
     this.lastTaskStaleNudgeAt.delete(workflowId);
+    this.lastReconcileAsk.delete(workflowId);
     // Sub-agent suppression state
     this.subagentInFlight.delete(workflowId);
     this.apparentIdleSince.delete(workflowId);
@@ -978,7 +993,7 @@ export class OvermindWatcher {
     // Idle-nudge cooldown (in-memory + persisted)
     this.lastIdleNudgeAt.delete(workflowId);
     this.lastAskUpdateNudgeAt.delete(workflowId);
-    this.nudgeState?.clearWorkflow(workflowId);
+    this.nudgeState?.forgetWorkflow(workflowId);
   }
 
   private async maybeAskForParentUpdate(workflow: OvermindWorkflow): Promise<void> {
@@ -997,7 +1012,10 @@ export class OvermindWatcher {
     const cooldownMs = this.effectiveAskUpdateCooldownMs(workflow);
     if (nowMs - lastParentUpdateMs <= cooldownMs) return;
 
-    const lastNudgeAt = this.lastAskUpdateNudgeAt.get(workflow.id) ?? 0;
+    const lastNudgeAt =
+      this.nudgeState?.getLastAskUpdateNudge(workflow.id) ??
+      this.lastAskUpdateNudgeAt.get(workflow.id) ??
+      0;
     if (nowMs - lastNudgeAt < cooldownMs) return;
 
     const staleMinutes = Math.max(1, Math.round((nowMs - lastParentUpdateMs) / 60_000));
@@ -1007,6 +1025,7 @@ export class OvermindWatcher {
     try {
       await this.tmuxService.sendAndSubmit(workflow.coordinator_session, message);
       this.lastAskUpdateNudgeAt.set(workflow.id, nowMs);
+      this.nudgeState?.setLastAskUpdateNudge(workflow.id, nowMs);
     } catch (error) {
       console.error("Overmind ask-update nudge failed:", error);
     }
@@ -1056,7 +1075,10 @@ export class OvermindWatcher {
     }
     // 2. Nag cooldown: even when staleness is detected, don't re-ask within N min
     //    (settings-driven, default 30) of the last tasks_stale-bearing ask. Other gaps are unaffected.
-    const lastNagAt = this.lastTaskStaleNudgeAt.get(wid) ?? 0;
+    const lastNagAt =
+      this.nudgeState?.getLastTaskStaleNudge(wid) ??
+      this.lastTaskStaleNudgeAt.get(wid) ??
+      0;
     if (now - lastNagAt < taskStaleNagCooldownMs) {
       return undefined;
     }
