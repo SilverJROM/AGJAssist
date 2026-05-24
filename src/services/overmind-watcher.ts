@@ -26,7 +26,6 @@ import {
 } from "./overmind-notifications.js";
 import {
   AppSettingsService,
-  DEFAULT_EVIDENCE_IDLE_THRESHOLD_MIN,
   DEFAULT_EVIDENCE_READ_CADENCE_MIN,
   DEFAULT_IDLE_NUDGE_COOLDOWN_MIN
 } from "./app-settings-service.js";
@@ -132,6 +131,7 @@ import { determineActiveSessionAttribution } from "./overmind/active-session-att
 import { assessRegistrationCompleteness } from "./overmind/completeness.js";
 import type { CompletenessResult } from "./overmind/completeness.js";
 import { WatcherCooldowns } from "./overmind/cooldowns.js";
+import { maybeAskForParentUpdate } from "./overmind/idle-detector.js";
 
 export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
@@ -367,7 +367,13 @@ export class OvermindWatcher {
       return;
     }
 
-    await this.maybeAskForParentUpdate(workflow, resolvedRunDir);
+    await maybeAskForParentUpdate(workflow, resolvedRunDir, {
+      tmuxService: this.tmuxService,
+      cooldowns: this.cooldowns,
+      appSettings: this.appSettings,
+      nudgeState: this.nudgeState,
+      TERMINAL_STATUSES
+    });
 
     // ── In-process sub-agent detection + suppression (Tier-1/2/3) ─────────────
     const nowMs = Date.now();
@@ -912,82 +918,6 @@ export class OvermindWatcher {
     this.subagentInFlight.delete(workflowId);
     this.apparentIdleSince.delete(workflowId);
     this.nudgeState?.forgetWorkflow(workflowId);
-  }
-
-  /**
-   * JROM 2026-05-24 v2 — only nag when EVERYTHING is idle.
-   * Freshness = MAX of (last_parent_update_at, progress.md mtime, callbacks.md mtime).
-   * The parent doesn't need to POST /tasks — overmind reads files. So as long as
-   * the parent writes to its normal work-evidence files, no nag fires. Only when
-   * all three signals go silent past the cooldown does the ask fire — and the new
-   * message asks for an evidence-file update, not an API POST.
-   */
-  private async maybeAskForParentUpdate(
-    workflow: OvermindWorkflow,
-    resolvedRunDir: string
-  ): Promise<void> {
-    if (workflow.monitoring_paused || TERMINAL_STATUSES.includes(workflow.status)) {
-      return;
-    }
-
-    // Build the MAX-of-three freshness signal. Missing files / unparseable
-    // timestamps contribute 0, so a parent that's never POSTed and has no
-    // evidence files yet naturally fails the cooldown check and gets nagged.
-    const parentApiMs = workflow.last_parent_update_at
-      ? Date.parse(workflow.last_parent_update_at)
-      : NaN;
-    const progressMtimeMs = await this.fileMtimeMsBestEffort(
-      path.join(resolvedRunDir, "progress.md")
-    );
-    const callbacksMtimeMs = await this.fileMtimeMsBestEffort(
-      path.join(resolvedRunDir, "callbacks.md")
-    );
-    const lastActivityMs = Math.max(
-      Number.isFinite(parentApiMs) ? parentApiMs : 0,
-      progressMtimeMs,
-      callbacksMtimeMs
-    );
-    if (lastActivityMs === 0) return; // brand-new workflow, no signal yet — wait
-
-    const nowMs = Date.now();
-    const cooldownMs = this.effectiveEvidenceIdleThresholdMs(workflow);
-    if (nowMs - lastActivityMs <= cooldownMs) return;
-
-    const lastNudgeAt =
-      this.nudgeState?.getLastAskUpdateNudge(workflow.id) ??
-      this.cooldowns.getLastFired(workflow.id, "ask_update");
-    if (nowMs - lastNudgeAt < cooldownMs) return;
-
-    const staleMinutes = Math.max(1, Math.round((nowMs - lastActivityMs) / 60_000));
-    const message =
-      `Overmind: I haven't seen any activity in ~${staleMinutes} minutes — ` +
-      "no progress.md / callbacks.md updates, no task-state changes. Are you still working? " +
-      "Please update progress.md (or callbacks.md) with current status and I'll read it from there. " +
-      "If the run is finished, POST /api/overmind/complete to close it out.";
-    try {
-      await this.tmuxService.sendAndSubmit(workflow.coordinator_session, message);
-      this.cooldowns.recordFired(workflow.id, "ask_update", nowMs);
-      this.nudgeState?.setLastAskUpdateNudge(workflow.id, nowMs);
-    } catch (error) {
-      console.error("Overmind ask-update nudge failed:", error);
-    }
-  }
-
-  /** Best-effort file mtime in ms; returns 0 when the file is missing or unstat-able. */
-  private async fileMtimeMsBestEffort(filePath: string): Promise<number> {
-    try {
-      const s = await stat(filePath);
-      return s.mtimeMs;
-    } catch {
-      return 0;
-    }
-  }
-
-  private effectiveEvidenceIdleThresholdMs(workflow: OvermindWorkflow): number {
-    const overrideMin = workflow.evidence_idle_threshold_override_minutes;
-    const systemMin =
-      this.appSettings?.get().evidence_idle_threshold_minutes ?? DEFAULT_EVIDENCE_IDLE_THRESHOLD_MIN;
-    return (overrideMin ?? systemMin) * 60_000;
   }
 
   // Async derivation of per-task states from local files + pane text. PURE
