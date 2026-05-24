@@ -1092,13 +1092,13 @@ function OvermindWorkflows() {
                         </div>
                       </div>
                     </button>
-                    <button
+                    ${(run.status === 'completed' || run.status === 'failed' || run.status === 'paused') && html`<button
                       type="button"
                       class="overmind-delete-button"
                       title="Delete this workflow (cannot be undone)"
                       aria-label=${'Delete workflow ' + title}
                       onclick=${(e) => { e.stopPropagation(); deleteWorkflow(run); }}
-                    >🗑</button>
+                    >🗑</button>`}
                   </div>
                   ${isExpanded && html`
                     <div class="overmind-history-list overmind-history-archive-list">
@@ -1192,13 +1192,13 @@ function OvermindWorkflows() {
                       aria-label=${'Rename workflow ' + displayName}
                       onclick=${() => renameWorkflow(workflow)}
                     >✎</button>
-                    <button
+                    ${(workflow.status === 'completed' || workflow.status === 'failed' || workflow.status === 'paused') && html`<button
                       type="button"
                       class="overmind-delete-button"
                       title="Delete this workflow (cannot be undone)"
                       aria-label=${'Delete workflow ' + displayName}
                       onclick=${() => deleteWorkflow(workflow)}
-                    >🗑</button>
+                    >🗑</button>`}
                     <button
                       type="button"
                       class="overmind-chevron-button"
