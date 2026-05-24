@@ -1274,10 +1274,11 @@ function OvermindWorkflows() {
                       </tbody>
                     </table>
 
-                    <div style="margin:10px 0 12px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                      <label for=${'ask-update-cooldown-' + workflow.id} style="font-size:12px;color:var(--text-secondary)">Ask-update cooldown override:</label>
+                    <div class="overmind-cooldown-row">
+                      <label for=${'ask-update-cooldown-' + workflow.id}>Ask-update cooldown override:</label>
                       <select
                         id=${'ask-update-cooldown-' + workflow.id}
+                        class="overmind-cooldown-select"
                         value=${askUpdateOverrideValue}
                         onChange=${(e) => {
                           const val = e.target.value;

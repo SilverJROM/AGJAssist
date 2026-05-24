@@ -990,6 +990,27 @@ body {
   color: #c0392b;
   background: rgba(192, 57, 43, 0.08);
 }
+/* Ask-update cooldown override dropdown — compact opt-out from the global
+   `select { width: 100% }` rule. JROM 2026-05-24: "make it more subtle ...
+   just its length not full width of the screen". */
+.overmind-cooldown-row {
+  margin: 10px 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.overmind-cooldown-row label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.overmind-cooldown-select {
+  width: auto;          /* override global `select { width: 100% }` */
+  max-width: 100%;      /* don't overflow narrow viewports */
+  padding: 4px 8px;     /* tighter than the global form-control padding */
+  font-size: 12px;      /* match the inline label */
+  line-height: 1.2;
+}
 .overmind-pause-button {
   width: 26px;
   height: 26px;
