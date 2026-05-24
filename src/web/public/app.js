@@ -5,6 +5,7 @@ import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState,
 import {
   AVAILABLE_BOTTOM_NAV_TABS,
   DEFAULT_BOTTOM_NAV_TAB_IDS,
+  DEFAULT_LANDING_TAB,
   addBottomNavTab,
   buildOvermindWsUrl,
   buildTmuxWsUrl,
@@ -16,13 +17,15 @@ import {
   isActiveStatus,
   moveBottomNavTab,
   readBottomNavTabIds,
+  readLandingTab,
   removeBottomNavTab,
   statusColor,
   statusIcon,
   summarizeWorkflows,
   taskGlyph,
   totalElapsedMs,
-  writeBottomNavTabIds
+  writeBottomNavTabIds,
+  writeLandingTab
 } from './overmind-helpers.js';
 
 const html = htm.bind(h);
@@ -5145,6 +5148,38 @@ function Conversations() {
   `;
 }
 
+// ── Landing-page preference (JROM 2026-05-24) ──────────────────────────────
+// Lets the user pick which tab the app opens on a fresh load. Default '/'.
+// Stored in localStorage via readLandingTab/writeLandingTab.
+
+function LandingPagePreference() {
+  const [value, setValue] = useState(() => readLandingTab());
+  const onChange = (e) => {
+    const next = writeLandingTab(e.target.value);
+    setValue(next);
+  };
+  return html`
+    <div class="overmind-cooldown-row">
+      <label for="landing-page-select">Default landing page:</label>
+      <select
+        id="landing-page-select"
+        class="overmind-cooldown-select"
+        value=${value}
+        onChange=${onChange}
+      >
+        ${AVAILABLE_BOTTOM_NAV_TABS.map(tab => html`
+          <option key=${tab.id} value=${tab.id}>
+            ${tab.icon} ${tab.label}${tab.id === DEFAULT_LANDING_TAB ? ' (default)' : ''}
+          </option>
+        `)}
+      </select>
+    </div>
+    <div style="font-size:11px;color:var(--text-secondary);margin-top:-4px;margin-bottom:8px">
+      Opens here on a fresh page load. Deep links to specific pages still work.
+    </div>
+  `;
+}
+
 // ── Overmind Cooldowns Settings Section ────────────────────────────────────
 
 function OvermindCooldownsSection() {
@@ -5679,8 +5714,11 @@ function Settings({ onEditBottomNav } = {}) {
       <h2 style="margin-bottom:16px">Settings</h2>
 
       ${onEditBottomNav && html`
-        <${SettingsSection} title="Bottom Navigation" defaultOpen=${true}>
-          <button class="btn btn-sm" onclick=${onEditBottomNav}>Edit bottom nav</button>
+        <${SettingsSection} title="Navigation" defaultOpen=${true}>
+          <div style="margin-bottom:12px">
+            <button class="btn btn-sm" onclick=${onEditBottomNav}>Edit bottom nav</button>
+          </div>
+          <${LandingPagePreference} />
         </${SettingsSection}>
       `}
 
@@ -5893,6 +5931,30 @@ function TgApp() {
   const user = JSON.parse(localStorage.getItem('agj_user') || 'null');
   const [bottomNavTabIds, setBottomNavTabIds] = useState(() => readBottomNavTabIds());
   const [editingBottomNav, setEditingBottomNav] = useState(false);
+
+  // JROM 2026-05-24: on a fresh page load, redirect away from any empty or
+  // unknown hash to the user's preferred landing page (default: Home '/').
+  // Deep linking still works — a known route in the hash is honored. This
+  // fixes the "Page not found" the user saw on initial open when an old
+  // stale hash (e.g. a removed page) survived in the URL.
+  useEffect(() => {
+    if (!authToken || !user) return;
+    const initialHash = location.hash.slice(1);
+    const KNOWN_PREFIXES = ['/project/'];
+    const KNOWN_EXACT = new Set([
+      '/', '/projects', '/terminals', '/overmind', '/tasks',
+      '/notes', '/conversations', '/settings'
+    ]);
+    const isKnown =
+      initialHash &&
+      (KNOWN_EXACT.has(initialHash) || KNOWN_PREFIXES.some(p => initialHash.startsWith(p)));
+    if (!isKnown) {
+      const landing = readLandingTab();
+      if (initialHash !== landing) navigate(landing);
+    }
+    // Only on mount — subsequent navigation respects the user's choices.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!authToken || !user) return html`<${Login} />`;
 

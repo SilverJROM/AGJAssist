@@ -30,6 +30,11 @@ export const OVERMIND_STATUS_COLORS = {
 
 export const BOTTOM_NAV_STORAGE_KEY = 'agj_bottom_nav_tabs_v1';
 
+// JROM 2026-05-24: configurable landing page. Default is '/' (Home). Stored in
+// localStorage so JROM can switch via Settings without code changes.
+export const LANDING_TAB_STORAGE_KEY = 'agj_landing_tab_v1';
+export const DEFAULT_LANDING_TAB = '/';
+
 export const AVAILABLE_BOTTOM_NAV_TABS = [
   { id: '/', icon: '\u{1F3E0}', label: 'Home' },
   { id: '/tasks', icon: '\u{2705}', label: 'Tasks' },
@@ -179,6 +184,23 @@ export function writeBottomNavTabIds(tabIds, storage = globalThis.localStorage) 
   const serialized = serializeBottomNavTabIds(tabIds);
   if (storage?.setItem) storage.setItem(BOTTOM_NAV_STORAGE_KEY, serialized);
   return JSON.parse(serialized);
+}
+
+// JROM 2026-05-24: read/write the user's preferred landing page (the route
+// the app opens to on a fresh load). Falls back to '/' (Home). Only accepts
+// tab IDs that exist in AVAILABLE_BOTTOM_NAV_TABS so a stale storage value
+// can't strand the user on a removed page.
+export function readLandingTab(storage = globalThis.localStorage) {
+  if (!storage?.getItem) return DEFAULT_LANDING_TAB;
+  const raw = storage.getItem(LANDING_TAB_STORAGE_KEY);
+  if (typeof raw === 'string' && AVAILABLE_BOTTOM_NAV_TAB_IDS.includes(raw)) return raw;
+  return DEFAULT_LANDING_TAB;
+}
+
+export function writeLandingTab(tabId, storage = globalThis.localStorage) {
+  if (!AVAILABLE_BOTTOM_NAV_TAB_IDS.includes(tabId)) tabId = DEFAULT_LANDING_TAB;
+  if (storage?.setItem) storage.setItem(LANDING_TAB_STORAGE_KEY, tabId);
+  return tabId;
 }
 
 export function taskGlyph(state) {
