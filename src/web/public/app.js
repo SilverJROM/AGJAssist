@@ -1208,8 +1208,11 @@ function OvermindWorkflows() {
                     >
                       <span class="overmind-chevron" aria-hidden="true">${isExpanded ? '▾' : '▸'}</span>
                     </button>
-                    ${workflow.monitoring_paused && html`<span class="badge overmind-paused-badge" title=${'Overmind checks paused' + (workflow.paused_by ? ' (' + workflow.paused_by + ')' : '') + ' — no interrupts'}>⏸ paused</span>`}
-                    <span class=${'badge overmind-status-badge ' + colorClass}>${statusIcon(workflow.status)} ${workflow.status}</span>
+                    <span
+                      class=${'badge overmind-status-badge overmind-status-badge-icon ' + colorClass}
+                      title=${workflow.status + (workflow.monitoring_paused ? ' · monitoring paused' + (workflow.paused_by ? ' (' + workflow.paused_by + ')' : '') : '')}
+                      aria-label=${'Status: ' + workflow.status}
+                    >${statusIcon(workflow.status)}</span>
                   </div>
                 </div>
                 <div class="overmind-substatus">

@@ -883,20 +883,31 @@ body {
 .overmind-card-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
 }
+/* JROM 2026-05-24: title reserves ~60% of the card width so the row never
+   gets crowded out by the status/action chrome. Buttons collapse to icons. */
 .overmind-title {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   min-width: 0;
+  flex: 1 1 60%;
 }
 .overmind-title-toggle {
   align-self: center;
+  flex: 1 1 60%;
+  min-width: 0;
 }
 .overmind-title > div {
   min-width: 0;
+  flex: 1 1 auto;
+}
+.overmind-card h3 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .overmind-chevron {
   color: var(--ovm-accent, var(--text-secondary));
@@ -908,7 +919,8 @@ body {
   font-size: 15px;
   line-height: 1.3;
   margin: 0;
-  overflow-wrap: anywhere;
+  /* Title is now single-line + ellipsis so the card header stays tight.
+     Full title still in the rename button's tooltip + the substatus area. */
 }
 .overmind-current {
   color: var(--text-secondary);
@@ -931,8 +943,11 @@ body {
 .overmind-status {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: 4px;
+  flex: 0 0 auto;
+  max-width: 40%;
+  flex-wrap: nowrap;
 }
 .overmind-rename-button {
   width: 26px;
@@ -1076,6 +1091,22 @@ body {
   background: var(--ovm-bg, rgba(139,148,158,0.15));
   border: 1px solid var(--ovm-border, var(--border));
   color: var(--ovm-accent, var(--text-secondary));
+}
+/* JROM 2026-05-24: status badge in the header is icon-only (e.g. ▶/⚠/✓) so
+   it doesn't crowd out the title. The verbose status text moves to the
+   `title=` tooltip + the substatus row + the detail table when expanded. */
+.overmind-status-badge.overmind-status-badge-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  text-transform: none;
+  flex-shrink: 0;
 }
 .overmind-expanded {
   display: grid;
@@ -1879,11 +1910,11 @@ body.tg-miniapp {
 
 /* OVM: workflow % complete + task count/total */
 .overmind-pct {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-secondary);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  min-width: 34px;
+  min-width: 28px;
   text-align: right;
 }
 .overmind-needs-info {
