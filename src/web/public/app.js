@@ -834,6 +834,48 @@ function OvermindWorkflows() {
     }
   }, []);
 
+  // JROM 2026-05-24 cleanup feature — delete a whole workflow row from either the
+  // Workflows tab or the History tab. Confirms once because the action is destructive
+  // (also drops all task-history rows for the session via FK cascade / forgetWorkflow).
+  const deleteWorkflow = useCallback(async (workflow) => {
+    const title = workflow.display_name || workflow.label;
+    const ok = window.confirm(
+      `Delete workflow "${title}" (id=${workflow.id})?\n\n` +
+      `This removes the workflow row + all its persisted cooldown state. Task-history\n` +
+      `entries for this session remain unless you delete them individually.\n\n` +
+      `Cannot be undone.`
+    );
+    if (!ok) return;
+    try {
+      await api(`/api/overmind/workflows/${workflow.id}`, { method: 'DELETE' });
+      setWorkflows(prev => prev.filter(w => w.id !== workflow.id));
+      setRuns(prev => prev.filter(r => r.id !== workflow.id));
+      setError('');
+    } catch (e) {
+      setError(e.message || 'Failed to delete workflow.');
+    }
+  }, []);
+
+  const deleteHistoryEntry = useCallback(async (entry, sessionKey) => {
+    if (!entry?.id) return;
+    const ok = window.confirm(
+      `Delete this history entry?\n\n` +
+      `Time: ${entry.at}\nCurrent task: ${entry.current_task || '—'}\nDone: ${entry.done}/${entry.total}\n\n` +
+      `Cannot be undone.`
+    );
+    if (!ok) return;
+    try {
+      await api(`/api/overmind/history/${entry.id}`, { method: 'DELETE' });
+      setRunDrilldown(prev => ({
+        ...prev,
+        [sessionKey]: (prev[sessionKey] || []).filter(e => e.id !== entry.id)
+      }));
+      setError('');
+    } catch (e) {
+      setError(e.message || 'Failed to delete history entry.');
+    }
+  }, []);
+
   const toggleMonitoring = useCallback(async (workflow) => {
     const action = workflow.monitoring_paused ? 'resume-monitoring' : 'pause-monitoring';
     try {
@@ -1050,6 +1092,13 @@ function OvermindWorkflows() {
                         </div>
                       </div>
                     </button>
+                    <button
+                      type="button"
+                      class="overmind-delete-button"
+                      title="Delete this workflow (cannot be undone)"
+                      aria-label=${'Delete workflow ' + title}
+                      onclick=${(e) => { e.stopPropagation(); deleteWorkflow(run); }}
+                    >🗑</button>
                   </div>
                   ${isExpanded && html`
                     <div class="overmind-history-list overmind-history-archive-list">
@@ -1058,6 +1107,13 @@ function OvermindWorkflows() {
                           <time>${entry.at ? new Date(entry.at).toLocaleString() : '—'}</time>
                           <span>${entry.current_task || '—'}</span>
                           <strong>${entry.done ?? 0}/${entry.total ?? 0}</strong>
+                          ${entry.id && html`<button
+                            type="button"
+                            class="overmind-delete-entry-button"
+                            title="Delete this history entry"
+                            aria-label="Delete history entry"
+                            onclick=${() => deleteHistoryEntry(entry, key)}
+                          >🗑</button>`}
                         </div>
                       `) : null}
                     </div>
@@ -1136,6 +1192,13 @@ function OvermindWorkflows() {
                       aria-label=${'Rename workflow ' + displayName}
                       onclick=${() => renameWorkflow(workflow)}
                     >✎</button>
+                    <button
+                      type="button"
+                      class="overmind-delete-button"
+                      title="Delete this workflow (cannot be undone)"
+                      aria-label=${'Delete workflow ' + displayName}
+                      onclick=${() => deleteWorkflow(workflow)}
+                    >🗑</button>
                     <button
                       type="button"
                       class="overmind-chevron-button"

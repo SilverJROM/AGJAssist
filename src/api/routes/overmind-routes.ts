@@ -106,6 +106,25 @@ function parseWorkflowId(id: string): number | null {
   return Number.isInteger(workflowId) && workflowId >= 1 ? workflowId : null;
 }
 
+// Best-effort JWT verification — returns the session user (owner role) when a
+// valid owner-authed bearer token is present, null otherwise. Used by dual-auth
+// routes that accept either JWT-owner (UI) or loopback+overmind-token (CLI).
+async function tryAuthOwner(
+  request: FastifyRequest,
+  authService: AuthService
+): Promise<{ id: number; role: "owner" | "viewer" } | null> {
+  const header = request.headers.authorization;
+  if (!header || typeof header !== "string" || !header.startsWith("Bearer ")) return null;
+  const token = header.slice(7).trim();
+  if (!token) return null;
+  try {
+    const user = authService.verifyToken(token);
+    return user && user.role === "owner" ? { id: user.id, role: user.role } : null;
+  } catch {
+    return null;
+  }
+}
+
 export function registerOvermindRoutes(
   app: FastifyInstance,
   config: AppConfig,
@@ -447,10 +466,19 @@ export function registerOvermindRoutes(
     }
   );
 
+  // Dual-authed: accepts either the loopback+token combo (for projcore-style
+  // programmatic cleanup) OR a JWT-owner session (for dashboard "Delete" button).
+  // JROM 2026-05-24: "allow deletion of actual workflows on history or the tasks
+  // list themselves, so i can clean them up myself".
   app.delete<{ Params: WorkflowParams; Body: TokenBody }>(
     "/api/overmind/workflows/:id",
     async (request, reply) => {
-      if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
+      // Try JWT-owner first (browser path). If the auth header is absent or invalid,
+      // fall back to the loopback+token path (projcore CLI path).
+      const sessionUser = await tryAuthOwner(request, authService);
+      if (!sessionUser) {
+        if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
+      }
 
       const id = parseWorkflowId(request.params.id);
       if (id === null) {
@@ -463,6 +491,26 @@ export function registerOvermindRoutes(
       nudgeState?.forgetWorkflow(id);
 
       streamManager?.broadcast();
+      return { ok: true };
+    }
+  );
+
+  // Owner-only: delete a single task-history entry from the workflow drill-down.
+  // JROM 2026-05-24 cleanup feature.
+  app.delete<{ Params: { id: string } }>(
+    "/api/overmind/history/:id",
+    { preHandler: authMiddleware },
+    async (request, reply) => {
+      if (request.sessionUser?.role !== "owner") {
+        return reply.code(403).send({ error: "Owner role required" });
+      }
+      const entryId = Number(request.params.id);
+      if (!Number.isInteger(entryId) || entryId < 1) {
+        return reply.code(400).send({ error: "Invalid history entry id" });
+      }
+      if (!overmindService.deleteHistoryEntry(entryId)) {
+        return reply.code(404).send({ error: "History entry not found" });
+      }
       return { ok: true };
     }
   );

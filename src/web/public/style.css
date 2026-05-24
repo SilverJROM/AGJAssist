@@ -950,6 +950,46 @@ body {
   color: var(--text);
   background: var(--ovm-bg, transparent);
 }
+/* JROM 2026-05-24 cleanup feature — delete workflow / delete history entry. */
+.overmind-delete-button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.overmind-delete-button:hover {
+  border-color: #c0392b;
+  color: #c0392b;
+  background: rgba(192, 57, 43, 0.08);
+}
+.overmind-delete-entry-button {
+  width: 22px;
+  height: 22px;
+  margin-left: 8px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+}
+.overmind-history-entry:hover .overmind-delete-entry-button {
+  opacity: 1;
+}
+.overmind-delete-entry-button:hover {
+  border-color: #c0392b;
+  color: #c0392b;
+  background: rgba(192, 57, 43, 0.08);
+}
 .overmind-pause-button {
   width: 26px;
   height: 26px;

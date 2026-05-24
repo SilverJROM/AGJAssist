@@ -568,6 +568,15 @@ export class OvermindService {
     return result.changes > 0;
   }
 
+  /** Owner cleanup: removes a single task-history entry (one row in
+   *  overmind_task_history). The workflow row itself is untouched. JROM 2026-05-24:
+   *  "delete actual workflows on history or the tasks list themselves, so i can
+   *  clean them up myself". Used by the JWT-owner DELETE /api/overmind/history/:id. */
+  deleteHistoryEntry(id: number): boolean {
+    const result = this.db.prepare("DELETE FROM overmind_task_history WHERE id = ?").run(id);
+    return result.changes > 0;
+  }
+
   private mapRow(row: OvermindWorkflowRow): OvermindWorkflow {
     return {
       ...row,

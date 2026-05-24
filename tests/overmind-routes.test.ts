@@ -646,6 +646,100 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     }
   });
 
+  it("DELETE /api/overmind/workflows/:id accepts JWT-owner auth (no overmind token) for the dashboard delete button (JROM 2026-05-24)", async () => {
+    const registered = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "owner-delete",
+      session: "owner-delete-parent",
+      run_dir: "/tmp/owner-delete",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
+    });
+    const workflowId = registered.json().workflow.id as number;
+    expect(overmindService.get(workflowId)).not.toBeNull();
+
+    // JWT-owner DELETE (no body, no x-overmind-token).
+    const dropped = await app.inject({
+      method: "DELETE",
+      url: `/api/overmind/workflows/${workflowId}`,
+      headers: authHeader()
+    });
+    expect(dropped.statusCode).toBe(200);
+    expect(dropped.json()).toEqual({ ok: true });
+    expect(overmindService.get(workflowId)).toBeNull();
+  });
+
+  it("DELETE /api/overmind/workflows/:id rejects when neither JWT-owner nor token is provided", async () => {
+    const registered = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "unauth-delete",
+      session: "unauth-delete-parent",
+      run_dir: "/tmp/unauth-delete",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
+    });
+    const workflowId = registered.json().workflow.id as number;
+
+    const noAuth = await app.inject({
+      method: "DELETE",
+      url: `/api/overmind/workflows/${workflowId}`
+      // no headers, no body
+    });
+    expect(noAuth.statusCode).toBe(401);
+    // Row still there
+    expect(overmindService.get(workflowId)).not.toBeNull();
+  });
+
+  it("DELETE /api/overmind/history/:id removes a single task-history entry, JWT-owner only", async () => {
+    // Register + push a task update so a history row exists
+    await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "history-del",
+      session: "history-del-parent",
+      run_dir: "/tmp/history-del",
+      tasks: [
+        { id: "T1", label: "A", state: "processing" },
+        { id: "T2", label: "B", state: "pending" }
+      ]
+    });
+    await lifecyclePost("/api/overmind/tasks", {
+      token: OVERMIND_TOKEN,
+      session: "history-del-parent",
+      current_task: "A2 routes",
+      tasks: [
+        { id: "T1", label: "A", state: "done" },
+        { id: "T2", label: "B", state: "processing" }
+      ]
+    });
+
+    const entries = overmindService.listHistory("history-del-parent");
+    expect(entries.length).toBeGreaterThanOrEqual(1);
+    const entryId = entries[0].id;
+
+    // No auth → 401
+    const unauth = await app.inject({
+      method: "DELETE",
+      url: `/api/overmind/history/${entryId}`
+    });
+    expect(unauth.statusCode).toBe(401);
+
+    // JWT-owner → 200
+    const dropped = await app.inject({
+      method: "DELETE",
+      url: `/api/overmind/history/${entryId}`,
+      headers: authHeader()
+    });
+    expect(dropped.statusCode).toBe(200);
+    expect(dropped.json()).toEqual({ ok: true });
+    expect(overmindService.listHistory("history-del-parent").find(e => e.id === entryId)).toBeUndefined();
+
+    // Second delete of the same entry → 404
+    const missing = await app.inject({
+      method: "DELETE",
+      url: `/api/overmind/history/${entryId}`,
+      headers: authHeader()
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+
   it("rejects operator control requests with missing or invalid token", async () => {
     const registered = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
