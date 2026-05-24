@@ -149,7 +149,9 @@ describe("Overmind routes", () => {
       label: "lkcamp rerun",
       session: "lkcamp-12",
       child_sessions: ["lkcdx-may20", "lkcdx-extra"],
-      run_dir: "/tmp/lkcamp-rerun",
+      // Same project tree as first (deeper sub-path) — required by the cross-project
+      // upsert guard (JROM 2026-05-24).
+      run_dir: "/tmp/lkcamp/rerun",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
@@ -204,6 +206,47 @@ describe("Overmind routes", () => {
     expect(reregister.json().workflow.tasks).toEqual([
       { id: "T1", label: "Initial", state: "processing" }
     ]);
+  });
+
+  it("rejects /register with 409 when a re-register against an existing coord session points at a different project tree (cross-project upsert guard — JROM 2026-05-24)", async () => {
+    // First register: AGJ-51 tracking AGJassist work
+    const first = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "AGJAssist chat decom",
+      session: "AGJ-51",
+      run_dir: "/home/agjrom/TGBOTS/AGJAssist/plan/WK_0519/chat-notes",
+      tasks: [{ id: "T1", label: "B1", state: "processing" }]
+    });
+    expect(first.statusCode).toBe(201);
+
+    // Same session, completely different project tree → must reject
+    const crossProject = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "receiptbot",
+      session: "AGJ-51",
+      run_dir: "/home/agjrom/TGBOTS/RS/plan/WK_0518/vat-decontam",
+      tasks: [{ id: "R1", label: "math validation rewrite", state: "processing" }]
+    });
+    expect(crossProject.statusCode).toBe(409);
+    const body = crossProject.json();
+    expect(body.existing_session_tracks.coordinator_session).toBe("AGJ-51");
+    expect(body.existing_session_tracks.label).toBe("AGJAssist chat decom");
+    expect(body.error).toContain("DIFFERENT project tree");
+
+    // The existing row was NOT clobbered.
+    const row = overmindService.get(first.json().workflow.id);
+    expect(row?.label).toBe("AGJAssist chat decom");
+    expect(row?.run_dir).toBe("/home/agjrom/TGBOTS/AGJAssist/plan/WK_0519/chat-notes");
+
+    // Same session, deeper sub-path within the SAME project tree → still allowed (upsert).
+    const sameProject = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "AGJAssist chat decom (deeper)",
+      session: "AGJ-51",
+      run_dir: "/home/agjrom/TGBOTS/AGJAssist/plan/WK_0519/chat-notes/projcore-run-2026-05-22",
+      tasks: [{ id: "T1", label: "B1", state: "done" }, { id: "T2", label: "B2", state: "processing" }]
+    });
+    expect(sameProject.statusCode).toBe(201);
   });
 
   it("rejects /register with 409 + use_existing when a different coordinator_session matches the same project tree", async () => {
@@ -816,7 +859,8 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       token: OVERMIND_TOKEN,
       label: "spoof-test-v2",
       session: "spoof-session",
-      run_dir: "/tmp/spoof-test-v2",
+      // Same project tree as first (cross-project upsert guard, JROM 2026-05-24).
+      run_dir: "/tmp/spoof-test/v2",
       display_name: "spoofed",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });

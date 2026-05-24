@@ -1,3 +1,4 @@
+import path from "node:path";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { AppConfig } from "../../config/config.js";
 import { createAuthMiddleware } from "../../auth/auth-middleware.js";
@@ -145,6 +146,55 @@ export function registerOvermindRoutes(
             "which is unactionable."
         });
       }
+      // Cross-project upsert guard (JROM 2026-05-24): if the parent re-registers
+      // their existing coordinator_session BUT the new run_dir sits in a different
+      // project tree than the existing row's run_dir, that's the receiptbot-on-AGJ-51
+      // destructive-overwrite bug. The session row should track ONE project tree
+      // forever — pick a different coordinator_session for genuinely different work.
+      if (existingBySession) {
+        const sharesTree = await overmindService.sharesProjectTree(
+          existingBySession.run_dir,
+          run_dir
+        );
+        if (!sharesTree) {
+          const correctiveAdvice =
+            `Overmind: coordinator_session '${session}' is currently tracking the project tree ` +
+            `'${existingBySession.run_dir}' (workflow id=${existingBySession.id}, label='${existingBySession.label}'). ` +
+            `You tried to re-register it pointing at '${run_dir}', which is a DIFFERENT project tree. ` +
+            `Don't reuse a parent session for unrelated projects — pick a fresh coordinator_session for this work ` +
+            `(e.g. '${session}-${path.basename(run_dir)}' or a project-specific name). One workflow per project tree.`;
+          if (tmuxService) {
+            try {
+              const parentAlive = typeof tmuxService.sessionExists === "function"
+                ? await tmuxService.sessionExists(session)
+                : true;
+              if (parentAlive) {
+                const nowMs = Date.now();
+                const lastSentAt =
+                  nudgeState?.getRegisterAdviceCooldown(session, existingBySession.id) ?? 0;
+                if (nowMs - lastSentAt >= REGISTER_CONFLICT_NUDGE_COOLDOWN_MS) {
+                  const delivered = await tmuxService.sendAndSubmit(session, correctiveAdvice);
+                  if (delivered) {
+                    nudgeState?.setRegisterAdviceCooldown(session, existingBySession.id, nowMs);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error("Overmind cross-project upsert advice send failed:", error);
+            }
+          }
+          return reply.code(409).send({
+            error: correctiveAdvice,
+            existing_session_tracks: {
+              id: existingBySession.id,
+              coordinator_session: existingBySession.coordinator_session,
+              label: existingBySession.label,
+              run_dir: existingBySession.run_dir
+            }
+          });
+        }
+      }
+
       if (!existingBySession) {
         // Step 2: enforce one workflow per project tree via run_dir prefix matching.
         const projectTreeMatch = await overmindService.findProjectTreeMatch(run_dir);

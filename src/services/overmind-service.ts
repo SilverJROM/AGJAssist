@@ -165,6 +165,22 @@ export class OvermindService {
     return registered;
   }
 
+  /**
+   * Returns true when two run_dirs sit in the same project tree — i.e. one is a
+   * component-aligned path-prefix of the other (after canonicalization). False
+   * when they're sibling paths under a common ancestor (e.g. /RS/experiments/A
+   * vs /RS/plan/WK_0518/B — both under /RS/ but neither prefixes the other).
+   *
+   * Used by /register's cross-project upsert guard (JROM 2026-05-24): if a
+   * parent re-registers their coordinator_session pointing at a different
+   * project tree, that's the receiptbot-on-AGJ-51 destructive-overwrite bug.
+   */
+  async sharesProjectTree(runDirA: string, runDirB: string): Promise<boolean> {
+    const a = this.pathComponents(await this.canonicalizeRunDir(runDirA));
+    const b = this.pathComponents(await this.canonicalizeRunDir(runDirB));
+    return this.pathPrefixDepth(a, b) > 0 || this.pathPrefixDepth(b, a) > 0;
+  }
+
   async findProjectTreeMatch(incomingRunDir: string): Promise<OvermindWorkflow | null> {
     const rows = this.list();
     if (rows.length === 0) return null;
