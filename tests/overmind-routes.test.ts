@@ -149,7 +149,8 @@ describe("Overmind routes", () => {
       label: "lkcamp rerun",
       session: "lkcamp-12",
       child_sessions: ["lkcdx-may20", "lkcdx-extra"],
-      run_dir: "/tmp/lkcamp-rerun"
+      run_dir: "/tmp/lkcamp-rerun",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
     expect(second.statusCode).toBe(201);
@@ -161,12 +162,57 @@ describe("Overmind routes", () => {
     expect(overmindService.list()).toHaveLength(1);
   });
 
+  it("rejects /register with 400 when a NEW parent session omits tasks or sends an empty tasks array (JROM 2026-05-24)", async () => {
+    const noTasks = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "ProjectX",
+      session: "px-new",
+      run_dir: "/tmp/projectx-no-tasks"
+      // intentionally NO tasks — this test asserts the 400
+    });
+    expect(noTasks.statusCode).toBe(400);
+    expect(noTasks.json().error).toContain("non-empty `tasks` array");
+
+    const emptyTasks = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "ProjectY",
+      session: "py-new",
+      run_dir: "/tmp/projecty-empty-tasks",
+      tasks: []
+    });
+    expect(emptyTasks.statusCode).toBe(400);
+
+    // Same-session re-register without tasks is allowed — it's a check-in, not a start.
+    const initial = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "ProjectZ",
+      session: "pz-checkin",
+      run_dir: "/tmp/projectz-checkin",
+      tasks: [{ id: "T1", label: "Initial", state: "processing" }]
+    });
+    expect(initial.statusCode).toBe(201);
+    const reregister = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "ProjectZ updated",
+      session: "pz-checkin",
+      run_dir: "/tmp/projectz-checkin",
+      child_sessions: ["child-new"]
+      // intentionally NO tasks — testing that existing tasks are preserved on upsert
+    });
+    expect(reregister.statusCode).toBe(201);
+    // Existing tasks preserved (destructive-overwrite safeguard).
+    expect(reregister.json().workflow.tasks).toEqual([
+      { id: "T1", label: "Initial", state: "processing" }
+    ]);
+  });
+
   it("rejects /register with 409 + use_existing when a different coordinator_session matches the same project tree", async () => {
     const first = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
       label: "HRIS · trapprove",
       session: "hris-d-22",
-      run_dir: "/home/agjrom/websites/HRIS"
+      run_dir: "/home/agjrom/websites/HRIS",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     expect(first.statusCode).toBe(201);
 
@@ -174,7 +220,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "HRIS · trapprove",
       session: "hris-claude-main",
-      run_dir: "/home/agjrom/websites/HRIS/anything-new"
+      run_dir: "/home/agjrom/websites/HRIS/anything-new",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     expect(dup.statusCode).toBe(409);
     const body = dup.json();
@@ -191,7 +238,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "AGJAssist",
       session: "agjassist-parent",
-      run_dir: "/tmp/project-alpha"
+      run_dir: "/tmp/project-alpha",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     expect(first.statusCode).toBe(201);
 
@@ -199,7 +247,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "Different project",
       session: "other-parent",
-      run_dir: "/tmp/project-beta"
+      run_dir: "/tmp/project-beta",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     expect(second.statusCode).toBe(201);
     expect(overmindService.list()).toHaveLength(2);
@@ -210,7 +259,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "HRIS completed",
       session: "hris-completed-parent",
-      run_dir: "/tmp/hris-completed-root"
+      run_dir: "/tmp/hris-completed-root",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     expect(first.statusCode).toBe(201);
 
@@ -225,7 +275,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "HRIS completed retry",
       session: "hris-other-parent",
-      run_dir: "/tmp/hris-completed-root/new-slice"
+      run_dir: "/tmp/hris-completed-root/new-slice",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     expect(dup.statusCode).toBe(409);
     expect(dup.json().use_existing.coordinator_session).toBe("hris-completed-parent");
@@ -280,8 +331,9 @@ describe("Overmind routes", () => {
             token: OVERMIND_TOKEN,
             label: "owner",
             session: "owner-parent",
-            run_dir: "/tmp/register-owner-root"
-          }
+            run_dir: "/tmp/register-owner-root",
+tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
+}
         });
 
         const dup = await a.inject({
@@ -292,8 +344,9 @@ describe("Overmind routes", () => {
             token: OVERMIND_TOKEN,
             label: "dup",
             session: "bad-parent",
-            run_dir: "/tmp/register-owner-root/new-phase"
-          }
+            run_dir: "/tmp/register-owner-root/new-phase",
+tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
+}
         });
 
         expect(dup.statusCode).toBe(409);
@@ -326,8 +379,9 @@ describe("Overmind routes", () => {
             token: OVERMIND_TOKEN,
             label: "owner",
             session: "owner-parent",
-            run_dir: "/tmp/register-owner-root-2"
-          }
+            run_dir: "/tmp/register-owner-root-2",
+tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
+}
         });
 
         const dup = await a.inject({
@@ -338,8 +392,9 @@ describe("Overmind routes", () => {
             token: OVERMIND_TOKEN,
             label: "dup",
             session: "bad-parent",
-            run_dir: "/tmp/register-owner-root-2/new-phase"
-          }
+            run_dir: "/tmp/register-owner-root-2/new-phase",
+tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
+}
         });
 
         expect(dup.statusCode).toBe(409);
@@ -387,7 +442,8 @@ describe("Overmind routes", () => {
     const missingToken = await lifecyclePost("/api/overmind/register", {
       label: "bad",
       session: "bad-1",
-      run_dir: "/tmp/bad"
+      run_dir: "/tmp/bad",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     expect(missingToken.statusCode).toBe(401);
 
@@ -395,7 +451,8 @@ describe("Overmind routes", () => {
       token: "wrong",
       label: "bad",
       session: "bad-1",
-      run_dir: "/tmp/bad"
+      run_dir: "/tmp/bad",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     expect(badToken.statusCode).toBe(401);
 
@@ -407,8 +464,9 @@ describe("Overmind routes", () => {
         token: OVERMIND_TOKEN,
         label: "bad",
         session: "bad-1",
-        run_dir: "/tmp/bad"
-      }
+        run_dir: "/tmp/bad",
+tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
+}
     });
     expect(nonLoopback.statusCode).toBe(403);
   });
@@ -418,7 +476,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "hris",
       session: "hris-d-22",
-      run_dir: "/tmp/hris"
+      run_dir: "/tmp/hris",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
     const tasks = await lifecyclePost("/api/overmind/tasks", {
@@ -458,7 +517,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "operator controls",
       session: "ovm-controls-parent",
-      run_dir: "/tmp/ovm-controls"
+      run_dir: "/tmp/ovm-controls",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id;
 
@@ -514,7 +574,8 @@ describe("Overmind routes", () => {
           token: OVERMIND_TOKEN,
           label: "nudge-delete",
           session: "nudge-delete-parent",
-          run_dir: "/tmp/nudge-delete"
+          run_dir: "/tmp/nudge-delete",
+          tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
         }
       });
       expect(registered.statusCode).toBe(201);
@@ -547,7 +608,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "guarded controls",
       session: "guarded-controls-parent",
-      run_dir: "/tmp/guarded-controls"
+      run_dir: "/tmp/guarded-controls",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id;
 
@@ -587,7 +649,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "lkvc",
       session: "lkvc-38",
-      run_dir: "/tmp/lkvc"
+      run_dir: "/tmp/lkvc",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
     const unauthenticated = await app.inject({
@@ -686,7 +749,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "agjassist",
       session: "agjassist-51",
-      run_dir: "/tmp/agjassist"
+      run_dir: "/tmp/agjassist",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id;
 
@@ -741,7 +805,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "spoof-test",
       session: "spoof-session",
-      run_dir: "/tmp/spoof-test"
+      run_dir: "/tmp/spoof-test",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = first.json().workflow.id;
     overmindService.setDisplayName(workflowId, "JROM Custom Title");
@@ -752,7 +817,8 @@ describe("Overmind routes", () => {
       label: "spoof-test-v2",
       session: "spoof-session",
       run_dir: "/tmp/spoof-test-v2",
-      display_name: "spoofed"
+      display_name: "spoofed",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
     expect(second.statusCode).toBe(201);
@@ -767,7 +833,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "ask-update-override",
       session: "ask-update-override-parent",
-      run_dir: "/tmp/ask-update-override"
+      run_dir: "/tmp/ask-update-override",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id;
 
@@ -804,7 +871,8 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN,
       label: "ask-update-validation",
       session: "ask-update-validation-parent",
-      run_dir: "/tmp/ask-update-validation"
+      run_dir: "/tmp/ask-update-validation",
+      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id;
 
@@ -849,8 +917,9 @@ describe("Overmind routes", () => {
             label: "close-reminder-test",
             session: "parent-coord",
             child_sessions: ["child-alive-1"],
-            run_dir: "/tmp/close-test"
-          }
+            run_dir: "/tmp/close-test",
+tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
+}
         });
 
         const complete = await a.inject({
@@ -884,7 +953,8 @@ describe("Overmind routes", () => {
             token: OVERMIND_TOKEN,
             label: "no-children-test",
             session: "parent-no-children",
-            run_dir: "/tmp/no-children"
+            run_dir: "/tmp/no-children",
+            tasks: [{ id: "t1", label: "Task 1", state: "done" }]
           }
         });
 
@@ -916,7 +986,8 @@ describe("Overmind routes", () => {
             label: "dead-children-test",
             session: "parent-dead-children",
             child_sessions: ["child-dead-1", "child-dead-2"],
-            run_dir: "/tmp/dead-children"
+            run_dir: "/tmp/dead-children",
+            tasks: [{ id: "t1", label: "Task 1", state: "done" }]
           }
         });
 
@@ -946,8 +1017,9 @@ describe("Overmind routes", () => {
           label: "no-tmux-test",
           session: "parent-no-tmux",
           child_sessions: ["child-1"],
-          run_dir: "/tmp/no-tmux"
-        }
+          run_dir: "/tmp/no-tmux",
+tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
+}
       });
 
       const complete = await app.inject({
@@ -1188,7 +1260,7 @@ describe("Overmind routes", () => {
     expect(ovmSession.close).toHaveBeenCalledOnce();
   });
 
-  it("GET /api/overmind/runs requires JWT, returns terminal-only run summaries with correct shape", async () => {
+  it("GET /api/overmind/runs requires JWT, returns ALL workflows (active + terminal) with correct shape (JROM 2026-05-24)", async () => {
     // register active + completed + failed workflows
     const activeReg = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
@@ -1243,9 +1315,9 @@ describe("Overmind routes", () => {
     const body = response.json();
     expect(Array.isArray(body.runs)).toBe(true);
 
-    // only terminal workflows returned
+    // history now includes ALL workflows (active + terminal) per JROM 2026-05-24
     const sessions = body.runs.map((r: { coordinator_session: string }) => r.coordinator_session);
-    expect(sessions).not.toContain("runs-active-parent");
+    expect(sessions).toContain("runs-active-parent");
     expect(sessions).toContain("runs-comp-parent");
     expect(sessions).toContain("runs-failed-parent");
 

@@ -54,6 +54,9 @@ export interface RunSummary {
   status: OvermindWorkflowStatus;
   run_started_at: string | null;
   ended_at: string | null;
+  /** Most recent parent-initiated API call (F1 field). Null when the parent
+   *  has never hit the API since registration — i.e. the History row is fresh. */
+  last_parent_update_at: string | null;
   total_tasks: number;
   done_tasks: number;
 }

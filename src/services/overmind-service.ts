@@ -267,15 +267,19 @@ export class OvermindService {
   }
 
   listRuns(): RunSummary[] {
+    // History tab shows EVERY workflow (active + terminal). JROM 2026-05-24:
+    // "the history should hold all the projects or workflow we have and only
+    // gets updated when a new tasklist is done so it gets updated". Ordered
+    // by most-recent activity — last_parent_update_at when present (it's the
+    // F1 signal "parent talked to me last"), else ended_at, else run_started_at.
     const rows = this.db
       .prepare(
-        `SELECT id, label, display_name, coordinator_session, status, run_started_at, ended_at, tasks
+        `SELECT id, label, display_name, coordinator_session, status,
+                run_started_at, ended_at, last_parent_update_at, tasks
         FROM overmind_workflows
-        WHERE status IN ('completed', 'failed')
         ORDER BY
-          CASE WHEN ended_at IS NULL THEN 1 ELSE 0 END,
-          ended_at DESC,
-          run_started_at DESC`
+          COALESCE(last_parent_update_at, ended_at, run_started_at, created_at) DESC,
+          id DESC`
       )
       .all() as Array<{
         id: number;
@@ -285,6 +289,7 @@ export class OvermindService {
         status: OvermindWorkflowStatus;
         run_started_at: string | null;
         ended_at: string | null;
+        last_parent_update_at: string | null;
         tasks: string;
       }>;
 
@@ -298,6 +303,7 @@ export class OvermindService {
         status: row.status,
         run_started_at: row.run_started_at,
         ended_at: row.ended_at,
+        last_parent_update_at: row.last_parent_update_at,
         total_tasks: tasks.length,
         done_tasks: this.countDoneTasks(tasks)
       };

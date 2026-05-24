@@ -658,7 +658,7 @@ describe("OvermindService", () => {
     expect(historyCols.filter((col) => col.name === "coordinator_session")).toHaveLength(1);
   });
 
-  it("listRuns() returns only terminal workflows ordered by ended_at desc, computing done_tasks/total_tasks from tasks JSON", () => {
+  it("listRuns() returns ALL workflows (active + terminal) with last_parent_update_at, ordered by most-recent activity (JROM 2026-05-24)", () => {
     const active = service.register({
       label: "active-run",
       coordinator_session: "active-run-parent",
@@ -692,17 +692,17 @@ describe("OvermindService", () => {
       label: "failed-run",
       coordinator_session: "failed-run-parent",
       run_dir: "/tmp/failed-run",
-      tasks: []
+      tasks: [{ id: "F1", label: "Failed task", state: "pending" }]
     });
     service.setStatus(failed.id, "failed");
 
     const runs = service.listRuns();
 
-    // only terminal workflows (completed / failed), not active
-    expect(runs.map((r) => r.coordinator_session)).not.toContain("active-run-parent");
-    expect(runs.length).toBe(3);
+    // History now includes EVERY workflow — JROM 2026-05-24.
+    expect(runs.map((r) => r.coordinator_session)).toContain("active-run-parent");
+    expect(runs.length).toBe(4);
 
-    // every run has the expected shape
+    // every run has the expected shape (incl new last_parent_update_at field)
     for (const run of runs) {
       expect(run).toHaveProperty("id");
       expect(run).toHaveProperty("label");
@@ -711,16 +711,12 @@ describe("OvermindService", () => {
       expect(run).toHaveProperty("status");
       expect(run).toHaveProperty("run_started_at");
       expect(run).toHaveProperty("ended_at");
+      expect(run).toHaveProperty("last_parent_update_at");
       expect(run).toHaveProperty("total_tasks");
       expect(run).toHaveProperty("done_tasks");
     }
 
-    // statuses are terminal only
-    for (const run of runs) {
-      expect(["completed", "failed"]).toContain(run.status);
-    }
-
-    // done_tasks / total_tasks computed correctly
+    // done_tasks / total_tasks computed correctly across active + terminal
     const run1 = runs.find((r) => r.coordinator_session === "completed-run-1-parent")!;
     expect(run1.total_tasks).toBe(3);
     expect(run1.done_tasks).toBe(2);
@@ -729,8 +725,13 @@ describe("OvermindService", () => {
     expect(run2.total_tasks).toBe(1);
     expect(run2.done_tasks).toBe(1);
 
+    const runActive = runs.find((r) => r.coordinator_session === "active-run-parent")!;
+    expect(runActive.status).toBe("active");
+    expect(runActive.ended_at).toBeNull();
+    expect(runActive.total_tasks).toBe(1);
+
     const runFailed = runs.find((r) => r.coordinator_session === "failed-run-parent")!;
-    expect(runFailed.total_tasks).toBe(0);
+    expect(runFailed.total_tasks).toBe(1);
     expect(runFailed.done_tasks).toBe(0);
   });
 

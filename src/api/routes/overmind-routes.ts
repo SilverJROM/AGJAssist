@@ -130,6 +130,21 @@ export function registerOvermindRoutes(
 
       // Step 1: existing coordinator_session keeps the current upsert behavior.
       const existingBySession = overmindService.getBySession(session);
+
+      // JROM 2026-05-24: "when a new parent session submits a start status demand a
+      // proper tasklist". Applies to INSERTs only (no row for this coordinator_session
+      // yet). Re-registers/upserts may omit tasks to update only other fields — the
+      // destructive-overwrite safeguard below preserves the existing list in that case.
+      const isNewParentSession = !existingBySession;
+      if (isNewParentSession && (!Array.isArray(tasks) || tasks.length === 0)) {
+        return reply.code(400).send({
+          error:
+            "Overmind: please include a non-empty `tasks` array in your /register payload. " +
+            "Build it from queue.md / your batch plan / req-matrix.md — overmind needs the " +
+            "tasklist to track this run, and an empty register leaves the dashboard at 0/0 " +
+            "which is unactionable."
+        });
+      }
       if (!existingBySession) {
         // Step 2: enforce one workflow per project tree via run_dir prefix matching.
         const projectTreeMatch = await overmindService.findProjectTreeMatch(run_dir);
@@ -169,14 +184,26 @@ export function registerOvermindRoutes(
       }
 
       // Step 3: brand-new tree OR same-session upsert.
+      //
+      // Destructive-overwrite safeguard (JROM 2026-05-24): a re-register against an
+      // existing session that omits `tasks` (or sends []) used to silently wipe the
+      // existing tasklist — which is exactly how the HRIS / AGJ-51 rows lost their
+      // tasks on 2026-05-24. Preserve the existing tasks + current_task in that case.
+      const effectiveTasks =
+        Array.isArray(tasks) && tasks.length > 0
+          ? tasks
+          : existingBySession?.tasks ?? [];
+      const effectiveCurrentTask =
+        current_task !== undefined ? current_task : existingBySession?.current_task ?? null;
+
       const workflow = overmindService.register({
         label,
         coordinator_session: session,
         child_sessions,
         child_roles,
         run_dir,
-        current_task,
-        tasks
+        current_task: effectiveCurrentTask,
+        tasks: effectiveTasks
       });
       return reply.code(201).send({ workflow });
     }

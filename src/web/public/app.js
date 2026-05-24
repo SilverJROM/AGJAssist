@@ -1006,7 +1006,16 @@ function OvermindWorkflows() {
               const drillEntries = runDrilldown[key] || null;
               const title = run.display_name || run.label;
               const startStr = run.run_started_at ? new Date(run.run_started_at).toLocaleString() : '—';
-              const endStr = run.ended_at ? new Date(run.ended_at).toLocaleString() : '—';
+              // History now includes active workflows (JROM 2026-05-24). For active rows
+              // "End" doesn't apply — show "Last update" (from last_parent_update_at)
+              // instead so the row carries useful timestamp info.
+              const isTerminal = run.status === 'completed' || run.status === 'failed';
+              const lastUpdateStr = run.last_parent_update_at
+                ? new Date(run.last_parent_update_at).toLocaleString()
+                : '—';
+              const endStr = isTerminal && run.ended_at
+                ? new Date(run.ended_at).toLocaleString()
+                : (isTerminal ? '—' : `(active · last update ${lastUpdateStr})`);
               let durationStr = '—';
               if (run.run_started_at && run.ended_at) {
                 const ms = new Date(run.ended_at).getTime() - new Date(run.run_started_at).getTime();
@@ -1017,7 +1026,11 @@ function OvermindWorkflows() {
                   durationStr = hrs > 0 ? hrs + 'h ' + mins + 'm' : (mins > 0 ? mins + 'm' : '<1m');
                 }
               }
-              const statusBadgeClass = run.status === 'completed' ? 'badge-active' : 'badge-stuck';
+              const statusBadgeClass =
+                run.status === 'completed' ? 'badge-active' :
+                run.status === 'failed' ? 'badge-stuck' :
+                run.status === 'paused' ? 'badge-stuck' :
+                'badge-working';
               return html`
                 <section class="item-card overmind-card ovm-neutral overmind-history-group" key=${run.id}>
                   <div class="overmind-card-header">
