@@ -154,25 +154,8 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
     }
   }
 
-  // JROM 2026-05-24 lazy-supervisor fix: the previous 'tasks_stale' branch
-  // nagged the parent to POST /tasks for the same staleIds we already derived
-  // from progress.md / callbacks.md. That was structurally lazy — supervisor
-  // asking the worker to restate what the supervisor already knows.
-  //
-  // The watcher now auto-promotes derivedTaskState='done' tasks BEFORE
-  // calling assessRegistrationCompleteness, so by the time we get here the
-  // registered state already matches the evidence. No 'tasks_stale' gap to
-  // flag. derivedTaskState is still passed in (and could be reintroduced for
-  // a different policy later), but for now it has no effect on the result.
-
-  // JROM v2.2: task_mismatch needsBrain branch REMOVED. When current_task
-  // names a batch token (e.g. "B3") that isn't in the registered list, that's
-  // a deterministic string-mismatch — the dashboard's current_task field
-  // already shows it to the human, no Sonnet routing needed. Pure deletion.
-
-  // Signature: sorted missing keys. (Used to dedupe re-asks — same gap set
-  // means we already asked.) The old `tasks_stale` suffix is gone with the
-  // auto-promote fix above.
+  // tasks_stale and task_mismatch gaps are gone (auto-promote + deterministic
+  // dashboard display handle them). derivedTaskState has no effect here.
   const signature = [...missing].sort().join("|");
 
   return {

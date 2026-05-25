@@ -1081,4 +1081,99 @@ describe("OvermindService", () => {
     expect(updated?.tasks.map((t) => t.id)).toEqual(["row-3"]);
     expect(updated?.current_task).toBeNull();
   });
+
+  // --- Done-state preservation ---
+
+  it("setTasks does not downgrade a done task back to pending on coordinator sync", () => {
+    const created = service.register({
+      label: "done-preserve",
+      coordinator_session: "done-preserve-session",
+      run_dir: "/tmp/overmind/done-preserve",
+      tasks: [
+        { id: "B12", label: "Batch 12", state: "done" },
+        { id: "B13", label: "Batch 13", state: "pending" },
+      ]
+    });
+
+    // Coordinator syncs with stale state — B12 back to pending
+    const updated = service.setTasks(created.id, "B13", [
+      { id: "B12", label: "Batch 12", state: "pending" },
+      { id: "B13", label: "Batch 13", state: "processing" },
+    ]);
+
+    const b12 = updated?.tasks.find(t => t.id === "B12");
+    const b13 = updated?.tasks.find(t => t.id === "B13");
+    expect(b12?.state).toBe("done");      // preserved — must not be downgraded
+    expect(b13?.state).toBe("processing"); // correctly updated
+  });
+
+  it("setTasks does not downgrade a done task back to processing", () => {
+    const created = service.register({
+      label: "done-preserve-2",
+      coordinator_session: "done-preserve-2-session",
+      run_dir: "/tmp/overmind/done-preserve-2",
+      tasks: [{ id: "B5", label: "Batch 5", state: "done" }]
+    });
+
+    const updated = service.setTasks(created.id, "B5", [
+      { id: "B5", label: "Batch 5", state: "processing" },
+    ]);
+    expect(updated?.tasks.find(t => t.id === "B5")?.state).toBe("done");
+  });
+
+  it("register (re-register upsert) preserves done state when task IDs overlap", () => {
+    const created = service.register({
+      label: "re-reg-preserve",
+      coordinator_session: "re-reg-session",
+      run_dir: "/tmp/overmind/re-reg",
+      tasks: [
+        { id: "B12", label: "Batch 12", state: "done" },
+        { id: "B13", label: "Batch 13", state: "done" },
+        { id: "B18", label: "Batch 18", state: "pending" },
+      ]
+    });
+    expect(created.tasks.find(t => t.id === "B12")?.state).toBe("done");
+
+    // Re-register (e.g. after session kill) with stale pending states
+    const rereged = service.register({
+      label: "re-reg-preserve",
+      coordinator_session: "re-reg-session",
+      run_dir: "/tmp/overmind/re-reg",
+      tasks: [
+        { id: "B12", label: "Batch 12", state: "pending" },
+        { id: "B13", label: "Batch 13", state: "pending" },
+        { id: "B18", label: "Batch 18", state: "processing" },
+      ]
+    });
+
+    expect(rereged.tasks.find(t => t.id === "B12")?.state).toBe("done");  // preserved
+    expect(rereged.tasks.find(t => t.id === "B13")?.state).toBe("done");  // preserved
+    expect(rereged.tasks.find(t => t.id === "B18")?.state).toBe("processing"); // updated
+  });
+
+  it("register with entirely new task IDs (new run) does NOT carry over done states", () => {
+    const created = service.register({
+      label: "new-run",
+      coordinator_session: "new-run-session",
+      run_dir: "/tmp/overmind/new-run",
+      tasks: [{ id: "B1", label: "Batch 1", state: "done" }]
+    });
+    expect(created.tasks.find(t => t.id === "B1")?.state).toBe("done");
+
+    // Genuinely new run with completely different task IDs
+    const newRun = service.register({
+      label: "new-run",
+      coordinator_session: "new-run-session",
+      run_dir: "/tmp/overmind/new-run",
+      tasks: [
+        { id: "C1", label: "Sprint 1", state: "pending" },
+        { id: "C2", label: "Sprint 2", state: "pending" },
+      ]
+    });
+
+    // No overlap → no preservation, incoming states used as-is
+    expect(newRun.tasks.find(t => t.id === "C1")?.state).toBe("pending");
+    expect(newRun.tasks.find(t => t.id === "C2")?.state).toBe("pending");
+    expect(newRun.tasks.find(t => t.id === "B1")).toBeUndefined();
+  });
 });

@@ -4,8 +4,10 @@ import { createAuthMiddleware } from "../../auth/auth-middleware.js";
 import { AppSettingsService, OvermindCooldowns } from "../../services/app-settings-service.js";
 
 interface PatchOvermindBody {
+  stuck_nudge_cooldown_minutes?: number;
   idle_nudge_cooldown_minutes?: number;
   evidence_read_cadence_minutes?: number;
+  unified_idle_threshold_minutes?: number;
   evidence_idle_threshold_minutes?: number;
   // JROM v2.3 back-compat: dashboard clients may still send the old key on the
   // first request after a deploy. Accept it and treat it as the new field —
@@ -41,14 +43,20 @@ export function registerAppSettingsRoutes(
       }
 
       const body = request.body ?? {};
+      if (body.idle_nudge_cooldown_minutes !== undefined && body.stuck_nudge_cooldown_minutes === undefined) {
+        body.stuck_nudge_cooldown_minutes = body.idle_nudge_cooldown_minutes;
+      }
       // Normalise deprecated `ask_update_cooldown_minutes` → new name.
-      if (body.ask_update_cooldown_minutes !== undefined && body.evidence_idle_threshold_minutes === undefined) {
-        body.evidence_idle_threshold_minutes = body.ask_update_cooldown_minutes;
+      if (body.ask_update_cooldown_minutes !== undefined && body.unified_idle_threshold_minutes === undefined) {
+        body.unified_idle_threshold_minutes = body.ask_update_cooldown_minutes;
+      }
+      if (body.evidence_idle_threshold_minutes !== undefined && body.unified_idle_threshold_minutes === undefined) {
+        body.unified_idle_threshold_minutes = body.evidence_idle_threshold_minutes;
       }
       const validKeys: Array<keyof OvermindCooldowns> = [
-        "idle_nudge_cooldown_minutes",
+        "stuck_nudge_cooldown_minutes",
         "evidence_read_cadence_minutes",
-        "evidence_idle_threshold_minutes"
+        "unified_idle_threshold_minutes"
       ];
 
       // Validate all provided keys before writing any.

@@ -467,7 +467,7 @@ function Header({ user }) {
 
 // Dashboard (hub with section cards)
 function Dashboard() {
-  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, conversations: 0, notes: 0, workflows: 0, activeWorkflows: 0 });
+  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, notes: 0, workflows: 0, activeWorkflows: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -475,22 +475,20 @@ function Dashboard() {
       api('/api/projects').catch(() => ({ projects: [] })),
       api('/api/personal-tasks').catch(() => ({ tasks: [] })),
       api('/api/reminders').catch(() => ({ reminders: [] })),
-      api('/api/conversations').catch(() => ({ conversations: [] })),
       api('/api/notes?status=open').catch(() => ({ notes: [] })),
       api('/api/overmind/workflows').catch(() => ({ workflows: [] }))
-    ]).then(([p, t, r, c, n, w]) => {
+    ]).then(([p, t, r, n, w]) => {
       const workflowSummary = summarizeWorkflows(w.workflows);
       setStats({
         projects: p.projects?.length || 0,
         tasks: t.tasks?.length || 0,
         reminders: r.reminders?.length || 0,
-        conversations: c.conversations?.length || 0,
         notes: n.notes?.length || 0,
         workflows: workflowSummary.total,
         activeWorkflows: workflowSummary.active
       });
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, []);
 
   if (loading) return html`<div class="loading">Loading...</div>`;
@@ -501,7 +499,6 @@ function Dashboard() {
     { label: 'Workflows', count: stats.workflows, route: '/overmind', desc: `${stats.workflows} workflows · ${stats.activeWorkflows} active` },
     { label: 'Tasks', count: stats.tasks, route: '/tasks', desc: 'Daily & weekly tasks, reminders' },
     { label: 'Notes', count: stats.notes, route: '/notes', desc: 'Quick notes, attach to any project' },
-    { label: 'Conversations', count: stats.conversations, route: '/conversations', desc: 'Chat with LLMs' },
     { label: 'Settings', count: null, route: '/settings', desc: 'Templates, safety patterns, 2FA' }
   ];
 
@@ -746,7 +743,7 @@ function OvermindWorkflows() {
   const [runDrilldown, setRunDrilldown] = useState({});
   const [runDrilldownLoading, setRunDrilldownLoading] = useState({});
   const [workflowTab, setWorkflowTab] = useState('active');
-  const [askUpdateSystemCooldownMin, setAskUpdateSystemCooldownMin] = useState(45);
+  const [askUpdateSystemCooldownMin, setAskUpdateSystemCooldownMin] = useState(30);
   const [askUpdateToast, setAskUpdateToast] = useState('');
   const streamStatusRef = useRef(streamStatus);
 
@@ -769,7 +766,9 @@ function OvermindWorkflows() {
   const loadAskUpdateSettings = useCallback(async () => {
     try {
       const data = await api('/api/app-settings');
-      const value = data?.overmind?.ask_update_cooldown_minutes;
+      const value = data?.overmind?.unified_idle_threshold_minutes
+        ?? data?.overmind?.evidence_idle_threshold_minutes
+        ?? data?.overmind?.ask_update_cooldown_minutes;
       if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
         setAskUpdateSystemCooldownMin(value);
       }
@@ -4739,414 +4738,7 @@ function TasksSection() {
   `;
 }
 
-// ===================== CONVERSATIONS (LLM CHAT) =====================
-
-// Conversations
-function Conversations() {
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeConv, setActiveConv] = useState(null);
-  const [input, setInput] = useState('');
-  const [sendingMap, setSendingMap] = useState({});
-  const [showNew, setShowNew] = useState(false);
-  const [newConvName, setNewConvName] = useState('');
-  const [newProjectId, setNewProjectId] = useState('');
-  const [projects, setProjects] = useState([]);
-  const [newProvider, setNewProvider] = useState(localStorage.getItem('agj_chat_default_provider') || 'ollama');
-  const [newModel, setNewModel] = useState('');
-  const [availableModels, setAvailableModels] = useState([]);
-  const [showChatSettings, setShowChatSettings] = useState(false);
-  const [convCwd, setConvCwd] = useState('/home/agjrom/websites');
-  const [cwdDirs, setCwdDirs] = useState([]);
-  const [showDirPicker, setShowDirPicker] = useState(false);
-  const chatEndRef = useRef(null);
-
-  // Per-conversation provider/model stored in localStorage
-  function getConvSettings(convId) {
-    try { return JSON.parse(localStorage.getItem('agj_conv_' + convId) || '{}'); } catch { return {}; }
-  }
-  function setConvSettings(convId, settings) {
-    const cur = getConvSettings(convId);
-    localStorage.setItem('agj_conv_' + convId, JSON.stringify({ ...cur, ...settings }));
-  }
-  function getProvider(conv) {
-    if (!conv) return newProvider;
-    return getConvSettings(conv.id).provider || newProvider;
-  }
-  function getModel(conv) {
-    if (!conv) return newModel;
-    return getConvSettings(conv.id).model || '';
-  }
-
-  const loadConversations = useCallback(async () => {
-    try {
-      const data = await api('/api/conversations');
-      setConversations(data.conversations);
-      return data.conversations;
-    } catch (e) { /* ignore */ }
-    setLoading(false);
-    return [];
-  }, []);
-
-  useEffect(() => {
-    loadConversations().then(async (convs) => {
-      if (convs && convs.length > 0) {
-        try {
-          const data = await api('/api/conversations/' + convs[0].id);
-          setActiveConv(data.conversation);
-        } catch (e) { /* ignore */ }
-      }
-      setLoading(false);
-    });
-  }, []);
-
-  // Load models when active conversation's provider changes
-  const activeProvider = getProvider(activeConv);
-  useEffect(() => {
-    const p = activeProvider;
-    api('/api/chat/models/' + p).then(d => {
-      setAvailableModels(d.models || []);
-    }).catch(() => setAvailableModels([]));
-  }, [activeProvider]);
-
-  // Also load models for new conversation modal provider
-  const [newModalModels, setNewModalModels] = useState([]);
-  useEffect(() => {
-    api('/api/chat/models/' + newProvider).then(d => {
-      setNewModalModels(d.models || []);
-      if (d.activeModel && !newModel) setNewModel(d.activeModel);
-    }).catch(() => setNewModalModels([]));
-  }, [newProvider]);
-
-  // Auto-scroll chat to bottom
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollTop = chatEndRef.current.scrollHeight;
-    }
-  }, [activeConv?.messages?.length, activeConv?.id, sendingMap]);
-
-  const isSending = activeConv ? !!sendingMap[activeConv.id] : false;
-
-  async function loadConversation(id) {
-    try {
-      const data = await api(`/api/conversations/${id}`);
-      setActiveConv(data.conversation);
-    } catch (e) { /* ignore */ }
-  }
-
-  async function sendMessage() {
-    if (!input.trim() || !activeConv || isSending) return;
-    const convId = activeConv.id;
-    const userMsg = input.trim();
-    const convProvider = getProvider(activeConv);
-    const convModel = getModel(activeConv);
-    setInput('');
-    setSendingMap(prev => ({ ...prev, [convId]: true }));
-
-    // Optimistic: show user message immediately
-    setActiveConv(prev => prev?.id === convId ? ({
-      ...prev,
-      messages: [...(prev.messages || []), { role: 'user', content: userMsg, timestamp: new Date().toISOString() }]
-    }) : prev);
-
-    if (convProvider === 'local') {
-      await sendViaLocalRelay(convId, userMsg);
-    } else {
-      try {
-        const sendBody = { conversation_id: convId, content: userMsg, provider: convProvider, model: convModel || undefined };
-        if (['claude', 'codex'].includes(convProvider)) sendBody.cwd = convCwd;
-        const data = await api('/api/chat/send', {
-          method: 'POST',
-          body: JSON.stringify(sendBody)
-        });
-        setActiveConv(prev => prev?.id === convId ? data.conversation : prev);
-      } catch (e) {
-        setActiveConv(prev => prev?.id === convId ? ({
-          ...prev,
-          messages: [...(prev.messages || []), { role: 'system', content: 'Error: ' + e.message, timestamp: new Date().toISOString() }]
-        }) : prev);
-      }
-    }
-    setSendingMap(prev => ({ ...prev, [convId]: false }));
-  }
-
-  async function sendViaLocalRelay(convId, content) {
-    try {
-      const data = await api('/api/local-llm/chat', {
-        method: 'POST',
-        body: JSON.stringify({ conversation_id: convId, content })
-      });
-      setActiveConv(prev => prev?.id === convId ? data.conversation : prev);
-    } catch (e) {
-      setActiveConv(prev => prev?.id === convId ? ({
-        ...prev,
-        messages: [...(prev.messages || []), { role: 'system', content: 'Error: ' + e.message, timestamp: new Date().toISOString() }]
-      }) : prev);
-    }
-  }
-
-  async function createConversation() {
-    const providerLabel = { ollama: 'Ollama', openrouter: 'OpenRouter', claude: 'Claude', codex: 'Codex', local: 'Local LLM' }[newProvider] || newProvider;
-    const modelLabel = newModel ? (' - ' + newModel.split('/').pop()) : '';
-    const name = newConvName.trim() || (providerLabel + modelLabel);
-    try {
-      const data = await api('/api/conversations', {
-        method: 'POST',
-        body: JSON.stringify({
-          agentName: name,
-          projectId: newProjectId ? Number(newProjectId) : undefined
-        })
-      });
-      // Save provider/model for this conversation
-      setConvSettings(data.conversation.id, { provider: newProvider, model: newModel });
-      setShowNew(false);
-      setNewConvName('');
-      setNewProjectId('');
-      await loadConversations();
-      setActiveConv(data.conversation);
-    } catch (e) { /* ignore */ }
-  }
-
-  async function deleteConversation(id, e) {
-    if (e) e.stopPropagation();
-    if (!confirm('Delete this conversation?')) return;
-    await api(`/api/conversations/${id}`, { method: 'DELETE' }).catch(() => {});
-    if (activeConv?.id === id) setActiveConv(null);
-    loadConversations();
-  }
-
-  async function loadDirs(dir) {
-    try {
-      const data = await api('/api/chat/directories?dir=' + encodeURIComponent(dir || '/home/agjrom/websites'));
-      setCwdDirs(data.directories || []);
-      setConvCwd(data.current);
-    } catch { setCwdDirs([]); }
-  }
-
-  async function changeDir(newDir) {
-    setConvCwd(newDir);
-    await loadDirs(newDir);
-    if (activeConv) {
-      await api('/api/chat/cwd', { method: 'POST', body: JSON.stringify({ conversation_id: activeConv.id, cwd: newDir }) }).catch(() => {});
-    }
-  }
-
-  // Check if active provider is a CLI provider (supports cwd)
-  const isCliProvider = activeConv && ['claude', 'codex'].includes(getProvider(activeConv));
-
-  if (loading) return html`<div class="loading">Loading conversations...</div>`;
-
-  return html`
-    <div class="action-bar">
-      <h2>Conversations</h2>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-sm" onclick=${() => setShowChatSettings(!showChatSettings)}>
-          ${showChatSettings ? 'Hide' : 'Chat'} Settings
-        </button>
-        <button class="btn btn-primary" onclick=${async () => {
-          if (projects.length === 0) {
-            const d = await api('/api/projects').catch(() => ({ projects: [] }));
-            setProjects(d.projects || []);
-          }
-          setNewConvName('');
-          setShowNew(true);
-        }}>New Conversation</button>
-      </div>
-    </div>
-
-    ${showChatSettings && html`
-      <div class="settings-section" style="margin-bottom:16px">
-        <h3 style="font-size:14px;margin-bottom:8px">Chat Settings (soul.md / context.md)</h3>
-        <${ChatSettingsSection} />
-      </div>
-    `}
-
-    ${showNew && html`
-      <div class="modal-overlay" onclick=${() => setShowNew(false)}>
-        <div class="modal" onclick=${e => e.stopPropagation()}>
-          <h3>New Conversation</h3>
-          <div class="form-group">
-            <label>Provider</label>
-            <select value=${newProvider} onChange=${e => {
-              setNewProvider(e.target.value);
-              localStorage.setItem('agj_chat_default_provider', e.target.value);
-              setNewModel('');
-            }}>
-              <option value="ollama">Ollama (Server)</option>
-              <option value="openrouter">OpenRouter</option>
-              <option value="claude">Claude Code</option>
-              <option value="codex">Codex</option>
-              <option value="local">Local LLM (Relay)</option>
-            </select>
-          </div>
-          ${newProvider !== 'local' ? html`
-            <div class="form-group">
-              <label>Model</label>
-              <select value=${newModel} onChange=${e => setNewModel(e.target.value)}>
-                ${newModalModels.length === 0 ? html`<option value="">Loading models...</option>` :
-                  newModalModels.map(m => html`<option value=${m.id}>${m.name}</option>`)
-                }
-              </select>
-            </div>
-          ` : html`
-            <div style="padding:10px 12px;background:var(--surface);border-radius:6px;font-size:12px;color:var(--text-secondary);margin-bottom:8px">
-              Model is determined by the connected relay client. Run the relay script on your machine first (see Settings > Local LLM).
-            </div>
-          `}
-          <div class="form-group">
-            <label>Conversation Name (optional)</label>
-            <input value=${newConvName} onInput=${e => setNewConvName(e.target.value)}
-                   onKeyDown=${e => e.key === 'Enter' && createConversation()}
-                   placeholder=${{ ollama: 'Ollama Chat', openrouter: 'OpenRouter Chat', claude: 'Claude Chat', codex: 'Codex Chat', local: 'Local LLM Chat' }[newProvider] || 'Chat'} />
-          </div>
-          <div class="form-group">
-            <label>Project (optional)</label>
-            <select value=${newProjectId} onChange=${e => setNewProjectId(e.target.value)}>
-              <option value="">No project</option>
-              ${projects.map(p => html`<option value=${p.id}>${p.display_name || p.directory_name}</option>`)}
-            </select>
-          </div>
-          <div class="modal-actions">
-            <button class="btn" onclick=${() => setShowNew(false)}>Cancel</button>
-            <button class="btn btn-primary" onclick=${createConversation}>Create</button>
-          </div>
-        </div>
-      </div>
-    `}
-
-    ${isTgMiniApp ? html`
-      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
-        <select style="flex:1;font-size:12px;padding:6px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px"
-                value=${activeConv?.id || ''}
-                onChange=${async (e) => {
-                  const id = Number(e.target.value);
-                  if (id) await loadConversation(id);
-                }}>
-          <option value="" disabled>Select conversation...</option>
-          ${conversations.map(c => html`<option value=${c.id}>${c.agent_name} (${c.updated_at?.slice(5,16)})</option>`)}
-        </select>
-        ${activeConv && html`
-          <button class="btn btn-sm btn-danger" style="padding:4px 8px;font-size:11px;white-space:nowrap"
-                  onclick=${() => deleteConversation(activeConv.id)}>✕</button>
-        `}
-      </div>
-    ` : ''}
-
-    <div class="terminal-container" style="height: calc(100vh - ${isTgMiniApp ? '240' : '200'}px);">
-      ${!isTgMiniApp ? html`
-        <div class="session-tree">
-          ${conversations.length === 0 ? html`<div class="empty-state" style="padding:16px;font-size:12px">No conversations yet</div>` :
-            conversations.map(c => html`
-              <div class="tree-item ${activeConv?.id === c.id ? 'active' : ''}"
-                   onclick=${() => loadConversation(c.id)}>
-                <div style="display:flex;justify-content:space-between;align-items:center">
-                  <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.agent_name}</span>
-                  <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px"
-                          onclick=${(e) => deleteConversation(c.id, e)}>x</button>
-                </div>
-                <div style="font-size:10px;color:var(--text-secondary)">${c.updated_at?.slice(0,16)}</div>
-              </div>
-            `)
-          }
-        </div>
-      ` : ''}
-
-      <div class="terminal-panel" style="display:flex;flex-direction:column;background:var(--surface)">
-        ${!activeConv ? html`<div class="empty-state" style="flex:1;display:flex;align-items:center;justify-content:center">Select or create a conversation</div>` : html`
-          <div style="padding:12px;border-bottom:1px solid var(--border);font-size:13px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-            <div>
-              <strong>${activeConv.agent_name}</strong>
-              ${activeConv.project_id ? html` <span class="badge badge-draft">Project #${activeConv.project_id}</span>` : ''}
-              <span class="badge badge-active">${activeConv.messages?.length || 0} messages</span>
-            </div>
-            <div style="display:flex;gap:6px;align-items:center">
-              <select value=${getProvider(activeConv)} onChange=${e => {
-                setConvSettings(activeConv.id, { provider: e.target.value, model: '' });
-                setActiveConv(prev => ({ ...prev, _refresh: Date.now() }));
-              }}
-                      style="font-size:12px;padding:2px 6px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">
-                <option value="ollama">Ollama (Server)</option>
-                <option value="openrouter">OpenRouter</option>
-                <option value="claude">Claude Code</option>
-                <option value="codex">Codex</option>
-                <option value="local">Local LLM</option>
-              </select>
-              <select value=${getModel(activeConv)} onChange=${e => {
-                setConvSettings(activeConv.id, { model: e.target.value });
-                setActiveConv(prev => ({ ...prev, _refresh: Date.now() }));
-              }}
-                      style="font-size:12px;padding:2px 6px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;max-width:200px">
-                ${availableModels.length === 0 ? html`<option value="">Loading...</option>` :
-                  availableModels.map(m => html`<option value=${m.id}>${m.name}</option>`)
-                }
-              </select>
-            </div>
-          </div>
-          ${isCliProvider ? html`
-            <div style="padding:4px 12px;border-bottom:1px solid var(--border);font-size:11px;display:flex;align-items:center;gap:6px;background:var(--surface)">
-              <span style="color:var(--text-secondary)">cwd:</span>
-              <span style="font-family:monospace;color:var(--text)">${convCwd}</span>
-              <button class="btn btn-sm" style="padding:1px 6px;font-size:10px;margin-left:auto"
-                      onclick=${() => { loadDirs(convCwd); setShowDirPicker(!showDirPicker); }}>
-                ${showDirPicker ? 'Close' : 'Change'}
-              </button>
-            </div>
-            ${showDirPicker ? html`
-              <div style="padding:6px 12px;border-bottom:1px solid var(--border);background:var(--bg);max-height:150px;overflow-y:auto">
-                ${convCwd !== '/home/agjrom/websites' ? html`
-                  <div style="padding:3px 0;cursor:pointer;font-size:11px;color:var(--accent)"
-                       onclick=${() => changeDir(convCwd.split('/').slice(0, -1).join('/') || '/home/agjrom/websites')}>
-                    .. (up)
-                  </div>
-                ` : ''}
-                <div style="padding:3px 0;cursor:pointer;font-size:11px;color:var(--text-secondary)"
-                     onclick=${() => { changeDir('/home/agjrom/websites'); setShowDirPicker(false); }}>
-                  ~ (home: /home/agjrom/websites)
-                </div>
-                ${cwdDirs.map(d => html`
-                  <div style="padding:3px 0;cursor:pointer;font-size:11px"
-                       onclick=${() => changeDir(d.path)}>
-                    📁 ${d.name}/
-                  </div>
-                `)}
-                ${cwdDirs.length === 0 ? html`<div style="font-size:11px;color:var(--text-secondary)">No subdirectories</div>` : ''}
-              </div>
-            ` : ''}
-          ` : ''}
-          <div ref=${chatEndRef} style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px">
-            ${(activeConv.messages || []).map(m => html`
-              <div style="padding:8px 12px;border-radius:8px;max-width:80%;
-                          ${m.role === 'user' ? 'align-self:flex-end;background:rgba(88,166,255,0.15);' :
-                            m.role === 'system' ? 'align-self:center;background:rgba(139,148,158,0.15);font-size:12px;' :
-                            'align-self:flex-start;background:var(--bg);border:1px solid var(--border);'}">
-                <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">${m.role}</div>
-                <div style="white-space:pre-wrap;word-break:break-word">${m.content}</div>
-              </div>
-            `)}
-            ${isSending && html`
-              <div style="align-self:flex-start;padding:8px 16px;border-radius:8px;background:var(--bg);border:1px solid var(--border)">
-                <span class="typing-dots">
-                  <span class="typing-dot"></span>
-                  <span class="typing-dot"></span>
-                  <span class="typing-dot"></span>
-                </span>
-              </div>
-            `}
-          </div>
-          <div style="padding:12px;border-top:1px solid var(--border);display:flex;gap:8px">
-            <input style="flex:1" value=${input}
-                   onInput=${e => setInput(e.target.value)}
-                   onKeyDown=${e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                   placeholder="Type a message..." />
-            <button class="btn btn-primary" onclick=${sendMessage} disabled=${isSending}>
-              ${isSending ? '...' : 'Send'}
-            </button>
-          </div>
-        `}
-      </div>
-    </div>
-  `;
-}
+// ========== Telegram Mini App Components ==========
 
 // ── Landing-page preference (JROM 2026-05-24) ──────────────────────────────
 // Lets the user pick which tab the app opens on a fresh load. Default '/'.
@@ -5182,12 +4774,12 @@ function LandingPagePreference() {
 
 // ── Overmind Cooldowns Settings Section ────────────────────────────────────
 
+
 function OvermindCooldownsSection() {
   const [vals, setVals] = useState({
-    idle_nudge_cooldown_minutes: 20,
-    task_stale_ask_cooldown_minutes: 30,
-    ask_update_cooldown_minutes: 45,
-    task_stale_recent_update_grace_minutes: 45
+    stuck_nudge_cooldown_minutes: 20,
+    evidence_read_cadence_minutes: 3,
+    unified_idle_threshold_minutes: 30
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -5237,21 +4829,17 @@ function OvermindCooldownsSection() {
 
   return html`
     <div>
-      ${field('idle_nudge_cooldown_minutes',
-        'Idle-nudge cooldown (minutes)',
-        "Wait this many minutes before sending another 'you appear idle' nudge to a workflow."
+      ${field('stuck_nudge_cooldown_minutes',
+        'Stuck nudge cooldown (minutes)',
+        "Wait this many minutes before sending another stuck-response nudge to a workflow."
       )}
-      ${field('task_stale_ask_cooldown_minutes',
-        'Task-list reminder cooldown (minutes)',
-        'Minimum time between task-list staleness reminders sent to the parent.'
+      ${field('evidence_read_cadence_minutes',
+        'Evidence read cadence (minutes)',
+        'Minimum time between progress.md and callbacks.md reads when no file mtime has advanced.'
       )}
-      ${field('ask_update_cooldown_minutes',
-        'Ask-update cooldown (minutes)',
-        "Minimum time before Overmind asks the parent for a fresh API update."
-      )}
-      ${field('task_stale_recent_update_grace_minutes',
-        'Skip task-list reminder if parent updated within (minutes)',
-        "Don't send a task-list reminder if the parent posted /tasks within this window."
+      ${field('unified_idle_threshold_minutes',
+        'Artifact fail-safe threshold (minutes)',
+        "Minimum artifact staleness before Overmind asks whether the run is still active."
       )}
       <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
         <button class="btn btn-primary btn-sm" onclick=${save} disabled=${saving}>
@@ -5264,6 +4852,7 @@ function OvermindCooldownsSection() {
 }
 
 // Settings
+
 function TwoFactorSetup() {
   const [status, setStatus] = useState('loading'); // loading | disabled | setup | enabled
   const [qrData, setQrData] = useState(null);
@@ -5366,54 +4955,6 @@ function TwoFactorSetup() {
   `;
 }
 
-function ChatSettingsSection() {
-  const [soulMd, setSoulMd] = useState('');
-  const [contextMd, setContextMd] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    Promise.all([
-      api('/api/chat-settings/soul_md').then(d => setSoulMd(d.value || '')).catch(() => {}),
-      api('/api/chat-settings/context_md').then(d => setContextMd(d.value || '')).catch(() => {})
-    ]).then(() => setLoading(false));
-  }, []);
-
-  async function save() {
-    setSaving(true);
-    try {
-      if (soulMd.trim()) {
-        await api('/api/chat-settings/soul_md', { method: 'PUT', body: JSON.stringify({ value: soulMd }) });
-      } else {
-        await api('/api/chat-settings/soul_md', { method: 'DELETE' }).catch(() => {});
-      }
-      if (contextMd.trim()) {
-        await api('/api/chat-settings/context_md', { method: 'PUT', body: JSON.stringify({ value: contextMd }) });
-      } else {
-        await api('/api/chat-settings/context_md', { method: 'DELETE' }).catch(() => {});
-      }
-    } catch (e) { alert('Save failed: ' + e.message); }
-    setSaving(false);
-  }
-
-  if (loading) return html`<div class="loading">Loading...</div>`;
-
-  return html`
-    <div>
-      <div class="form-group" style="margin-bottom:12px">
-        <label>soul.md (System Prompt — sent as first message to every LLM call)</label>
-        <textarea rows="5" value=${soulMd} onInput=${e => setSoulMd(e.target.value)}
-                  placeholder="You are a helpful assistant..." style="font-family:monospace;font-size:12px"></textarea>
-      </div>
-      <div class="form-group" style="margin-bottom:12px">
-        <label>context.md (Additional context — sent as second system message)</label>
-        <textarea rows="5" value=${contextMd} onInput=${e => setContextMd(e.target.value)}
-                  placeholder="Project context, rules, etc..." style="font-family:monospace;font-size:12px"></textarea>
-      </div>
-      <button class="btn btn-primary" onclick=${save} disabled=${saving}>${saving ? 'Saving...' : 'Save Chat Settings'}</button>
-    </div>
-  `;
-}
 
 function TemplateManagement() {
   const [templates, setTemplates] = useState([]);
@@ -5518,6 +5059,7 @@ function TemplateManagement() {
   `;
 }
 
+
 function SettingsSection({ title, icon, children, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen !== false);
   return html`
@@ -5534,6 +5076,7 @@ function SettingsSection({ title, icon, children, defaultOpen }) {
     </div>
   `;
 }
+
 
 function AgentRegistrySection() {
   const [agents, setAgents] = useState([]);
@@ -5562,137 +5105,6 @@ function AgentRegistrySection() {
           </div>
         `)}
       </div>
-    </div>
-  `;
-}
-
-// --- Local LLM Relay Status ---
-function LocalLlmSettings() {
-  const [status, setStatus] = useState(null);
-  const [checking, setChecking] = useState(false);
-  const [showToken, setShowToken] = useState(false);
-
-  async function checkStatus() {
-    setChecking(true);
-    try {
-      const d = await api('/api/local-llm/status');
-      setStatus(d);
-    } catch (e) {
-      setStatus({ connected: false, clients: [], error: e.message });
-    }
-    setChecking(false);
-  }
-
-  useEffect(() => { checkStatus(); }, []);
-
-  const wsUrl = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws/local-llm?token=' + (showToken ? authToken : '***');
-  const cmdExample = 'node local-relay.mjs "' + (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws/local-llm?token=' + (showToken ? authToken : '<YOUR_TOKEN>') + '" http://127.0.0.1:1234 openai your-model-name';
-
-  return html`
-    <div>
-      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">
-        Run a relay script on your machine to connect your local LLM (Ollama, LM Studio) to AGJAssist.
-        The relay connects outbound to this server — no port forwarding needed.
-      </p>
-
-      <div style="margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:13px;font-weight:600">Connected Relays</span>
-          <button class="btn btn-sm" onclick=${checkStatus} disabled=${checking}
-                  style="font-size:11px;padding:2px 10px">${checking ? 'Checking...' : 'Refresh'}</button>
-        </div>
-        ${status?.clients?.length > 0 ? status.clients.map(c => html`
-          <div class="item-card" style="padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px">
-            <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--success)"></span>
-            <div style="flex:1">
-              <div style="font-weight:500">${c.name}</div>
-              <div style="font-size:11px;color:var(--text-secondary)">
-                Model: ${c.model} · Format: ${c.format} · Since: ${c.connectedAt?.slice(11,19) || 'N/A'}
-              </div>
-            </div>
-          </div>
-        `) : html`
-          <div class="item-card" style="padding:12px 14px;display:flex;align-items:center;gap:12px">
-            <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--danger)"></span>
-            <span style="font-size:13px;color:var(--text-secondary)">No relay connected</span>
-          </div>
-        `}
-      </div>
-
-      <div style="margin-bottom:12px">
-        <div style="font-size:13px;font-weight:600;margin-bottom:6px">Setup Instructions</div>
-        <ol style="font-size:12px;color:var(--text-secondary);margin:0;padding-left:20px;line-height:1.8">
-          <li>Copy <code>tools/local-relay.mjs</code> to your machine</li>
-          <li>Run the command below (requires Node.js 18+)</li>
-          <li>Create a chat with provider "Local LLM"</li>
-        </ol>
-      </div>
-
-      <div style="margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-size:12px;font-weight:600">Relay Command</span>
-          <div style="display:flex;gap:6px">
-            <button class="btn btn-sm" onclick=${() => setShowToken(!showToken)}
-                    style="font-size:10px;padding:2px 6px">${showToken ? 'Hide Token' : 'Show Token'}</button>
-            <button class="btn btn-sm" onclick=${() => {
-              const cmd = 'node local-relay.mjs "' + (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws/local-llm?token=' + authToken + '" http://127.0.0.1:1234 openai your-model-name';
-              navigator.clipboard?.writeText(cmd);
-            }} style="font-size:10px;padding:2px 6px">Copy</button>
-          </div>
-        </div>
-        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:monospace;font-size:11px;word-break:break-all;line-height:1.5;color:var(--text-secondary)">
-          ${cmdExample}
-        </div>
-        <div style="font-size:11px;color:var(--text-secondary);margin-top:6px">
-          Replace <code>http://127.0.0.1:1234</code> with your LLM URL, <code>openai</code> with <code>ollama</code> if using Ollama, and <code>your-model-name</code> with your model.
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function LlmHealthCheck() {
-  const [health, setHealth] = useState(null);
-  const [checking, setChecking] = useState(false);
-
-  async function checkHealth() {
-    setChecking(true);
-    try {
-      const d = await api('/api/chat/health');
-      setHealth(d.providers);
-    } catch (e) { setHealth({ error: 'Failed to check health' }); }
-    setChecking(false);
-  }
-
-  useEffect(() => { checkHealth(); }, []);
-
-  const providers = health ? Object.entries(health).filter(([k]) => k !== 'error') : [];
-
-  return html`
-    <div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <span style="font-size:13px;color:var(--text-secondary)">Provider health status</span>
-        <button class="btn btn-sm" onclick=${checkHealth} disabled=${checking}
-                style="font-size:11px;padding:2px 10px">${checking ? 'Checking...' : 'Refresh'}</button>
-      </div>
-      ${!health && !checking ? html`<div class="empty-state" style="padding:12px;font-size:12px">Click Refresh to check provider status</div>` : ''}
-      ${checking && !health ? html`<div style="padding:12px;font-size:12px;color:var(--text-secondary)">Checking providers...</div>` : ''}
-      ${providers.map(([name, info]) => html`
-        <div class="item-card" style="padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
-          <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${info.status === 'up' ? 'var(--success)' : 'var(--danger)'}"></span>
-          <div style="flex:1">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-weight:600;text-transform:capitalize">${name}</span>
-              <span class="badge badge-${info.status === 'up' ? 'active' : 'danger'}" style="font-size:10px">${info.status === 'up' ? 'Online' : 'Offline'}</span>
-              ${info.latency != null ? html`<span style="font-size:10px;color:var(--text-secondary)">${info.latency}ms</span>` : ''}
-            </div>
-            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">
-              Model: ${info.model || 'N/A'}
-              ${info.error ? html` · <span style="color:var(--danger)">${info.error}</span>` : ''}
-            </div>
-          </div>
-        </div>
-      `)}
     </div>
   `;
 }
@@ -5742,17 +5154,6 @@ function Settings({ onEditBottomNav } = {}) {
         </div>
       </${SettingsSection}>
 
-      <${SettingsSection} title="LLM Providers" defaultOpen=${true}>
-        <${LlmHealthCheck} />
-      </${SettingsSection}>
-
-      <${SettingsSection} title="Local LLM (Browser Relay)" defaultOpen=${false}>
-        <${LocalLlmSettings} />
-      </${SettingsSection}>
-
-      <${SettingsSection} title="Chat Configuration" defaultOpen=${false}>
-        <${ChatSettingsSection} />
-      </${SettingsSection}>
 
       <${SettingsSection} title="Agent Registry" defaultOpen=${false}>
         <${AgentRegistrySection} />
@@ -5818,8 +5219,6 @@ function Settings({ onEditBottomNav } = {}) {
   `;
 }
 
-// ========== Telegram Mini App Components ==========
-
 function BottomNavEditor({ tabIds, onChange, onClose }) {
   const [addId, setAddId] = useState('');
   const currentTabs = getBottomNavTabs(tabIds);
@@ -5864,7 +5263,7 @@ function BottomNavEditor({ tabIds, onChange, onClose }) {
 }
 
 function TgDashboard({ onEditBottomNav }) {
-  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, conversations: 0, notes: 0, workflows: 0, activeWorkflows: 0 });
+  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, notes: 0, workflows: 0, activeWorkflows: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -5872,22 +5271,20 @@ function TgDashboard({ onEditBottomNav }) {
       api('/api/projects').catch(() => ({ projects: [] })),
       api('/api/personal-tasks').catch(() => ({ tasks: [] })),
       api('/api/reminders').catch(() => ({ reminders: [] })),
-      api('/api/conversations').catch(() => ({ conversations: [] })),
       api('/api/notes?status=open').catch(() => ({ notes: [] })),
       api('/api/overmind/workflows').catch(() => ({ workflows: [] }))
-    ]).then(([p, t, r, c, n, w]) => {
+    ]).then(([p, t, r, n, w]) => {
       const workflowSummary = summarizeWorkflows(w.workflows);
       setStats({
         projects: p.projects?.length || 0,
         tasks: t.tasks?.length || 0,
         reminders: r.reminders?.length || 0,
-        conversations: c.conversations?.length || 0,
         notes: n.notes?.length || 0,
         workflows: workflowSummary.total,
         activeWorkflows: workflowSummary.active
       });
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, []);
 
   if (loading) return html`<div class="loading">Loading...</div>`;
@@ -5895,7 +5292,6 @@ function TgDashboard({ onEditBottomNav }) {
   const cards = [
     { icon: '\u{1F4CB}', label: 'Tasks', count: stats.tasks, route: '/tasks', desc: 'Daily & weekly' },
     { icon: '\u{1F4DD}', label: 'Notes', count: stats.notes, route: '/notes', desc: 'Quick notes' },
-    { icon: '\u{1F4AC}', label: 'Chat', count: stats.conversations, route: '/conversations', desc: 'LLM conversations' },
     { icon: '\u{1F5A5}', label: 'Terminals', count: null, route: '/terminals', desc: 'Tmux sessions' },
     { icon: '\u{25B6}', label: 'Workflows', count: stats.workflows, route: '/overmind', desc: `${stats.workflows} workflows · ${stats.activeWorkflows} active` },
     { icon: '\u{1F4C1}', label: 'Projects', count: stats.projects, route: '/projects', desc: 'Dev projects' },

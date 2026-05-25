@@ -4,7 +4,6 @@
 
 // ─── In-process sub-agent suppression constants ──────────────────────────────
 export const SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS = 10 * 60 * 1000; // 10 min
-export const SUBAGENT_REASK_GRACE_MS = 2 * 60 * 60 * 1000; // 2 h
 export const SUBAGENT_DURATION_GRACE_MS = 10 * 60 * 1000; // 10 min grace past expectedEndAt
 
 // Tunable patterns — JROM will refine once a real sub-agent pane is captured.

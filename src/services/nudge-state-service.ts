@@ -6,6 +6,7 @@ import path from "node:path";
 // Keep the key generic so future nudge timestamps (task-stale, parent-idle, etc.)
 // can live alongside idle without a schema change.
 interface WorkflowNudgeState {
+  lastUnifiedIdleNudgeAt?: number;
   lastIdleNudgeAt?: number;
   lastAskUpdateNudgeAt?: number;
   lastTaskStaleNudgeAt?: number;
@@ -65,32 +66,41 @@ export class NudgeStateService {
     }
   }
 
-  /** Returns the timestamp (ms) of the last idle nudge for a workflow, or 0 if unknown. */
+  getLastUnifiedIdleNudge(workflowId: number): number {
+    const row = this.state.workflows[String(workflowId)];
+    if (!row) return 0;
+    return Math.max(
+      row.lastUnifiedIdleNudgeAt ?? 0,
+      row.lastIdleNudgeAt ?? 0,
+      row.lastAskUpdateNudgeAt ?? 0
+    );
+  }
+
+  setLastUnifiedIdleNudge(workflowId: number, ms: number): void {
+    this.upsertWorkflow(workflowId, {
+      lastUnifiedIdleNudgeAt: ms
+    });
+    this.persistSync();
+  }
+
+  /** @deprecated Use getLastUnifiedIdleNudge. */
   getLastIdleNudge(workflowId: number): number {
-    return this.state.workflows[String(workflowId)]?.lastIdleNudgeAt ?? 0;
+    return this.getLastUnifiedIdleNudge(workflowId);
   }
 
-  /**
-   * Update the last-idle-nudge timestamp for a workflow.
-   * Updates the in-memory cache synchronously and atomically writes to disk
-   * (write to <file>.tmp then rename — fire-and-forget, non-throwing).
-   */
+  /** @deprecated Use setLastUnifiedIdleNudge. */
   setLastIdleNudge(workflowId: number, ms: number): void {
-    this.upsertWorkflow(workflowId, {
-      lastIdleNudgeAt: ms
-    });
-    this.persistSync();
+    this.setLastUnifiedIdleNudge(workflowId, ms);
   }
 
+  /** @deprecated Use getLastUnifiedIdleNudge. */
   getLastAskUpdateNudge(workflowId: number): number {
-    return this.state.workflows[String(workflowId)]?.lastAskUpdateNudgeAt ?? 0;
+    return this.getLastUnifiedIdleNudge(workflowId);
   }
 
+  /** @deprecated Use setLastUnifiedIdleNudge. */
   setLastAskUpdateNudge(workflowId: number, ms: number): void {
-    this.upsertWorkflow(workflowId, {
-      lastAskUpdateNudgeAt: ms
-    });
-    this.persistSync();
+    this.setLastUnifiedIdleNudge(workflowId, ms);
   }
 
   getLastTaskStaleNudge(workflowId: number): number {
