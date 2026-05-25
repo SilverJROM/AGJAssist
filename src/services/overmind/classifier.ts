@@ -68,21 +68,37 @@ export function deriveTaskStateFromText(
     if (!id) continue;
     const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+    // Projcore callbacks/progress use "batch-14" / "batch-17b" for IDs like "B14" / "B17b".
+    // Build an alternate escaped form so both formats are matched.
+    const altEscapedId = /^B\d/i.test(id)
+      ? `batch-${id.slice(1).toLowerCase()}`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      : null;
+    const doneWords = "\\b(?:pass|done|merged|verified)\\b";
+    const inProgressWords = "\\b(?:in[\\s\\-_]?flight|in[\\s\\-_]?progress|processing|revise|iter[\\s\\-]?\\d|fail)\\b";
+    const altDone = altEscapedId
+      ? `|\\b${altEscapedId}\\b[^\\n]{0,40}${doneWords}`
+      : "";
+    const altInProgress = altEscapedId
+      ? `|\\b${altEscapedId}\\b[^\\n]{0,40}${inProgressWords}`
+      : "";
+
     // Done patterns:
     //   \b<id>\b[^\n]{0,40}(PASS|done|merged|VERIFIED)
     //   (?:✓|✔|\[x\])\s*<id>\b
     //   <id>\s*(?:✓|✔|done|PASS)
     const doneRe = new RegExp(
-      `\\b${escapedId}\\b[^\\n]{0,40}(?:pass|done|merged|verified)\\b` +
+      `\\b${escapedId}\\b[^\\n]{0,40}${doneWords}` +
       `|(?:✓|✔|\\[x\\])\\s*${escapedId}\\b` +
-      `|\\b${escapedId}\\s*(?:✓|✔|done|pass)`,
+      `|\\b${escapedId}\\s*(?:✓|✔|done\\b|pass\\b)` +
+      altDone,
       "i"
     );
 
     // In-progress patterns:
-    //   \b<id>\b[^\n]{0,40}(in-flight|in-progress|processing|REVISE|iter-N|FAIL)
+    //   \b<id>\b[^\n]{0,40}(in-flight|in-progress|in_progress|processing|REVISE|iter-N|FAIL)
     const inProgressRe = new RegExp(
-      `\\b${escapedId}\\b[^\\n]{0,40}(?:in[\\s\\-]?flight|in[\\s\\-]?progress|processing|revise|iter[\\s\\-]?\\d|fail)\\b`,
+      `\\b${escapedId}\\b[^\\n]{0,40}${inProgressWords}` +
+      altInProgress,
       "i"
     );
 

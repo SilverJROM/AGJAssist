@@ -16,7 +16,8 @@ export function cleanupWorkflowState(
   workflowId: number,
   deps: WorkflowCleanupDeps
 ): void {
-  deps.cooldowns.forget(workflowId);
+  deps.cooldowns.forgetKey(workflowId, "unified_idle_nudge");
+  deps.cooldowns.forgetKey(workflowId, "evidence_read");
   deps.evidenceReader.forget(workflowId);
   deps.lastReconcileAsk.delete(workflowId);
   deps.childPaneHashes.delete(workflowId);

@@ -1,0 +1,9 @@
+{
+  "workflow_id": 4,
+  "label": "D5 dead-code cleanup: rm Conversations + stat refs",
+  "session": "AGJ-51",
+  "child_sessions": [],
+  "child_roles": [],
+  "last_hash": "cf0fd4ab5978a1a9ae52457688bfd7a465e346bbb4cb89343e9a000f7c2af872",
+  "last_sync_at": "2026-05-24T13:48:24+00:00"
+}

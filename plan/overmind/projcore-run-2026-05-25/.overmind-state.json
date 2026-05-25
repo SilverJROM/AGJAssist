@@ -1,0 +1,13 @@
+{
+  "session": "AGJ-51",
+  "workflow_id": 4,
+  "label": "ovm-idle-three-path-refactor",
+  "child_sessions": [
+    "agj-ovm-idle-impl"
+  ],
+  "child_roles": [
+    "implementer"
+  ],
+  "last_hash": "780befa5f778f107882aa4dc78a4fb81d1e0cc1bde069e17fdbc17e9c4fc4a9b",
+  "last_sync_at": "2026-05-25T10:41:30+00:00"
+}

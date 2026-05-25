@@ -1,0 +1,55 @@
+You are a validator. The impl codex just finished implementing the three-path idle nudge refactor on branch `codex/overmind-idle-three-path-refactor`. Your job: validate it matches the spec and tests pass.
+
+## Spec is at: /home/agjrom/TGBOTS/AGJAssist/ovm-idle-impl-spec.md
+Read it first.
+
+## Validation checklist — verify each:
+
+1. **PATH 1 (Stuck)** — `applyNudgeLadder` in `nudge-ladder.ts`:
+   - Uses `unified_idle_nudge` cooldown key (not `idle_nudge`)
+   - Reads `stuck_nudge_cooldown_minutes` from settings (not `idle_nudge_cooldown_minutes`)
+   - Uses `getLastUnifiedIdleNudge`/`setLastUnifiedIdleNudge` on nudgeState
+   - Tier-3 Brain logic still intact
+   - nudge_count still increments on each canned nudge
+
+2. **PATH 2 (All idle)** — in `overmind-watcher.ts`:
+   - Fires when parentStatus !== "working" AND all children idle/closed
+   - Grace period: `SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS` (10min) via `apparentIdleSince`
+   - Uses `unified_idle_nudge` key with `stuck_nudge_cooldown_minutes` threshold
+   - New unified idle message (mentions subagent ack pattern)
+   - Does NOT increment nudge_count
+   - Old `subagent_ask` block removed
+
+3. **PATH 3 (Artifact fail-safe)** — in `idle-detector.ts`:
+   - `maybeAskForParentUpdate` removed, replaced with `maybeFireArtifactFailsafe`
+   - Checks progress.md, callbacks.md, queue.md, AND last_parent_update_at
+   - Uses `unified_idle_nudge` key with `unified_idle_threshold_minutes` threshold (default 30min)
+   - Respects per-workflow `evidence_idle_threshold_override_minutes` override
+   - Fires regardless of pane state (no session-idle requirement)
+   - Does NOT increment nudge_count
+   - Returns boolean (fired or not)
+
+4. **Settings** (`app-settings-service.ts`):
+   - `idle_nudge_cooldown_minutes` renamed to `stuck_nudge_cooldown_minutes` (default 20min)
+   - Backward-compat: JSON with old key `idle_nudge_cooldown_minutes` still works
+   - `unified_idle_threshold_minutes` added (default 30min)
+   - `DEFAULT_UNIFIED_IDLE_THRESHOLD_MIN` and `DEFAULT_STUCK_NUDGE_COOLDOWN_MIN` exported
+   - `evidence_read_cadence_minutes` unchanged
+
+5. **NudgeStateService** (`nudge-state-service.ts`):
+   - `lastUnifiedIdleNudgeAt` field in WorkflowNudgeState
+   - `getLastUnifiedIdleNudge` / `setLastUnifiedIdleNudge` methods added
+   - Old `getLastIdleNudge` / `getLastAskUpdateNudge` either removed or aliased
+
+6. **No double-firing**: PATH 1 firing must block PATH 2 (same cooldown key, 20min window)
+
+7. **Tests pass**: `npm test` exits 0
+
+## Run:
+```
+cd /home/agjrom/TGBOTS/AGJAssist
+git diff main --name-only
+npm test 2>&1 | tail -30
+```
+
+Report: PASS (with a bullet list of all 7 checks) or FAIL (with specific failure and line reference).

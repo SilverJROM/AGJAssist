@@ -83,9 +83,15 @@ function makeTmuxMock(panes: Record<string, string>) {
 let db: DatabaseService;
 let service: OvermindService;
 let runDirs: string[];
+let originalHome: string | undefined;
+let tempHome: string;
 
 beforeEach(() => {
   cleanupDb();
+  originalHome = process.env.HOME;
+  tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "overmind-decision-home-"));
+  process.env.HOME = tempHome;
+  fs.mkdirSync(path.join(tempHome, ".claude/JROM/decisions"), { recursive: true });
   db = new DatabaseService(TEST_DB);
   db.ensureOwner(111222);
   service = new OvermindService(db);
@@ -98,6 +104,12 @@ afterEach(() => {
   for (const runDir of runDirs) {
     fs.rmSync(runDir, { recursive: true, force: true });
   }
+  if (originalHome === undefined) {
+    delete process.env.HOME;
+  } else {
+    process.env.HOME = originalHome;
+  }
+  fs.rmSync(tempHome, { recursive: true, force: true });
 });
 
 function registerDecisionWorkflow(decisionPane: string): OvermindWorkflow {

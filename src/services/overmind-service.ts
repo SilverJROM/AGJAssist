@@ -99,8 +99,25 @@ export class OvermindService {
   constructor(private readonly db: DatabaseService) {}
 
   register(input: RegisterOvermindWorkflowInput): OvermindWorkflow {
-    const tasks = sanitizeTaskList(input.tasks);
+    let tasks = sanitizeTaskList(input.tasks);
     const currentTask = sanitizeCurrentTask(input.current_task);
+
+    // On re-register (upsert), preserve evidence-promoted "done" states — same
+    // invariant as setTasks. Only applies when incoming IDs overlap with existing
+    // (zero overlap = genuinely new run, skip merge to avoid stale state carry-over).
+    const existingForSession = this.getBySession(input.coordinator_session);
+    if (existingForSession?.tasks?.length && tasks.length > 0) {
+      const prevById = new Map(existingForSession.tasks.map(t => [t.id, t]));
+      const overlap = tasks.some(t => prevById.has(t.id));
+      if (overlap) {
+        tasks = tasks.map(t =>
+          t.state !== "done" && prevById.get(t.id)?.state === "done"
+            ? { ...t, state: "done" as const }
+            : t
+        );
+      }
+    }
+
     const now = this.isoNow();
     const endedAt = this.computeEndedAt(tasks, "active", null, now);
     const row = this.db
@@ -526,6 +543,18 @@ export class OvermindService {
     // pipe a queue.md through line-by-line stop polluting the dashboard.
     tasks = sanitizeTaskList(tasks);
     currentTask = sanitizeCurrentTask(currentTask);
+
+    // Preserve evidence-promoted "done" states — never let a coordinator sync
+    // overwrite a task back from done to pending/processing.
+    if (existing.tasks?.length) {
+      const prevById = new Map(existing.tasks.map(t => [t.id, t]));
+      tasks = tasks.map(t =>
+        t.state !== "done" && prevById.get(t.id)?.state === "done"
+          ? { ...t, state: "done" as const }
+          : t
+      );
+    }
+
     const now = this.isoNow();
     const doneCount = this.countDoneTasks(tasks);
     const existingDoneCount = this.countDoneTasks(existing.tasks);

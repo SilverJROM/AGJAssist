@@ -488,7 +488,7 @@ function Dashboard() {
         activeWorkflows: workflowSummary.active
       });
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, []);
 
   if (loading) return html`<div class="loading">Loading...</div>`;
@@ -743,7 +743,7 @@ function OvermindWorkflows() {
   const [runDrilldown, setRunDrilldown] = useState({});
   const [runDrilldownLoading, setRunDrilldownLoading] = useState({});
   const [workflowTab, setWorkflowTab] = useState('active');
-  const [askUpdateSystemCooldownMin, setAskUpdateSystemCooldownMin] = useState(45);
+  const [askUpdateSystemCooldownMin, setAskUpdateSystemCooldownMin] = useState(30);
   const [askUpdateToast, setAskUpdateToast] = useState('');
   const streamStatusRef = useRef(streamStatus);
 
@@ -766,7 +766,9 @@ function OvermindWorkflows() {
   const loadAskUpdateSettings = useCallback(async () => {
     try {
       const data = await api('/api/app-settings');
-      const value = data?.overmind?.ask_update_cooldown_minutes;
+      const value = data?.overmind?.unified_idle_threshold_minutes
+        ?? data?.overmind?.evidence_idle_threshold_minutes
+        ?? data?.overmind?.ask_update_cooldown_minutes;
       if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
         setAskUpdateSystemCooldownMin(value);
       }
@@ -4738,6 +4740,485 @@ function TasksSection() {
 
 // ========== Telegram Mini App Components ==========
 
+// ── Landing-page preference (JROM 2026-05-24) ──────────────────────────────
+// Lets the user pick which tab the app opens on a fresh load. Default '/'.
+// Stored in localStorage via readLandingTab/writeLandingTab.
+
+function LandingPagePreference() {
+  const [value, setValue] = useState(() => readLandingTab());
+  const onChange = (e) => {
+    const next = writeLandingTab(e.target.value);
+    setValue(next);
+  };
+  return html`
+    <div class="overmind-cooldown-row">
+      <label for="landing-page-select">Default landing page:</label>
+      <select
+        id="landing-page-select"
+        class="overmind-cooldown-select"
+        value=${value}
+        onChange=${onChange}
+      >
+        ${AVAILABLE_BOTTOM_NAV_TABS.map(tab => html`
+          <option key=${tab.id} value=${tab.id}>
+            ${tab.icon} ${tab.label}${tab.id === DEFAULT_LANDING_TAB ? ' (default)' : ''}
+          </option>
+        `)}
+      </select>
+    </div>
+    <div style="font-size:11px;color:var(--text-secondary);margin-top:-4px;margin-bottom:8px">
+      Opens here on a fresh page load. Deep links to specific pages still work.
+    </div>
+  `;
+}
+
+// ── Overmind Cooldowns Settings Section ────────────────────────────────────
+
+
+function OvermindCooldownsSection() {
+  const [vals, setVals] = useState({
+    stuck_nudge_cooldown_minutes: 20,
+    evidence_read_cadence_minutes: 3,
+    unified_idle_threshold_minutes: 30
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api('/api/app-settings').then(d => {
+      if (d && d.overmind) setVals(d.overmind);
+    }).catch(() => {});
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const d = await api('/api/app-settings/overmind', {
+        method: 'PATCH',
+        body: JSON.stringify(vals)
+      });
+      if (d && d.overmind) setVals(d.overmind);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e) {
+      alert('Save failed: ' + (e.message || e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function field(key, label, desc) {
+    return html`
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px">${label}</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input
+            type="number"
+            min="0"
+            style="width:80px"
+            value=${vals[key]}
+            oninput=${e => setVals(v => ({ ...v, [key]: Number(e.target.value) }))}
+          />
+          <span style="font-size:12px;color:var(--text-secondary)">minutes</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:3px">${desc}</div>
+      </div>
+    `;
+  }
+
+  return html`
+    <div>
+      ${field('stuck_nudge_cooldown_minutes',
+        'Stuck nudge cooldown (minutes)',
+        "Wait this many minutes before sending another stuck-response nudge to a workflow."
+      )}
+      ${field('evidence_read_cadence_minutes',
+        'Evidence read cadence (minutes)',
+        'Minimum time between progress.md and callbacks.md reads when no file mtime has advanced.'
+      )}
+      ${field('unified_idle_threshold_minutes',
+        'Artifact fail-safe threshold (minutes)',
+        "Minimum artifact staleness before Overmind asks whether the run is still active."
+      )}
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+        <button class="btn btn-primary btn-sm" onclick=${save} disabled=${saving}>
+          ${saving ? 'Saving...' : 'Save'}
+        </button>
+        ${saved ? html`<span style="font-size:12px;color:var(--success,#4caf50)">Saved.</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// Settings
+
+function TwoFactorSetup() {
+  const [status, setStatus] = useState('loading'); // loading | disabled | setup | enabled
+  const [qrData, setQrData] = useState(null);
+  const [secret, setSecret] = useState('');
+  const [confirmCode, setConfirmCode] = useState('');
+  const [error, setError] = useState('');
+  const [disableCode, setDisableCode] = useState('');
+
+  useEffect(() => {
+    api('/api/auth/me').then(d => {
+      setStatus(d.totp_enabled ? 'enabled' : 'disabled');
+    }).catch(() => setStatus('disabled'));
+  }, []);
+
+  async function startSetup() {
+    setError('');
+    try {
+      const data = await api('/api/auth/2fa/setup');
+      setQrData(data.qrDataUrl);
+      setSecret(data.secret);
+      setStatus('setup');
+    } catch (e) { setError(e.message); }
+  }
+
+  async function confirmSetup() {
+    if (confirmCode.length !== 6) return;
+    setError('');
+    try {
+      await api('/api/auth/2fa/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ token: confirmCode })
+      });
+      setStatus('enabled');
+      setQrData(null);
+      setSecret('');
+      setConfirmCode('');
+    } catch (e) { setError(e.message); }
+  }
+
+  async function disable2FA() {
+    if (disableCode.length !== 6) return;
+    setError('');
+    try {
+      await api('/api/auth/2fa/disable', {
+        method: 'POST',
+        body: JSON.stringify({ token: disableCode })
+      });
+      setStatus('disabled');
+      setDisableCode('');
+    } catch (e) { setError(e.message); }
+  }
+
+  if (status === 'loading') return html`<div class="loading">Loading...</div>`;
+
+  return html`
+    <div>
+      ${status === 'disabled' && html`
+        <p style="color:var(--text-secondary);margin-bottom:12px">Two-factor authentication is not enabled.</p>
+        <button class="btn btn-primary" onclick=${startSetup}>Enable 2FA</button>
+      `}
+
+      ${status === 'setup' && html`
+        <p style="margin-bottom:12px">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.):</p>
+        <div style="text-align:center;margin:16px 0">
+          <img src=${qrData} style="border-radius:8px;background:#fff;padding:8px" />
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:11px;color:var(--text-secondary)">Manual entry key:</label>
+          <code style="display:block;padding:8px;background:var(--bg);border-radius:4px;font-size:13px;word-break:break-all;margin-top:4px">${secret}</code>
+        </div>
+        <div class="form-group">
+          <label>Enter the 6-digit code from your app to confirm:</label>
+          <input value=${confirmCode}
+                 onInput=${e => setConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                 onKeyDown=${e => e.key === 'Enter' && confirmCode.length === 6 && confirmSetup()}
+                 placeholder="000000" maxlength="6"
+                 style="text-align:center;font-size:24px;letter-spacing:8px;font-family:monospace;max-width:250px" />
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick=${confirmSetup} disabled=${confirmCode.length !== 6}>Verify & Enable</button>
+          <button class="btn" onclick=${() => { setStatus('disabled'); setQrData(null); setSecret(''); }}>Cancel</button>
+        </div>
+      `}
+
+      ${status === 'enabled' && html`
+        <p style="color:var(--success);margin-bottom:12px">2FA is enabled. Your account is protected.</p>
+        <div class="form-group" style="max-width:300px">
+          <label>Enter current 2FA code to disable:</label>
+          <input value=${disableCode}
+                 onInput=${e => setDisableCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                 onKeyDown=${e => e.key === 'Enter' && disableCode.length === 6 && disable2FA()}
+                 placeholder="000000" maxlength="6"
+                 style="text-align:center;font-size:18px;letter-spacing:6px;font-family:monospace" />
+        </div>
+        <button class="btn btn-danger" onclick=${disable2FA} disabled=${disableCode.length !== 6}>Disable 2FA</button>
+      `}
+
+      ${error && html`<p style="color:var(--danger);margin-top:12px">${error}</p>`}
+    </div>
+  `;
+}
+
+
+function TemplateManagement() {
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(null);
+  const [expandedItems, setExpandedItems] = useState([]);
+
+  const loadTemplates = useCallback(() => {
+    api('/api/templates').then(d => { setTemplates(d.templates); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { loadTemplates(); }, [loadTemplates]);
+
+  async function loadItems(id) {
+    if (expanded === id) { setExpanded(null); return; }
+    try {
+      const d = await api(`/api/templates/${id}`);
+      setExpandedItems(d.template.items);
+      setExpanded(id);
+    } catch { setExpanded(null); }
+  }
+
+  if (loading) return html`<div class="loading">Loading...</div>`;
+
+  return html`
+    <div>
+      ${templates.map(t => html`
+        <div class="item-card" style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:500;cursor:pointer;flex:1" onclick=${() => loadItems(t.id)}>${t.name}</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-sm" onclick=${async () => {
+                const name = prompt('Rename template:', t.name);
+                if (!name || name === t.name) return;
+                await api(`/api/templates/${t.id}`, { method: 'PATCH', body: JSON.stringify({ name }) });
+                loadTemplates();
+              }}>Rename</button>
+              <button class="btn btn-sm btn-danger" onclick=${async () => {
+                if (!confirm('Delete template "' + t.name + '"?')) return;
+                await api(`/api/templates/${t.id}`, { method: 'DELETE' });
+                if (expanded === t.id) setExpanded(null);
+                loadTemplates();
+              }}>Del</button>
+            </div>
+          </div>
+          ${expanded === t.id && html`
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+              ${expandedItems.map(item => html`
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:13px">
+                  <span style="color:var(--text-secondary);min-width:20px">${item.item_order}.</span>
+                  <span style="flex:1">${item.description}</span>
+                  <button class="btn btn-sm" onclick=${async () => {
+                    const desc = prompt('Edit step:', item.description);
+                    if (!desc || desc === item.description) return;
+                    await api(`/api/templates/${t.id}/items/${item.id}`, {
+                      method: 'PATCH', body: JSON.stringify({ description: desc })
+                    });
+                    loadItems(t.id);
+                  }} style="padding:1px 6px;font-size:11px">Edit</button>
+                  <button class="btn btn-sm btn-danger" onclick=${async () => {
+                    await api(`/api/templates/${t.id}/items/${item.id}`, { method: 'DELETE' });
+                    loadItems(t.id);
+                  }} style="padding:1px 6px;font-size:11px">Del</button>
+                </div>
+              `)}
+              ${expandedItems.length === 0 && html`<div style="font-size:12px;color:var(--text-secondary)">No items yet.</div>`}
+              <div style="margin-top:6px;display:flex;gap:6px">
+                <input id="newTplItem_${t.id}" placeholder="New step..." style="flex:1;font-size:12px" onKeyDown=${async e => {
+                  if (e.key !== 'Enter') return;
+                  const desc = e.target.value.trim();
+                  if (!desc) return;
+                  await api(`/api/templates/${t.id}/items`, { method: 'POST', body: JSON.stringify({ description: desc }) });
+                  e.target.value = '';
+                  loadItems(t.id);
+                }} />
+                <button class="btn btn-sm btn-primary" onclick=${async () => {
+                  const input = document.getElementById('newTplItem_' + t.id);
+                  const desc = input.value.trim();
+                  if (!desc) return;
+                  await api(`/api/templates/${t.id}/items`, { method: 'POST', body: JSON.stringify({ description: desc }) });
+                  input.value = '';
+                  loadItems(t.id);
+                }} style="font-size:11px">Add</button>
+              </div>
+            </div>
+          `}
+        </div>
+      `)}
+      ${templates.length === 0 && html`<div style="font-size:13px;color:var(--text-secondary)">No templates yet.</div>`}
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <input id="newTemplateName" placeholder="Template name..." style="flex:1" />
+        <button class="btn btn-sm btn-primary" onclick=${async () => {
+          const input = document.getElementById('newTemplateName');
+          const name = input.value.trim();
+          if (!name) return;
+          await api('/api/templates', { method: 'POST', body: JSON.stringify({ name }) });
+          input.value = '';
+          loadTemplates();
+        }}>Add Template</button>
+      </div>
+    </div>
+  `;
+}
+
+
+function SettingsSection({ title, icon, children, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen !== false);
+  return html`
+    <div class="settings-section" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding-bottom:${open ? '12px' : '0'}"
+           onclick=${() => setOpen(!open)}>
+        <h3 style="font-size:14px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--text-secondary)">${open ? '\u25BC' : '\u25B6'}</span>
+          ${icon ? html`<span style="font-size:16px">${icon}</span>` : ''}
+          ${title}
+        </h3>
+      </div>
+      ${open && children}
+    </div>
+  `;
+}
+
+
+function AgentRegistrySection() {
+  const [agents, setAgents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api('/api/agents').then(d => { setAgents(d.agents || []); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return html`<div class="loading">Loading...</div>`;
+
+  return html`
+    <div>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">
+        Available agents for conversations. These are defined in the agent registry.
+      </p>
+      <div class="item-list">
+        ${agents.map(a => html`
+          <div class="item-card" style="padding:8px 12px;display:flex;align-items:center;gap:12px">
+            <div style="flex:1">
+              <span style="font-weight:500">${a.id}</span>
+              <span style="color:var(--text-secondary);font-size:12px;margin-left:8px">${a.name}</span>
+            </div>
+            <span style="font-size:11px;color:var(--text-secondary)">${a.description}</span>
+            <span class="badge badge-${a.model === 'Opus' ? 'active' : 'draft'}" style="font-size:10px">${a.model}</span>
+          </div>
+        `)}
+      </div>
+    </div>
+  `;
+}
+
+function Settings({ onEditBottomNav } = {}) {
+  const [patterns, setPatterns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [userInfo, setUserInfo] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      api('/api/safety/patterns').then(d => setPatterns(d.patterns)).catch(() => {}),
+      api('/api/auth/me').then(d => setUserInfo(d)).catch(() => {})
+    ]).then(() => setLoading(false));
+  }, []);
+
+  return html`
+    <div>
+      <h2 style="margin-bottom:16px">Settings</h2>
+
+      ${onEditBottomNav && html`
+        <${SettingsSection} title="Navigation" defaultOpen=${true}>
+          <div style="margin-bottom:12px">
+            <button class="btn btn-sm" onclick=${onEditBottomNav}>Edit bottom nav</button>
+          </div>
+          <${LandingPagePreference} />
+        </${SettingsSection}>
+      `}
+
+      <${SettingsSection} title="Account" defaultOpen=${true}>
+        <div style="margin-bottom:16px">
+          ${userInfo ? html`
+            <div class="item-card" style="padding:12px 16px;margin-bottom:12px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                  <div style="font-weight:500;margin-bottom:4px">${userInfo.display_name || userInfo.username || 'User'}</div>
+                  <div style="font-size:12px;color:var(--text-secondary)">
+                    Role: <span class="badge badge-${userInfo.role === 'owner' ? 'active' : 'draft'}">${userInfo.role}</span>
+                    ${userInfo.totp_enabled ? html` <span class="badge badge-active" style="font-size:10px">2FA ON</span>` : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+          <h4 style="font-size:13px;margin-bottom:8px">Two-Factor Authentication</h4>
+          <${TwoFactorSetup} />
+        </div>
+      </${SettingsSection}>
+
+
+      <${SettingsSection} title="Agent Registry" defaultOpen=${false}>
+        <${AgentRegistrySection} />
+      </${SettingsSection}>
+
+      <${SettingsSection} title="Step Templates" defaultOpen=${false}>
+        <${TemplateManagement} />
+      </${SettingsSection}>
+
+      <${SettingsSection} title="Overmind cooldowns" defaultOpen=${false}>
+        <${OvermindCooldownsSection} />
+      </${SettingsSection}>
+
+      <${SettingsSection} title="Safety Patterns" defaultOpen=${false}>
+        ${loading ? html`<div class="loading">Loading...</div>` : html`
+          <div>
+            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">
+              Commands matching these patterns will be blocked in terminal sessions.
+            </p>
+            ${patterns.map(p => html`
+              <div class="pattern-row">
+                <span class="pattern-text">${p.pattern}</span>
+                <span style="color:var(--text-secondary);font-size:11px;flex:1">${p.description || ''}</span>
+                <span style="font-size:11px;color:var(--text-secondary)">${p.is_regex ? 'regex' : 'prefix'}</span>
+                <label class="toggle">
+                  <input type="checkbox" checked=${p.active} onchange=${async () => {
+                    await api(`/api/safety/patterns/${p.id}`, {
+                      method: 'PATCH', body: JSON.stringify({ active: !p.active })
+                    });
+                    const d = await api('/api/safety/patterns');
+                    setPatterns(d.patterns);
+                  }} />
+                  <span class="slider"></span>
+                </label>
+                <button class="btn btn-sm btn-danger" onclick=${async () => {
+                  if (!confirm('Delete this pattern?')) return;
+                  await api(`/api/safety/patterns/${p.id}`, { method: 'DELETE' });
+                  const d = await api('/api/safety/patterns');
+                  setPatterns(d.patterns);
+                }}>Del</button>
+              </div>
+            `)}
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <input id="newPattern" placeholder="Pattern..." style="flex:1" />
+              <input id="newPatternDesc" placeholder="Description..." style="flex:1" />
+              <button class="btn btn-sm btn-primary" onclick=${async () => {
+                const pattern = document.getElementById('newPattern').value;
+                const description = document.getElementById('newPatternDesc').value;
+                if (!pattern) return;
+                await api('/api/safety/patterns', {
+                  method: 'POST', body: JSON.stringify({ pattern, description })
+                });
+                document.getElementById('newPattern').value = '';
+                document.getElementById('newPatternDesc').value = '';
+                const d = await api('/api/safety/patterns');
+                setPatterns(d.patterns);
+              }}>Add</button>
+            </div>
+          </div>
+        `}
+      </${SettingsSection}>
+    </div>
+  `;
+}
+
 function BottomNavEditor({ tabIds, onChange, onClose }) {
   const [addId, setAddId] = useState('');
   const currentTabs = getBottomNavTabs(tabIds);
@@ -4803,7 +5284,7 @@ function TgDashboard({ onEditBottomNav }) {
         activeWorkflows: workflowSummary.active
       });
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, []);
 
   if (loading) return html`<div class="loading">Loading...</div>`;

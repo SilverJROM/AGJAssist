@@ -4,7 +4,6 @@ import { hashPane } from "../src/services/overmind/pane-utils.js";
 import {
   SUBAGENT_PATTERNS,
   SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS,
-  SUBAGENT_REASK_GRACE_MS,
   SUBAGENT_DURATION_GRACE_MS,
   subAgentInFlight,
   paneShowsSubagentDone,
@@ -248,10 +247,10 @@ describe("Tier-1: TUI indicator suppresses nudge and keeps status working", () =
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Tier-2 integration: apparent-idle >10min → ONE ask, re-ask gated by 2h
+// 3. Path 2 integration: apparent-idle >10min → unified idle nudge
 // ─────────────────────────────────────────────────────────────────────────────
-describe("Tier-2: apparent-idle >10 min → one ask, then 2h re-ask grace", () => {
-  it("fires ONE ask after apparent-idle exceeds 10 min threshold", async () => {
+describe("Path 2: apparent-idle >10 min → shared unified idle cooldown", () => {
+  it("fires ONE unified idle nudge after apparent-idle exceeds 10 min threshold", async () => {
     // Parent is idle (stuck_since in past, pane unchanged), child is idle too.
     // No Tier-1 indicator in pane.
     const pane = "coordinator idle recap";
@@ -268,15 +267,15 @@ describe("Tier-2: apparent-idle >10 min → one ask, then 2h re-ask grace", () =
 
     await watcher.tick();
 
-    // The sub-agent ask must have been sent exactly once.
+    // The all-idle nudge must have been sent exactly once.
     const calls = (tmux as any).sendAndSubmit.mock.calls as [string, string][];
     const subagentAsk = calls.filter(([, msg]) => msg.includes("[OVERMIND] subagent"));
     expect(subagentAsk).toHaveLength(1);
     expect(subagentAsk[0][0]).toBe("coord-sa");
-    expect(subagentAsk[0][1]).toContain("in-process sub-agent");
+    expect(subagentAsk[0][1]).toContain("in-process subagent");
   });
 
-  it("does NOT re-ask within the 2h grace window", async () => {
+  it("does NOT re-ask within the shared stuck-nudge cooldown window", async () => {
     const pane = "coordinator idle recap";
     const workflow = wf({
       last_pane_hash: hashPane(pane),
@@ -286,16 +285,16 @@ describe("Tier-2: apparent-idle >10 min → one ask, then 2h re-ask grace", () =
     const tmux = makeTmux(pane);
     const watcher = new OvermindWatcher(service, tmux);
 
-    // Pre-seed: apparent idle was set long ago AND last ask was just now (within 2h grace).
+    // Pre-seed: apparent idle was set long ago AND the unified idle nudge just fired.
     (watcher as any).apparentIdleSince.set(workflow.id, Date.now() - SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS - 5_000);
-    (watcher as any).lastSubagentAskAt.set(workflow.id, Date.now() - 1_000); // 1s ago
+    (watcher as any).cooldowns.recordFired(workflow.id, "unified_idle_nudge", Date.now() - 1_000);
 
     await watcher.tick();
     await watcher.tick();
 
     const calls = (tmux as any).sendAndSubmit.mock.calls as [string, string][];
     const subagentAsk = calls.filter(([, msg]) => msg.includes("[OVERMIND] subagent"));
-    // Must not ask again within 2h grace.
+    // Must not ask again within the shared cooldown.
     expect(subagentAsk).toHaveLength(0);
   });
 
@@ -425,7 +424,7 @@ describe("Duration grace resolution", () => {
     expect((watcher as any).subagentInFlight.has(workflow.id)).toBe(false);
   });
 
-  it("clears lastSubagentAskAt when duration grace expires (allowing fresh ask)", async () => {
+  it("leaves the shared unified idle cooldown intact when duration grace expires", async () => {
     const pane = "coordinator output";
     const workflow = wf({ last_pane_hash: hashPane(pane) });
     const service = makeService(workflow);
@@ -439,12 +438,12 @@ describe("Duration grace resolution", () => {
       name: "dev",
       expectedEndAt: expiredEnd
     });
-    // Set a prior ask timestamp — it should be cleared on expiry.
-    (watcher as any).lastSubagentAskAt.set(workflow.id, Date.now() - 60_000);
+    const priorCooldown = Date.now() - 60_000;
+    (watcher as any).cooldowns.recordFired(workflow.id, "unified_idle_nudge", priorCooldown);
 
     await watcher.tick();
 
-    expect((watcher as any).lastSubagentAskAt.has(workflow.id)).toBe(false);
+    expect((watcher as any).cooldowns.getLastFired(workflow.id, "unified_idle_nudge")).toBe(priorCooldown);
   });
 });
 
@@ -519,10 +518,6 @@ describe("monitoring_paused: no interaction from sub-agent logic", () => {
 describe("Sub-agent suppression constants", () => {
   it("SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS is 10 min", () => {
     expect(SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS).toBe(10 * 60 * 1000);
-  });
-
-  it("SUBAGENT_REASK_GRACE_MS is 2 hours", () => {
-    expect(SUBAGENT_REASK_GRACE_MS).toBe(2 * 60 * 60 * 1000);
   });
 
   it("SUBAGENT_DURATION_GRACE_MS is 10 min", () => {

@@ -20,7 +20,6 @@ export const POLL_MS = 30_000;
 export const RECONCILE_MS = 1_800_000;
 import {
   SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS,
-  SUBAGENT_REASK_GRACE_MS,
   SUBAGENT_DURATION_GRACE_MS,
   subAgentInFlight,
   paneShowsSubagentDone,
@@ -51,34 +50,12 @@ import {
   classifyParentSession,
   classifyChildSessionStatus
 } from "./overmind/classifier.js";
-class CooldownTimestampStore {
-  constructor(
-    private readonly cooldowns: WatcherCooldowns,
-    private readonly key: string
-  ) {}
-  get(workflowId: number): number | undefined {
-    const lastFired = this.cooldowns.getLastFired(workflowId, this.key);
-    return lastFired === 0 ? undefined : lastFired;
-  }
-  set(workflowId: number, timestampMs: number): this {
-    this.cooldowns.recordFired(workflowId, this.key, timestampMs);
-    return this;
-  }
-  has(workflowId: number): boolean {
-    return this.cooldowns.getLastFired(workflowId, this.key) !== 0;
-  }
-  delete(workflowId: number): boolean {
-    const hadValue = this.has(workflowId);
-    this.cooldowns.forgetKey(workflowId, this.key);
-    return hadValue;
-  }
-}
 import { hashPane, hasActiveTurn } from "./overmind/pane-utils.js";
 import { determineActiveSessionAttribution } from "./overmind/active-session-attribution.js";
 import { assessRegistrationCompleteness } from "./overmind/completeness.js";
 import type { CompletenessResult } from "./overmind/completeness.js";
 import { WatcherCooldowns } from "./overmind/cooldowns.js";
-import { maybeAskForParentUpdate } from "./overmind/idle-detector.js";
+import { maybeFireArtifactFailsafe } from "./overmind/idle-detector.js";
 import { EvidenceReader } from "./overmind/evidence-reader.js";
 import { cleanupWorkflowState } from "./overmind/workflow-cleanup.js";
 import {
@@ -92,10 +69,6 @@ export class OvermindWatcher {
   private lastReconcileAt = 0;
   private readonly lastReconcileAsk = new Map<number, string>();
   private readonly cooldowns = new WatcherCooldowns();
-  private readonly lastTaskStaleCheckAt = new CooldownTimestampStore(this.cooldowns, "evidence_read");
-  private readonly lastSubagentAskAt = new CooldownTimestampStore(this.cooldowns, "subagent_ask");
-  private readonly lastIdleNudgeAt = new CooldownTimestampStore(this.cooldowns, "idle_nudge");
-  private readonly lastAskUpdateNudgeAt = new CooldownTimestampStore(this.cooldowns, "ask_update");
   private readonly evidenceReader: EvidenceReader;
   private readonly subagentInFlight = new Map<
     number,
@@ -260,13 +233,6 @@ export class OvermindWatcher {
       });
       return;
     }
-    await maybeAskForParentUpdate(workflow, resolvedRunDir, {
-      tmuxService: this.tmuxService,
-      cooldowns: this.cooldowns,
-      appSettings: this.appSettings,
-      nudgeState: this.nudgeState,
-      TERMINAL_STATUSES
-    });
     const nowMs = Date.now();
     const wid = workflow.id;
     const ackMatch = parseSubagentAckFromPane(coordinatorPane);
@@ -304,7 +270,6 @@ export class OvermindWatcher {
         nowMs > saEntry.expectedEndAt + SUBAGENT_DURATION_GRACE_MS
       ) {
         this.subagentInFlight.delete(wid);
-        this.cooldowns.forgetKey(wid, "subagent_ask");
       }
     }
     const currentSaEntry = this.subagentInFlight.get(wid);
@@ -324,22 +289,33 @@ export class OvermindWatcher {
       const idleSince = this.apparentIdleSince.get(wid);
       if (
         idleSince !== undefined &&
-        nowMs - idleSince > SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS &&
-        this.cooldowns.shouldFire(wid, "subagent_ask", SUBAGENT_REASK_GRACE_MS, nowMs)
+        nowMs - idleSince >= SUBAGENT_APPARENT_IDLE_BEFORE_ASK_MS
       ) {
-        try {
-          await this.tmuxService.sendAndSubmit(
-            workflow.coordinator_session,
-            "Overmind: you appear idle but no child session is working — are you running an in-process sub-agent? " +
-            "If yes, reply with: [OVERMIND] subagent <name> ~<N>min (and I'll stop nudging until you return). " +
-            "Otherwise resume work or report STATUS."
-          );
-        } catch (err) {
-          console.error("Overmind sub-agent ask failed:", err);
+        const stuckCooldownMs = (this.appSettings?.get().stuck_nudge_cooldown_minutes ?? 20) * 60_000;
+        const lastUnified = getLastUnifiedIdleNudgeAt(wid, this.cooldowns, this.nudgeState);
+        if (nowMs - lastUnified >= stuckCooldownMs) {
+          const hasChildren = (workflow.child_sessions?.length ?? 0) > 0;
+          const msg = hasChildren
+            ? "Overmind: all sessions appear idle — parent and all children are quiet.\n\nIf you have an in-process subagent running, reply with:\n  [OVERMIND] subagent <name> ~<N>min\nOtherwise, check callbacks.md for pending work, update progress.md with current status, or report STATUS."
+            : "Overmind: your session appears idle — no child sessions are active.\n\nIf you have an in-process subagent running, reply with:\n  [OVERMIND] subagent <name> ~<N>min\nOtherwise, resume work or report STATUS.";
+          try {
+            await this.tmuxService.sendAndSubmit(workflow.coordinator_session, msg);
+            this.cooldowns.recordFired(wid, "unified_idle_nudge", nowMs);
+            this.nudgeState?.setLastUnifiedIdleNudge(wid, nowMs);
+          } catch (err) {
+            console.error("Overmind PATH 2 idle nudge failed:", err);
+          }
         }
-        this.cooldowns.recordFired(wid, "subagent_ask", nowMs);
       }
     }
+    await maybeFireArtifactFailsafe(workflow, resolvedRunDir, {
+      tmuxService: this.tmuxService,
+      cooldowns: this.cooldowns,
+      appSettings: this.appSettings,
+      nudgeState: this.nudgeState,
+      TERMINAL_STATUSES,
+      subagentInFlight: this.subagentInFlight.has(wid)
+    });
     if (this.subagentInFlight.has(wid)) {
       this.overmindService.update(workflow.id, {
         status: "working",
@@ -563,4 +539,18 @@ function parseTimestamp(value: string | null): number | null {
     : value;
   const parsed = Date.parse(normalized);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function getLastUnifiedIdleNudgeAt(
+  workflowId: number,
+  cooldowns: WatcherCooldowns,
+  nudgeState?: NudgeStateService
+): number {
+  return Math.max(
+    nudgeState?.getLastUnifiedIdleNudge(workflowId) ?? 0,
+    cooldowns.getLastFired(workflowId, "unified_idle_nudge"),
+    cooldowns.getLastFired(workflowId, "idle_nudge"),
+    cooldowns.getLastFired(workflowId, "ask_update"),
+    cooldowns.getLastFired(workflowId, "subagent_ask")
+  );
 }

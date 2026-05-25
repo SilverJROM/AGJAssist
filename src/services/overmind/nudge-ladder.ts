@@ -89,11 +89,9 @@ export async function applyNudgeLadder(
   }
 
   if (deps.appSettings) {
-    const idleCooldownMs = deps.appSettings.get().idle_nudge_cooldown_minutes * 60_000;
+    const idleCooldownMs = deps.appSettings.get().stuck_nudge_cooldown_minutes * 60_000;
     const nowMs = Date.now();
-    const lastIdleNudge =
-      deps.nudgeState?.getLastIdleNudge(workflow.id) ??
-      deps.cooldowns.getLastFired(workflow.id, "idle_nudge");
+    const lastIdleNudge = getLastUnifiedIdleNudgeAt(workflow.id, deps.cooldowns, deps.nudgeState);
     if (nowMs - lastIdleNudge < idleCooldownMs) {
       return { nudge_count: workflow.nudge_count, tier: workflow.tier };
     }
@@ -103,14 +101,28 @@ export async function applyNudgeLadder(
   const nudgeText = (workflow.child_sessions?.length ?? 0) === 0 ? CANNED_NUDGE_NO_CHILD : CANNED_NUDGE;
   await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, nudgeText);
   const sendTs = Date.now();
-  deps.cooldowns.recordFired(workflow.id, "idle_nudge", sendTs);
-  deps.nudgeState?.setLastIdleNudge(workflow.id, sendTs);
+  deps.cooldowns.recordFired(workflow.id, "unified_idle_nudge", sendTs);
+  deps.nudgeState?.setLastUnifiedIdleNudge(workflow.id, sendTs);
   const postNudgePane = await capturePaneSafe(deps.tmuxService, workflow.coordinator_session);
   return {
     nudge_count: nextNudgeCount,
     tier: nextNudgeCount,
     last_pane_hash: hashPane(postNudgePane)
   };
+}
+
+function getLastUnifiedIdleNudgeAt(
+  workflowId: number,
+  cooldowns: WatcherCooldowns,
+  nudgeState?: NudgeStateService
+): number {
+  return Math.max(
+    nudgeState?.getLastUnifiedIdleNudge(workflowId) ?? 0,
+    cooldowns.getLastFired(workflowId, "unified_idle_nudge"),
+    cooldowns.getLastFired(workflowId, "idle_nudge"),
+    cooldowns.getLastFired(workflowId, "ask_update"),
+    cooldowns.getLastFired(workflowId, "subagent_ask")
+  );
 }
 
 export async function applyDecisionInterception(

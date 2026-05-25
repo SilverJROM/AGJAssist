@@ -374,3 +374,346 @@
 [2026-05-24T11:30:01.461Z]     spark_parse_error: both spark and Sonnet fallback failed
 [2026-05-24T11:30:01.461Z] Tick 58 done. Next fire: 2026-05-24T12:00:01.445Z (+30min)
 [2026-05-24T11:40:01.495Z] Not yet. Next fire: 2026-05-24T12:00:01.445Z (20min away)
+[2026-05-24T11:50:01.529Z] Not yet. Next fire: 2026-05-24T12:00:01.445Z (10min away)
+[2026-05-24T12:00:01.564Z] === TICK 59 ===
+[2026-05-24T12:00:01.567Z]   Workflow 2: lokal-tg-bot-mini-app
+[2026-05-24T12:00:01.580Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T12:00:01.582Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T12:00:01.582Z] Tick 59 done. Next fire: 2026-05-24T12:20:01.564Z (+20min)
+[2026-05-24T12:10:01.613Z] Not yet. Next fire: 2026-05-24T12:20:01.564Z (10min away)
+[2026-05-24T12:20:01.652Z] === TICK 60 ===
+[2026-05-24T12:20:01.655Z]   Workflow 2: lokal-tg-bot-mini-app
+[2026-05-24T12:20:01.667Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T12:20:01.670Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T12:20:01.670Z] Tick 60 done. Next fire: 2026-05-24T12:50:01.652Z (+30min)
+[2026-05-24T12:30:01.704Z] Not yet. Next fire: 2026-05-24T12:50:01.652Z (20min away)
+[2026-05-24T12:40:01.738Z] Not yet. Next fire: 2026-05-24T12:50:01.652Z (10min away)
+[2026-05-24T12:50:01.773Z] === TICK 61 ===
+[2026-05-24T12:50:01.776Z]   Workflow 2: lokal-tg-bot-mini-app
+[2026-05-24T12:50:01.790Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T12:50:01.791Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T12:50:01.792Z] Tick 61 done. Next fire: 2026-05-24T13:20:01.773Z (+30min)
+[2026-05-24T13:00:01.825Z] Not yet. Next fire: 2026-05-24T13:20:01.773Z (20min away)
+[2026-05-24T13:10:01.858Z] Not yet. Next fire: 2026-05-24T13:20:01.773Z (10min away)
+[2026-05-24T13:20:01.899Z] === TICK 62 ===
+[2026-05-24T13:20:01.902Z]   Workflow 2: lokal-tg-bot-mini-app
+[2026-05-24T13:20:01.912Z]     Child lkcamp-tg-codex: session closed.
+[2026-05-24T13:20:01.913Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T13:20:01.914Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T13:20:01.915Z] Tick 62 done. Next fire: 2026-05-24T13:40:01.899Z (+20min)
+[2026-05-24T13:30:01.950Z] Not yet. Next fire: 2026-05-24T13:40:01.899Z (10min away)
+[2026-05-24T13:40:01.986Z] === TICK 63 ===
+[2026-05-24T13:40:01.989Z]   Workflow 2: lokal-tg-bot-mini-app
+[2026-05-24T13:40:01.998Z]     Child lkcamp-tg-codex: session closed.
+[2026-05-24T13:40:01.998Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T13:40:02.000Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T13:40:02.000Z] Tick 63 done. Next fire: 2026-05-24T14:10:01.986Z (+30min)
+[2026-05-24T13:50:01.034Z] Not yet. Next fire: 2026-05-24T14:10:01.986Z (20min away)
+[2026-05-24T14:00:01.072Z] Not yet. Next fire: 2026-05-24T14:10:01.986Z (10min away)
+[2026-05-24T14:10:01.108Z] Not yet. Next fire: 2026-05-24T14:10:01.986Z (0min away)
+[2026-05-24T14:20:01.146Z] === TICK 64 ===
+[2026-05-24T14:20:01.149Z]   No active workflows — tick skipped.
+[2026-05-24T14:20:01.149Z] Tick 64 done. Next fire: 2026-05-24T14:40:01.146Z (+20min)
+[2026-05-24T14:30:01.185Z] Not yet. Next fire: 2026-05-24T14:40:01.146Z (10min away)
+[2026-05-24T14:40:01.222Z] === TICK 65 ===
+[2026-05-24T14:40:01.224Z]   No active workflows — tick skipped.
+[2026-05-24T14:40:01.224Z] Tick 65 done. Next fire: 2026-05-24T15:00:01.221Z (+20min)
+[2026-05-24T14:50:01.258Z] Not yet. Next fire: 2026-05-24T15:00:01.221Z (10min away)
+[2026-05-24T15:00:01.294Z] === TICK 66 ===
+[2026-05-24T15:00:01.297Z]   No active workflows — tick skipped.
+[2026-05-24T15:00:01.297Z] Tick 66 done. Next fire: 2026-05-24T15:20:01.294Z (+20min)
+[2026-05-24T15:10:01.332Z] Not yet. Next fire: 2026-05-24T15:20:01.294Z (10min away)
+[2026-05-24T15:20:01.373Z] === TICK 67 ===
+[2026-05-24T15:20:01.375Z]   No active workflows — tick skipped.
+[2026-05-24T15:20:01.376Z] Tick 67 done. Next fire: 2026-05-24T15:50:01.373Z (+30min)
+[2026-05-24T15:30:01.411Z] Not yet. Next fire: 2026-05-24T15:50:01.373Z (20min away)
+[2026-05-24T15:40:01.448Z] Not yet. Next fire: 2026-05-24T15:50:01.373Z (10min away)
+[2026-05-24T15:50:01.485Z] === TICK 68 ===
+[2026-05-24T15:50:01.487Z]   No active workflows — tick skipped.
+[2026-05-24T15:50:01.488Z] Tick 68 done. Next fire: 2026-05-24T16:10:01.485Z (+20min)
+[2026-05-24T16:00:01.522Z] Not yet. Next fire: 2026-05-24T16:10:01.485Z (10min away)
+[2026-05-24T16:10:01.558Z] === TICK 69 ===
+[2026-05-24T16:10:01.560Z]   No active workflows — tick skipped.
+[2026-05-24T16:10:01.561Z] Tick 69 done. Next fire: 2026-05-24T16:30:01.558Z (+20min)
+[2026-05-24T16:20:01.604Z] Not yet. Next fire: 2026-05-24T16:30:01.558Z (10min away)
+[2026-05-24T16:30:01.642Z] === TICK 70 ===
+[2026-05-24T16:30:01.644Z]   No active workflows — tick skipped.
+[2026-05-24T16:30:01.645Z] Tick 70 done. Next fire: 2026-05-24T16:50:01.642Z (+20min)
+[2026-05-24T16:40:01.676Z] Not yet. Next fire: 2026-05-24T16:50:01.642Z (10min away)
+[2026-05-24T16:50:01.712Z] === TICK 71 ===
+[2026-05-24T16:50:01.715Z]   No active workflows — tick skipped.
+[2026-05-24T16:50:01.715Z] Tick 71 done. Next fire: 2026-05-24T17:20:01.712Z (+30min)
+[2026-05-24T17:00:01.748Z] Not yet. Next fire: 2026-05-24T17:20:01.712Z (20min away)
+[2026-05-24T17:10:01.784Z] Not yet. Next fire: 2026-05-24T17:20:01.712Z (10min away)
+[2026-05-24T17:20:01.825Z] === TICK 72 ===
+[2026-05-24T17:20:01.828Z]   No active workflows — tick skipped.
+[2026-05-24T17:20:01.828Z] Tick 72 done. Next fire: 2026-05-24T17:40:01.825Z (+20min)
+[2026-05-24T17:30:01.863Z] Not yet. Next fire: 2026-05-24T17:40:01.825Z (10min away)
+[2026-05-24T17:40:01.902Z] === TICK 73 ===
+[2026-05-24T17:40:01.904Z]   No active workflows — tick skipped.
+[2026-05-24T17:40:01.905Z] Tick 73 done. Next fire: 2026-05-24T18:10:01.902Z (+30min)
+[2026-05-24T17:50:01.939Z] Not yet. Next fire: 2026-05-24T18:10:01.902Z (20min away)
+[2026-05-24T18:00:01.977Z] Not yet. Next fire: 2026-05-24T18:10:01.902Z (10min away)
+[2026-05-24T18:10:02.016Z] === TICK 74 ===
+[2026-05-24T18:10:02.018Z]   No active workflows — tick skipped.
+[2026-05-24T18:10:02.018Z] Tick 74 done. Next fire: 2026-05-24T18:30:02.015Z (+20min)
+[2026-05-24T18:20:01.062Z] Not yet. Next fire: 2026-05-24T18:30:02.015Z (10min away)
+[2026-05-24T18:30:01.099Z] Not yet. Next fire: 2026-05-24T18:30:02.015Z (0min away)
+[2026-05-24T18:40:01.136Z] === TICK 75 ===
+[2026-05-24T18:40:01.138Z]   No active workflows — tick skipped.
+[2026-05-24T18:40:01.138Z] Tick 75 done. Next fire: 2026-05-24T19:00:01.135Z (+20min)
+[2026-05-24T18:50:01.172Z] Not yet. Next fire: 2026-05-24T19:00:01.135Z (10min away)
+[2026-05-24T19:00:01.211Z] === TICK 76 ===
+[2026-05-24T19:00:01.213Z]   No active workflows — tick skipped.
+[2026-05-24T19:00:01.213Z] Tick 76 done. Next fire: 2026-05-24T19:20:01.210Z (+20min)
+[2026-05-24T19:10:01.249Z] Not yet. Next fire: 2026-05-24T19:20:01.210Z (10min away)
+[2026-05-24T19:20:01.290Z] === TICK 77 ===
+[2026-05-24T19:20:01.293Z]   No active workflows — tick skipped.
+[2026-05-24T19:20:01.293Z] Tick 77 done. Next fire: 2026-05-24T19:40:01.290Z (+20min)
+[2026-05-24T19:30:01.340Z] Not yet. Next fire: 2026-05-24T19:40:01.290Z (10min away)
+[2026-05-24T19:40:01.376Z] === TICK 78 ===
+[2026-05-24T19:40:01.378Z]   No active workflows — tick skipped.
+[2026-05-24T19:40:01.378Z] Tick 78 done. Next fire: 2026-05-24T20:10:01.375Z (+30min)
+[2026-05-24T19:50:01.415Z] Not yet. Next fire: 2026-05-24T20:10:01.375Z (20min away)
+[2026-05-24T20:00:01.453Z] Not yet. Next fire: 2026-05-24T20:10:01.375Z (10min away)
+[2026-05-24T20:10:01.490Z] === TICK 79 ===
+[2026-05-24T20:10:01.493Z]   No active workflows — tick skipped.
+[2026-05-24T20:10:01.493Z] Tick 79 done. Next fire: 2026-05-24T20:30:01.490Z (+20min)
+[2026-05-24T20:20:01.533Z] Not yet. Next fire: 2026-05-24T20:30:01.490Z (10min away)
+[2026-05-24T20:30:01.572Z] === TICK 80 ===
+[2026-05-24T20:30:01.575Z]   No active workflows — tick skipped.
+[2026-05-24T20:30:01.575Z] Tick 80 done. Next fire: 2026-05-24T21:00:01.572Z (+30min)
+[2026-05-24T20:40:01.610Z] Not yet. Next fire: 2026-05-24T21:00:01.572Z (20min away)
+[2026-05-24T20:50:01.645Z] Not yet. Next fire: 2026-05-24T21:00:01.572Z (10min away)
+[2026-05-24T21:00:01.682Z] === TICK 81 ===
+[2026-05-24T21:00:01.685Z]   No active workflows — tick skipped.
+[2026-05-24T21:00:01.685Z] Tick 81 done. Next fire: 2026-05-24T21:20:01.682Z (+20min)
+[2026-05-24T21:10:01.718Z] Not yet. Next fire: 2026-05-24T21:20:01.682Z (10min away)
+[2026-05-24T21:20:01.762Z] === TICK 82 ===
+[2026-05-24T21:20:01.765Z]   No active workflows — tick skipped.
+[2026-05-24T21:20:01.765Z] Tick 82 done. Next fire: 2026-05-24T21:40:01.762Z (+20min)
+[2026-05-24T21:30:01.798Z] Not yet. Next fire: 2026-05-24T21:40:01.762Z (10min away)
+[2026-05-24T21:40:01.833Z] === TICK 83 ===
+[2026-05-24T21:40:01.836Z]   No active workflows — tick skipped.
+[2026-05-24T21:40:01.836Z] Tick 83 done. Next fire: 2026-05-24T22:10:01.833Z (+30min)
+[2026-05-24T21:50:01.870Z] Not yet. Next fire: 2026-05-24T22:10:01.833Z (20min away)
+[2026-05-24T22:00:01.903Z] Not yet. Next fire: 2026-05-24T22:10:01.833Z (10min away)
+[2026-05-24T22:10:01.935Z] === TICK 84 ===
+[2026-05-24T22:10:01.938Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-24T22:10:01.952Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T22:10:01.954Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T22:10:01.954Z]   Workflow 2: lokal-tg-link-consent-prompt
+[2026-05-24T22:10:01.965Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T22:10:01.967Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T22:10:01.968Z] Tick 84 done. Next fire: 2026-05-24T22:30:01.935Z (+20min)
+[2026-05-24T22:20:02.003Z] Not yet. Next fire: 2026-05-24T22:30:01.935Z (10min away)
+[2026-05-24T22:30:01.038Z] Not yet. Next fire: 2026-05-24T22:30:01.935Z (0min away)
+[2026-05-24T22:40:01.071Z] === TICK 85 ===
+[2026-05-24T22:40:01.074Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-24T22:40:01.086Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T22:40:01.088Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T22:40:01.089Z]   Workflow 2: lokal-tg-link-consent-prompt
+[2026-05-24T22:40:01.101Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T22:40:01.102Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T22:40:01.103Z] Tick 85 done. Next fire: 2026-05-24T23:00:01.071Z (+20min)
+[2026-05-24T22:50:01.134Z] Not yet. Next fire: 2026-05-24T23:00:01.071Z (10min away)
+[2026-05-24T23:00:01.170Z] === TICK 86 ===
+[2026-05-24T23:00:01.172Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-24T23:00:01.185Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T23:00:01.187Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T23:00:01.187Z]   Workflow 2: lokal-tg-link-consent-prompt
+[2026-05-24T23:00:01.200Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T23:00:01.202Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T23:00:01.202Z] Tick 86 done. Next fire: 2026-05-24T23:30:01.170Z (+30min)
+[2026-05-24T23:10:01.233Z] Not yet. Next fire: 2026-05-24T23:30:01.170Z (20min away)
+[2026-05-24T23:20:01.273Z] Not yet. Next fire: 2026-05-24T23:30:01.170Z (10min away)
+[2026-05-24T23:30:01.306Z] === TICK 87 ===
+[2026-05-24T23:30:01.309Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-24T23:30:01.321Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T23:30:01.323Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T23:30:01.323Z]   Workflow 2: lokal-tg-link-consent-prompt
+[2026-05-24T23:30:01.334Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-24T23:30:01.336Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-24T23:30:01.336Z] Tick 87 done. Next fire: 2026-05-25T00:00:01.306Z (+30min)
+[2026-05-24T23:40:01.367Z] Not yet. Next fire: 2026-05-25T00:00:01.306Z (20min away)
+[2026-05-24T23:50:01.402Z] Not yet. Next fire: 2026-05-25T00:00:01.306Z (10min away)
+[2026-05-25T00:00:01.454Z] === TICK 88 ===
+[2026-05-25T00:00:01.457Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T00:00:01.469Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T00:00:01.471Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T00:00:01.471Z] Tick 88 done. Next fire: 2026-05-25T00:20:01.454Z (+20min)
+[2026-05-25T00:10:01.503Z] Not yet. Next fire: 2026-05-25T00:20:01.454Z (10min away)
+[2026-05-25T00:20:01.547Z] === TICK 89 ===
+[2026-05-25T00:20:01.551Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T00:20:01.564Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T00:20:01.566Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T00:20:01.566Z] Tick 89 done. Next fire: 2026-05-25T00:50:01.547Z (+30min)
+[2026-05-25T00:30:01.598Z] Not yet. Next fire: 2026-05-25T00:50:01.547Z (20min away)
+[2026-05-25T00:40:01.633Z] Not yet. Next fire: 2026-05-25T00:50:01.547Z (10min away)
+[2026-05-25T00:50:01.667Z] === TICK 90 ===
+[2026-05-25T00:50:01.670Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T00:50:01.681Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T00:50:01.683Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T00:50:01.683Z] Tick 90 done. Next fire: 2026-05-25T01:20:01.667Z (+30min)
+[2026-05-25T01:00:01.718Z] Not yet. Next fire: 2026-05-25T01:20:01.667Z (20min away)
+[2026-05-25T01:10:01.751Z] Not yet. Next fire: 2026-05-25T01:20:01.667Z (10min away)
+[2026-05-25T01:20:01.789Z] === TICK 91 ===
+[2026-05-25T01:20:01.792Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T01:20:01.804Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T01:20:01.805Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T01:20:01.806Z] Tick 91 done. Next fire: 2026-05-25T01:50:01.789Z (+30min)
+[2026-05-25T01:30:01.840Z] Not yet. Next fire: 2026-05-25T01:50:01.789Z (20min away)
+[2026-05-25T01:40:01.875Z] Not yet. Next fire: 2026-05-25T01:50:01.789Z (10min away)
+[2026-05-25T01:50:01.907Z] === TICK 92 ===
+[2026-05-25T01:50:01.910Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T01:50:01.923Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T01:50:01.925Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T01:50:01.926Z] Tick 92 done. Next fire: 2026-05-25T02:20:01.907Z (+30min)
+[2026-05-25T02:00:01.960Z] Not yet. Next fire: 2026-05-25T02:20:01.907Z (20min away)
+[2026-05-25T02:10:01.995Z] Not yet. Next fire: 2026-05-25T02:20:01.907Z (10min away)
+[2026-05-25T02:20:01.037Z] Not yet. Next fire: 2026-05-25T02:20:01.907Z (0min away)
+[2026-05-25T02:30:01.072Z] === TICK 93 ===
+[2026-05-25T02:30:01.075Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T02:30:01.087Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T02:30:01.089Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T02:30:01.089Z] Tick 93 done. Next fire: 2026-05-25T02:50:01.072Z (+20min)
+[2026-05-25T02:40:01.121Z] Not yet. Next fire: 2026-05-25T02:50:01.072Z (10min away)
+[2026-05-25T02:50:01.154Z] === TICK 94 ===
+[2026-05-25T02:50:01.157Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T02:50:01.170Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T02:50:01.172Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T02:50:01.173Z] Tick 94 done. Next fire: 2026-05-25T03:10:01.154Z (+20min)
+[2026-05-25T03:00:01.206Z] Not yet. Next fire: 2026-05-25T03:10:01.154Z (10min away)
+[2026-05-25T03:10:01.241Z] === TICK 95 ===
+[2026-05-25T03:10:01.244Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T03:10:01.257Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T03:10:01.259Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T03:10:01.259Z] Tick 95 done. Next fire: 2026-05-25T03:30:01.241Z (+20min)
+[2026-05-25T03:20:01.301Z] Not yet. Next fire: 2026-05-25T03:30:01.241Z (10min away)
+[2026-05-25T03:30:01.337Z] === TICK 96 ===
+[2026-05-25T03:30:01.340Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T03:30:01.352Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T03:30:01.354Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T03:30:01.354Z] Tick 96 done. Next fire: 2026-05-25T03:50:01.337Z (+20min)
+[2026-05-25T03:40:01.389Z] Not yet. Next fire: 2026-05-25T03:50:01.337Z (10min away)
+[2026-05-25T03:50:01.425Z] === TICK 97 ===
+[2026-05-25T03:50:01.427Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T03:50:01.440Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T03:50:01.442Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T03:50:01.442Z] Tick 97 done. Next fire: 2026-05-25T04:10:01.424Z (+20min)
+[2026-05-25T04:00:01.476Z] Not yet. Next fire: 2026-05-25T04:10:01.424Z (10min away)
+[2026-05-25T04:10:01.511Z] === TICK 98 ===
+[2026-05-25T04:10:01.514Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T04:10:01.526Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T04:10:01.528Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T04:10:01.528Z] Tick 98 done. Next fire: 2026-05-25T04:30:01.511Z (+20min)
+[2026-05-25T04:20:01.568Z] Not yet. Next fire: 2026-05-25T04:30:01.511Z (10min away)
+[2026-05-25T04:30:01.602Z] === TICK 99 ===
+[2026-05-25T04:30:01.605Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T04:30:01.617Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T04:30:01.619Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T04:30:01.620Z] Tick 99 done. Next fire: 2026-05-25T04:50:01.602Z (+20min)
+[2026-05-25T04:40:01.656Z] Not yet. Next fire: 2026-05-25T04:50:01.602Z (10min away)
+[2026-05-25T04:50:01.690Z] === TICK 100 ===
+[2026-05-25T04:50:01.693Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T04:50:01.705Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T04:50:01.707Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T04:50:01.707Z] Tick 100 done. Next fire: 2026-05-25T05:10:01.690Z (+20min)
+[2026-05-25T05:00:01.741Z] Not yet. Next fire: 2026-05-25T05:10:01.690Z (10min away)
+[2026-05-25T05:10:01.779Z] === TICK 101 ===
+[2026-05-25T05:10:01.781Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T05:10:01.795Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T05:10:01.797Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T05:10:01.798Z] Tick 101 done. Next fire: 2026-05-25T05:40:01.779Z (+30min)
+[2026-05-25T05:20:01.842Z] Not yet. Next fire: 2026-05-25T05:40:01.779Z (20min away)
+[2026-05-25T05:30:01.877Z] Not yet. Next fire: 2026-05-25T05:40:01.779Z (10min away)
+[2026-05-25T05:40:01.910Z] === TICK 102 ===
+[2026-05-25T05:40:01.913Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T05:40:01.927Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T05:40:01.929Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T05:40:01.929Z] Tick 102 done. Next fire: 2026-05-25T06:00:01.910Z (+20min)
+[2026-05-25T05:50:01.962Z] Not yet. Next fire: 2026-05-25T06:00:01.910Z (10min away)
+[2026-05-25T06:00:01.996Z] === TICK 103 ===
+[2026-05-25T06:00:01.999Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T06:00:02.011Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T06:00:02.013Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T06:00:02.013Z] Tick 103 done. Next fire: 2026-05-25T06:20:01.996Z (+20min)
+[2026-05-25T06:10:01.048Z] Not yet. Next fire: 2026-05-25T06:20:01.996Z (10min away)
+[2026-05-25T06:20:01.086Z] Not yet. Next fire: 2026-05-25T06:20:01.996Z (0min away)
+[2026-05-25T06:30:01.132Z] === TICK 104 ===
+[2026-05-25T06:30:01.135Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T06:30:01.149Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T06:30:01.151Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T06:30:01.151Z] Tick 104 done. Next fire: 2026-05-25T07:00:01.132Z (+30min)
+[2026-05-25T06:40:01.186Z] Not yet. Next fire: 2026-05-25T07:00:01.132Z (20min away)
+[2026-05-25T06:50:01.222Z] Not yet. Next fire: 2026-05-25T07:00:01.132Z (10min away)
+[2026-05-25T07:00:01.259Z] === TICK 105 ===
+[2026-05-25T07:00:01.262Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T07:00:01.274Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T07:00:01.276Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T07:00:01.276Z] Tick 105 done. Next fire: 2026-05-25T07:20:01.259Z (+20min)
+[2026-05-25T07:10:01.309Z] Not yet. Next fire: 2026-05-25T07:20:01.259Z (10min away)
+[2026-05-25T07:20:01.351Z] === TICK 106 ===
+[2026-05-25T07:20:01.354Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T07:20:01.368Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T07:20:01.369Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T07:20:01.370Z] Tick 106 done. Next fire: 2026-05-25T07:50:01.351Z (+30min)
+[2026-05-25T07:30:01.424Z] Not yet. Next fire: 2026-05-25T07:50:01.351Z (20min away)
+[2026-05-25T07:40:01.460Z] Not yet. Next fire: 2026-05-25T07:50:01.351Z (10min away)
+[2026-05-25T07:50:01.496Z] === TICK 107 ===
+[2026-05-25T07:50:01.498Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T07:50:01.511Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T07:50:01.513Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T07:50:01.514Z] Tick 107 done. Next fire: 2026-05-25T08:10:01.495Z (+20min)
+[2026-05-25T08:00:01.548Z] Not yet. Next fire: 2026-05-25T08:10:01.495Z (10min away)
+[2026-05-25T08:10:01.583Z] === TICK 108 ===
+[2026-05-25T08:10:01.586Z]   Workflow 1: HRIS · tenant-wide templates + xcompany scope (8 batches)
+[2026-05-25T08:10:01.599Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T08:10:01.601Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T08:10:01.601Z] Tick 108 done. Next fire: 2026-05-25T08:40:01.583Z (+30min)
+[2026-05-25T08:20:01.640Z] Not yet. Next fire: 2026-05-25T08:40:01.583Z (20min away)
+[2026-05-25T08:30:01.676Z] Not yet. Next fire: 2026-05-25T08:40:01.583Z (10min away)
+[2026-05-25T08:40:01.710Z] === TICK 109 ===
+[2026-05-25T08:40:01.713Z]   No active workflows — tick skipped.
+[2026-05-25T08:40:01.713Z] Tick 109 done. Next fire: 2026-05-25T09:00:01.710Z (+20min)
+[2026-05-25T08:50:01.747Z] Not yet. Next fire: 2026-05-25T09:00:01.710Z (10min away)
+[2026-05-25T09:00:01.780Z] === TICK 110 ===
+[2026-05-25T09:00:01.783Z]   Workflow 2: client-full-access-R1-R22
+[2026-05-25T09:00:01.802Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T09:00:01.804Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T09:00:01.805Z] Tick 110 done. Next fire: 2026-05-25T09:20:01.780Z (+20min)
+[2026-05-25T09:10:01.838Z] Not yet. Next fire: 2026-05-25T09:20:01.780Z (10min away)
+[2026-05-25T09:20:01.880Z] === TICK 111 ===
+[2026-05-25T09:20:01.883Z]   Workflow 2: client-full-access-R1-R22
+[2026-05-25T09:20:01.901Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T09:20:01.902Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T09:20:01.903Z] Tick 111 done. Next fire: 2026-05-25T09:50:01.880Z (+30min)
+[2026-05-25T09:30:01.936Z] Not yet. Next fire: 2026-05-25T09:50:01.880Z (20min away)
+[2026-05-25T09:40:01.972Z] Not yet. Next fire: 2026-05-25T09:50:01.880Z (10min away)
+[2026-05-25T09:50:02.004Z] === TICK 112 ===
+[2026-05-25T09:50:02.007Z]   Workflow 1: HRIS · att-payroll-link · R1 attendance→payroll TR + R3 payroll RBAC
+[2026-05-25T09:50:02.023Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T09:50:02.024Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T09:50:02.024Z]   Workflow 2: client-full-access-R1-R22
+[2026-05-25T09:50:02.041Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T09:50:02.043Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T09:50:02.043Z] Tick 112 done. Next fire: 2026-05-25T10:10:02.004Z (+20min)
+[2026-05-25T10:00:01.075Z] Not yet. Next fire: 2026-05-25T10:10:02.004Z (10min away)
+[2026-05-25T10:10:01.110Z] Not yet. Next fire: 2026-05-25T10:10:02.004Z (0min away)
+[2026-05-25T10:20:01.149Z] === TICK 113 ===
+[2026-05-25T10:20:01.152Z]   Workflow 1: HRIS · att-payroll-link · R1 attendance→payroll TR + R3 payroll RBAC
+[2026-05-25T10:20:01.174Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T10:20:01.176Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T10:20:01.177Z]   Workflow 2: client-full-access-R1-R22
+[2026-05-25T10:20:01.194Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T10:20:01.196Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T10:20:01.196Z] Tick 113 done. Next fire: 2026-05-25T10:40:01.149Z (+20min)
+[2026-05-25T10:30:01.230Z] Not yet. Next fire: 2026-05-25T10:40:01.149Z (10min away)
+[2026-05-25T10:40:01.265Z] === TICK 114 ===
+[2026-05-25T10:40:01.268Z]   Workflow 1: HRIS · att-payroll-link · R1 attendance→payroll TR + R3 payroll RBAC
+[2026-05-25T10:40:01.290Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T10:40:01.293Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T10:40:01.293Z]   Workflow 2: client-full-access-R1-R22
+[2026-05-25T10:40:01.309Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T10:40:01.310Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T10:40:01.311Z] Tick 114 done. Next fire: 2026-05-25T11:00:01.265Z (+20min)

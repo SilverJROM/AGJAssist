@@ -392,15 +392,15 @@ describe("Overmind watcher nudge ladder", () => {
 // ─── Idle-nudge cooldown tests ───────────────────────────────────────────────
 
 function makeSettingsStub(
-  idle_nudge_cooldown_minutes: number,
-  evidence_idle_threshold_minutes = 30,
+  stuck_nudge_cooldown_minutes: number,
+  unified_idle_threshold_minutes = 30,
   evidence_read_cadence_minutes = 3
 ): AppSettingsService {
   return {
     get: () => ({
-      idle_nudge_cooldown_minutes,
+      stuck_nudge_cooldown_minutes,
       evidence_read_cadence_minutes,
-      evidence_idle_threshold_minutes
+      unified_idle_threshold_minutes
     } satisfies OvermindCooldowns),
     load: async () => {},
     setOvermindCooldown: async () => {}
@@ -432,8 +432,8 @@ describe("Idle-nudge cooldown", () => {
     expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-cd", CANNED_NUDGE);
 
     // Tick 2: 1 minute later — still within the 20-min cooldown.
-    // Simulate time passing: override lastIdleNudgeAt to 1 min ago.
-    (watcher as any).lastIdleNudgeAt.set(workflow.id, Date.now() - 1 * 60 * 1000);
+    // Simulate time passing: override the shared unified idle cooldown to 1 min ago.
+    (watcher as any).cooldowns.recordFired(workflow.id, "unified_idle_nudge", Date.now() - 1 * 60 * 1000);
 
     await watcher.tick();
     updated = service.get(workflow.id);
@@ -464,7 +464,7 @@ describe("Idle-nudge cooldown", () => {
     expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
 
     // Simulate last nudge was sent 6 minutes ago — cooldown expired.
-    (watcher as any).lastIdleNudgeAt.set(workflow.id, Date.now() - 6 * 60 * 1000);
+    (watcher as any).cooldowns.recordFired(workflow.id, "unified_idle_nudge", Date.now() - 6 * 60 * 1000);
 
     // Tick 2: cooldown expired → second nudge goes out.
     await watcher.tick();
@@ -473,17 +473,73 @@ describe("Idle-nudge cooldown", () => {
   });
 });
 
-describe("Ask-update cooldown nudge", () => {
-  // JROM 2026-05-24 v2 — message now asks for progress.md/callbacks.md updates,
-  // not POSTs to /api/overmind/tasks. The cooldown trigger is also the MAX of
-  // (last_parent_update_at, progress.md mtime, callbacks.md mtime).
-  const ASK_UPDATE_TEXT = "I haven't seen any activity";
+describe("All-sessions idle nudge", () => {
+  it("fires the unified all-idle message after the apparent-idle grace without incrementing nudge_count", async () => {
+    const workflow = service.register({
+      label: "path2-idle",
+      coordinator_session: "coord-path2",
+      child_sessions: ["child-path2"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.update(workflow.id, {
+      last_pane_hash: hashPane(QUIET_PANE)
+    });
+
+    const tmux = makeTmuxMock({
+      "coord-path2": QUIET_PANE,
+      "child-path2": "child quiet pane"
+    });
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20));
+    (watcher as any).apparentIdleSince.set(workflow.id, Date.now() - 11 * 60 * 1000);
+
+    await watcher.tick();
+
+    const updated = service.get(workflow.id);
+    expect(updated?.nudge_count).toBe(0);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit.mock.calls[0][1]).toContain("all sessions appear idle");
+    expect(tmux.sendAndSubmit.mock.calls[0][1]).toContain("[OVERMIND] subagent <name> ~<N>min");
+  });
+
+  it("does not fire within the shared cooldown after a stuck nudge", async () => {
+    const workflow = service.register({
+      label: "path1-blocks-path2",
+      coordinator_session: "coord-path12",
+      child_sessions: ["child-path12"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.update(workflow.id, {
+      last_pane_hash: hashPane(QUIET_PANE),
+      stuck_since: "2000-01-01T00:00:00.000Z"
+    });
+
+    const tmux = makeTmuxMock({
+      "coord-path12": QUIET_PANE,
+      "child-path12": "child quiet pane"
+    });
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20));
+
+    await watcher.tick();
+    expect(service.get(workflow.id)?.nudge_count).toBe(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit.mock.calls[0][1]).toBe(CANNED_NUDGE);
+
+    (watcher as any).apparentIdleSince.set(workflow.id, Date.now() - 11 * 60 * 1000);
+    await watcher.tick();
+
+    expect(service.get(workflow.id)?.nudge_count).toBe(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Artifact fail-safe idle nudge", () => {
+  const ARTIFACT_FAILSAFE_TEXT = "no tracked artifact has advanced";
 
   function setLastParentUpdate(workflowId: number, iso: string): void {
     db.prepare("UPDATE overmind_workflows SET last_parent_update_at = ? WHERE id = ?").run(iso, workflowId);
   }
 
-  it("fires once when last_parent_update_at is older than the effective cooldown", async () => {
+  it("fires despite a working pane when tracked artifacts are older than the effective threshold", async () => {
     const workflow = service.register({
       label: "ask-update-once",
       coordinator_session: "coord-ask-once",
@@ -503,7 +559,7 @@ describe("Ask-update cooldown nudge", () => {
     const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 45));
 
     await watcher.tick();
-    const askCalls = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT));
+    const askCalls = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ARTIFACT_FAILSAFE_TEXT));
     expect(askCalls).toHaveLength(1);
     expect(askCalls[0][0]).toBe("coord-ask-once");
   });
@@ -528,14 +584,14 @@ describe("Ask-update cooldown nudge", () => {
     const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 10));
 
     await watcher.tick();
-    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT))).toHaveLength(1);
+    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ARTIFACT_FAILSAFE_TEXT))).toHaveLength(1);
 
     await watcher.tick();
-    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT))).toHaveLength(1);
+    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ARTIFACT_FAILSAFE_TEXT))).toHaveLength(1);
 
-    (watcher as any).lastAskUpdateNudgeAt.set(workflow.id, Date.now() - 11 * 60 * 1000);
+    (watcher as any).cooldowns.recordFired(workflow.id, "unified_idle_nudge", Date.now() - 11 * 60 * 1000);
     await watcher.tick();
-    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT))).toHaveLength(2);
+    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ARTIFACT_FAILSAFE_TEXT))).toHaveLength(2);
   });
 
   it("respects per-workflow override (override cooldown beats system default)", async () => {
@@ -559,7 +615,7 @@ describe("Ask-update cooldown nudge", () => {
     const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 45));
 
     await watcher.tick();
-    const askCalls = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT));
+    const askCalls = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ARTIFACT_FAILSAFE_TEXT));
     expect(askCalls).toHaveLength(1);
     expect(askCalls[0][0]).toBe("coord-ask-override");
   });
@@ -599,7 +655,7 @@ describe("Ask-update cooldown nudge", () => {
     const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 10));
 
     await watcher.tick();
-    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT))).toHaveLength(0);
+    expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ARTIFACT_FAILSAFE_TEXT))).toHaveLength(0);
   });
 
   // ── JROM 2026-05-24 v2: MAX-of-three freshness + new message text ──────────
@@ -629,7 +685,7 @@ describe("Ask-update cooldown nudge", () => {
       });
       const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 45));
       await watcher.tick();
-      const asks = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT));
+      const asks = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ARTIFACT_FAILSAFE_TEXT));
       expect(asks).toHaveLength(0);
     } finally {
       fs.rmSync(runDir, { recursive: true, force: true });
@@ -663,11 +719,12 @@ describe("Ask-update cooldown nudge", () => {
       });
       const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 45));
       await watcher.tick();
-      const asks = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT));
+      const asks = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ARTIFACT_FAILSAFE_TEXT));
       expect(asks).toHaveLength(1);
       const msg = asks[0][1];
       expect(msg).toContain("progress.md");
       expect(msg).toContain("callbacks.md");
+      expect(msg).toContain("queue.md");
       expect(msg).toContain("POST /api/overmind/complete");
       // The legacy "POST /api/overmind/tasks" wording is GONE in v2.
       expect(msg).not.toContain("POST /api/overmind/tasks");
@@ -699,7 +756,7 @@ describe("Ask-update cooldown nudge", () => {
       });
       const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 45));
       await watcher.tick();
-      const asks = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ASK_UPDATE_TEXT));
+      const asks = tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ARTIFACT_FAILSAFE_TEXT));
       expect(asks).toHaveLength(1); // falls back to last_parent_update_at being stale
     } finally {
       fs.rmSync(runDir, { recursive: true, force: true });
@@ -752,7 +809,7 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
     expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-rp", CANNED_NUDGE);
 
     // Verify the timestamp landed in the persisted store (non-zero).
-    expect(nudgeState.getLastIdleNudge(workflow.id)).toBeGreaterThan(0);
+    expect(nudgeState.getLastUnifiedIdleNudge(workflow.id)).toBeGreaterThan(0);
 
     // ── Simulate pm2 restart: new OvermindWatcher instance, same NudgeStateService ──
     // (NudgeStateService.load() already ran; on a real restart we'd load() again from
@@ -764,7 +821,7 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
     const watcher2 = new OvermindWatcher(service, tmux2, undefined, undefined, undefined, settings, nudgeState2);
 
     // ── Immediately stuck again — cooldown should hold ─────────────────────────
-    // (the in-memory lastIdleNudgeAt on watcher2 starts at 0, but nudgeState2
+    // (the in-memory cooldowns on watcher2 start at 0, but nudgeState2
     // returns the persisted timestamp → cooldown is respected).
     await watcher2.tick();
     updated = service.get(workflow.id);
@@ -799,7 +856,7 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
     await watcher1.tick();
     expect(
       tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) =>
-        call[1].includes("I haven't seen any activity")
+        call[1].includes("no tracked artifact has advanced")
       )
     ).toHaveLength(1);
 
@@ -813,7 +870,7 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
     await watcher2.tick();
     expect(
       tmux2.sendAndSubmit.mock.calls.filter((call: [string, string]) =>
-        call[1].includes("I haven't seen any activity")
+        call[1].includes("no tracked artifact has advanced")
       )
     ).toHaveLength(0);
   });
@@ -838,8 +895,7 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
     const nudgeState = new NudgeStateService();
     await nudgeState.load();
     for (const wf of [completed, failed, paused]) {
-      nudgeState.setLastIdleNudge(wf.id, Date.now() - 1000);
-      nudgeState.setLastAskUpdateNudge(wf.id, Date.now() - 2000);
+      nudgeState.setLastUnifiedIdleNudge(wf.id, Date.now() - 1000);
       nudgeState.setLastTaskStaleNudge(wf.id, Date.now() - 3000);
       nudgeState.setLastReconcileAsk(wf.id, "gap:missing");
     }
