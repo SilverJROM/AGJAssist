@@ -717,3 +717,21 @@
 [2026-05-25T10:40:01.309Z]   Invoking spark (codex) with Sonnet fallback…
 [2026-05-25T10:40:01.310Z]     spark_parse_error: both spark and Sonnet fallback failed
 [2026-05-25T10:40:01.311Z] Tick 114 done. Next fire: 2026-05-25T11:00:01.265Z (+20min)
+[2026-05-25T10:50:01.346Z] Not yet. Next fire: 2026-05-25T11:00:01.265Z (10min away)
+[2026-05-25T11:00:01.381Z] === TICK 115 ===
+[2026-05-25T11:00:01.384Z]   Workflow 2: client-full-access-R1-R22
+[2026-05-25T11:00:01.402Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T11:00:01.405Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T11:00:01.405Z] Tick 115 done. Next fire: 2026-05-25T11:30:01.381Z (+30min)
+[2026-05-25T11:10:01.437Z] Not yet. Next fire: 2026-05-25T11:30:01.381Z (20min away)
+[2026-05-25T11:20:01.480Z] Not yet. Next fire: 2026-05-25T11:30:01.381Z (10min away)
+[2026-05-25T11:30:01.512Z] === TICK 116 ===
+[2026-05-25T11:30:01.515Z]   Workflow 1: HRIS · att-payroll-link2 · R1-R4 TRE approval + backfill + manager scope
+[2026-05-25T11:30:01.530Z]     Child hris-d-22-codex-val: session closed.
+[2026-05-25T11:30:01.530Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T11:30:01.532Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T11:30:01.532Z]   Workflow 2: client-full-access-R1-R22
+[2026-05-25T11:30:01.551Z]   Invoking spark (codex) with Sonnet fallback…
+[2026-05-25T11:30:01.553Z]     spark_parse_error: both spark and Sonnet fallback failed
+[2026-05-25T11:30:01.553Z] Tick 116 done. Next fire: 2026-05-25T11:50:01.512Z (+20min)
+[2026-05-25T11:40:01.587Z] Not yet. Next fire: 2026-05-25T11:50:01.512Z (10min away)

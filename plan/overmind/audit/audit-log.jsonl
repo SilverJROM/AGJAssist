@@ -94,3 +94,6 @@
 {"at":"2026-05-25T10:20:01.196Z","tick_n":113,"workflow_id":2,"workflow_label":"client-full-access-R1-R22","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
 {"at":"2026-05-25T10:40:01.293Z","tick_n":114,"workflow_id":1,"workflow_label":"HRIS · att-payroll-link · R1 attendance→payroll TR + R3 payroll RBAC","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
 {"at":"2026-05-25T10:40:01.310Z","tick_n":114,"workflow_id":2,"workflow_label":"client-full-access-R1-R22","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-25T11:00:01.405Z","tick_n":115,"workflow_id":2,"workflow_label":"client-full-access-R1-R22","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-25T11:30:01.532Z","tick_n":116,"workflow_id":1,"workflow_label":"HRIS · att-payroll-link2 · R1-R4 TRE approval + backfill + manager scope","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
+{"at":"2026-05-25T11:30:01.553Z","tick_n":116,"workflow_id":2,"workflow_label":"client-full-access-R1-R22","event":"spark_parse_error","error":"both spark and Sonnet fallback failed"}
