@@ -743,8 +743,8 @@ function OvermindWorkflows() {
   const [runDrilldown, setRunDrilldown] = useState({});
   const [runDrilldownLoading, setRunDrilldownLoading] = useState({});
   const [workflowTab, setWorkflowTab] = useState('active');
-  const [askUpdateSystemCooldownMin, setAskUpdateSystemCooldownMin] = useState(30);
-  const [askUpdateToast, setAskUpdateToast] = useState('');
+  const [failsafeThresholdSystemMin, setFailsafeThresholdSystemMin] = useState(30);
+  const [failsafeToast, setFailsafeToast] = useState('');
   const streamStatusRef = useRef(streamStatus);
 
   useEffect(() => {
@@ -763,14 +763,14 @@ function OvermindWorkflows() {
     }
   }, []);
 
-  const loadAskUpdateSettings = useCallback(async () => {
+  const loadFailsafeSettings = useCallback(async () => {
     try {
       const data = await api('/api/app-settings');
       const value = data?.overmind?.unified_idle_threshold_minutes
         ?? data?.overmind?.evidence_idle_threshold_minutes
         ?? data?.overmind?.ask_update_cooldown_minutes;
       if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
-        setAskUpdateSystemCooldownMin(value);
+        setFailsafeThresholdSystemMin(value);
       }
     } catch {}
   }, []);
@@ -811,8 +811,8 @@ function OvermindWorkflows() {
   }, [loadWorkflows]);
 
   useEffect(() => {
-    loadAskUpdateSettings();
-  }, [loadAskUpdateSettings]);
+    loadFailsafeSettings();
+  }, [loadFailsafeSettings]);
 
   const toggleWorkflow = useCallback((workflowId) => {
     setExpandedWorkflows(prev => ({ ...prev, [workflowId]: !prev[workflowId] }));
@@ -907,12 +907,12 @@ function OvermindWorkflows() {
       if (streamStatusRef.current !== 'connected') {
         loadWorkflows();
       }
-      loadAskUpdateSettings();
+      loadFailsafeSettings();
     }, 15000);
     return () => clearInterval(timer);
-  }, [loadWorkflows, loadAskUpdateSettings]);
+  }, [loadWorkflows, loadFailsafeSettings]);
 
-  const updateAskUpdateCooldownOverride = useCallback(async (workflow, nextOverrideMinutes) => {
+  const updateFailsafeThresholdOverride = useCallback(async (workflow, nextOverrideMinutes) => {
     const previousOverride = workflow.evidence_idle_threshold_override_minutes ?? null;
     setWorkflows(prev => prev.map(item =>
       item.id === workflow.id
@@ -934,8 +934,8 @@ function OvermindWorkflows() {
           ? { ...item, evidence_idle_threshold_override_minutes: previousOverride }
           : item
       ));
-      setAskUpdateToast(e.message || 'Failed to save ask-update cooldown override.');
-      setTimeout(() => setAskUpdateToast(''), 2600);
+      setFailsafeToast(e.message || 'Failed to save idle fail-safe threshold override.');
+      setTimeout(() => setFailsafeToast(''), 2600);
     }
   }, []);
 
@@ -993,7 +993,7 @@ function OvermindWorkflows() {
 
       ${error && html`<div class="overmind-alert">${error}</div>`}
       ${historyError && workflowTab === 'history' && html`<div class="overmind-alert">${historyError}</div>`}
-      ${askUpdateToast && html`<div class="toast">${askUpdateToast}</div>`}
+      ${failsafeToast && html`<div class="toast">${failsafeToast}</div>`}
 
       <div class="overmind-tabs" role="tablist" aria-label="Workflow status filters">
         <button
@@ -1160,11 +1160,11 @@ function OvermindWorkflows() {
             const lastParentUpdateLabel = Number.isFinite(lastParentUpdateMs)
               ? Math.max(0, Math.floor((now - lastParentUpdateMs) / 60000)) + ' min ago'
               : '—';
-            const askUpdateOverrideValue = workflow.evidence_idle_threshold_override_minutes == null
+            const failsafeOverrideValue = workflow.evidence_idle_threshold_override_minutes == null
               ? 'system'
               : String(workflow.evidence_idle_threshold_override_minutes);
-            const askUpdateOptions = [];
-            for (let min = 5; min <= 180; min += 5) askUpdateOptions.push(min);
+            const failsafeOptions = [];
+            for (let min = 5; min <= 180; min += 5) failsafeOptions.push(min);
             return html`
               <section class=${'item-card overmind-card ' + colorClass} key=${workflow.id}>
                 <div class="overmind-card-header">
@@ -1280,19 +1280,19 @@ function OvermindWorkflows() {
                     </table>
 
                     <div class="overmind-cooldown-row">
-                      <label for=${'ask-update-cooldown-' + workflow.id}>Ask-update cooldown override:</label>
+                      <label for=${'idle-failsafe-threshold-' + workflow.id}>Idle fail-safe threshold override:</label>
                       <select
-                        id=${'ask-update-cooldown-' + workflow.id}
+                        id=${'idle-failsafe-threshold-' + workflow.id}
                         class="overmind-cooldown-select"
-                        value=${askUpdateOverrideValue}
+                        value=${failsafeOverrideValue}
                         onChange=${(e) => {
                           const val = e.target.value;
                           const override = val === 'system' ? null : Number(val);
-                          updateAskUpdateCooldownOverride(workflow, override);
+                          updateFailsafeThresholdOverride(workflow, override);
                         }}
                       >
-                        <option value="system">${'System default (' + askUpdateSystemCooldownMin + ' min)'}</option>
-                        ${askUpdateOptions.map(min => html`<option key=${min} value=${String(min)}>${min} min</option>`)}
+                        <option value="system">${'System default (' + failsafeThresholdSystemMin + ' min)'}</option>
+                        ${failsafeOptions.map(min => html`<option key=${min} value=${String(min)}>${min} min</option>`)}
                       </select>
                     </div>
 
@@ -4830,8 +4830,8 @@ function OvermindCooldownsSection() {
   return html`
     <div>
       ${field('stuck_nudge_cooldown_minutes',
-        'Stuck nudge cooldown (minutes)',
-        "Wait this many minutes before sending another stuck-response nudge to a workflow."
+        'Idle nudge cooldown (minutes)',
+        "Cooldown between nudges for PATH 1 (stuck pane) and PATH 2 (all sessions idle). Both paths share this cooldown."
       )}
       ${field('evidence_read_cadence_minutes',
         'Evidence read cadence (minutes)',
@@ -4839,7 +4839,7 @@ function OvermindCooldownsSection() {
       )}
       ${field('unified_idle_threshold_minutes',
         'Artifact fail-safe threshold (minutes)',
-        "Minimum artifact staleness before Overmind asks whether the run is still active."
+        "PATH 3: nudge if artifact files (progress.md, callbacks.md, queue.md) are stale for this many minutes — fires regardless of pane activity."
       )}
       <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
         <button class="btn btn-primary btn-sm" onclick=${save} disabled=${saving}>
