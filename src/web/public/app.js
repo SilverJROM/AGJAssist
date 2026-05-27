@@ -3106,9 +3106,21 @@ function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) 
   // Insert a checklist item at current cursor position
   function fmtChecklist() {
     editorRef.current && editorRef.current.focus();
-    // Insert a checklist row as HTML
-    const clHtml = '<div class="cl-item" data-checked="false"><button class="cl-btn" tabindex="-1" type="button">◯</button><span class="cl-text"> </span></div>';
-    document.execCommand('insertHTML', false, clHtml);
+    const sel = window.getSelection();
+    const selectedText = sel && !sel.isCollapsed ? sel.toString() : '';
+    const nonEmptyLines = selectedText ? selectedText.split('\n').filter(l => l.trim()) : [];
+    if (nonEmptyLines.length > 0) {
+      // Bulk convert: replace selection with one cl-item per non-empty line
+      const html = nonEmptyLines.map(line => {
+        const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<div class="cl-item" data-checked="false"><button class="cl-btn" tabindex="-1" type="button">◯</button><span class="cl-text">${escaped}</span></div>`;
+      }).join('');
+      document.execCommand('insertHTML', false, html);
+    } else {
+      // No selection (or whitespace-only) — insert single empty item
+      const clHtml = '<div class="cl-item" data-checked="false"><button class="cl-btn" tabindex="-1" type="button">◯</button><span class="cl-text"> </span></div>';
+      document.execCommand('insertHTML', false, clHtml);
+    }
     handleEditorInput();
   }
 
