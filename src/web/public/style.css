@@ -2537,6 +2537,30 @@ body.tg-miniapp {
 .ios-swipe-delete-btn { background: var(--danger); }
 .ios-swipe-action-btn:hover { opacity: 0.88; }
 
+/* Folder row swipe-delete */
+.ios-folder-row-wrap {
+  position: relative;
+  overflow: hidden;
+}
+.ios-folder-row {
+  transition: transform 0.2s ease;
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
+}
+.ios-folder-row--swiped {
+  transform: translateX(-76px);
+}
+.ios-folder-swipe-actions {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 76px;
+  display: flex;
+  z-index: 0;
+}
+
 /* Pin indicator in note title */
 .ios-pin-indicator { font-size: 11px; }
 

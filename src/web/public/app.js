@@ -3373,26 +3373,14 @@ function IosNotesPage() {
           <div class="ios-section-header">iCloud</div>
           <div class="ios-list-group">
             ${folders.map(f => html`
-              <div key=${f.id} class=${'ios-folder-row' + (editMode ? ' ios-folder-row--edit' : '')}
-                   onclick=${() => { if (!editMode) setCurrentFolder(f); }}>
-                ${editMode && !f.is_default && html`
-                  <button class="ios-folder-delete-circle" title="Delete folder"
-                          onclick=${(e) => { e.stopPropagation(); handleDeleteFolder(f); }}>
-                    <span>–</span>
-                  </button>
-                `}
-                ${editMode && f.is_default && html`
-                  <span class="ios-folder-delete-circle ios-folder-delete-circle--disabled" title="Default folder">–</span>
-                `}
-                <span class="ios-folder-icon">📁</span>
-                <span class="ios-folder-name">${f.name}${f.is_default ? '' : ''}</span>
-                <span class="ios-folder-count">${f.note_count ?? ''}</span>
-                ${editMode && !f.is_default
-                  ? html`<button class="ios-folder-rename-btn" onclick=${(e) => { e.stopPropagation(); handleRenameFolder(f); }}>Rename</button>`
-                  : html`<span class="ios-folder-chevron">${editMode ? '' : '›'}</span>`
-                }
-              </div>
-              <div class="ios-list-divider ios-list-divider--indent"></div>
+              <${IosFolderRow}
+                key=${f.id}
+                folder=${f}
+                editMode=${editMode}
+                onOpen=${(folder) => setCurrentFolder(folder)}
+                onDelete=${handleDeleteFolder}
+                onRename=${handleRenameFolder}
+              />
             `)}
             ${folders.length === 0 && html`
               <div class="ios-empty-state">No folders found.</div>
@@ -3408,6 +3396,68 @@ function IosNotesPage() {
         </div>
       `}
     </div>
+  `;
+}
+
+
+function IosFolderRow({ folder, editMode, onOpen, onDelete, onRename }) {
+  const [swiped, setSwiped] = useState(false);
+  const touchStartX = useRef(null);
+
+  function handleTouchStart(e) {
+    if (folder.is_default) return;
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function handleTouchMove(e) {
+    if (touchStartX.current === null) return;
+    const dx = e.touches[0].clientX - touchStartX.current;
+    if (dx < -50) setSwiped(true);
+    else if (dx > 20) setSwiped(false);
+  }
+  function handleTouchEnd() {
+    touchStartX.current = null;
+  }
+  function handleContextMenu(e) {
+    if (folder.is_default) return;
+    e.preventDefault();
+    setSwiped(v => !v);
+  }
+
+  return html`
+    <div class="ios-folder-row-wrap">
+      <div class=${'ios-folder-row' + (editMode ? ' ios-folder-row--edit' : '') + (swiped ? ' ios-folder-row--swiped' : '')}
+           ontouchstart=${handleTouchStart}
+           ontouchmove=${handleTouchMove}
+           ontouchend=${handleTouchEnd}
+           oncontextmenu=${handleContextMenu}
+           onclick=${() => { if (!editMode && !swiped) onOpen(folder); else if (swiped) setSwiped(false); }}>
+        ${editMode && !folder.is_default && html`
+          <button class="ios-folder-delete-circle" title="Delete folder"
+                  onclick=${(e) => { e.stopPropagation(); onDelete(folder); }}>
+            <span>–</span>
+          </button>
+        `}
+        ${editMode && folder.is_default && html`
+          <span class="ios-folder-delete-circle ios-folder-delete-circle--disabled" title="Default folder">–</span>
+        `}
+        <span class="ios-folder-icon">📁</span>
+        <span class="ios-folder-name">${folder.name}</span>
+        <span class="ios-folder-count">${folder.note_count ?? ''}</span>
+        ${editMode && !folder.is_default
+          ? html`<button class="ios-folder-rename-btn" onclick=${(e) => { e.stopPropagation(); onRename(folder); }}>Rename</button>`
+          : html`<span class="ios-folder-chevron">${editMode ? '' : '›'}</span>`
+        }
+      </div>
+      ${!folder.is_default && html`
+        <div class="ios-folder-swipe-actions">
+          <button class="ios-swipe-action-btn ios-swipe-delete-btn"
+                  onclick=${(e) => { e.stopPropagation(); setSwiped(false); onDelete(folder); }}>
+            Delete
+          </button>
+        </div>
+      `}
+    </div>
+    <div class="ios-list-divider ios-list-divider--indent"></div>
   `;
 }
 
