@@ -297,7 +297,7 @@ export class NoteService {
 
   updateNote(
     id: number,
-    updates: { body?: string; pinned?: number; folder_id?: number; font_size?: number },
+    updates: { body?: string; pinned?: number; folder_id?: number; font_size?: number; title?: string | null },
     userId: number
   ): Note | null {
     const existing = this.getById(id);
@@ -307,12 +307,13 @@ export class NoteService {
     const pinned = updates.pinned ?? existing.pinned;
     const folderId = updates.folder_id ?? existing.folder_id;
     const fontSize = updates.font_size ?? existing.font_size;
+    const title = 'title' in updates ? (updates.title ?? null) : existing.title;
 
     this.db
       .prepare(
-        "UPDATE notes SET body = ?, pinned = ?, folder_id = ?, font_size = ?, updated_at = datetime('now') WHERE id = ?"
+        "UPDATE notes SET body = ?, pinned = ?, folder_id = ?, font_size = ?, title = ?, updated_at = datetime('now') WHERE id = ?"
       )
-      .run(body, pinned, folderId, fontSize, id);
+      .run(body, pinned, folderId, fontSize, title, id);
 
     this.auditService.log({
       userId,

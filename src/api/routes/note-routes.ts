@@ -127,7 +127,7 @@ export function registerNoteRoutes(
 
   app.patch<{
     Params: { id: string };
-    Body: { body?: string; pinned?: number; folder_id?: number; font_size?: number };
+    Body: { body?: string; pinned?: number; folder_id?: number; font_size?: number; title?: string | null };
   }>(
     "/api/notes/:id",
     { preHandler: authMiddleware },
@@ -138,13 +138,15 @@ export function registerNoteRoutes(
 
       const userId = request.sessionUser.id;
       const id = Number(request.params.id);
-      const { body, pinned, folder_id, font_size } = request.body || {};
+      const reqBody = request.body || {};
+      const { body, pinned, folder_id, font_size, title } = reqBody;
 
-      const updates: { body?: string; pinned?: number; folder_id?: number; font_size?: number } = {};
+      const updates: { body?: string; pinned?: number; folder_id?: number; font_size?: number; title?: string | null } = {};
       if (body !== undefined) updates.body = body;
       if (pinned !== undefined) updates.pinned = pinned;
       if (folder_id !== undefined) updates.folder_id = folder_id;
       if (font_size !== undefined) updates.font_size = font_size;
+      if ('title' in reqBody) updates.title = title ?? null;
 
       if (Object.keys(updates).length > 0) {
         const result = noteService.updateNote(id, updates, userId);

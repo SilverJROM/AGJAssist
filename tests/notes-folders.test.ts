@@ -111,6 +111,24 @@ describe("migration v26", () => {
     const fetched = svc.getById(note.id);
     expect(fetched?.font_size).toBe(20);
   });
+
+  it("updateNote with title persists and returns updated title", () => {
+    const folder = svc.listFolders()[0];
+    const note = svc.createNote(folder.id, "body text", 1);
+    expect(note.title).toBeNull();
+    const updated = svc.updateNote(note.id, { title: "My Note Name" }, 1);
+    expect(updated?.title).toBe("My Note Name");
+    const fetched = svc.getById(note.id);
+    expect(fetched?.title).toBe("My Note Name");
+  });
+
+  it("updateNote can clear title back to null", () => {
+    const folder = svc.listFolders()[0];
+    const note = svc.createNote(folder.id, "body text", 1);
+    svc.updateNote(note.id, { title: "Temp Name" }, 1);
+    const cleared = svc.updateNote(note.id, { title: null }, 1);
+    expect(cleared?.title).toBeNull();
+  });
 });
 
 // ------------------------------------------------------------------ folder CRUD

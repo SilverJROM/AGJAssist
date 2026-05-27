@@ -2703,7 +2703,7 @@ function IosNoteRow({ note, onOpen, onDelete, onPin, onMove }) {
     setSwiped(v => !v);
   }
 
-  const title = noteTitle(note.body);
+  const title = note.title || noteTitle(note.body);
   const snippet = noteSnippet(note.body);
   const date = relativeDate(note.updated_at || note.created_at);
 
@@ -2947,6 +2947,7 @@ function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) 
   const isNewEmpty = useRef(!note.body || note.body.trim() === '');
   const saveTimer = useRef(null);
   const feedbackTimer = useRef(null);
+  const [editorTitle, setEditorTitle] = useState(note.title || '');
   const editorRef = useRef(null);
   // Keep a live ref to current HTML so handleBack always sees latest value
   const currentHtmlRef = useRef(note.body || '');
@@ -2961,6 +2962,12 @@ function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) 
     try {
       await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ font_size: newSize }) });
     } catch { /* silent; UI already updated */ }
+  }
+
+  async function handleTitleSave() {
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ title: editorTitle || null }) });
+    } catch { /* silent */ }
   }
 
   // Set initial content on mount (once; bypass Preact diffing)
@@ -3003,7 +3010,10 @@ function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) 
     const html = getEditorHtml(editorRef.current);
     currentHtmlRef.current = html;
     try {
-      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ body: html }) });
+      await api(`/api/notes/${note.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ body: html, title: editorTitle || null })
+      });
       if (onReload) onReload();
       setSaveLabel('Saved ✓');
       clearTimeout(feedbackTimer.current);
@@ -3183,6 +3193,14 @@ function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) 
                 onmousedown=${e => { e.preventDefault(); handleManualSave(); }}
                 title="Save">${saveLabel}</button>
       </div>
+
+      <input class="ios-editor-title"
+             type="text"
+             placeholder="Note title…"
+             value=${editorTitle}
+             onInput=${e => setEditorTitle(e.target.value)}
+             onBlur=${handleTitleSave}
+      />
 
       <div class="ios-editor-body">
         <div ref=${editorRef}
