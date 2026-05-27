@@ -2240,6 +2240,7 @@ body.tg-miniapp {
 }
 .ios-fmt-btn:hover,
 .ios-fmt-btn:active { background: rgba(88,166,255,0.15); color: var(--accent); }
+.ios-fmt-btn.saved { color: #30d158; }
 .ios-fmt-divider {
   width: 1px;
   height: 20px;

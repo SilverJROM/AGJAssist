@@ -2942,9 +2942,11 @@ function prepareInitialHtml(body) {
 function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) {
   const [pinned, setPinned] = useState(!!note.pinned);
   const [showMoveSheet, setShowMoveSheet] = useState(false);
+  const [saveLabel, setSaveLabel] = useState('Save');
   // Track whether this is a brand-new empty note (for discard-on-back logic)
   const isNewEmpty = useRef(!note.body || note.body.trim() === '');
   const saveTimer = useRef(null);
+  const feedbackTimer = useRef(null);
   const editorRef = useRef(null);
   // Keep a live ref to current HTML so handleBack always sees latest value
   const currentHtmlRef = useRef(note.body || '');
@@ -2981,6 +2983,22 @@ function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) 
     if (!editorRef.current) return;
     const html = getEditorHtml(editorRef.current);
     scheduleAutoSave(html);
+  }
+
+  async function handleManualSave() {
+    if (!editorRef.current) return;
+    clearTimeout(saveTimer.current);
+    const html = getEditorHtml(editorRef.current);
+    currentHtmlRef.current = html;
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ body: html }) });
+      if (onReload) onReload();
+      setSaveLabel('Saved ✓');
+      clearTimeout(feedbackTimer.current);
+      feedbackTimer.current = setTimeout(() => setSaveLabel('Save'), 1000);
+    } catch {
+      setSaveLabel('Save');
+    }
   }
 
   async function handlePinToggle() {
@@ -3133,6 +3151,10 @@ function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) 
         <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtHeading(); }} title="Heading">H</button>
         <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtBullet(); }} title="Bullet list">• ≡</button>
         <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtChecklist(); }} title="Checklist">◯✓</button>
+        <div class="ios-fmt-divider"></div>
+        <button class=${'ios-fmt-btn' + (saveLabel === 'Saved ✓' ? ' saved' : '')}
+                onmousedown=${e => { e.preventDefault(); handleManualSave(); }}
+                title="Save">${saveLabel}</button>
       </div>
 
       <div class="ios-editor-body">
