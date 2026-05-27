@@ -2951,6 +2951,18 @@ function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) 
   // Keep a live ref to current HTML so handleBack always sees latest value
   const currentHtmlRef = useRef(note.body || '');
 
+  const FONT_SIZES = [13, 15, 17, 20];
+  const initialFontIdx = FONT_SIZES.indexOf(note.font_size);
+  const [fontSizeIdx, setFontSizeIdx] = useState(initialFontIdx >= 0 ? initialFontIdx : 1);
+
+  async function handleFontChange(newIdx) {
+    const newSize = FONT_SIZES[newIdx];
+    setFontSizeIdx(newIdx);
+    try {
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: JSON.stringify({ font_size: newSize }) });
+    } catch { /* silent; UI already updated */ }
+  }
+
   // Set initial content on mount (once; bypass Preact diffing)
   useEffect(() => {
     if (!editorRef.current) return;
@@ -3152,6 +3164,9 @@ function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) 
         <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtBullet(); }} title="Bullet list">• ≡</button>
         <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); fmtChecklist(); }} title="Checklist">◯✓</button>
         <div class="ios-fmt-divider"></div>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); if (fontSizeIdx > 0) handleFontChange(fontSizeIdx - 1); }} title="Smaller text">A−</button>
+        <button class="ios-fmt-btn" onmousedown=${e => { e.preventDefault(); if (fontSizeIdx < FONT_SIZES.length - 1) handleFontChange(fontSizeIdx + 1); }} title="Larger text">A+</button>
+        <div class="ios-fmt-divider"></div>
         <button class=${'ios-fmt-btn' + (saveLabel === 'Saved ✓' ? ' saved' : '')}
                 onmousedown=${e => { e.preventDefault(); handleManualSave(); }}
                 title="Save">${saveLabel}</button>
@@ -3163,6 +3178,7 @@ function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) 
              contenteditable="true"
              spellcheck="true"
              data-placeholder="Start typing…"
+             style=${'font-size:' + FONT_SIZES[fontSizeIdx] + 'px'}
              onInput=${handleEditorInput}
              onclick=${handleEditorClick}
              ontouchend=${handleEditorTouchEnd}

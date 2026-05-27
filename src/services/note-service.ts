@@ -12,6 +12,7 @@ export interface Note {
   folder_id: number | null;
   pinned: number;
   position: number;
+  font_size: number;
   created_at: string;
   updated_at: string;
 }
@@ -296,7 +297,7 @@ export class NoteService {
 
   updateNote(
     id: number,
-    updates: { body?: string; pinned?: number; folder_id?: number },
+    updates: { body?: string; pinned?: number; folder_id?: number; font_size?: number },
     userId: number
   ): Note | null {
     const existing = this.getById(id);
@@ -305,12 +306,13 @@ export class NoteService {
     const body = updates.body ?? existing.body;
     const pinned = updates.pinned ?? existing.pinned;
     const folderId = updates.folder_id ?? existing.folder_id;
+    const fontSize = updates.font_size ?? existing.font_size;
 
     this.db
       .prepare(
-        "UPDATE notes SET body = ?, pinned = ?, folder_id = ?, updated_at = datetime('now') WHERE id = ?"
+        "UPDATE notes SET body = ?, pinned = ?, folder_id = ?, font_size = ?, updated_at = datetime('now') WHERE id = ?"
       )
-      .run(body, pinned, folderId, id);
+      .run(body, pinned, folderId, fontSize, id);
 
     this.auditService.log({
       userId,

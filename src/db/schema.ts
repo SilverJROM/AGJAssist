@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 25;
+export const SCHEMA_VERSION = 26;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS notes (
   folder_id INTEGER REFERENCES note_folders(id),
   pinned INTEGER NOT NULL DEFAULT 0,
   position INTEGER NOT NULL DEFAULT 0,
+  font_size INTEGER NOT NULL DEFAULT 15,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

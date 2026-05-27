@@ -105,8 +105,7 @@ export function registerNoteRoutes(
         return reply.code(403).send({ error: "Owner role required" });
       }
 
-      const { body, folder_id } = request.body || {};
-      if (!body) return reply.code(400).send({ error: "body is required" });
+      const { body = '', folder_id } = request.body || {};
 
       const resolvedFolderId = folder_id ?? noteService.defaultFolderId();
       const note = noteService.createNote(resolvedFolderId, body, request.sessionUser.id);
@@ -128,7 +127,7 @@ export function registerNoteRoutes(
 
   app.patch<{
     Params: { id: string };
-    Body: { body?: string; pinned?: number; folder_id?: number };
+    Body: { body?: string; pinned?: number; folder_id?: number; font_size?: number };
   }>(
     "/api/notes/:id",
     { preHandler: authMiddleware },
@@ -139,12 +138,13 @@ export function registerNoteRoutes(
 
       const userId = request.sessionUser.id;
       const id = Number(request.params.id);
-      const { body, pinned, folder_id } = request.body || {};
+      const { body, pinned, folder_id, font_size } = request.body || {};
 
-      const updates: { body?: string; pinned?: number; folder_id?: number } = {};
+      const updates: { body?: string; pinned?: number; folder_id?: number; font_size?: number } = {};
       if (body !== undefined) updates.body = body;
       if (pinned !== undefined) updates.pinned = pinned;
       if (folder_id !== undefined) updates.folder_id = folder_id;
+      if (font_size !== undefined) updates.font_size = font_size;
 
       if (Object.keys(updates).length > 0) {
         const result = noteService.updateNote(id, updates, userId);

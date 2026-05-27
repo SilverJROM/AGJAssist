@@ -406,6 +406,15 @@ export class DatabaseService {
         }
       }
 
+      // Migration: v25 → v26: add font_size column to notes for per-note font size picker
+      if (current && current.version < 26) {
+        const noteCols = this.db.pragma("table_info(notes)") as { name: string }[];
+        const noteColNames = new Set(noteCols.map((c) => c.name));
+        if (!noteColNames.has("font_size")) {
+          this.db.exec("ALTER TABLE notes ADD COLUMN font_size INTEGER NOT NULL DEFAULT 15");
+        }
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);

@@ -33,7 +33,7 @@ afterEach(() => {
 describe("migration v23", () => {
   it("creates latest schema version", () => {
     const row = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(row.version).toBe(25);
+    expect(row.version).toBe(26);
   });
 
   it("creates the note_folders table", () => {
@@ -86,6 +86,30 @@ describe("migration v23", () => {
 
     const unassigned = db.prepare("SELECT COUNT(*) as cnt FROM notes WHERE folder_id IS NULL").get() as { cnt: number };
     expect(unassigned.cnt).toBe(0);
+  });
+});
+
+describe("migration v26", () => {
+  it("creates latest schema version (26)", () => {
+    const row = db.prepare("SELECT version FROM schema_version").get() as { version: number };
+    expect(row.version).toBe(26);
+  });
+
+  it("notes table has font_size column with default 15", () => {
+    const cols = db.raw.pragma("table_info(notes)") as { name: string; dflt_value: string | null }[];
+    const col = cols.find((c) => c.name === "font_size");
+    expect(col).toBeDefined();
+    expect(col!.dflt_value).toBe("15");
+  });
+
+  it("updateNote persists font_size and returns updated note", () => {
+    const folder = svc.listFolders()[0];
+    const note = svc.createNote(folder.id, "test body", 1);
+    expect(note.font_size).toBe(15);
+    const updated = svc.updateNote(note.id, { font_size: 20 }, 1);
+    expect(updated?.font_size).toBe(20);
+    const fetched = svc.getById(note.id);
+    expect(fetched?.font_size).toBe(20);
   });
 });
 
