@@ -2680,7 +2680,7 @@ function relativeDate(dateStr) {
 }
 
 // --- Note row with swipe actions: Pin | Move | Delete ---
-function IosNoteRow({ note, onOpen, onDelete, onPin, onMove }) {
+function IosNoteRow({ note, onOpen, onDelete, onPin, onMove, onMore }) {
   const [swiped, setSwiped] = useState(false);
   const touchStartX = useRef(null);
   const rowRef = useRef(null);
@@ -2704,7 +2704,6 @@ function IosNoteRow({ note, onOpen, onDelete, onPin, onMove }) {
   }
 
   const title = note.title || noteTitle(note.body);
-  const snippet = noteSnippet(note.body);
   const date = relativeDate(note.updated_at || note.created_at);
 
   return html`
@@ -2716,11 +2715,16 @@ function IosNoteRow({ note, onOpen, onDelete, onPin, onMove }) {
            oncontextmenu=${handleContextMenu}
            onclick=${() => { if (!swiped) onOpen(note); }}>
         <div class="ios-note-row-content">
-          <div class="ios-note-row-top">
+          <div class="ios-note-row-main">
             <span class="ios-note-title">${note.pinned ? html`<span class="ios-pin-indicator">📌 </span>` : ''}${title}</span>
             <span class="ios-note-date">${date}</span>
           </div>
-          <div class="ios-note-snippet">${snippet || html`<span style="color:var(--text-secondary);font-style:italic">No additional text</span>`}</div>
+          ${onMore && html`
+            <button class="ios-note-more-btn"
+                    onclick=${e => { e.stopPropagation(); e.preventDefault(); onMore(note); }}
+                    onmousedown=${e => e.stopPropagation()}
+                    title="More actions">⋯</button>
+          `}
         </div>
       </div>
       <div class="ios-swipe-actions">
@@ -2769,6 +2773,28 @@ function IosMoveFolderSheet({ note, folders, currentFolderId, onMove, onClose })
   `;
 }
 
+// --- Note more-actions bottom sheet ---
+function IosNoteMoreSheet({ note, canPin, canMove, onEdit, onDelete, onPin, onMove, onClose }) {
+  return html`
+    <div class="ios-sheet-backdrop" onclick=${onClose}></div>
+    <div class="ios-more-sheet">
+      <div class="ios-more-sheet-handle"></div>
+      <div class="ios-more-sheet-title">${note.title || 'Note'}</div>
+      <button class="ios-more-sheet-btn" onclick=${onEdit}>Edit</button>
+      ${canPin && html`
+        <button class="ios-more-sheet-btn" onclick=${onPin}>
+          ${note.pinned ? 'Unpin' : 'Pin'}
+        </button>
+      `}
+      ${canMove && html`
+        <button class="ios-more-sheet-btn" onclick=${onMove}>Move to Folder</button>
+      `}
+      <button class="ios-more-sheet-btn ios-more-sheet-btn--danger" onclick=${onDelete}>Delete</button>
+      <button class="ios-more-sheet-btn ios-more-sheet-btn--cancel" onclick=${onClose}>Cancel</button>
+    </div>
+  `;
+}
+
 // --- Notes list screen (within a folder) ---
 function IosNotesList({ folder, folders, onBack, onOpenNote, onNewNote, onPinNote }) {
   const [notes, setNotes] = useState([]);
@@ -2776,6 +2802,7 @@ function IosNotesList({ folder, folders, onBack, onOpenNote, onNewNote, onPinNot
   const [search, setSearch] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [moveNote, setMoveNote] = useState(null);
+  const [moreNote, setMoreNote] = useState(null);
   const searchRef = useRef(null);
 
   useEffect(() => {
@@ -2845,6 +2872,7 @@ function IosNotesList({ folder, folders, onBack, onOpenNote, onNewNote, onPinNot
           <span>Folders</span>
         </button>
         <h1 class="ios-screen-title">${folder.name}</h1>
+        <button class="ios-header-new-btn" onclick=${handleNewNote} title="New Note">+</button>
       </div>
 
       <div class="ios-search-bar-wrap">
@@ -2869,6 +2897,7 @@ function IosNotesList({ folder, folders, onBack, onOpenNote, onNewNote, onPinNot
                   onDelete=${handleDelete}
                   onPin=${handlePin}
                   onMove=${(folders && folders.length > 1) ? (note) => setMoveNote(note) : null}
+                  onMore=${(note) => setMoreNote(note)}
                 />
               `)}
             </div>
@@ -2883,6 +2912,7 @@ function IosNotesList({ folder, folders, onBack, onOpenNote, onNewNote, onPinNot
                   onDelete=${handleDelete}
                   onPin=${handlePin}
                   onMove=${(folders && folders.length > 1) ? (note) => setMoveNote(note) : null}
+                  onMore=${(note) => setMoreNote(note)}
                 />
               `)}
             </div>
@@ -2911,6 +2941,19 @@ function IosNotesList({ folder, folders, onBack, onOpenNote, onNewNote, onPinNot
           currentFolderId=${folder.id}
           onMove=${handleMoveConfirm}
           onClose=${() => setMoveNote(null)}
+        />
+      `}
+
+      ${moreNote && html`
+        <${IosNoteMoreSheet}
+          note=${moreNote}
+          canPin=${true}
+          canMove=${folders && folders.length > 1}
+          onEdit=${() => { setMoreNote(null); onOpenNote(moreNote, loadNotes); }}
+          onDelete=${() => { setMoreNote(null); handleDelete(moreNote); }}
+          onPin=${() => { setMoreNote(null); handlePin(moreNote); }}
+          onMove=${() => { setMoreNote(null); setMoveNote(moreNote); }}
+          onClose=${() => setMoreNote(null)}
         />
       `}
     </div>

@@ -2007,6 +2007,19 @@ body.tg-miniapp {
   line-height: 1;
   margin-right: 2px;
 }
+.ios-header-new-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 28px;
+  font-weight: 300;
+  cursor: pointer;
+  padding: 0 4px;
+  min-width: 44px;
+  text-align: right;
+  line-height: 1;
+}
+.ios-header-new-btn:hover { opacity: 0.7; }
 
 /* Search bar */
 .ios-search-bar-wrap {
@@ -2093,10 +2106,11 @@ body.tg-miniapp {
 .ios-note-row-wrap {
   position: relative;
   overflow: hidden;
+  border-bottom: 1px solid var(--border);
 }
 .ios-note-row {
   background: var(--surface);
-  padding: 10px 14px;
+  padding: 14px 16px;
   cursor: pointer;
   transition: transform 0.2s ease;
   position: relative;
@@ -2106,16 +2120,21 @@ body.tg-miniapp {
 /* N4: swipe offset updated; old .swiped kept for any residual references */
 .ios-note-row.swiped { transform: translateX(-76px); }
 
-.ios-note-row-content { pointer-events: none; }
-.ios-note-row-top {
+.ios-note-row-content {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 2px;
+  pointer-events: none;
+}
+.ios-note-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 .ios-note-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
@@ -2127,15 +2146,21 @@ body.tg-miniapp {
   font-size: 12px;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+.ios-note-more-btn {
   flex-shrink: 0;
-}
-.ios-note-snippet {
-  font-size: 13px;
+  background: none;
+  border: none;
   color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1;
 }
+.ios-note-more-btn:hover { background: rgba(128,128,128,0.15); }
 
 /* Dividers */
 .ios-list-divider {
@@ -2595,3 +2620,49 @@ body.tg-miniapp {
   flex-shrink: 0;
 }
 .ios-sheet-cancel:active { opacity: 0.7; }
+
+/* Note more-actions sheet */
+.ios-more-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  padding: 8px 0 24px;
+  z-index: 500;
+  box-shadow: 0 -4px 30px rgba(0,0,0,0.25);
+}
+.ios-more-sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 12px;
+}
+.ios-more-sheet-title {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 0 16px 10px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ios-more-sheet-btn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  padding: 14px 16px;
+  font-size: 17px;
+  font-family: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.ios-more-sheet-btn:active { background: rgba(128,128,128,0.1); }
+.ios-more-sheet-btn--danger { color: var(--danger); }
+.ios-more-sheet-btn--cancel { color: var(--accent); font-weight: 600; margin-top: 8px; border-top: none; background: var(--surface-2, var(--surface)); }
