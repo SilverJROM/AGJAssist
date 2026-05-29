@@ -525,7 +525,9 @@ function OvmConsole() {
   const [statusLoading, setStatusLoading] = useState(true);
   const [action, setAction] = useState('');
   const [error, setError] = useState('');
-  const [messages, setMessages] = useState([]);  // { id, role: 'user'|'ovm'|'system', text, ts }
+  const [messages, setMessages] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ovm-chat-messages') || '[]'); } catch { return []; }
+  });  // { id, role: 'user'|'ovm'|'system', text, ts }
   const [thinking, setThinking] = useState(false);
   const [input, setInput] = useState('');
   const transcriptRef = useRef(null);
@@ -631,6 +633,10 @@ function OvmConsole() {
     const node = transcriptRef.current;
     if (node) node.scrollTop = node.scrollHeight;
   }, [messages, thinking]);
+
+  useEffect(() => {
+    try { localStorage.setItem('ovm-chat-messages', JSON.stringify(messages)); } catch {}
+  }, [messages]);
 
   const statusText = statusLoading ? 'checking' : (ovmStatus?.status || (open ? 'open' : 'closed'));
   const busy = !!action;
@@ -3027,6 +3033,18 @@ function IosNoteEditor({ note, folder, folders, onBack, onReload, onMoveNote }) 
     sel.removeAllRanges();
     sel.addRange(range);
     editorRef.current.focus();
+  }, []);
+
+  // Ctrl+S / Cmd+S keyboard save
+  useEffect(() => {
+    function onKeyDown(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleManualSave();
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
 
   // Debounced auto-save
