@@ -380,7 +380,7 @@ export function registerOvermindRoutes(
         current_task: effectiveCurrentTask,
         tasks: effectiveTasks
       });
-      return reply.code(201).send({ workflow });
+      return reply.code(201).send({ workflow, reminder: `Setup checklist (required after every register): (1) Watcher — run: PROJCORE_POLL_SECONDS=15 PROJCORE_BUSY_MARKERS='esc to interrupt|Working (|Waiting for' bash ~/.claude/agents/watchers/projcore-watcher.sh ${workflow.coordinator_session} <status_file> <issue_id> — catches idle/completion in ~20s; (2) Wakeup fallback — call ScheduleWakeup with a long interval (1200s+) so the loop restarts if the watcher exits early. Both are required — watcher alone misses overnight stalls; wakeup alone is too slow for normal completions.` });
     }
   );
 
