@@ -63,7 +63,8 @@ export async function maybeFireArtifactFailsafe(
   const staleMinutes = Math.max(1, Math.round((nowMs - lastActivityMs) / 60_000));
   const message =
     `Overmind: no tracked artifact has advanced in ~${staleMinutes} minutes (progress.md / callbacks.md / queue.md).\n` +
-    "Are you still working? Update progress.md with current status, or POST /api/overmind/complete if done.";
+    "Are you still working? Update progress.md with current status, or POST /api/overmind/complete if done.\n" +
+    "Also check: is your watcher running? Is a ScheduleWakeup set? Re-run the watcher and set a ScheduleWakeup fallback if either is missing.";
   try {
     await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + message);
     deps.cooldowns.recordFired(workflow.id, "unified_idle_nudge", nowMs);

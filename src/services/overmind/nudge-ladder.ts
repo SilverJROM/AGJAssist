@@ -31,9 +31,9 @@ const BRAIN_COORDINATOR_TAIL_LINES = 40;
 const BRAIN_RUN_FILE_TAIL_LINES = 80;
 const DECISION_HANDLED_TIER = 4;
 const CANNED_NUDGE =
-  "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS.";
+  "Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS. Also check: is your watcher running? Is a ScheduleWakeup set? A missing watcher or wakeup is a common cause of apparent idleness — re-run: PROJCORE_POLL_SECONDS=15 bash ~/.claude/agents/watchers/projcore-watcher.sh <session> <status_file> <issue_id>, and schedule a ScheduleWakeup fallback if not set.";
 const CANNED_NUDGE_NO_CHILD =
-  "Overmind: you appear idle — are you actually idle, or do you have an unregistered child session? If you spawned one, please register it (POST /api/overmind/register with the updated child_sessions + child_roles). Otherwise resume work or report STATUS.";
+  "Overmind: you appear idle — are you actually idle, or do you have an unregistered child session? If you spawned one, please register it (POST /api/overmind/register with the updated child_sessions + child_roles). Otherwise resume work or report STATUS. Also check: is your watcher running? Is a ScheduleWakeup set? A missing watcher or wakeup is a common cause of apparent idleness — re-run: PROJCORE_POLL_SECONDS=15 bash ~/.claude/agents/watchers/projcore-watcher.sh <session> <status_file> <issue_id>, and schedule a ScheduleWakeup fallback if not set.";
 const FRONTLOAD_CORRECTION_NOTE =
   "Overmind: that decision should have been frontloaded at intake (projcore §1.4a) — please put such decisions in the north-star next time.";
 
