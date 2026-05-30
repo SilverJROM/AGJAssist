@@ -133,7 +133,7 @@ export class OvmSessionService implements OvmSessionManager {
       true
     );
     await this.sleep(this.settleMs);
-    await this.tmuxService.sendCommand(this.sessionName, this.kickoffMessage(), true, true);
+    await this.tmuxService.sendCommand(this.sessionName, "overmind: " + this.kickoffMessage(), true, true);
 
     return {
       open: true,
@@ -173,7 +173,7 @@ export class OvmSessionService implements OvmSessionManager {
     await this.open();
 
     const before = await this.tmuxService.capturePane(this.sessionName, 500);
-    await this.tmuxService.sendCommand(this.sessionName, message, true, true);
+    await this.tmuxService.sendCommand(this.sessionName, "overmind: " + message, true, true);
 
     // Start the background poll that runs until OVM is done (no cap — keep going)
     const fullPromise = this.pollUntilDone(before, message);

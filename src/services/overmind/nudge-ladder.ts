@@ -99,7 +99,7 @@ export async function applyNudgeLadder(
 
   const nextNudgeCount = workflow.nudge_count + 1;
   const nudgeText = (workflow.child_sessions?.length ?? 0) === 0 ? CANNED_NUDGE_NO_CHILD : CANNED_NUDGE;
-  await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, nudgeText);
+  await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + nudgeText);
   const sendTs = Date.now();
   deps.cooldowns.recordFired(workflow.id, "unified_idle_nudge", sendTs);
   deps.nudgeState?.setLastUnifiedIdleNudge(workflow.id, sendTs);
@@ -162,8 +162,8 @@ export async function applyDecisionInterception(
   await logDecisionCorrection(workflow, pendingDecision, guardedVerdict);
 
   if (guardedVerdict.action === "answer") {
-    await deps.tmuxService.sendCommand(workflow.coordinator_session, guardedVerdict.answerText!, true, true);
-    await deps.tmuxService.sendCommand(workflow.coordinator_session, FRONTLOAD_CORRECTION_NOTE, true, true);
+    await deps.tmuxService.sendCommand(workflow.coordinator_session, "overmind: " + guardedVerdict.answerText!, true, true);
+    await deps.tmuxService.sendCommand(workflow.coordinator_session, "overmind: " + FRONTLOAD_CORRECTION_NOTE, true, true);
     const postDecisionPane = await capturePaneSafe(deps.tmuxService, workflow.coordinator_session);
     return {
       nudge_count: workflow.nudge_count,
@@ -212,7 +212,7 @@ async function applyTier3Brain(
   }
 
   if (verdict.action === "nudge") {
-    await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, verdict.nudgeText!);
+    await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + verdict.nudgeText!);
     const postNudgePane = await capturePaneSafe(deps.tmuxService, workflow.coordinator_session);
     return {
       nudge_count: workflow.nudge_count,

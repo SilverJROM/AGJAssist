@@ -76,7 +76,7 @@ export async function handleAllTasksDone(
 
   let lastPaneHash = coordinatorHash;
   try {
-    await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, verdict.consultText!);
+    await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + verdict.consultText!);
     lastPaneHash = hashPane(await capturePaneSafe(deps.tmuxService, workflow.coordinator_session));
   } catch (error) {
     console.error("Overmind completion consult nudge failed:", error);

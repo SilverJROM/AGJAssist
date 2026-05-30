@@ -65,7 +65,7 @@ export async function maybeFireArtifactFailsafe(
     `Overmind: no tracked artifact has advanced in ~${staleMinutes} minutes (progress.md / callbacks.md / queue.md).\n` +
     "Are you still working? Update progress.md with current status, or POST /api/overmind/complete if done.";
   try {
-    await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, message);
+    await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + message);
     deps.cooldowns.recordFired(workflow.id, "unified_idle_nudge", nowMs);
     deps.nudgeState?.setLastUnifiedIdleNudge(workflow.id, nowMs);
     return true;

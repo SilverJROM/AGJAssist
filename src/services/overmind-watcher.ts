@@ -148,7 +148,7 @@ export class OvermindWatcher {
         const msg =
           `Overmind: registration gap detected (${problemDesc}) — please re-register your CURRENT child_sessions, child_roles, and status to overmind now (POST /api/overmind/register), ` +
           `and update your task list (POST /api/overmind/tasks) if it has changed since you last reported.`;
-        await this.tmuxService.sendAndSubmit(workflow.coordinator_session, msg);
+        await this.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + msg);
         this.lastReconcileAsk.set(workflow.id, gapSignature);
         this.nudgeState?.setLastReconcileAsk(workflow.id, gapSignature);
       } catch (error) {
@@ -299,7 +299,7 @@ export class OvermindWatcher {
             ? "Overmind: all sessions appear idle — parent and all children are quiet.\n\nIf you have an in-process subagent running, reply with:\n  [OVERMIND] subagent <name> ~<N>min\nOtherwise, check callbacks.md for pending work, update progress.md with current status, or report STATUS."
             : "Overmind: your session appears idle — no child sessions are active.\n\nIf you have an in-process subagent running, reply with:\n  [OVERMIND] subagent <name> ~<N>min\nOtherwise, resume work or report STATUS.";
           try {
-            await this.tmuxService.sendAndSubmit(workflow.coordinator_session, msg);
+            await this.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + msg);
             this.cooldowns.recordFired(wid, "unified_idle_nudge", nowMs);
             this.nudgeState?.setLastUnifiedIdleNudge(wid, nowMs);
           } catch (err) {
@@ -447,7 +447,7 @@ export class OvermindWatcher {
     }
     let lastPaneHash: string | undefined;
     try {
-      await this.tmuxService.sendAndSubmit(workflow.coordinator_session, requestText);
+      await this.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + requestText);
       lastPaneHash = hashPane(await this.capturePaneSafe(workflow.coordinator_session));
     } catch (error) {
       console.error("Overmind completeness request failed:", error);
