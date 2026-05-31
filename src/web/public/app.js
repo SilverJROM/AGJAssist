@@ -2675,14 +2675,8 @@ function noteSnippet(body) {
 function relativeDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z');
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const noteDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diff = today - noteDay;
-  if (diff === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (diff === 86400000) return 'Yesterday';
-  if (diff < 7 * 86400000) return d.toLocaleDateString([], { weekday: 'long' });
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' +
+         d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 // --- Note row with swipe actions: Pin | Move | Delete ---
