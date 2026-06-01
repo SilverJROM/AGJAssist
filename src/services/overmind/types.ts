@@ -91,6 +91,7 @@ export interface UpdateOvermindProjectInput {
 
 export interface OvermindWorkflow {
   id: number;
+  project_id: number | null;
   label: string;
   display_name: string | null;
   coordinator_session: string;

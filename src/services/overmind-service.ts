@@ -112,6 +112,12 @@ export interface OvermindWorkflowLookup {
   session?: string | null;
 }
 
+export interface OvermindProjectRunDirMatch {
+  project: OvermindProject | null;
+  run_dir: string;
+  searched_up_to: string;
+}
+
 // Depth of components shared between two run_dirs that counts as "same project".
 // pathComponents returns [root, ...nonEmpty]; for /home/agjrom/<bucket>/<proj>/...
 // that's [/, home, agjrom, bucket, proj, ...] — so depth 5 means the project
@@ -217,6 +223,137 @@ export class OvermindService {
       .prepare("DELETE FROM overmind_projects WHERE slug = ?")
       .run(slug);
     return result.changes > 0;
+  }
+
+  async findProjectForRunDir(runDir: string): Promise<OvermindProjectRunDirMatch> {
+    const canonicalRunDir = await this.canonicalizeRunDir(runDir);
+    const root = path.parse(canonicalRunDir).root;
+    const projectsByPath = new Map<string, OvermindProject>();
+
+    for (const project of this.listProjects()) {
+      projectsByPath.set(await this.canonicalizeRunDir(project.app_path), project);
+    }
+
+    let current = canonicalRunDir;
+    while (true) {
+      const project = projectsByPath.get(current);
+      if (project) {
+        return { project, run_dir: canonicalRunDir, searched_up_to: current };
+      }
+      if (current === root) {
+        return { project: null, run_dir: canonicalRunDir, searched_up_to: root };
+      }
+      current = path.dirname(current);
+    }
+  }
+
+  registerAttached(input: {
+    project_id: number;
+    label: string;
+    run_dir: string;
+    current_task?: string | null;
+    tasks?: OvermindTask[];
+  }): OvermindWorkflow {
+    let tasks = sanitizeTaskList(input.tasks);
+    const existing = this.getByProjectRunDir(input.project_id, input.run_dir);
+    const currentTask = input.current_task !== undefined
+      ? sanitizeCurrentTask(input.current_task)
+      : existing?.current_task ?? null;
+
+    if (existing?.tasks?.length && tasks.length > 0) {
+      const prevById = new Map(existing.tasks.map(t => [t.id, t]));
+      const overlap = tasks.some(t => prevById.has(t.id));
+      if (overlap) {
+        tasks = tasks.map(t =>
+          t.state !== "done" && prevById.get(t.id)?.state === "done"
+            ? { ...t, state: "done" as const }
+            : t
+        );
+      }
+    }
+
+    const effectiveTasks = tasks.length > 0 ? tasks : existing?.tasks ?? [];
+    const now = this.isoNow();
+    const endedAt = this.computeEndedAt(effectiveTasks, "active", existing?.ended_at ?? null, now);
+    const row = (existing
+      ? this.db
+          .prepare(
+            `UPDATE overmind_workflows
+             SET label = ?,
+                 project_id = ?,
+                 run_dir = ?,
+                 status = 'active',
+                 current_task = ?,
+                 tasks = ?,
+                 pending_decision = NULL,
+                 active_session = NULL,
+                 active_role = NULL,
+                 ended_at = ?,
+                 stuck_since = NULL,
+                 nudge_count = 0,
+                 tier = 0,
+                 last_notified_transition = NULL,
+                 completion_check = NULL,
+                 run_started_at = COALESCE(run_started_at, ?),
+                 updated_at = ?
+             WHERE id = ?
+             RETURNING *`
+          )
+          .get(
+            input.label,
+            input.project_id,
+            input.run_dir,
+            currentTask,
+            JSON.stringify(effectiveTasks),
+            endedAt,
+            now,
+            now,
+            existing.id
+          )
+      : this.db
+          .prepare(
+            `INSERT INTO overmind_workflows (
+              project_id,
+              label,
+              coordinator_session,
+              child_sessions,
+              child_roles,
+              run_dir,
+              status,
+              current_task,
+              tasks,
+              pending_decision,
+              active_session,
+              active_role,
+              ended_at,
+              task_log,
+              stuck_since,
+              nudge_count,
+              tier,
+              last_notified_transition,
+              run_started_at,
+              accumulated_ms,
+              updated_at
+            ) VALUES (?, ?, NULL, '[]', '[]', ?, 'active', ?, ?, NULL, NULL, NULL, ?, '[]', NULL, 0, 0, NULL, ?, 0, ?)
+            RETURNING *`
+          )
+          .get(
+            input.project_id,
+            input.label,
+            input.run_dir,
+            currentTask,
+            JSON.stringify(effectiveTasks),
+            endedAt,
+            now,
+            now
+          )) as OvermindWorkflowRow;
+
+    this.touchParentUpdate(row.id);
+    const registered = this.get(row.id);
+    if (!registered) {
+      throw new Error(`Failed to load workflow ${row.id} after attached register`);
+    }
+    return registered;
   }
 
   register(input: RegisterOvermindWorkflowInput): OvermindWorkflow {
@@ -430,6 +567,18 @@ export class OvermindService {
     const row = this.db
       .prepare("SELECT * FROM overmind_workflows WHERE run_dir = ? ORDER BY updated_at DESC, id DESC LIMIT 1")
       .get(runDir) as OvermindWorkflowRow | undefined;
+    return row ? this.mapRow(row) : null;
+  }
+
+  getByProjectRunDir(projectId: number, runDir: string): OvermindWorkflow | null {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM overmind_workflows
+         WHERE project_id = ? AND run_dir = ?
+         ORDER BY updated_at DESC, id DESC
+         LIMIT 1`
+      )
+      .get(projectId, runDir) as OvermindWorkflowRow | undefined;
     return row ? this.mapRow(row) : null;
   }
 

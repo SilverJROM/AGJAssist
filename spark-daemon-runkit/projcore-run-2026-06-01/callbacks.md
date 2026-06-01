@@ -22,3 +22,7 @@
 [projcore callback] batch-b12e PROPOSED GET/PATCH/DELETE overmind_projects route plan ready; awaiting APPROVED-PLAN
 [projcore callback] batch-b12e APPROVED-PLAN implementing GET/PATCH/DELETE overmind_projects routes with shared active-runs count guard
 [projcore callback] batch-b12e DONE GET/PATCH/DELETE overmind_projects routes committed; targeted route/service tests and build pass
+[projcore callback] batch-b12e VALIDATED PASS real dist app.inject CRUD validation passed; read counts, owner-only mutations, immutable fields, 409 active-run guard, 404s, build, and targeted tests pass
+[projcore callback] batch-b12f PROPOSED Dual-shape register plan ready: legacy label+session preserved; new run_dir-only attach walks projects and returns 201/404/422. DISPATCH-MARKER: AGJ-B12F
+[projcore callback] batch-b12f APPROVED-PLAN Implementing run_dir-only attach with legacy register preserved. DISPATCH-MARKER: AGJ-B12F
+[projcore callback] batch-b12f DONE Implemented run_dir-only project attach with 422/404 responses, project/run_dir idempotent upsert, legacy register preserved, tests/build green. DISPATCH-MARKER: AGJ-B12F

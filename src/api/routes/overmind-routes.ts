@@ -48,6 +48,9 @@ interface SendBody {
 
 interface RegisterBody extends TokenBody {
   label?: string;
+  parent_label?: string;
+  parent_session?: string;
+  project_slug?: string;
   session?: string;
   child_sessions?: string[];
   child_roles?: string[];
@@ -391,7 +394,56 @@ export function registerOvermindRoutes(
     async (request, reply) => {
       if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
 
-      const { label, session, child_sessions, child_roles, run_dir, current_task, tasks } = request.body || {};
+      const { label, parent_label, parent_session, project_slug, session, child_sessions, child_roles, run_dir, current_task, tasks } = request.body || {};
+      const hasRunDir = typeof run_dir === "string" && run_dir.trim() !== "";
+      const isLegacyShape =
+        typeof label === "string" && label.trim() !== "" &&
+        typeof session === "string" && session.trim() !== "";
+      const isAttachShape = hasRunDir && !isLegacyShape;
+
+      if (isAttachShape) {
+        const forbiddenFields: Array<keyof RegisterBody> = [
+          "label",
+          "parent_label",
+          "parent_session",
+          "project_slug",
+          "session"
+        ];
+        for (const field of forbiddenFields) {
+          if (request.body && request.body[field] !== undefined) {
+            return reply.code(422).send({ error: "forbidden-derived-field", field });
+          }
+        }
+
+        if (!path.isAbsolute(run_dir)) {
+          return reply.code(400).send({
+            error: `'run_dir' must be an absolute path. Got: '${run_dir}'. Use the canonical path on disk; relative paths are ambiguous because overmind and the caller may have different cwds.`
+          });
+        }
+
+        const match = await overmindService.findProjectForRunDir(run_dir);
+        if (!match.project) {
+          return reply.code(404).send({
+            error: "no-project-for-run-dir",
+            run_dir: match.run_dir,
+            searched_up_to: match.searched_up_to,
+            hint: "Ask JROM to create a project for the containing app via POST /api/overmind/projects, then re-register."
+          });
+        }
+
+        const workflow = overmindService.registerAttached({
+          project_id: match.project.id,
+          label: `${match.project.slug} · ${path.basename(match.run_dir) || "run"}`,
+          run_dir: match.run_dir
+        });
+        return reply.code(201).send({
+          workflow,
+          workflow_id: workflow.id,
+          project_id: match.project.id,
+          project_slug: match.project.slug,
+          parent_session: match.project.parent_session
+        });
+      }
 
       // JROM 2026-05-24: "we must validate all ... not some lame ass lazy not
       // checking always accepting what is given to him". Full payload validation

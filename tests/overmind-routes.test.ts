@@ -509,6 +509,96 @@ describe("Overmind routes", () => {
     expect(overmindService.list()).toHaveLength(1);
   });
 
+  it("attaches run_dir-only register requests to the matching overmind project and upserts by project/run_dir", async () => {
+    const appPath = tempProjectPath();
+    const runDir = path.join(appPath, "plans", "b12f", "run-1");
+    fs.mkdirSync(runDir, { recursive: true });
+    const project = overmindService.createProject({
+      slug: "agjassist",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: null
+    });
+
+    const attached = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir
+    });
+
+    expect(attached.statusCode).toBe(201);
+    const firstBody = attached.json();
+    expect(firstBody.workflow_id).toBe(firstBody.workflow.id);
+    expect(firstBody.project_id).toBe(project.id);
+    expect(firstBody.project_slug).toBe("agjassist");
+    expect(firstBody.parent_session).toBe("AGJ-51");
+    expect(firstBody.workflow).toMatchObject({
+      id: firstBody.workflow_id,
+      project_id: project.id,
+      label: "agjassist · run-1",
+      coordinator_session: null,
+      run_dir: fs.realpathSync(runDir)
+    });
+
+    const idempotent = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir
+    });
+    expect(idempotent.statusCode).toBe(201);
+    expect(idempotent.json().workflow_id).toBe(firstBody.workflow_id);
+    expect(overmindService.list()).toHaveLength(1);
+  });
+
+  it("returns 404 with searched_up_to when run_dir-only register has no containing project", async () => {
+    const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "overmind-no-project-"));
+    tempProjectDirs.push(runDir);
+
+    const rejected = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir
+    });
+
+    expect(rejected.statusCode).toBe(404);
+    expect(rejected.json()).toEqual({
+      error: "no-project-for-run-dir",
+      run_dir: fs.realpathSync(runDir),
+      searched_up_to: path.parse(runDir).root,
+      hint: "Ask JROM to create a project for the containing app via POST /api/overmind/projects, then re-register."
+    });
+  });
+
+  it("rejects derived fields on run_dir-only register without blocking legacy register", async () => {
+    const appPath = tempProjectPath();
+    const runDir = path.join(appPath, "run-forbidden");
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "forbidden",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: null
+    });
+
+    const forbidden = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir,
+      label: "hack"
+    });
+    expect(forbidden.statusCode).toBe(422);
+    expect(forbidden.json()).toEqual({
+      error: "forbidden-derived-field",
+      field: "label"
+    });
+
+    const legacy = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "legacy still works",
+      session: "legacy-b12f",
+      run_dir: "/tmp/legacy-b12f",
+      tasks: [{ id: "B12f", label: "Legacy", state: "processing" }]
+    });
+    expect(legacy.statusCode).toBe(201);
+    expect(legacy.json().workflow.coordinator_session).toBe("legacy-b12f");
+  });
+
   it("rejects /register with 400 when a NEW parent session omits tasks or sends an empty tasks array (JROM 2026-05-24)", async () => {
     const noTasks = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
