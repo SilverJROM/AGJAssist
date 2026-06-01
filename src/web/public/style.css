@@ -504,6 +504,30 @@ body {
   font-size: 15px;
   margin: 0;
 }
+.overmind-project-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.overmind-project-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(210,153,34,0.45);
+  background: rgba(210,153,34,0.12);
+  color: var(--warning);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.overmind-project-warning span {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
 .overmind-project-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

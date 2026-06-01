@@ -272,7 +272,7 @@ describe("Overmind routes", () => {
       parent_session: "AGJ-51",
       notes: "Primary project"
     });
-    overmindService.createProject({
+    const second = overmindService.createProject({
       slug: "receiptbot",
       app_path: tempProjectPath(),
       parent_session: "RS-1",
@@ -291,6 +291,25 @@ describe("Overmind routes", () => {
       `INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir, status, tasks)
        VALUES (?, 'done-run', 'AGJ-53', '/tmp/agjassist/done', 'completed', '[]')`
     ).run(first.id);
+    db.prepare(
+      `UPDATE overmind_workflows
+       SET parent_status = 'ok', updated_at = '2026-01-01 00:00:00'
+       WHERE coordinator_session = 'AGJ-51'`
+    ).run();
+    db.prepare(
+      `UPDATE overmind_workflows
+       SET parent_status = 'bare-bash', updated_at = '2026-01-02 00:00:00'
+       WHERE coordinator_session = 'AGJ-52'`
+    ).run();
+    db.prepare(
+      `UPDATE overmind_workflows
+       SET parent_status = 'no-session', updated_at = '2026-01-03 00:00:00'
+       WHERE coordinator_session = 'AGJ-53'`
+    ).run();
+    db.prepare(
+      `INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir, status, tasks, parent_status, updated_at)
+       VALUES (?, 'receipt-warning', 'RS-1', '/tmp/receiptbot/run', 'completed', '[]', 'no-session', '2026-01-04 00:00:00')`
+    ).run(second.id);
 
     const loopbackList = await app.inject({
       method: "GET",
@@ -302,8 +321,8 @@ describe("Overmind routes", () => {
     });
     expect(loopbackList.statusCode).toBe(200);
     expect(loopbackList.json().projects).toEqual([
-      expect.objectContaining({ slug: "agjassist", active_runs_count: 2 }),
-      expect.objectContaining({ slug: "receiptbot", active_runs_count: 0 })
+      expect.objectContaining({ slug: "agjassist", active_runs_count: 2, latest_parent_status: "no-session" }),
+      expect.objectContaining({ slug: "receiptbot", active_runs_count: 0, latest_parent_status: "no-session" })
     ]);
 
     const viewerOne = await app.inject({
@@ -314,7 +333,8 @@ describe("Overmind routes", () => {
     expect(viewerOne.statusCode).toBe(200);
     expect(viewerOne.json().project).toMatchObject({
       slug: "agjassist",
-      active_runs_count: 2
+      active_runs_count: 2,
+      latest_parent_status: "no-session"
     });
 
     const missing = await app.inject({

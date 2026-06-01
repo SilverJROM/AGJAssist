@@ -277,9 +277,10 @@ export function registerOvermindRoutes(
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
 
-  const withActiveRunsCount = (project: OvermindProject) => ({
+  const withProjectReadMetadata = (project: OvermindProject) => ({
     ...project,
-    active_runs_count: overmindService.activeRunsCountForProjectSlug(project.slug)
+    active_runs_count: overmindService.activeRunsCountForProjectSlug(project.slug),
+    latest_parent_status: overmindService.latestParentStatusForProjectSlug(project.slug)
   });
 
   app.post<{ Body: CreateProjectBody }>(
@@ -336,7 +337,7 @@ export function registerOvermindRoutes(
       if (!requireProjectReadAuth(request, reply, authService, config.overmind.token)) return;
 
       return {
-        projects: overmindService.listProjects().map(withActiveRunsCount)
+        projects: overmindService.listProjects().map(withProjectReadMetadata)
       };
     }
   );
@@ -351,7 +352,7 @@ export function registerOvermindRoutes(
         return reply.code(404).send({ error: "Project not found" });
       }
 
-      return { project: withActiveRunsCount(project) };
+      return { project: withProjectReadMetadata(project) };
     }
   );
 
@@ -386,7 +387,7 @@ export function registerOvermindRoutes(
         return reply.code(404).send({ error: "Project not found" });
       }
 
-      return { project: withActiveRunsCount(project) };
+      return { project: withProjectReadMetadata(project) };
     }
   );
 

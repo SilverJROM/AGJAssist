@@ -41,3 +41,6 @@
 [projcore callback] batch-b12j PROPOSED Add distinct /overmind-projects bottom-nav dashboard page with GET list, owner-JWT create modal, mapped 409/400/403 UI errors, and app-level create-flow proof. DISPATCH-MARKER: AGJ-B12J
 [projcore callback] batch-b12j APPROVED-PLAN Implementing distinct /overmind-projects dashboard list/create UI using existing app.js + bottom-nav conventions. DISPATCH-MARKER: AGJ-B12J
 [projcore callback] batch-b12j DONE distinct OVM Projects tab/page implemented; list + owner-JWT create modal verified via Playwright, DB row, 409/400/403 UI errors, build, and targeted tests. DISPATCH-MARKER: AGJ-B12J
+[projcore callback] batch-b12j VALIDATED PASS distinct /overmind-projects tab/page verified; fallback app.inject create returned 201, follow-up list row and SQLite DB row existed, errors surfaced by UI code, build green. DISPATCH-MARKER: AGJ-VAL-B12J
+[projcore callback] batch-b12k PROPOSED edit/delete modal plan plus minimal latest_parent_status read-shape for warn tile; waiting for APPROVED-PLAN. DISPATCH-MARKER: AGJ-B12K
+[projcore callback] batch-b12k DONE edit modal, delete 409/success handling, latest_parent_status warning tile, route test, build, and localhost:3101 screenshots complete. DISPATCH-MARKER: AGJ-B12K

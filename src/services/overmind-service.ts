@@ -184,6 +184,20 @@ export class OvermindService {
     return row?.count ?? 0;
   }
 
+  latestParentStatusForProjectSlug(slug: string): OvermindParentStatus | null {
+    const row = this.db
+      .prepare(
+        `SELECT w.parent_status AS parent_status
+         FROM overmind_workflows w
+         JOIN overmind_projects p ON p.id = w.project_id
+         WHERE p.slug = ?
+         ORDER BY datetime(w.updated_at) DESC, w.id DESC
+         LIMIT 1`
+      )
+      .get(slug) as { parent_status: OvermindParentStatus | null } | undefined;
+    return row?.parent_status ?? null;
+  }
+
   updateProjectBySlug(slug: string, input: UpdateOvermindProjectInput): OvermindProject | null {
     const assignments: string[] = [];
     const params: unknown[] = [];

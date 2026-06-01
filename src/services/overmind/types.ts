@@ -80,6 +80,7 @@ export interface OvermindProject {
   parent_session: string;
   notes: string | null;
   created_by: string;
+  latest_parent_status?: OvermindParentStatus | null;
   created_at: string;
   updated_at: string;
 }

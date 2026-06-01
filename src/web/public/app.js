@@ -1423,13 +1423,20 @@ function Projects() {
 
 function OvermindProjects() {
   const emptyForm = { slug: '', app_path: '', parent_session: '', notes: '' };
+  const emptyEditForm = { parent_session: '', notes: '' };
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [editForm, setEditForm] = useState(emptyEditForm);
   const [createError, setCreateError] = useState('');
+  const [editError, setEditError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingSlug, setDeletingSlug] = useState('');
 
   const loadProjects = useCallback(async () => {
     setError('');
@@ -1448,11 +1455,26 @@ function OvermindProjects() {
   function openCreate() {
     setForm(emptyForm);
     setCreateError('');
+    setActionError('');
     setShowCreate(true);
+  }
+
+  function openEdit(project) {
+    setEditingProject(project);
+    setEditForm({
+      parent_session: project.parent_session || '',
+      notes: project.notes || ''
+    });
+    setEditError('');
+    setActionError('');
   }
 
   function updateForm(field, value) {
     setForm(current => ({ ...current, [field]: value }));
+  }
+
+  function updateEditForm(field, value) {
+    setEditForm(current => ({ ...current, [field]: value }));
   }
 
   async function createProject(e) {
@@ -1482,7 +1504,48 @@ function OvermindProjects() {
     }
   }
 
+  async function saveEdit(e) {
+    e?.preventDefault?.();
+    if (savingEdit || !editingProject) return;
+    setEditError('');
+    setSavingEdit(true);
+    try {
+      await api(`/api/overmind/projects/${encodeURIComponent(editingProject.slug)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          parent_session: editForm.parent_session.trim(),
+          notes: editForm.notes.trim() ? editForm.notes : null
+        })
+      });
+      setEditingProject(null);
+      setEditForm(emptyEditForm);
+      setLoading(true);
+      await loadProjects();
+    } catch (e) {
+      setEditError(e.message || 'Failed to update Overmind project.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function deleteProject(project) {
+    if (deletingSlug) return;
+    if (!confirm(`Delete OVM project "${project.slug}"?`)) return;
+    setActionError('');
+    setDeletingSlug(project.slug);
+    try {
+      await api(`/api/overmind/projects/${encodeURIComponent(project.slug)}`, { method: 'DELETE' });
+      setProjects(current => current.filter(item => item.slug !== project.slug));
+    } catch (e) {
+      setActionError(e.message || 'Failed to delete Overmind project.');
+    } finally {
+      setDeletingSlug('');
+    }
+  }
+
   const canSubmit = form.slug.trim() && form.app_path.trim() && form.parent_session.trim();
+  const canSaveEdit = editForm.parent_session.trim();
+  const isParentWarning = project => ['bare-bash', 'no-session'].includes(project.latest_parent_status);
 
   return html`
     <div class="overmind-page">
@@ -1495,6 +1558,7 @@ function OvermindProjects() {
       </div>
 
       ${error && html`<div class="overmind-alert">${error}</div>`}
+      ${actionError && html`<div class="overmind-alert">${actionError}</div>`}
 
       ${loading ? html`
         <div class="loading">Loading Overmind projects...</div>
@@ -1506,10 +1570,26 @@ function OvermindProjects() {
             <section class="item-card overmind-project-card" key=${project.slug}>
               <div class="overmind-project-card-header">
                 <h3>${project.slug}</h3>
-                <span class=${'badge ' + (project.active_runs_count > 0 ? 'badge-active' : 'badge-draft')}>
-                  ${project.active_runs_count || 0} active
-                </span>
+                <div class="overmind-project-card-actions">
+                  <span class=${'badge ' + (project.active_runs_count > 0 ? 'badge-active' : 'badge-draft')}>
+                    ${project.active_runs_count || 0} active
+                  </span>
+                  <button class="btn btn-sm" onclick=${() => openEdit(project)}>Edit</button>
+                  <button
+                    class="btn btn-sm btn-danger"
+                    onclick=${() => deleteProject(project)}
+                    disabled=${deletingSlug === project.slug}
+                  >
+                    ${deletingSlug === project.slug ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
               </div>
+              ${isParentWarning(project) && html`
+                <div class="overmind-project-warning">
+                  <strong>Parent ${project.latest_parent_status}</strong>
+                  <span>${project.parent_session}</span>
+                </div>
+              `}
               <div class="overmind-project-field">
                 <span>app_path</span>
                 <code>${project.app_path}</code>
@@ -1571,6 +1651,44 @@ function OvermindProjects() {
               <button class="btn" type="button" onclick=${() => !submitting && setShowCreate(false)} disabled=${submitting}>Cancel</button>
               <button class="btn btn-primary" type="submit" disabled=${submitting || !canSubmit}>
                 ${submitting ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          </form>
+        </div>
+      `}
+
+      ${editingProject && html`
+        <div class="modal-overlay" onclick=${() => !savingEdit && setEditingProject(null)}>
+          <form class="modal" style="max-width:560px" onclick=${e => e.stopPropagation()} onSubmit=${saveEdit}>
+            <h3>Edit OVM Project</h3>
+            ${editError && html`<div class="overmind-alert" style="margin-bottom:12px">${editError}</div>`}
+            <div class="form-group">
+              <label>Slug</label>
+              <input value=${editingProject.slug} disabled />
+            </div>
+            <div class="form-group">
+              <label>App Path</label>
+              <input value=${editingProject.app_path} disabled />
+            </div>
+            <div class="form-group">
+              <label>Parent Session</label>
+              <input
+                value=${editForm.parent_session}
+                onInput=${e => updateEditForm('parent_session', e.target.value)}
+                autofocus
+              />
+            </div>
+            <div class="form-group">
+              <label>Notes</label>
+              <textarea
+                value=${editForm.notes}
+                onInput=${e => updateEditForm('notes', e.target.value)}
+              />
+            </div>
+            <div class="modal-actions">
+              <button class="btn" type="button" onclick=${() => !savingEdit && setEditingProject(null)} disabled=${savingEdit}>Cancel</button>
+              <button class="btn btn-primary" type="submit" disabled=${savingEdit || !canSaveEdit}>
+                ${savingEdit ? 'Saving...' : 'Save'}
               </button>
             </div>
           </form>
