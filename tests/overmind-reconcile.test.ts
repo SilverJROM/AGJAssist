@@ -100,9 +100,9 @@ describe("OvermindWatcher.reconcile()", () => {
     expect(target).toBe("coord-reconcile");
     // Must mention the gap
     expect(msg).toContain("roster");
-    // Must include re-register ask
-    expect(msg).toMatch(/re-register/i);
-    expect(msg).toMatch(/POST \/api\/overmind\/register/);
+    // Must include child-roster update guidance on the project-model endpoint.
+    expect(msg).toMatch(/POST \/api\/overmind\/children/);
+    expect(msg).toMatch(/child-add|child-rm/);
     // Task-list reminder must be bundled in the SAME message
     expect(msg).toMatch(/POST \/api\/overmind\/tasks/);
   });
@@ -114,6 +114,33 @@ describe("OvermindWatcher.reconcile()", () => {
     const watcher = new OvermindWatcher(service, tmux);
 
     await watcher.reconcile([wf]);
+
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+  });
+
+  it("does NOT send a stale registration-gap demand after a healthy attached run clears the gap", async () => {
+    const stale = workflow({
+      id: 11,
+      project_id: 4,
+      coordinator_session: "AGJ-51",
+      child_sessions: ["AGJ-codex55"],
+      child_roles: ["implementer"],
+      info_request: "roster",
+      info_check: "dead_child"
+    });
+    const healthy = workflow({
+      ...stale,
+      info_request: null,
+      info_check: null
+    });
+    const service = {
+      ...makeServiceStub([healthy]),
+      get: vi.fn(() => healthy)
+    } as unknown as OvermindService;
+    const tmux = makeTmuxMock({ sessionAlive: true });
+    const watcher = new OvermindWatcher(service, tmux);
+
+    await watcher.reconcile([stale]);
 
     expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
   });
@@ -141,7 +168,7 @@ describe("OvermindWatcher.reconcile()", () => {
     expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
   });
 
-  it("task-list reminder is ONLY sent as part of the re-register demand, never as a standalone call", async () => {
+  it("task-list reminder is ONLY sent as part of the registration-gap demand, never as a standalone call", async () => {
     const wf = workflow({ info_request: "roles" });
     const service = makeServiceStub([wf]);
     const tmux = makeTmuxMock({ sessionAlive: true });
@@ -152,8 +179,8 @@ describe("OvermindWatcher.reconcile()", () => {
     // Exactly one sendAndSubmit call total — task-list ask is never a separate call
     expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
     const [, msg] = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
-    // Must contain both the register ask and the task-list ask in one message
-    expect(msg).toContain("/api/overmind/register");
+    // Must contain both the child-roster ask and the task-list ask in one message
+    expect(msg).toContain("/api/overmind/children");
     expect(msg).toContain("/api/overmind/tasks");
   });
 
@@ -179,7 +206,7 @@ describe("OvermindWatcher.reconcile()", () => {
 
     // sendAndSubmit should have been called for the reconcile demand
     const calls = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls as [string, string][];
-    const reconcileCalls = calls.filter(([, msg]) => msg.includes("/api/overmind/register"));
+    const reconcileCalls = calls.filter(([, msg]) => msg.includes("/api/overmind/children"));
     expect(reconcileCalls.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -204,7 +231,7 @@ describe("OvermindWatcher.reconcile()", () => {
     await watcher.tick();
 
     const calls = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls as [string, string][];
-    const reconcileCalls = calls.filter(([, msg]) => msg.includes("/api/overmind/register"));
+    const reconcileCalls = calls.filter(([, msg]) => msg.includes("/api/overmind/children"));
     expect(reconcileCalls.length).toBe(0);
   });
 
@@ -236,7 +263,7 @@ describe("OvermindWatcher.reconcile()", () => {
     expect(calls.length).toBe(1);
     expect(calls[0][0]).toBe("coord-a");
     expect(calls[0][1]).toContain("tasklist");
-    expect(calls[0][1]).toContain("/api/overmind/register");
+    expect(calls[0][1]).toContain("/api/overmind/children");
     expect(calls[0][1]).toContain("/api/overmind/tasks");
   });
 

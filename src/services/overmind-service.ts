@@ -617,7 +617,7 @@ export class OvermindService {
     return row ? this.mapRow(row) : null;
   }
 
-  findWorkflow(lookup: OvermindWorkflowLookup): OvermindWorkflow | null {
+  async findWorkflow(lookup: OvermindWorkflowLookup): Promise<OvermindWorkflow | null> {
     const workflowId = this.normalizeWorkflowId(lookup.workflow_id);
     if (workflowId !== null) {
       const byId = this.get(workflowId);
@@ -628,6 +628,9 @@ export class OvermindService {
     if (runDir) {
       const byRunDir = this.getByRunDir(runDir);
       if (byRunDir) return byRunDir;
+
+      const byCanonicalRunDir = await this.findByCanonicalRunDir(runDir);
+      if (byCanonicalRunDir) return byCanonicalRunDir;
     }
 
     const session = typeof lookup.session === "string" ? lookup.session.trim() : "";
@@ -635,6 +638,23 @@ export class OvermindService {
       return this.getBySession(session);
     }
 
+    return null;
+  }
+
+  private async findByCanonicalRunDir(runDir: string): Promise<OvermindWorkflow | null> {
+    const incomingCanonical = await this.canonicalizeRunDir(runDir);
+    const exactCanonical = this.getByRunDir(incomingCanonical);
+    if (exactCanonical) return exactCanonical;
+
+    const rows = this.db
+      .prepare("SELECT * FROM overmind_workflows ORDER BY updated_at DESC, id DESC")
+      .all() as OvermindWorkflowRow[];
+    for (const row of rows) {
+      const workflowCanonical = await this.canonicalizeRunDir(row.run_dir);
+      if (workflowCanonical === incomingCanonical) {
+        return this.mapRow(row);
+      }
+    }
     return null;
   }
 

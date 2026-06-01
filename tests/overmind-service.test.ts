@@ -4,6 +4,7 @@ import { OvermindService } from "../src/services/overmind-service.js";
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 
 const TEST_DB = path.join("data", "test-overmind-service.sqlite");
 
@@ -131,6 +132,38 @@ describe("OvermindService", () => {
     expect(service.deleteProjectBySlug("missing")).toBe(false);
     expect(service.deleteProjectBySlug("agjassist")).toBe(true);
     expect(service.getProjectBySlug("agjassist")).toBeNull();
+  });
+
+  it("finds workflows by canonicalized run_dir after exact run_dir misses", async () => {
+    const appPath = fs.mkdtempSync(path.join(os.tmpdir(), "overmind-service-app-"));
+    const symlinkRoot = `${appPath}-link`;
+    try {
+      fs.symlinkSync(appPath, symlinkRoot, "dir");
+      const realRunDir = path.join(appPath, "plans", "b9a", "run-1");
+      const linkedRunDir = path.join(symlinkRoot, "plans", "b9a", "run-1");
+      fs.mkdirSync(realRunDir, { recursive: true });
+      const project = service.createProject({
+        slug: "agjassist",
+        app_path: appPath,
+        parent_session: "AGJ-51",
+        notes: null
+      });
+      const workflow = service.registerAttached({
+        project_id: project.id,
+        label: "agjassist · run-1",
+        run_dir: fs.realpathSync(realRunDir),
+        coordinator_session: "AGJ-51"
+      });
+
+      expect(service.getByRunDir(linkedRunDir)).toBeNull();
+      await expect(service.findWorkflow({ run_dir: linkedRunDir })).resolves.toMatchObject({
+        id: workflow.id,
+        run_dir: fs.realpathSync(realRunDir)
+      });
+    } finally {
+      fs.rmSync(symlinkRoot, { recursive: true, force: true });
+      fs.rmSync(appPath, { recursive: true, force: true });
+    }
   });
 
   it("round-trips register, list, get, getBySession, updates, status, tasks, and delete", () => {

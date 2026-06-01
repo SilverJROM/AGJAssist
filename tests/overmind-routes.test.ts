@@ -787,6 +787,41 @@ describe("Overmind routes", () => {
     expect(overmindService.list()).toHaveLength(1);
   });
 
+  it("adds children to an attached workflow by canonicalized run_dir without workflow_id", async () => {
+    const appPath = tempProjectPath();
+    const symlinkRoot = `${appPath}-link`;
+    tempProjectDirs.push(symlinkRoot);
+    fs.symlinkSync(appPath, symlinkRoot, "dir");
+    const realRunDir = path.join(appPath, "plans", "b9a", "run-1");
+    const linkedRunDir = path.join(symlinkRoot, "plans", "b9a", "run-1");
+    fs.mkdirSync(realRunDir, { recursive: true });
+    overmindService.createProject({
+      slug: "agjassist",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: null
+    });
+
+    const attached = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: linkedRunDir
+    });
+    expect(attached.statusCode).toBe(201);
+    expect(attached.json().workflow.run_dir).toBe(fs.realpathSync(realRunDir));
+
+    const children = await lifecyclePost("/api/overmind/children", {
+      token: OVERMIND_TOKEN,
+      run_dir: linkedRunDir,
+      child_sessions: ["AGJ-codex55"],
+      child_roles: ["implementer"]
+    });
+    expect(children.statusCode).toBe(200);
+    expect(children.json().workflow.id).toBe(attached.json().workflow_id);
+    expect(children.json().workflow.child_sessions).toEqual(["AGJ-codex55"]);
+    expect(children.json().workflow.child_roles).toEqual(["implementer"]);
+    expect(overmindService.get(attached.json().workflow_id)?.child_sessions).toEqual(["AGJ-codex55"]);
+  });
+
   it("records ok parent_status and no warning when attach parent_session is an agent pane", async () => {
     vi.spyOn(agentPane, "isAgentPane").mockResolvedValue("codex");
     const appPath = tempProjectPath();

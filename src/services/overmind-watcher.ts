@@ -34,7 +34,7 @@ export const DECISION_HANDLED_TIER = 4;
 export const CANNED_NUDGE =
   "overmind: Overmind: you appear idle — check your implementer pane / callbacks.md and route the current batch, or report STATUS. Also check: is your watcher running? Is a ScheduleWakeup set? A missing watcher or wakeup is a common cause of apparent idleness — re-run: PROJCORE_POLL_SECONDS=15 bash ~/.claude/agents/watchers/projcore-watcher.sh <session> <status_file> <issue_id>, and schedule a ScheduleWakeup fallback if not set.";
 export const CANNED_NUDGE_NO_CHILD =
-  "overmind: Overmind: you appear idle — are you actually idle, or do you have an unregistered child session? If you spawned one, please register it (POST /api/overmind/register with the updated child_sessions + child_roles). Otherwise resume work or report STATUS. Also check: is your watcher running? Is a ScheduleWakeup set? A missing watcher or wakeup is a common cause of apparent idleness — re-run: PROJCORE_POLL_SECONDS=15 bash ~/.claude/agents/watchers/projcore-watcher.sh <session> <status_file> <issue_id>, and schedule a ScheduleWakeup fallback if not set.";
+  "overmind: Overmind: you appear idle — no child sessions are registered. If this run uses a child, attach it with `overmind.sh child-add <session> <role> --run-dir <run_dir>` or POST /api/overmind/children. Otherwise resume work or report STATUS. Also check: is your watcher running? Is a ScheduleWakeup set? A missing watcher or wakeup is a common cause of apparent idleness — re-run: PROJCORE_POLL_SECONDS=15 bash ~/.claude/agents/watchers/projcore-watcher.sh <session> <status_file> <issue_id>, and schedule a ScheduleWakeup fallback if not set.";
 export const ALL_DONE_CONFIRM_NUDGE = "overmind: " + DEFAULT_COMPLETION_CONSULT_TEXT;
 export const FRONTLOAD_CORRECTION_NOTE =
   "overmind: Overmind: that decision should have been frontloaded at intake (projcore §1.4a) — please put such decisions in the north-star next time.";
@@ -112,7 +112,10 @@ export class OvermindWatcher {
     }
     await Promise.all(activeWorkflows.map((workflow) => this.tickWorkflow(workflow)));
     if (Date.now() - this.lastReconcileAt >= RECONCILE_MS) {
-      await this.reconcile(activeWorkflows);
+      const freshActiveWorkflows = this.overmindService.list().filter(
+        (workflow) => !TERMINAL_STATUSES.includes(workflow.status)
+      );
+      await this.reconcile(freshActiveWorkflows);
       this.lastReconcileAt = Date.now();
     }
     await this.onUpdate?.(this.overmindService.list());
@@ -129,7 +132,8 @@ export class OvermindWatcher {
     this.interval = null;
   }
   async reconcile(workflows: OvermindWorkflow[]): Promise<void> {
-    for (const workflow of workflows) {
+    for (const originalWorkflow of workflows) {
+      const workflow = this.overmindService.get(originalWorkflow.id) ?? originalWorkflow;
       if (!workflow.info_request || workflow.monitoring_paused) {
         this.lastReconcileAsk.delete(workflow.id);
         this.nudgeState?.setLastReconcileAsk(workflow.id, null);
@@ -146,7 +150,7 @@ export class OvermindWatcher {
         if (lastAskedSignature === gapSignature) continue;
         const problemDesc = workflow.info_request;
         const msg =
-          `Overmind: registration gap detected (${problemDesc}) — please re-register your CURRENT child_sessions, child_roles, and status to overmind now (POST /api/overmind/register), ` +
+          `Overmind: registration gap detected (${problemDesc}) — update child roster with overmind.sh child-add/child-rm or POST /api/overmind/children, ` +
           `and update your task list (POST /api/overmind/tasks) if it has changed since you last reported.`;
         const guarded = await sendGuardedParentNudge(
           workflow,

@@ -108,7 +108,7 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
   if (deadChildren.length > 0) {
     missing.push("dead_child");
     labels.push("roster");
-    lines.push(`child session(s) ${deadChildren.join(", ")} are no longer alive — re-register with the correct child_sessions roster`);
+    lines.push(`child session(s) ${deadChildren.join(", ")} are no longer alive — update the roster with overmind.sh child-rm/child-add or POST /api/overmind/children`);
   }
 
   const rolesMissing =
@@ -118,7 +118,7 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
   if (rolesMissing) {
     missing.push("roles");
     labels.push("roles");
-    lines.push("send child_roles (aligned by index with child_sessions) so the dashboard labels your agents (e.g. coder/tester)");
+    lines.push("send child_roles via overmind.sh child-add or POST /api/overmind/children so the dashboard labels your agents (e.g. coder/tester)");
   }
 
   // Half-broken register: child_roles declared but no child_sessions provided.
@@ -127,7 +127,7 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
     missing.push("roles_without_sessions");
     labels.push("roster");
     lines.push(
-      `you registered child_roles (${input.childRoles.join(", ")}) but no child_sessions — please re-register with the actual child session names.`
+      `you registered child_roles (${input.childRoles.join(", ")}) but no child_sessions — attach the actual child session names with overmind.sh child-add or POST /api/overmind/children.`
     );
   }
 
@@ -162,7 +162,7 @@ export function assessRegistrationCompleteness(input: CompletenessInput): Comple
     missing,
     requestLabel: labels.length ? labels.join(", ") : null,
     requestText: lines.length
-      ? `Overmind: your overmind registration looks incomplete — please re-register/update so I can track this run:\n- ${lines.join("\n- ")}`
+      ? `Overmind: your overmind registration looks incomplete — please update it so I can track this run:\n- ${lines.join("\n- ")}`
       : null,
     signature,
     needsBrain: false

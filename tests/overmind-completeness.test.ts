@@ -165,7 +165,7 @@ describe("assessRegistrationCompleteness", () => {
     expect(r.requestLabel).toContain("roster");
     expect(r.requestText).toContain("coder");
     expect(r.requestText).toContain("tester");
-    expect(r.requestText).toContain("re-register");
+    expect(r.requestText).toContain("/api/overmind/children");
   });
 
   it("does NOT flag roles_without_sessions when child_roles is empty", () => {

@@ -876,7 +876,7 @@ export function registerOvermindRoutes(
         return reply.code(400).send({ error: "workflow_id, run_dir, or session is required" });
       }
 
-      const workflow = overmindService.findWorkflow({ workflow_id, run_dir, session });
+      const workflow = await overmindService.findWorkflow({ workflow_id, run_dir, session });
       if (!workflow) {
         return reply.code(404).send({ error: "Workflow not found" });
       }
@@ -945,7 +945,7 @@ export function registerOvermindRoutes(
         return reply.code(400).send({ error: "workflow_id, run_dir, or session and tasks are required" });
       }
 
-      const workflow = overmindService.findWorkflow({ workflow_id, run_dir, session });
+      const workflow = await overmindService.findWorkflow({ workflow_id, run_dir, session });
       if (!workflow) {
         return reply.code(404).send({ error: "Workflow not found" });
       }
@@ -976,7 +976,7 @@ export function registerOvermindRoutes(
         });
       }
 
-      const workflow = overmindService.findWorkflow({ workflow_id, run_dir, session });
+      const workflow = await overmindService.findWorkflow({ workflow_id, run_dir, session });
       if (!workflow) {
         return reply.code(404).send({ error: "Workflow not found" });
       }
