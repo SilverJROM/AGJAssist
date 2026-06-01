@@ -327,3 +327,144 @@ describe("T12.1-T12.5 Overmind projects/register acceptance", () => {
     }
   );
 });
+
+describe("T12.6-T12.8 Overmind projects dashboard/delete/warn acceptance", () => {
+  it("T12.6 proves dashboard create path via owner API, follow-up row, and DB row", async () => {
+    const appPath = projectPath("dashboard-create");
+
+    // The B12j browser screenshots prove the modal wiring; this asserts the
+    // exact POST path that modal uses plus the persisted outcome.
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/overmind/projects",
+      headers: ownerHeaders(),
+      payload: {
+        slug: "dash-create",
+        app_path: appPath,
+        parent_session: "AGJ-51",
+        notes: "B12p T12.6 acceptance"
+      }
+    });
+
+    expect(created.statusCode).toBe(201);
+    expect(created.json().project).toMatchObject({
+      slug: "dash-create",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: "B12p T12.6 acceptance",
+      created_by: "JROM"
+    });
+
+    const listed = await app.inject({
+      method: "GET",
+      url: "/api/overmind/projects",
+      headers: ownerHeaders()
+    });
+
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json().projects).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          slug: "dash-create",
+          app_path: appPath,
+          parent_session: "AGJ-51",
+          active_runs_count: 0
+        })
+      ])
+    );
+
+    expect(overmindService.getProjectBySlug("dash-create")).toMatchObject({
+      slug: "dash-create",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: "B12p T12.6 acceptance",
+      created_by: "JROM"
+    });
+  });
+
+  it("T12.7 rejects delete with an active run, then deletes after the run completes", async () => {
+    const appPath = projectPath("delete-guard");
+    const runDir = path.join(appPath, "spark-daemon-runkit", "active-run");
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "delete-guard",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: null
+    });
+    const attached = await registerRun({ run_dir: runDir });
+    expect(attached.statusCode).toBe(201);
+    const workflowId = attached.json().workflow_id;
+
+    const guarded = await app.inject({
+      method: "DELETE",
+      url: "/api/overmind/projects/delete-guard",
+      headers: ownerHeaders()
+    });
+
+    expect(guarded.statusCode).toBe(409);
+    expect(guarded.json()).toEqual({
+      error: "project has active runs; complete or cancel them first",
+      active_runs: 1
+    });
+    expect(overmindService.getProjectBySlug("delete-guard")).toMatchObject({
+      slug: "delete-guard",
+      app_path: appPath
+    });
+    expect(overmindService.activeRunsCountForProjectSlug("delete-guard")).toBe(1);
+
+    expect(overmindService.setStatus(workflowId, "completed")).toMatchObject({
+      id: workflowId,
+      status: "completed"
+    });
+
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: "/api/overmind/projects/delete-guard",
+      headers: ownerHeaders()
+    });
+
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.json()).toEqual({ ok: true });
+    expect(overmindService.getProjectBySlug("delete-guard")).toBeNull();
+    expect(overmindService.activeRunsCountForProjectSlug("delete-guard")).toBe(0);
+  });
+
+  it("T12.8 accepts bare-bash parent_session registration with parent warning", async () => {
+    vi.mocked(agentPane.isAgentPane).mockResolvedValue("bare-bash");
+    const appPath = projectPath("bare-bash-parent");
+    const runDir = path.join(appPath, "spark-daemon-runkit", "warned-run");
+    fs.mkdirSync(runDir, { recursive: true });
+    const project = overmindService.createProject({
+      slug: "bare-bash-parent",
+      app_path: appPath,
+      parent_session: "AGJ-bare-shell",
+      notes: null
+    });
+
+    const attached = await registerRun({ run_dir: runDir });
+
+    expect(attached.statusCode).toBe(201);
+    const body = attached.json();
+    expect(body).toMatchObject({
+      project_id: project.id,
+      project_slug: "bare-bash-parent",
+      parent_session: "AGJ-bare-shell",
+      parent_status: "bare-bash",
+      parent_warning: {
+        code: "parent-session-bare-bash"
+      },
+      workflow: {
+        project_id: project.id,
+        run_dir: fs.realpathSync(runDir),
+        parent_status: "bare-bash"
+      }
+    });
+    expect(body.workflow_id).toBe(body.workflow.id);
+    expect(overmindService.get(body.workflow_id)).toMatchObject({
+      project_id: project.id,
+      run_dir: fs.realpathSync(runDir),
+      parent_status: "bare-bash"
+    });
+  });
+});
