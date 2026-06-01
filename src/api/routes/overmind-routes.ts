@@ -127,6 +127,13 @@ const PROJECT_MUTATION_FORBIDDEN = {
   error: "projects are JROM-managed; ask JROM to create via dashboard"
 };
 
+function validProjectsForRegister(overmindService: OvermindService): Array<{ slug: string; app_path: string }> {
+  return overmindService.listProjects().map((project) => ({
+    slug: project.slug,
+    app_path: project.app_path
+  }));
+}
+
 function normalizeRegisterParentStatus(kind: AgentPaneKind): OvermindParentStatus {
   if (kind === "claude" || kind === "codex") return "ok";
   if (kind === "bare-bash" || kind === "no-session") return kind;
@@ -562,7 +569,14 @@ export function registerOvermindRoutes(
         ];
         for (const field of forbiddenFields) {
           if (request.body && request.body[field] !== undefined) {
-            return reply.code(422).send({ error: "forbidden-derived-field", field });
+            return reply.code(422).send({
+              ok: false,
+              error: "forbidden-derived-field",
+              code: "forbidden-derived-field",
+              message: `Attach registration rejected forbidden derived field '${field}'.`,
+              hint: `identity is derived server-side; do not send ${field} — see GET /api/overmind/register/describe`,
+              field
+            });
           }
         }
 
@@ -574,11 +588,16 @@ export function registerOvermindRoutes(
 
         const match = await overmindService.findProjectForRunDir(run_dir);
         if (!match.project) {
+          const validProjects = validProjectsForRegister(overmindService);
           return reply.code(404).send({
+            ok: false,
             error: "no-project-for-run-dir",
+            code: "no-project-for-run-dir",
+            message: `No registered overmind project contains run_dir '${match.run_dir}'.`,
             run_dir: match.run_dir,
             searched_up_to: match.searched_up_to,
-            hint: "Ask JROM to create a project for the containing app via POST /api/overmind/projects, then re-register."
+            hint: `your run_dir ${match.run_dir} is not under any registered project; valid projects: ${validProjects.map((project) => `${project.slug} (${project.app_path})`).join(", ") || "none"}; use the correct run_dir or ask JROM to create the project`,
+            validProjects
           });
         }
 

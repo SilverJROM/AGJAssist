@@ -889,8 +889,16 @@ describe("Overmind routes", () => {
   });
 
   it("returns 404 with searched_up_to when run_dir-only register has no containing project", async () => {
+    const appPath = tempProjectPath();
+    overmindService.createProject({
+      slug: "seeded-project",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: null
+    });
     const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "overmind-no-project-"));
     tempProjectDirs.push(runDir);
+    const resolvedRunDir = fs.realpathSync(runDir);
 
     const rejected = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
@@ -898,12 +906,23 @@ describe("Overmind routes", () => {
     });
 
     expect(rejected.statusCode).toBe(404);
-    expect(rejected.json()).toEqual({
+    expect(rejected.json()).toMatchObject({
+      ok: false,
       error: "no-project-for-run-dir",
-      run_dir: fs.realpathSync(runDir),
+      code: "no-project-for-run-dir",
+      message: `No registered overmind project contains run_dir '${resolvedRunDir}'.`,
+      run_dir: resolvedRunDir,
       searched_up_to: path.parse(runDir).root,
-      hint: "Ask JROM to create a project for the containing app via POST /api/overmind/projects, then re-register."
+      validProjects: [
+        {
+          slug: "seeded-project",
+          app_path: appPath
+        }
+      ]
     });
+    expect(rejected.json().hint).toContain(`your run_dir ${resolvedRunDir} is not under any registered project`);
+    expect(rejected.json().hint).toContain(`seeded-project (${appPath})`);
+    expect(rejected.json().hint).toContain("use the correct run_dir or ask JROM to create the project");
   });
 
   it("rejects derived fields on run_dir-only register without blocking legacy register", async () => {
@@ -923,8 +942,12 @@ describe("Overmind routes", () => {
       label: "hack"
     });
     expect(forbidden.statusCode).toBe(422);
-    expect(forbidden.json()).toEqual({
+    expect(forbidden.json()).toMatchObject({
+      ok: false,
       error: "forbidden-derived-field",
+      code: "forbidden-derived-field",
+      message: "Attach registration rejected forbidden derived field 'label'.",
+      hint: "identity is derived server-side; do not send label — see GET /api/overmind/register/describe",
       field: "label"
     });
 
