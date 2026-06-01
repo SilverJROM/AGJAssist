@@ -16,6 +16,12 @@ export interface UnresolvedNotificationInput {
   reason: string;
 }
 
+export interface ParentOrphanedNotificationInput {
+  workflow: OvermindNotificationWorkflow;
+  parentSession: string;
+  paneKind: "bare-bash" | "no-session";
+}
+
 export function buildDoneNotification(workflow: OvermindNotificationWorkflow): string {
   const name = workflowDisplayName(workflow);
   return [
@@ -55,6 +61,19 @@ export function buildNeedsInputNotification(input: UnresolvedNotificationInput):
     "If unanswered: holding until you reply",
     `Where: ${input.workflow.run_dir || name}`,
     `Checked: ${input.checked}`
+  ].join("\n");
+}
+
+export function buildParentOrphanedNotification(input: ParentOrphanedNotificationInput): string {
+  const name = workflowDisplayName(input.workflow);
+  return [
+    `🚨 URGENT · ${OVERMIND_PROJECT} · ${OVERMIND_AGENT}`,
+    "",
+    `⚠️ ${name} parent session is orphaned.`,
+    `Parent: ${input.parentSession}`,
+    `Detected: ${input.paneKind}`,
+    "Action taken: suppressed the outbound Overmind nudge before it could paste into the parent pane.",
+    `Where: ${input.workflow.run_dir || name}`
   ].join("\n");
 }
 

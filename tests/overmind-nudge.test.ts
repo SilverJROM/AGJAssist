@@ -18,6 +18,12 @@ import { TmuxService } from "../src/tmux/tmux-service.js";
 import type { AppSettingsService, OvermindCooldowns } from "../src/services/app-settings-service.js";
 import { NudgeStateService } from "../src/services/nudge-state-service.js";
 
+const isAgentPaneMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../src/services/overmind/agent-pane.js", () => ({
+  isAgentPane: isAgentPaneMock
+}));
+
 const TEST_DB = path.join("data", "test-overmind-nudge.sqlite");
 const BOT_TOKEN = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11";
 const JWT_SECRET = "test-secret";
@@ -84,6 +90,8 @@ let service: OvermindService;
 
 beforeEach(() => {
   cleanup();
+  isAgentPaneMock.mockReset();
+  isAgentPaneMock.mockResolvedValue("codex");
   // The fixtures use this run_dir; it must exist on disk so the registration-completeness
   // layer treats them as complete and the nudge ladder is exercised in isolation.
   fs.mkdirSync("/tmp/overmind-nudge", { recursive: true });

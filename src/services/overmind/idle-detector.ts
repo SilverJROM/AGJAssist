@@ -3,19 +3,28 @@ import { stat } from "node:fs/promises";
 import type { AppSettingsService } from "../app-settings-service.js";
 import { DEFAULT_UNIFIED_IDLE_THRESHOLD_MIN } from "../app-settings-service.js";
 import type { NudgeStateService } from "../nudge-state-service.js";
-import type { OvermindWorkflow, OvermindWorkflowStatus } from "../overmind-service.js";
+import type { OvermindNotify } from "../overmind-watcher.js";
+import type { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "../overmind-service.js";
 import type { TmuxService } from "../../tmux/tmux-service.js";
 import type { WatcherCooldowns } from "./cooldowns.js";
+import { sendGuardedParentNudge, type OrphanedParentKind } from "./parent-nudge-guard.js";
 
 const TRACKED_ARTIFACT_FILES = ["progress.md", "callbacks.md", "queue.md"] as const;
 
 export interface ArtifactFailsafeDeps {
+  overmindService: OvermindService;
   tmuxService: TmuxService;
   cooldowns: WatcherCooldowns;
   appSettings?: AppSettingsService;
   nudgeState?: NudgeStateService;
+  notify?: OvermindNotify;
   TERMINAL_STATUSES: OvermindWorkflowStatus[];
   subagentInFlight?: boolean;
+}
+
+export interface ArtifactFailsafeResult {
+  fired: boolean;
+  parent_status?: OrphanedParentKind;
 }
 
 export async function getLastTrackedArtifactActivityMs(runDir: string): Promise<number> {
@@ -39,26 +48,26 @@ export async function maybeFireArtifactFailsafe(
   workflow: OvermindWorkflow,
   resolvedRunDir: string,
   deps: ArtifactFailsafeDeps
-): Promise<boolean> {
+): Promise<ArtifactFailsafeResult> {
   if (
     workflow.monitoring_paused ||
     deps.subagentInFlight ||
     deps.TERMINAL_STATUSES.includes(workflow.status)
   ) {
-    return false;
+    return { fired: false };
   }
 
   const parentApiMs = parseTimestampMs(workflow.last_parent_update_at);
   const artifactMtimeMs = await getLastTrackedArtifactActivityMs(resolvedRunDir);
   const lastActivityMs = Math.max(parentApiMs, artifactMtimeMs);
-  if (lastActivityMs === 0) return false;
+  if (lastActivityMs === 0) return { fired: false };
 
   const nowMs = Date.now();
   const thresholdMs = effectiveUnifiedIdleThresholdMs(workflow, deps.appSettings);
-  if (nowMs - lastActivityMs <= thresholdMs) return false;
+  if (nowMs - lastActivityMs <= thresholdMs) return { fired: false };
 
   const lastNudgeAt = getLastUnifiedIdleNudgeAt(workflow.id, deps.cooldowns, deps.nudgeState);
-  if (nowMs - lastNudgeAt < thresholdMs) return false;
+  if (nowMs - lastNudgeAt < thresholdMs) return { fired: false };
 
   const staleMinutes = Math.max(1, Math.round((nowMs - lastActivityMs) / 60_000));
   const message =
@@ -66,13 +75,21 @@ export async function maybeFireArtifactFailsafe(
     "Are you still working? Update progress.md with current status, or POST /api/overmind/complete if done.\n" +
     "Also check: is your watcher running? Is a ScheduleWakeup set? Re-run the watcher and set a ScheduleWakeup fallback if either is missing.";
   try {
-    await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + message);
+    const guarded = await sendGuardedParentNudge(
+      workflow,
+      "overmind: " + message,
+      deps,
+      (target, text) => deps.tmuxService.sendAndSubmit(target, text)
+    );
+    if (!guarded.sent) {
+      return { fired: false, parent_status: guarded.parent_status };
+    }
     deps.cooldowns.recordFired(workflow.id, "unified_idle_nudge", nowMs);
     deps.nudgeState?.setLastUnifiedIdleNudge(workflow.id, nowMs);
-    return true;
+    return { fired: true };
   } catch (error) {
     console.error("Overmind PATH 3 artifact fail-safe nudge failed:", error);
-    return false;
+    return { fired: false };
   }
 }
 

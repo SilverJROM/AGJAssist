@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import {
   OvermindChildSessionStatus,
+  OvermindParentStatus,
   OvermindService,
   OvermindWorkflow,
   OvermindWorkflowStatus
@@ -63,6 +64,7 @@ import {
   applyNudgeLadder
 } from "./overmind/nudge-ladder.js";
 import { handleAllTasksDone } from "./overmind/completion-detector.js";
+import { sendGuardedParentNudge } from "./overmind/parent-nudge-guard.js";
 export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
   private readonly childPaneHashes = new Map<number, Map<string, string>>();
@@ -136,8 +138,6 @@ export class OvermindWatcher {
       }
       if (this.subagentInFlight.has(workflow.id)) continue;
       try {
-        const parentAlive = await this.sessionExistsSafe(workflow.coordinator_session);
-        if (!parentAlive) continue;
         const gapSignature = workflow.info_check ?? workflow.info_request;
         const lastAskedSignature =
           this.nudgeState?.getLastReconcileAsk(workflow.id) ??
@@ -148,7 +148,17 @@ export class OvermindWatcher {
         const msg =
           `Overmind: registration gap detected (${problemDesc}) — please re-register your CURRENT child_sessions, child_roles, and status to overmind now (POST /api/overmind/register), ` +
           `and update your task list (POST /api/overmind/tasks) if it has changed since you last reported.`;
-        await this.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + msg);
+        const guarded = await sendGuardedParentNudge(
+          workflow,
+          "overmind: " + msg,
+          {
+            overmindService: this.overmindService,
+            nudgeState: this.nudgeState,
+            notify: this.notify
+          },
+          (target, text) => this.tmuxService.sendAndSubmit(target, text)
+        );
+        if (!guarded.sent) continue;
         this.lastReconcileAsk.set(workflow.id, gapSignature);
         this.nudgeState?.setLastReconcileAsk(workflow.id, gapSignature);
       } catch (error) {
@@ -186,6 +196,7 @@ export class OvermindWatcher {
       stuckSincePrev: workflow.stuck_since,
       now
     });
+    let effectiveParentStatus: OvermindParentStatus = parentStatus;
     const result = classifyWorkflow({
       coordinatorPane,
       childPanes,
@@ -227,7 +238,7 @@ export class OvermindWatcher {
         stuck_since: result.stuckSince,
         active_session: activeAttribution.active_session,
         active_role: activeAttribution.active_role,
-        parent_status: parentStatus,
+        parent_status: effectiveParentStatus,
         child_statuses: childStatuses,
         ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
       });
@@ -299,23 +310,41 @@ export class OvermindWatcher {
             ? "Overmind: all sessions appear idle — parent and all children are quiet.\n\nIf you have an in-process subagent running, reply with:\n  [OVERMIND] subagent <name> ~<N>min\nOtherwise, check callbacks.md for pending work, update progress.md with current status, or report STATUS."
             : "Overmind: your session appears idle — no child sessions are active.\n\nIf you have an in-process subagent running, reply with:\n  [OVERMIND] subagent <name> ~<N>min\nOtherwise, resume work or report STATUS.";
           try {
-            await this.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + msg);
-            this.cooldowns.recordFired(wid, "unified_idle_nudge", nowMs);
-            this.nudgeState?.setLastUnifiedIdleNudge(wid, nowMs);
+            const guarded = await sendGuardedParentNudge(
+              workflow,
+              "overmind: " + msg,
+              {
+                overmindService: this.overmindService,
+                nudgeState: this.nudgeState,
+                notify: this.notify
+              },
+              (target, text) => this.tmuxService.sendAndSubmit(target, text)
+            );
+            if (guarded.sent) {
+              this.cooldowns.recordFired(wid, "unified_idle_nudge", nowMs);
+              this.nudgeState?.setLastUnifiedIdleNudge(wid, nowMs);
+            } else if (guarded.parent_status) {
+              effectiveParentStatus = guarded.parent_status;
+            }
           } catch (err) {
             console.error("Overmind PATH 2 idle nudge failed:", err);
           }
         }
       }
     }
-    await maybeFireArtifactFailsafe(workflow, resolvedRunDir, {
+    const artifactFailsafe = await maybeFireArtifactFailsafe(workflow, resolvedRunDir, {
+      overmindService: this.overmindService,
       tmuxService: this.tmuxService,
       cooldowns: this.cooldowns,
       appSettings: this.appSettings,
       nudgeState: this.nudgeState,
+      notify: this.notify,
       TERMINAL_STATUSES,
       subagentInFlight: this.subagentInFlight.has(wid)
     });
+    if (artifactFailsafe.parent_status) {
+      effectiveParentStatus = artifactFailsafe.parent_status;
+    }
     if (this.subagentInFlight.has(wid)) {
       this.overmindService.update(workflow.id, {
         status: "working",
@@ -324,7 +353,7 @@ export class OvermindWatcher {
         stuck_since: null,
         active_session: activeAttribution.active_session,
         active_role: activeAttribution.active_role,
-        parent_status: parentStatus,
+        parent_status: effectiveParentStatus,
         child_statuses: childStatuses,
         ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
       });
@@ -336,13 +365,15 @@ export class OvermindWatcher {
         coordinatorPane,
         result.coordinatorHash,
         activeAttribution,
-        parentStatus,
+        effectiveParentStatus,
         childStatuses,
         resolvedRunDir,
         {
           overmindService: this.overmindService,
           tmuxService: this.tmuxService,
-          brain: this.brain
+          brain: this.brain,
+          nudgeState: this.nudgeState,
+          notify: this.notify
         }
       );
       return;
@@ -385,7 +416,7 @@ export class OvermindWatcher {
       stuck_since: nudgeFields.stuck_since !== undefined ? nudgeFields.stuck_since : result.stuckSince,
       active_session: activeAttribution.active_session,
       active_role: activeAttribution.active_role,
-      parent_status: parentStatus,
+      parent_status: info.parent_status ?? nudgeFields.parent_status ?? effectiveParentStatus,
       child_statuses: childStatuses,
       info_request: info.info_request,
       info_check: info.info_check,
@@ -412,6 +443,7 @@ export class OvermindWatcher {
     info_request: string | null;
     info_check: string | null;
     last_pane_hash?: string;
+    parent_status?: OvermindParentStatus;
     requestedThisTick: boolean;
   }> {
     const ageMs = Math.max(
@@ -446,9 +478,23 @@ export class OvermindWatcher {
       return { info_request: requestLabel, info_check: assessment.signature, requestedThisTick: false };
     }
     let lastPaneHash: string | undefined;
+    let parentStatus: OvermindParentStatus | undefined;
     try {
-      await this.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + requestText);
-      lastPaneHash = hashPane(await this.capturePaneSafe(workflow.coordinator_session));
+      const guarded = await sendGuardedParentNudge(
+        workflow,
+        "overmind: " + requestText,
+        {
+          overmindService: this.overmindService,
+          nudgeState: this.nudgeState,
+          notify: this.notify
+        },
+        (target, text) => this.tmuxService.sendAndSubmit(target, text)
+      );
+      if (guarded.sent) {
+        lastPaneHash = hashPane(await this.capturePaneSafe(guarded.parentSession));
+      } else {
+        parentStatus = guarded.parent_status;
+      }
     } catch (error) {
       console.error("Overmind completeness request failed:", error);
     }
@@ -456,6 +502,7 @@ export class OvermindWatcher {
       info_request: requestLabel,
       info_check: assessment.signature,
       last_pane_hash: lastPaneHash,
+      parent_status: parentStatus,
       requestedThisTick: true
     };
   }

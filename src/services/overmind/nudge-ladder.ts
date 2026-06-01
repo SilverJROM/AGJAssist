@@ -24,6 +24,7 @@ import {
 import { hashPane } from "./pane-utils.js";
 import type { WatcherCooldowns } from "./cooldowns.js";
 import type { OvermindNotify } from "../overmind-watcher.js";
+import { sendGuardedParentNudge, type OrphanedParentKind } from "./parent-nudge-guard.js";
 
 const CAPTURE_LINES = 200;
 const MAX_CANNED_NUDGES = 2;
@@ -41,6 +42,7 @@ export interface NudgeLadderFields {
   nudge_count: number;
   tier: number;
   status?: OvermindWorkflowStatus;
+  parent_status?: OrphanedParentKind;
   last_pane_hash?: string;
   stuck_since?: string | null;
   pending_decision?: string | null;
@@ -99,11 +101,23 @@ export async function applyNudgeLadder(
 
   const nextNudgeCount = workflow.nudge_count + 1;
   const nudgeText = (workflow.child_sessions?.length ?? 0) === 0 ? CANNED_NUDGE_NO_CHILD : CANNED_NUDGE;
-  await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + nudgeText);
+  const guarded = await sendGuardedParentNudge(
+    workflow,
+    "overmind: " + nudgeText,
+    deps,
+    (target, text) => deps.tmuxService.sendAndSubmit(target, text)
+  );
+  if (!guarded.sent) {
+    return {
+      nudge_count: workflow.nudge_count,
+      tier: workflow.tier,
+      parent_status: guarded.parent_status
+    };
+  }
   const sendTs = Date.now();
   deps.cooldowns.recordFired(workflow.id, "unified_idle_nudge", sendTs);
   deps.nudgeState?.setLastUnifiedIdleNudge(workflow.id, sendTs);
-  const postNudgePane = await capturePaneSafe(deps.tmuxService, workflow.coordinator_session);
+  const postNudgePane = await capturePaneSafe(deps.tmuxService, guarded.parentSession);
   return {
     nudge_count: nextNudgeCount,
     tier: nextNudgeCount,
@@ -162,9 +176,33 @@ export async function applyDecisionInterception(
   await logDecisionCorrection(workflow, pendingDecision, guardedVerdict);
 
   if (guardedVerdict.action === "answer") {
-    await deps.tmuxService.sendCommand(workflow.coordinator_session, "overmind: " + guardedVerdict.answerText!, true, true);
-    await deps.tmuxService.sendCommand(workflow.coordinator_session, "overmind: " + FRONTLOAD_CORRECTION_NOTE, true, true);
-    const postDecisionPane = await capturePaneSafe(deps.tmuxService, workflow.coordinator_session);
+    const answerSend = await sendGuardedParentNudge(
+      workflow,
+      "overmind: " + guardedVerdict.answerText!,
+      deps,
+      (target, text) => deps.tmuxService.sendCommand(target, text, true, true)
+    );
+    if (!answerSend.sent) {
+      return {
+        nudge_count: workflow.nudge_count,
+        tier: workflow.tier,
+        parent_status: answerSend.parent_status
+      };
+    }
+    const correctionSend = await sendGuardedParentNudge(
+      workflow,
+      "overmind: " + FRONTLOAD_CORRECTION_NOTE,
+      deps,
+      (target, text) => deps.tmuxService.sendCommand(target, text, true, true)
+    );
+    if (!correctionSend.sent) {
+      return {
+        nudge_count: workflow.nudge_count,
+        tier: workflow.tier,
+        parent_status: correctionSend.parent_status
+      };
+    }
+    const postDecisionPane = await capturePaneSafe(deps.tmuxService, correctionSend.parentSession);
     return {
       nudge_count: workflow.nudge_count,
       tier: DECISION_HANDLED_TIER,
@@ -212,8 +250,20 @@ async function applyTier3Brain(
   }
 
   if (verdict.action === "nudge") {
-    await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + verdict.nudgeText!);
-    const postNudgePane = await capturePaneSafe(deps.tmuxService, workflow.coordinator_session);
+    const guarded = await sendGuardedParentNudge(
+      workflow,
+      "overmind: " + verdict.nudgeText!,
+      deps,
+      (target, text) => deps.tmuxService.sendAndSubmit(target, text)
+    );
+    if (!guarded.sent) {
+      return {
+        nudge_count: workflow.nudge_count,
+        tier: workflow.tier,
+        parent_status: guarded.parent_status
+      };
+    }
+    const postNudgePane = await capturePaneSafe(deps.tmuxService, guarded.parentSession);
     return {
       nudge_count: workflow.nudge_count,
       tier: 3,

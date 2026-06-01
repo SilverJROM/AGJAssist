@@ -31,6 +31,7 @@ export class NudgeStateService {
   private readonly dataDir: string;
   private readonly stateFile: string;
   private state: NudgeStateFile = { workflows: {}, registerAdviceCooldowns: {} };
+  private readonly parentOrphanedAlerts = new Set<string>();
 
   constructor() {
     this.dataDir = path.resolve(process.cwd(), "data");
@@ -142,6 +143,14 @@ export class NudgeStateService {
     this.persistSync();
   }
 
+  hasParentOrphanedAlerted(workflowId: number): boolean {
+    return this.parentOrphanedAlerts.has(String(workflowId));
+  }
+
+  markParentOrphanedAlerted(workflowId: number): void {
+    this.parentOrphanedAlerts.add(String(workflowId));
+  }
+
   /**
    * Remove persisted state for a workflow across every per-workflow map/key.
    * Also removes register-advice cooldown keys targeting this workflow.
@@ -151,6 +160,9 @@ export class NudgeStateService {
     let changed = false;
     if (key in this.state.workflows) {
       delete this.state.workflows[key];
+      changed = true;
+    }
+    if (this.parentOrphanedAlerts.delete(key)) {
       changed = true;
     }
     const adviceKeys = Object.keys(this.state.registerAdviceCooldowns ?? {});

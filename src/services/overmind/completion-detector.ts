@@ -11,10 +11,13 @@ import type {
   OvermindService,
   OvermindWorkflow
 } from "../overmind-service.js";
+import type { NudgeStateService } from "../nudge-state-service.js";
+import type { OvermindNotify } from "../overmind-watcher.js";
 import type { TmuxService } from "../../tmux/tmux-service.js";
 import type { ActiveSessionAttribution } from "./active-session-attribution.js";
 import { collectPriorDecisions } from "./decision-match.js";
 import { hashPane } from "./pane-utils.js";
+import { sendGuardedParentNudge } from "./parent-nudge-guard.js";
 
 const CAPTURE_LINES = 200;
 const BRAIN_COORDINATOR_TAIL_LINES = 40;
@@ -25,6 +28,8 @@ export interface CompletionDetectorDeps {
   overmindService: OvermindService;
   tmuxService: TmuxService;
   brain?: OvermindBrain;
+  nudgeState?: NudgeStateService;
+  notify?: OvermindNotify;
 }
 
 export async function handleAllTasksDone(
@@ -75,9 +80,19 @@ export async function handleAllTasksDone(
   }
 
   let lastPaneHash = coordinatorHash;
+  let nextParentStatus = parentStatus;
   try {
-    await deps.tmuxService.sendAndSubmit(workflow.coordinator_session, "overmind: " + verdict.consultText!);
-    lastPaneHash = hashPane(await capturePaneSafe(deps.tmuxService, workflow.coordinator_session));
+    const guarded = await sendGuardedParentNudge(
+      workflow,
+      "overmind: " + verdict.consultText!,
+      deps,
+      (target, text) => deps.tmuxService.sendAndSubmit(target, text)
+    );
+    if (guarded.sent) {
+      lastPaneHash = hashPane(await capturePaneSafe(deps.tmuxService, guarded.parentSession));
+    } else if (guarded.parent_status) {
+      nextParentStatus = guarded.parent_status;
+    }
   } catch (error) {
     console.error("Overmind completion consult nudge failed:", error);
   }
@@ -92,7 +107,7 @@ export async function handleAllTasksDone(
     completion_check: signature,
     active_session: attribution.active_session,
     active_role: attribution.active_role,
-    parent_status: parentStatus,
+    parent_status: nextParentStatus,
     child_statuses: childStatuses
   });
 }
