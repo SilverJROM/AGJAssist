@@ -278,11 +278,16 @@ export class OvermindService {
     project_id: number;
     label: string;
     run_dir: string;
+    coordinator_session?: string | null;
     current_task?: string | null;
     tasks?: OvermindTask[];
   }): OvermindWorkflow {
     let tasks = sanitizeTaskList(input.tasks);
     const existing = this.getByProjectRunDir(input.project_id, input.run_dir);
+    // coordinator_session is DERIVED server-side from the project's parent_session
+    // (the attach shape forbids the caller supplying it). Without this it stayed NULL,
+    // which the watcher + spark daemon read as "coord session dead" → false CRASHED.
+    const coordinatorSession = input.coordinator_session ?? existing?.coordinator_session ?? null;
     const currentTask = input.current_task !== undefined
       ? sanitizeCurrentTask(input.current_task)
       : existing?.current_task ?? null;
@@ -307,6 +312,7 @@ export class OvermindService {
           .prepare(
             `UPDATE overmind_workflows
              SET label = ?,
+                 coordinator_session = ?,
                  project_id = ?,
                  run_dir = ?,
                  status = 'active',
@@ -328,6 +334,7 @@ export class OvermindService {
           )
           .get(
             input.label,
+            coordinatorSession,
             input.project_id,
             input.run_dir,
             currentTask,
@@ -361,12 +368,13 @@ export class OvermindService {
               run_started_at,
               accumulated_ms,
               updated_at
-            ) VALUES (?, ?, NULL, '[]', '[]', ?, 'active', ?, ?, NULL, NULL, NULL, ?, '[]', NULL, 0, 0, NULL, ?, 0, ?)
+            ) VALUES (?, ?, ?, '[]', '[]', ?, 'active', ?, ?, NULL, NULL, NULL, ?, '[]', NULL, 0, 0, NULL, ?, 0, ?)
             RETURNING *`
           )
           .get(
             input.project_id,
             input.label,
+            coordinatorSession,
             input.run_dir,
             currentTask,
             JSON.stringify(effectiveTasks),

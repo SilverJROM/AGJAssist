@@ -715,7 +715,9 @@ describe("Overmind routes", () => {
       id: firstBody.workflow_id,
       project_id: project.id,
       label: "agjassist · run-1",
-      coordinator_session: null,
+      // coordinator_session is DERIVED from the project's parent_session on attach
+      // (was NULL — the bug that made the watcher/spark-daemon read "coord session dead").
+      coordinator_session: "AGJ-51",
       run_dir: fs.realpathSync(runDir)
     });
 

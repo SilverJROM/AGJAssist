@@ -540,7 +540,8 @@ export function registerOvermindRoutes(
         let workflow = overmindService.registerAttached({
           project_id: match.project.id,
           label: `${match.project.slug} · ${path.basename(match.run_dir) || "run"}`,
-          run_dir: match.run_dir
+          run_dir: match.run_dir,
+          coordinator_session: match.project.parent_session
         });
         let parentStatus: OvermindParentStatus = "unknown";
         try {
