@@ -486,6 +486,51 @@ body {
   padding: 10px 12px;
   font-size: 13px;
 }
+.overmind-project-list {
+  gap: 10px;
+}
+.overmind-project-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.overmind-project-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.overmind-project-card-header h3 {
+  font-size: 15px;
+  margin: 0;
+}
+.overmind-project-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.overmind-project-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.overmind-project-field span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+.overmind-project-field strong,
+.overmind-project-field code {
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.overmind-project-field code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
 .overmind-tabs {
   display: inline-flex;
   align-self: flex-start;
@@ -1484,6 +1529,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
   .header { padding: 8px 12px; }
   .main { padding: 12px; }
   .project-grid { grid-template-columns: 1fr; }
+  .overmind-project-grid { grid-template-columns: 1fr; }
   .terminal-container { flex-direction: column; height: auto; }
   .session-tree { width: 100%; max-height: 200px; }
   .terminal-panel { min-height: 400px; }

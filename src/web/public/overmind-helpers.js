@@ -42,7 +42,8 @@ export const AVAILABLE_BOTTOM_NAV_TABS = [
   { id: '/terminals', icon: '\u{1F5A5}', label: 'Terminal' },
   { id: '/conversations', icon: '\u{1F4AC}', label: 'Chat' },
   { id: '/settings', icon: '\u{2699}', label: 'Settings' },
-  { id: '/overmind', icon: '\u{25B6}', label: 'Workflows' }
+  { id: '/overmind', icon: '\u{25B6}', label: 'Workflows' },
+  { id: '/overmind-projects', icon: '\u{25A3}', label: 'OVM Projects' }
 ];
 
 export const DEFAULT_BOTTOM_NAV_TAB_IDS = [
@@ -51,6 +52,7 @@ export const DEFAULT_BOTTOM_NAV_TAB_IDS = [
   '/notes',
   '/terminals',
   '/conversations',
+  '/overmind-projects',
   '/settings'
 ];
 

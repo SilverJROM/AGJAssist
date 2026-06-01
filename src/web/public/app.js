@@ -445,6 +445,7 @@ function Header({ user }) {
           <a href="#/projects" class=${route === '/projects' || route.startsWith('/project/') ? 'active' : ''}>Projects</a>
           <a href="#/terminals" class=${route === '/terminals' ? 'active' : ''}>Terminals</a>
           <a href="#/overmind" class=${route === '/overmind' ? 'active' : ''}>Workflows</a>
+          <a href="#/overmind-projects" class=${route === '/overmind-projects' ? 'active' : ''}>OVM Projects</a>
           <a href="#/tasks" class=${route === '/tasks' ? 'active' : ''}>Tasks</a>
           <a href="#/notes" class=${route === '/notes' ? 'active' : ''}>Notes</a>
           <a href="#/conversations" class=${route === '/conversations' ? 'active' : ''}>Chat</a>
@@ -1416,6 +1417,165 @@ function Projects() {
           ` : ''}
         `
       }
+    </div>
+  `;
+}
+
+function OvermindProjects() {
+  const emptyForm = { slug: '', app_path: '', parent_session: '', notes: '' };
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [createError, setCreateError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadProjects = useCallback(async () => {
+    setError('');
+    try {
+      const data = await api('/api/overmind/projects');
+      setProjects(Array.isArray(data.projects) ? data.projects : []);
+    } catch (e) {
+      setError(e.message || 'Failed to load Overmind projects.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadProjects(); }, [loadProjects]);
+
+  function openCreate() {
+    setForm(emptyForm);
+    setCreateError('');
+    setShowCreate(true);
+  }
+
+  function updateForm(field, value) {
+    setForm(current => ({ ...current, [field]: value }));
+  }
+
+  async function createProject(e) {
+    e?.preventDefault?.();
+    if (submitting) return;
+    setCreateError('');
+    setSubmitting(true);
+    try {
+      const body = {
+        slug: form.slug.trim(),
+        app_path: form.app_path.trim(),
+        parent_session: form.parent_session.trim()
+      };
+      if (form.notes.trim()) body.notes = form.notes;
+      await api('/api/overmind/projects', {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+      setShowCreate(false);
+      setForm(emptyForm);
+      setLoading(true);
+      await loadProjects();
+    } catch (e) {
+      setCreateError(e.message || 'Failed to create Overmind project.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const canSubmit = form.slug.trim() && form.app_path.trim() && form.parent_session.trim();
+
+  return html`
+    <div class="overmind-page">
+      <div class="action-bar">
+        <h2>OVM Projects</h2>
+        <div class="overmind-actions">
+          <button class="btn btn-sm" onclick=${loadProjects}>Refresh</button>
+          <button class="btn btn-sm btn-primary" onclick=${openCreate}>+ New Project</button>
+        </div>
+      </div>
+
+      ${error && html`<div class="overmind-alert">${error}</div>`}
+
+      ${loading ? html`
+        <div class="loading">Loading Overmind projects...</div>
+      ` : projects.length === 0 ? html`
+        <div class="empty-state">No Overmind projects yet.</div>
+      ` : html`
+        <div class="item-list overmind-project-list">
+          ${projects.map(project => html`
+            <section class="item-card overmind-project-card" key=${project.slug}>
+              <div class="overmind-project-card-header">
+                <h3>${project.slug}</h3>
+                <span class=${'badge ' + (project.active_runs_count > 0 ? 'badge-active' : 'badge-draft')}>
+                  ${project.active_runs_count || 0} active
+                </span>
+              </div>
+              <div class="overmind-project-field">
+                <span>app_path</span>
+                <code>${project.app_path}</code>
+              </div>
+              <div class="overmind-project-grid">
+                <div class="overmind-project-field">
+                  <span>parent_session</span>
+                  <strong>${project.parent_session}</strong>
+                </div>
+                <div class="overmind-project-field">
+                  <span>updated_at</span>
+                  <strong>${project.updated_at ? new Date(project.updated_at).toLocaleString() : '—'}</strong>
+                </div>
+              </div>
+            </section>
+          `)}
+        </div>
+      `}
+
+      ${showCreate && html`
+        <div class="modal-overlay" onclick=${() => !submitting && setShowCreate(false)}>
+          <form class="modal" style="max-width:560px" onclick=${e => e.stopPropagation()} onSubmit=${createProject}>
+            <h3>New OVM Project</h3>
+            ${createError && html`<div class="overmind-alert" style="margin-bottom:12px">${createError}</div>`}
+            <div class="form-group">
+              <label>Slug</label>
+              <input
+                value=${form.slug}
+                onInput=${e => updateForm('slug', e.target.value)}
+                placeholder="agjassist"
+                autofocus
+              />
+            </div>
+            <div class="form-group">
+              <label>App Path</label>
+              <input
+                value=${form.app_path}
+                onInput=${e => updateForm('app_path', e.target.value)}
+                placeholder="/home/agjrom/TGBOTS/AGJAssist"
+              />
+            </div>
+            <div class="form-group">
+              <label>Parent Session</label>
+              <input
+                value=${form.parent_session}
+                onInput=${e => updateForm('parent_session', e.target.value)}
+                placeholder="AGJ-51"
+              />
+            </div>
+            <div class="form-group">
+              <label>Notes</label>
+              <textarea
+                value=${form.notes}
+                onInput=${e => updateForm('notes', e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+            <div class="modal-actions">
+              <button class="btn" type="button" onclick=${() => !submitting && setShowCreate(false)} disabled=${submitting}>Cancel</button>
+              <button class="btn btn-primary" type="submit" disabled=${submitting || !canSubmit}>
+                ${submitting ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          </form>
+        </div>
+      `}
     </div>
   `;
 }
@@ -5514,7 +5674,7 @@ function TgApp() {
     const initialHash = location.hash.slice(1);
     const KNOWN_PREFIXES = ['/project/'];
     const KNOWN_EXACT = new Set([
-      '/', '/projects', '/terminals', '/overmind', '/tasks',
+      '/', '/projects', '/terminals', '/overmind', '/overmind-projects', '/tasks',
       '/notes', '/conversations', '/settings'
     ]);
     const isKnown =
@@ -5545,6 +5705,8 @@ function TgApp() {
     content = html`<${Terminals} />`;
   } else if (route === '/overmind') {
     content = html`<${OvermindWorkflows} />`;
+  } else if (route === '/overmind-projects') {
+    content = html`<${OvermindProjects} />`;
   } else if (route === '/tasks') {
     content = html`<${TasksSection} />`;
   } else if (route === '/notes') {
@@ -5604,6 +5766,8 @@ function App() {
     content = html`<${Terminals} />`;
   } else if (route === '/overmind') {
     content = html`<${OvermindWorkflows} />`;
+  } else if (route === '/overmind-projects') {
+    content = html`<${OvermindProjects} />`;
   } else if (route === '/tasks') {
     content = html`<${TasksSection} />`;
   } else if (route === '/notes') {

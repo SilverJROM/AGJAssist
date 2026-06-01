@@ -37,3 +37,7 @@
 [projcore callback] batch-b12i PROPOSED hook outbound overmind parent sends through project parent resolver + is_agent_pane precheck; suppress/orphan/TG-once design ready; awaiting APPROVED-PLAN. DISPATCH-MARKER: AGJ-B12I
 [projcore callback] batch-b12i APPROVED-PLAN implementing shared parent-nudge guard with in-memory NudgeStateService debounce; route corrective/child-close sends out of scope. DISPATCH-MARKER: AGJ-B12I
 [projcore callback] batch-b12i DONE shared parent-nudge guard implemented; project parent resolver + legacy fallback; bare-bash/no-session suppress with parent_status + TG once; targeted guard tests and build green. DISPATCH-MARKER: AGJ-B12I
+[projcore callback] batch-b12i VALIDATED PASS parent guard suppresses bare-bash/no-session with TG-once debounce, allows agent/legacy sends, and all nudge chokepoints route through guard; build and targeted tests pass. DISPATCH-MARKER: AGJ-VAL-B12I
+[projcore callback] batch-b12j PROPOSED Add distinct /overmind-projects bottom-nav dashboard page with GET list, owner-JWT create modal, mapped 409/400/403 UI errors, and app-level create-flow proof. DISPATCH-MARKER: AGJ-B12J
+[projcore callback] batch-b12j APPROVED-PLAN Implementing distinct /overmind-projects dashboard list/create UI using existing app.js + bottom-nav conventions. DISPATCH-MARKER: AGJ-B12J
+[projcore callback] batch-b12j DONE distinct OVM Projects tab/page implemented; list + owner-JWT create modal verified via Playwright, DB row, 409/400/403 UI errors, build, and targeted tests. DISPATCH-MARKER: AGJ-B12J
