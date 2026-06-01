@@ -258,23 +258,23 @@ spark_classify_run_signals() {
   local head_delta="$9"
   local unchanged_ticks="${10}"
   local unchanged_threshold="${11:-${SPARK_DAEMON_PANE_UNCHANGED_TICKS}}"
-  local fresh_progress=0
-
-  if [[ "${pane_changed}" == "1" || "${progress_fresh}" == "1" || "${callbacks_delta}" == "1" || "${head_delta}" == "1" ]]; then
-    fresh_progress=1
-  fi
 
   if [[ "${session_dead}" == "1" || "${watcher_alive}" != "1" ]]; then
     printf 'CRASHED\n'
     return 0
   fi
 
-  if [[ "${fresh_progress}" == "1" ]]; then
+  if [[ "${pane_changed}" == "1" ]]; then
     printf 'HEALTHY\n'
     return 0
   fi
 
-  if [[ "${worked_for_marker}" == "1" && "${active_busy_marker}" == "0" && "${progress_stale}" == "0" ]]; then
+  if [[ "${progress_fresh}" == "1" ]] && (( unchanged_ticks < unchanged_threshold )); then
+    printf 'HEALTHY\n'
+    return 0
+  fi
+
+  if [[ "${worked_for_marker}" == "1" && "${active_busy_marker}" == "0" && "${progress_fresh}" == "0" ]]; then
     printf 'IDLE-CLEAN\n'
     return 0
   fi
