@@ -104,6 +104,11 @@ interface OvermindProjectRow {
   updated_at: string;
 }
 
+interface ActiveRunRow extends OvermindWorkflowRow {
+  project_slug: string;
+  project_parent_session: string;
+}
+
 const PROJECT_TREE_TERMINAL_STATUSES = new Set<OvermindWorkflowStatus>(["completed", "failed", "paused"]);
 
 export interface OvermindWorkflowLookup {
@@ -116,6 +121,12 @@ export interface OvermindProjectRunDirMatch {
   project: OvermindProject | null;
   run_dir: string;
   searched_up_to: string;
+}
+
+export interface OvermindActiveRun {
+  workflow: OvermindWorkflow;
+  project_slug: string;
+  parent_session: string;
 }
 
 // Depth of components shared between two run_dirs that counts as "same project".
@@ -627,6 +638,30 @@ export class OvermindService {
       )
       .get(id) as { parent_session: string } | undefined;
     return row?.parent_session ?? null;
+  }
+
+  listActiveRunsForDaemon(): OvermindActiveRun[] {
+    const rows = this.db
+      .prepare(
+        `SELECT
+           w.*,
+           p.slug AS project_slug,
+           p.parent_session AS project_parent_session
+         FROM overmind_workflows w
+         JOIN overmind_projects p ON p.id = w.project_id
+         WHERE w.status NOT IN ('completed', 'failed', 'paused')
+         ORDER BY datetime(w.created_at) ASC, w.id ASC`
+      )
+      .all() as ActiveRunRow[];
+
+    return rows.map((row) => {
+      const { project_slug, project_parent_session, ...workflowRow } = row;
+      return {
+        workflow: this.mapRow(workflowRow),
+        project_slug,
+        parent_session: project_parent_session
+      };
+    });
   }
 
   listHistory(coordinatorSession?: string): OvermindTaskHistoryEntry[] {

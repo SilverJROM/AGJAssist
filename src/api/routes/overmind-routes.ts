@@ -10,6 +10,7 @@ import {
   OvermindTask,
   OvermindWorkflow,
   OvermindWorkflowStatus,
+  OvermindActiveRun,
   RunSummary
 } from "../../services/overmind-service.js";
 import type { OvermindNotify } from "../../services/overmind-watcher.js";
@@ -99,6 +100,27 @@ interface AskUpdateCooldownBody extends TokenBody {
   override_minutes?: number | null;
 }
 
+interface ActiveRunChild {
+  session: string;
+  role: string;
+}
+
+interface ActiveRunResponseItem {
+  run_id: number;
+  run_dir: string;
+  label: string;
+  parent_label: string;
+  parent_session: string;
+  status: OvermindWorkflowStatus;
+  registered_at: string;
+  children: ActiveRunChild[];
+  dispatch_manifests: string[];
+}
+
+interface ActiveRunsResponse {
+  runs: ActiveRunResponseItem[];
+}
+
 const REGISTER_CONFLICT_NUDGE_COOLDOWN_MS = 30 * 60 * 1000;
 const PROJECT_MUTATION_FORBIDDEN = {
   error: "projects are JROM-managed; ask JROM to create via dashboard"
@@ -149,13 +171,22 @@ function requireLoopbackAndToken(
   reply: FastifyReply,
   expectedToken: string
 ): boolean {
+  return requireLoopbackAndTokenCredential(request, reply, expectedToken);
+}
+
+function requireLoopbackAndTokenCredential(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  expectedToken: string
+): boolean {
   if (!isLoopbackAddress(request.ip)) {
     reply.code(403).send({ error: "Overmind lifecycle endpoints are localhost-only" });
     return false;
   }
 
   const headerToken = request.headers["x-overmind-token"];
-  const token = request.body?.token || (Array.isArray(headerToken) ? headerToken[0] : headerToken);
+  const body = request.body as TokenBody | undefined;
+  const token = body?.token || (Array.isArray(headerToken) ? headerToken[0] : headerToken);
   if (!token || token !== expectedToken) {
     reply.code(401).send({ error: "Missing or invalid overmind token" });
     return false;
@@ -245,6 +276,44 @@ function hasWorkflowLookupKey(body: { workflow_id?: number | string; run_dir?: s
     typeof body.session === "string" && body.session.trim() !== "";
 }
 
+function listDispatchManifests(runDir: string): string[] {
+  const dispatchDir = path.join(runDir, "dispatch");
+  try {
+    return fs.readdirSync(dispatchDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+      .map((entry) => path.join(dispatchDir, entry.name))
+      .sort();
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error.code === "ENOENT" || error.code === "ENOTDIR")
+    ) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+function mapActiveRunForDaemon(activeRun: OvermindActiveRun): ActiveRunResponseItem {
+  const { workflow, project_slug, parent_session } = activeRun;
+  return {
+    run_id: workflow.id,
+    run_dir: workflow.run_dir,
+    label: workflow.label || project_slug,
+    parent_label: project_slug,
+    parent_session,
+    status: workflow.status,
+    registered_at: workflow.created_at,
+    children: workflow.child_sessions.map((session, index) => ({
+      session,
+      role: workflow.child_roles[index] || "child"
+    })),
+    dispatch_manifests: listDispatchManifests(workflow.run_dir)
+  };
+}
+
 // Best-effort JWT verification — returns the session user (owner role) when a
 // valid owner-authed bearer token is present, null otherwise. Used by dual-auth
 // routes that accept either JWT-owner (UI) or loopback+overmind-token (CLI).
@@ -282,6 +351,17 @@ export function registerOvermindRoutes(
     active_runs_count: overmindService.activeRunsCountForProjectSlug(project.slug),
     latest_parent_status: overmindService.latestParentStatusForProjectSlug(project.slug)
   });
+
+  app.get(
+    "/api/overmind/runs/active",
+    async (request, reply): Promise<ActiveRunsResponse | void> => {
+      if (!requireLoopbackAndTokenCredential(request, reply, config.overmind.token)) return;
+
+      return {
+        runs: overmindService.listActiveRunsForDaemon().map(mapActiveRunForDaemon)
+      };
+    }
+  );
 
   app.post<{ Body: CreateProjectBody }>(
     "/api/overmind/projects",

@@ -89,6 +89,17 @@ function lifecycleDeleteWithTokenHeader(url: string) {
   });
 }
 
+function lifecycleGetWithTokenHeader(url: string, remoteAddress = "127.0.0.1") {
+  return app.inject({
+    method: "GET",
+    url,
+    remoteAddress,
+    headers: {
+      "x-overmind-token": OVERMIND_TOKEN
+    }
+  });
+}
+
 let app: FastifyInstance;
 let db: DatabaseService;
 let authService: AuthService;
@@ -492,6 +503,94 @@ describe("Overmind routes", () => {
       headers: authHeader()
     });
     expect(missing.statusCode).toBe(404);
+  });
+
+  it("serves project-backed active runs for the spark daemon", async () => {
+    const empty = await lifecycleGetWithTokenHeader("/api/overmind/runs/active");
+    expect(empty.statusCode).toBe(200);
+    expect(empty.json()).toEqual({ runs: [] });
+
+    const appPath = tempProjectPath();
+    const runDir = path.join(appPath, "spark-run");
+    const dispatchDir = path.join(runDir, "dispatch");
+    fs.mkdirSync(dispatchDir, { recursive: true });
+    fs.writeFileSync(path.join(dispatchDir, "b.json"), "{}");
+    fs.writeFileSync(path.join(dispatchDir, "a.json"), "{}");
+    fs.writeFileSync(path.join(dispatchDir, "ignore.txt"), "ignore");
+
+    const project = overmindService.createProject({
+      slug: "agjassist",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: null
+    });
+    const activeId = db.prepare(
+      `INSERT INTO overmind_workflows (
+         project_id,
+         label,
+         coordinator_session,
+         child_sessions,
+         child_roles,
+         run_dir,
+         status,
+         tasks,
+         created_at
+       ) VALUES (?, 'AGJ B2', NULL, ?, ?, ?, 'working', '[]', '2026-06-01T13:00:00.000Z')`
+    ).run(
+      project.id,
+      JSON.stringify(["agj-spark", "agj-validator"]),
+      JSON.stringify(["implementer", "validator"]),
+      runDir
+    ).lastInsertRowid as number;
+    db.prepare(
+      `INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir, status, tasks)
+       VALUES (?, 'completed-run', NULL, ?, 'completed', '[]')`
+    ).run(project.id, path.join(appPath, "completed"));
+    db.prepare(
+      `INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir, status, tasks)
+       VALUES (?, 'paused-run', NULL, ?, 'paused', '[]')`
+    ).run(project.id, path.join(appPath, "paused"));
+    db.prepare(
+      `INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir, status, tasks)
+       VALUES (NULL, 'legacy-active', 'legacy-parent', '/tmp/legacy-active', 'active', '[]')`
+    ).run();
+
+    const response = await lifecycleGetWithTokenHeader("/api/overmind/runs/active");
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      runs: [
+        {
+          run_id: activeId,
+          run_dir: runDir,
+          label: "AGJ B2",
+          parent_label: "agjassist",
+          parent_session: "AGJ-51",
+          status: "working",
+          registered_at: "2026-06-01T13:00:00.000Z",
+          children: [
+            { session: "agj-spark", role: "implementer" },
+            { session: "agj-validator", role: "validator" }
+          ],
+          dispatch_manifests: [
+            path.join(dispatchDir, "a.json"),
+            path.join(dispatchDir, "b.json")
+          ]
+        }
+      ]
+    });
+  });
+
+  it("rejects active-runs registry reads without loopback overmind token auth", async () => {
+    const noToken = await app.inject({
+      method: "GET",
+      url: "/api/overmind/runs/active",
+      remoteAddress: "127.0.0.1"
+    });
+    expect(noToken.statusCode).toBe(401);
+
+    const nonLoopback = await lifecycleGetWithTokenHeader("/api/overmind/runs/active", "10.0.0.7");
+    expect(nonLoopback.statusCode).toBe(403);
   });
 
   it("registers and upserts workflows from localhost with the shared token", async () => {
