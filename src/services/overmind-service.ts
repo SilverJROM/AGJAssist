@@ -40,6 +40,7 @@ export { isTrashTaskLabel, sanitizeTaskList, sanitizeCurrentTask } from "./overm
 
 interface OvermindWorkflowRow {
   id: number;
+  project_id: number | null;
   label: string;
   display_name: string | null;
   coordinator_session: string;
@@ -88,6 +89,12 @@ interface OvermindTaskHistoryRow {
 
 const PROJECT_TREE_TERMINAL_STATUSES = new Set<OvermindWorkflowStatus>(["completed", "failed", "paused"]);
 
+export interface OvermindWorkflowLookup {
+  workflow_id?: number | string | null;
+  run_dir?: string | null;
+  session?: string | null;
+}
+
 // Depth of components shared between two run_dirs that counts as "same project".
 // pathComponents returns [root, ...nonEmpty]; for /home/agjrom/<bucket>/<proj>/...
 // that's [/, home, agjrom, bucket, proj, ...] — so depth 5 means the project
@@ -120,66 +127,87 @@ export class OvermindService {
 
     const now = this.isoNow();
     const endedAt = this.computeEndedAt(tasks, "active", null, now);
-    const row = this.db
-      .prepare(
-        `INSERT INTO overmind_workflows (
-          label,
-          coordinator_session,
-          child_sessions,
-          child_roles,
-          run_dir,
-          status,
-          current_task,
-          tasks,
-          pending_decision,
-          active_session,
-          active_role,
-          ended_at,
-          task_log,
-          stuck_since,
-          nudge_count,
-          tier,
-          last_notified_transition,
-          run_started_at,
-          accumulated_ms,
-          updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, ?, '[]', NULL, 0, 0, NULL, ?, 0, ?)
-        ON CONFLICT(coordinator_session) DO UPDATE SET
-          label = excluded.label,
-          child_sessions = excluded.child_sessions,
-          child_roles = CASE WHEN excluded.child_roles = '[]' THEN overmind_workflows.child_roles ELSE excluded.child_roles END,
-          run_dir = excluded.run_dir,
-          status = 'active',
-          current_task = excluded.current_task,
-          tasks = excluded.tasks,
-          pending_decision = NULL,
-          active_session = NULL,
-          active_role = NULL,
-          ended_at = excluded.ended_at,
-          task_log = '[]',
-          stuck_since = NULL,
-          nudge_count = 0,
-          tier = 0,
-          last_notified_transition = NULL,
-          completion_check = NULL,
-          accumulated_ms = overmind_workflows.accumulated_ms + ?,
-          run_started_at = excluded.run_started_at,
-          updated_at = excluded.updated_at
-        RETURNING *`
-      )
-      .get(
-        input.label,
-        input.coordinator_session,
-        JSON.stringify(input.child_sessions ?? []),
-        JSON.stringify(input.child_roles ?? []),
-        input.run_dir,
-        currentTask,
-        JSON.stringify(tasks),
-        endedAt,
-        now,
-        now,
-        this.priorRunElapsedMs(input.coordinator_session, now)
-      ) as OvermindWorkflowRow;
+    const childRolesJson = JSON.stringify(input.child_roles ?? []);
+    const existingId = existingForSession?.id ?? null;
+    const row = (existingId
+      ? this.db
+          .prepare(
+            `UPDATE overmind_workflows
+             SET label = ?,
+                 child_sessions = ?,
+                 child_roles = CASE WHEN ? = '[]' THEN child_roles ELSE ? END,
+                 run_dir = ?,
+                 status = 'active',
+                 current_task = ?,
+                 tasks = ?,
+                 pending_decision = NULL,
+                 active_session = NULL,
+                 active_role = NULL,
+                 ended_at = ?,
+                 task_log = '[]',
+                 stuck_since = NULL,
+                 nudge_count = 0,
+                 tier = 0,
+                 last_notified_transition = NULL,
+                 completion_check = NULL,
+                 accumulated_ms = accumulated_ms + ?,
+                 run_started_at = ?,
+                 updated_at = ?
+             WHERE id = ?
+             RETURNING *`
+          )
+          .get(
+            input.label,
+            JSON.stringify(input.child_sessions ?? []),
+            childRolesJson,
+            childRolesJson,
+            input.run_dir,
+            currentTask,
+            JSON.stringify(tasks),
+            endedAt,
+            this.priorRunElapsedMs(input.coordinator_session, now),
+            now,
+            now,
+            existingId
+          )
+      : this.db
+          .prepare(
+            `INSERT INTO overmind_workflows (
+              label,
+              coordinator_session,
+              child_sessions,
+              child_roles,
+              run_dir,
+              status,
+              current_task,
+              tasks,
+              pending_decision,
+              active_session,
+              active_role,
+              ended_at,
+              task_log,
+              stuck_since,
+              nudge_count,
+              tier,
+              last_notified_transition,
+              run_started_at,
+              accumulated_ms,
+              updated_at
+            ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, ?, '[]', NULL, 0, 0, NULL, ?, 0, ?)
+            RETURNING *`
+          )
+          .get(
+            input.label,
+            input.coordinator_session,
+            JSON.stringify(input.child_sessions ?? []),
+            childRolesJson,
+            input.run_dir,
+            currentTask,
+            JSON.stringify(tasks),
+            endedAt,
+            now,
+            now
+          )) as OvermindWorkflowRow;
 
     this.touchParentUpdate(row.id);
     const registered = this.get(row.id);
@@ -282,6 +310,46 @@ export class OvermindService {
       .prepare("SELECT * FROM overmind_workflows WHERE coordinator_session = ?")
       .get(coordinatorSession) as OvermindWorkflowRow | undefined;
     return row ? this.mapRow(row) : null;
+  }
+
+  getByRunDir(runDir: string): OvermindWorkflow | null {
+    const row = this.db
+      .prepare("SELECT * FROM overmind_workflows WHERE run_dir = ? ORDER BY updated_at DESC, id DESC LIMIT 1")
+      .get(runDir) as OvermindWorkflowRow | undefined;
+    return row ? this.mapRow(row) : null;
+  }
+
+  findWorkflow(lookup: OvermindWorkflowLookup): OvermindWorkflow | null {
+    const workflowId = this.normalizeWorkflowId(lookup.workflow_id);
+    if (workflowId !== null) {
+      const byId = this.get(workflowId);
+      if (byId) return byId;
+    }
+
+    const runDir = typeof lookup.run_dir === "string" ? lookup.run_dir.trim() : "";
+    if (runDir) {
+      const byRunDir = this.getByRunDir(runDir);
+      if (byRunDir) return byRunDir;
+    }
+
+    const session = typeof lookup.session === "string" ? lookup.session.trim() : "";
+    if (session) {
+      return this.getBySession(session);
+    }
+
+    return null;
+  }
+
+  getParentSessionForWorkflow(id: number): string | null {
+    const row = this.db
+      .prepare(
+        `SELECT p.parent_session AS parent_session
+         FROM overmind_workflows w
+         JOIN overmind_projects p ON p.id = w.project_id
+         WHERE w.id = ?`
+      )
+      .get(id) as { parent_session: string } | undefined;
+    return row?.parent_session ?? null;
   }
 
   listHistory(coordinatorSession?: string): OvermindTaskHistoryEntry[] {
@@ -592,8 +660,8 @@ export class OvermindService {
             ) VALUES (?, ?, ?, ?, ?, ?)`
           )
           .run(
-            existing.coordinator_session,
-            existing.display_name || existing.label,
+            existing.coordinator_session || `workflow:${existing.id}`,
+            this.workflowName(existing),
             now,
             currentTask,
             doneCount,
@@ -602,6 +670,22 @@ export class OvermindService {
       }
     });
     tx();
+    this.touchParentUpdate(id);
+    return this.get(id);
+  }
+
+  setChildren(id: number, childSessions: string[], childRoles: string[]): OvermindWorkflow | null {
+    const existing = this.get(id);
+    if (!existing) return null;
+    this.db
+      .prepare(
+        `UPDATE overmind_workflows
+         SET child_sessions = ?,
+             child_roles = ?,
+             updated_at = datetime('now')
+         WHERE id = ?`
+      )
+      .run(JSON.stringify(childSessions), JSON.stringify(childRoles), id);
     this.touchParentUpdate(id);
     return this.get(id);
   }
@@ -659,6 +743,16 @@ export class OvermindService {
 
   private countDoneTasks(tasks: OvermindTask[]): number {
     return tasks.filter((task) => task.state === "done").length;
+  }
+
+  private workflowName(workflow: Pick<OvermindWorkflow, "id" | "display_name" | "label" | "run_dir">): string {
+    return workflow.display_name || workflow.label || path.basename(workflow.run_dir) || `workflow:${workflow.id}`;
+  }
+
+  private normalizeWorkflowId(value: number | string | null | undefined): number | null {
+    if (value === null || value === undefined || value === "") return null;
+    const workflowId = Number(value);
+    return Number.isInteger(workflowId) && workflowId >= 1 ? workflowId : null;
   }
 
   private taskLogNote(previousTask: string | null, currentTask: string | null, previousDone: number, done: number): string {

@@ -488,6 +488,74 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     expect(upd.json().workflow.current_task).toBeNull();
   });
 
+  it("addresses lifecycle updates by workflow_id and run_dir without session, while preserving legacy session fallback", async () => {
+    const reg = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "identity-route",
+      session: "identity-session",
+      run_dir: "/tmp/overmind/identity-route",
+      current_task: "Start",
+      tasks: [{ id: "B12c", label: "Identity", state: "processing" }]
+    });
+    expect(reg.statusCode).toBe(201);
+    const workflowId = reg.json().workflow.id;
+
+    const byId = await lifecyclePost("/api/overmind/tasks", {
+      token: OVERMIND_TOKEN,
+      workflow_id: workflowId,
+      run_dir: "/tmp/overmind/identity-route",
+      current_task: "By id",
+      tasks: [{ id: "B12c", label: "Identity", state: "done" }]
+    });
+    expect(byId.statusCode).toBe(200);
+    expect(byId.json().workflow.current_task).toBe("By id");
+    expect(byId.json().workflow.tasks[0].state).toBe("done");
+
+    const children = await lifecyclePost("/api/overmind/children", {
+      token: OVERMIND_TOKEN,
+      workflow_id: workflowId,
+      run_dir: "/tmp/overmind/identity-route",
+      child_sessions: ["identity-child"],
+      child_roles: ["tester"]
+    });
+    expect(children.statusCode).toBe(200);
+    expect(children.json().workflow.child_sessions).toEqual(["identity-child"]);
+    expect(children.json().workflow.child_roles).toEqual(["tester"]);
+
+    const byRunDir = await lifecyclePost("/api/overmind/complete", {
+      token: OVERMIND_TOKEN,
+      run_dir: "/tmp/overmind/identity-route"
+    });
+    expect(byRunDir.statusCode).toBe(200);
+    expect(byRunDir.json().workflow.status).toBe("completed");
+
+    const legacy = await lifecyclePost("/api/overmind/tasks", {
+      token: OVERMIND_TOKEN,
+      session: "identity-session",
+      current_task: "Legacy session fallback",
+      tasks: [{ id: "B12c", label: "Identity", state: "done" }]
+    });
+    expect(legacy.statusCode).toBe(200);
+    expect(legacy.json().workflow.current_task).toBe("Legacy session fallback");
+  });
+
+  it("resolves project parent_session by workflow project_id", async () => {
+    db.prepare(`
+      INSERT INTO overmind_projects (slug, app_path, parent_session)
+      VALUES ('parent-route', '/tmp/overmind/parent-route-app', 'AGJ-51')
+    `).run();
+    const project = db.prepare("SELECT id FROM overmind_projects WHERE slug = 'parent-route'").get() as { id: number };
+    const workflow = overmindService.register({
+      label: "parent-route",
+      coordinator_session: "parent-route-session",
+      run_dir: "/tmp/overmind/parent-route-app/run",
+      tasks: [{ id: "B12c", label: "Identity", state: "processing" }]
+    });
+    db.prepare("UPDATE overmind_workflows SET project_id = ? WHERE id = ?").run(project.id, workflow.id);
+
+    expect(overmindService.getParentSessionForWorkflow(workflow.id)).toBe("AGJ-51");
+  });
+
   it("rejects lifecycle requests with missing or invalid token and non-loopback source", async () => {
     const missingToken = await lifecyclePost("/api/overmind/register", {
       label: "bad",

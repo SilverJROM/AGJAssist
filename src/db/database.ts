@@ -441,6 +441,128 @@ export class DatabaseService {
         this.db.exec("CREATE INDEX IF NOT EXISTS idx_overmind_workflows_project_status ON overmind_workflows(project_id, status)");
       }
 
+      // Migration: v27 → v28: workflow identity no longer depends on session.
+      // SQLite cannot relax NOT NULL/drop UNIQUE in place, so rebuild with an
+      // explicit column copy. Only label/coordinator_session constraints change.
+      if (current && current.version < 28) {
+        const workflowColumns = [
+          "id",
+          "project_id",
+          "label",
+          "display_name",
+          "coordinator_session",
+          "child_sessions",
+          "child_roles",
+          "run_dir",
+          "status",
+          "current_task",
+          "tasks",
+          "pending_decision",
+          "active_session",
+          "active_role",
+          "ended_at",
+          "task_log",
+          "last_pane_hash",
+          "last_activity_at",
+          "stuck_since",
+          "nudge_count",
+          "tier",
+          "last_notified_transition",
+          "run_started_at",
+          "accumulated_ms",
+          "completion_check",
+          "parent_status",
+          "child_statuses",
+          "info_request",
+          "info_check",
+          "monitoring_paused",
+          "paused_at",
+          "paused_by",
+          "last_parent_update_at",
+          "evidence_idle_threshold_override_minutes",
+          "created_at",
+          "updated_at"
+        ];
+        const columnList = workflowColumns.join(", ");
+        const before = this.db
+          .prepare("SELECT COUNT(*) AS count FROM overmind_workflows")
+          .get() as { count: number };
+
+        this.db.exec("PRAGMA foreign_keys = OFF");
+        try {
+          const rebuild = this.db.transaction(() => {
+            this.db.exec(`
+              CREATE TABLE overmind_workflows_new (
+                id INTEGER PRIMARY KEY,
+                project_id INTEGER REFERENCES overmind_projects(id),
+                label TEXT,
+                display_name TEXT,
+                coordinator_session TEXT,
+                child_sessions TEXT NOT NULL DEFAULT '[]',
+                child_roles TEXT NOT NULL DEFAULT '[]',
+                run_dir TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'working', 'waiting_human', 'awaiting_decision', 'stuck', 'paused', 'completed', 'failed')),
+                current_task TEXT,
+                tasks TEXT NOT NULL DEFAULT '[]',
+                pending_decision TEXT,
+                active_session TEXT,
+                active_role TEXT CHECK(active_role IN ('parent', 'child') OR active_role IS NULL),
+                ended_at TEXT,
+                task_log TEXT NOT NULL DEFAULT '[]',
+                last_pane_hash TEXT,
+                last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
+                stuck_since TEXT,
+                nudge_count INTEGER NOT NULL DEFAULT 0,
+                tier INTEGER NOT NULL DEFAULT 0,
+                last_notified_transition TEXT,
+                run_started_at TEXT,
+                accumulated_ms INTEGER NOT NULL DEFAULT 0,
+                completion_check TEXT,
+                parent_status TEXT,
+                child_statuses TEXT NOT NULL DEFAULT '[]',
+                info_request TEXT,
+                info_check TEXT,
+                monitoring_paused INTEGER NOT NULL DEFAULT 0,
+                paused_at TEXT,
+                paused_by TEXT,
+                last_parent_update_at TEXT,
+                evidence_idle_threshold_override_minutes INTEGER,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+              );
+              INSERT INTO overmind_workflows_new (${columnList})
+              SELECT ${columnList}
+              FROM overmind_workflows;
+            `);
+
+            const copied = this.db
+              .prepare("SELECT COUNT(*) AS count FROM overmind_workflows_new")
+              .get() as { count: number };
+            if (copied.count !== before.count) {
+              throw new Error(`overmind_workflows v28 rebuild copied ${copied.count} rows, expected ${before.count}`);
+            }
+
+            this.db.exec(`
+              DROP TABLE overmind_workflows;
+              ALTER TABLE overmind_workflows_new RENAME TO overmind_workflows;
+              CREATE INDEX IF NOT EXISTS idx_overmind_workflows_coordinator_session ON overmind_workflows(coordinator_session);
+              CREATE INDEX IF NOT EXISTS idx_overmind_workflows_status ON overmind_workflows(status);
+              CREATE INDEX IF NOT EXISTS idx_overmind_workflows_project_id ON overmind_workflows(project_id);
+              CREATE INDEX IF NOT EXISTS idx_overmind_workflows_project_status ON overmind_workflows(project_id, status);
+              CREATE UNIQUE INDEX IF NOT EXISTS idx_overmind_workflows_project_run_dir ON overmind_workflows(project_id, run_dir);
+            `);
+
+            const fkProblems = this.db.pragma("foreign_key_check") as unknown[];
+            if (fkProblems.length > 0) {
+              throw new Error(`overmind_workflows v28 rebuild foreign_key_check failed with ${fkProblems.length} violation(s)`);
+            }
+          });
+          rebuild();
+        } finally {
+          this.db.exec("PRAGMA foreign_keys = ON");
+        }
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);

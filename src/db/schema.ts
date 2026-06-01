@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -318,9 +318,9 @@ CREATE INDEX IF NOT EXISTS idx_overmind_projects_app_path ON overmind_projects(a
 CREATE TABLE IF NOT EXISTS overmind_workflows (
   id INTEGER PRIMARY KEY,
   project_id INTEGER REFERENCES overmind_projects(id),
-  label TEXT NOT NULL,
+  label TEXT,
   display_name TEXT,
-  coordinator_session TEXT NOT NULL UNIQUE,
+  coordinator_session TEXT,
   child_sessions TEXT NOT NULL DEFAULT '[]',
   child_roles TEXT NOT NULL DEFAULT '[]',
   run_dir TEXT NOT NULL,
@@ -394,4 +394,5 @@ export function applyFreshDbExtras(db: Database.Database): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_overmind_workflows_project_id ON overmind_workflows(project_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_overmind_workflows_project_status ON overmind_workflows(project_id, status)");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_overmind_workflows_project_run_dir ON overmind_workflows(project_id, run_dir)");
 }

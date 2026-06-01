@@ -36,13 +36,25 @@ interface RegisterBody extends TokenBody {
 }
 
 interface CompleteBody extends TokenBody {
+  workflow_id?: number | string;
+  run_dir?: string;
   session?: string;
 }
 
 interface TasksBody extends TokenBody {
+  workflow_id?: number | string;
+  run_dir?: string;
   session?: string;
   current_task?: string | null;
   tasks?: OvermindTask[];
+}
+
+interface ChildrenBody extends TokenBody {
+  workflow_id?: number | string;
+  run_dir?: string;
+  session?: string;
+  child_sessions?: string[];
+  child_roles?: string[];
 }
 
 interface WorkflowParams {
@@ -104,6 +116,12 @@ function requireLoopbackAndToken(
 function parseWorkflowId(id: string): number | null {
   const workflowId = Number(id);
   return Number.isInteger(workflowId) && workflowId >= 1 ? workflowId : null;
+}
+
+function hasWorkflowLookupKey(body: { workflow_id?: number | string; run_dir?: string; session?: string }): boolean {
+  return body.workflow_id !== undefined && body.workflow_id !== null && `${body.workflow_id}`.trim() !== "" ||
+    typeof body.run_dir === "string" && body.run_dir.trim() !== "" ||
+    typeof body.session === "string" && body.session.trim() !== "";
 }
 
 // Best-effort JWT verification — returns the session user (owner role) when a
@@ -389,12 +407,12 @@ export function registerOvermindRoutes(
     async (request, reply) => {
       if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
 
-      const { session } = request.body || {};
-      if (!session) {
-        return reply.code(400).send({ error: "session is required" });
+      const { workflow_id, run_dir, session } = request.body || {};
+      if (!hasWorkflowLookupKey({ workflow_id, run_dir, session })) {
+        return reply.code(400).send({ error: "workflow_id, run_dir, or session is required" });
       }
 
-      const workflow = overmindService.getBySession(session);
+      const workflow = overmindService.findWorkflow({ workflow_id, run_dir, session });
       if (!workflow) {
         return reply.code(404).send({ error: "Workflow not found" });
       }
@@ -439,7 +457,9 @@ export function registerOvermindRoutes(
 
             if (parts.length > 0) {
               const msg = parts.join(" ");
-              await tmuxService.sendAndSubmit(completed.coordinator_session, msg);
+              if (completed.coordinator_session) {
+                await tmuxService.sendAndSubmit(completed.coordinator_session, msg);
+              }
             }
           }
         } catch (error) {
@@ -456,17 +476,48 @@ export function registerOvermindRoutes(
     async (request, reply) => {
       if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
 
-      const { session, current_task, tasks } = request.body || {};
-      if (!session || !Array.isArray(tasks)) {
-        return reply.code(400).send({ error: "session and tasks are required" });
+      const { workflow_id, run_dir, session, current_task, tasks } = request.body || {};
+      if (!hasWorkflowLookupKey({ workflow_id, run_dir, session }) || !Array.isArray(tasks)) {
+        return reply.code(400).send({ error: "workflow_id, run_dir, or session and tasks are required" });
       }
 
-      const workflow = overmindService.getBySession(session);
+      const workflow = overmindService.findWorkflow({ workflow_id, run_dir, session });
       if (!workflow) {
         return reply.code(404).send({ error: "Workflow not found" });
       }
 
       return { workflow: overmindService.setTasks(workflow.id, current_task ?? null, tasks) };
+    }
+  );
+
+  app.post<{ Body: ChildrenBody }>(
+    "/api/overmind/children",
+    async (request, reply) => {
+      if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
+
+      const { workflow_id, run_dir, session, child_sessions, child_roles } = request.body || {};
+      if (!hasWorkflowLookupKey({ workflow_id, run_dir, session })) {
+        return reply.code(400).send({ error: "workflow_id, run_dir, or session is required" });
+      }
+      if (!Array.isArray(child_sessions)) {
+        return reply.code(400).send({ error: "child_sessions is required" });
+      }
+      if (child_roles !== undefined && !Array.isArray(child_roles)) {
+        return reply.code(400).send({ error: "child_roles must be an array" });
+      }
+      const roles = child_roles ?? [];
+      if (roles.length > 0 && roles.length !== child_sessions.length) {
+        return reply.code(400).send({
+          error: `child_roles length (${roles.length}) must match child_sessions length (${child_sessions.length})`
+        });
+      }
+
+      const workflow = overmindService.findWorkflow({ workflow_id, run_dir, session });
+      if (!workflow) {
+        return reply.code(404).send({ error: "Workflow not found" });
+      }
+
+      return { workflow: overmindService.setChildren(workflow.id, child_sessions, roles) };
     }
   );
 
