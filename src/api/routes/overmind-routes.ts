@@ -22,6 +22,7 @@ import type { NudgeStateService } from "../../services/nudge-state-service.js";
 import { isAgentPane, type AgentPaneKind } from "../../services/overmind/agent-pane.js";
 import { augmentWorkflowSparkHealth } from "../../services/overmind/spark-health.js";
 import type { OvermindParentStatus } from "../../services/overmind/types.js";
+import { validateSubmittedTaskList, type TaskListValidation } from "../../services/overmind/sanitize.js";
 
 interface TokenBody {
   token?: string;
@@ -123,6 +124,7 @@ interface ActiveRunsResponse {
 }
 
 const REGISTER_CONFLICT_NUDGE_COOLDOWN_MS = 30 * 60 * 1000;
+const SESSION_NAME_RE = /^[A-Za-z0-9._-]{1,80}$/;
 const PROJECT_MUTATION_FORBIDDEN = {
   error: "projects are JROM-managed; ask JROM to create via dashboard"
 };
@@ -138,6 +140,36 @@ function normalizeRegisterParentStatus(kind: AgentPaneKind): OvermindParentStatu
   if (kind === "claude" || kind === "codex") return "ok";
   if (kind === "bare-bash" || kind === "no-session") return kind;
   return "unknown";
+}
+
+function sendInvalidSessionName(
+  reply: FastifyReply,
+  field: string,
+  value: unknown
+): void {
+  reply.code(422).send({
+    ok: false,
+    error: "invalid-session-name",
+    code: "invalid-session-name",
+    message: `${field} must be a tmux-safe identifier.`,
+    hint: "Use only letters, digits, dots, underscores, and dashes; maximum length is 80 characters.",
+    field,
+    value
+  });
+}
+
+function sendInvalidTaskList(
+  reply: FastifyReply,
+  validation: TaskListValidation
+): void {
+  reply.code(422).send({
+    ok: false,
+    error: "invalid-task-list",
+    code: "invalid-task-list",
+    message: "Task list rejected because at least one submitted row is not a real Overmind task.",
+    hint: "Rebuild tasks from queue.md with real IDs and labels; skip unparseable rows instead of sending row-N fallback IDs.",
+    invalid_tasks: validation.invalid_tasks
+  });
 }
 
 function parentWarningFor(status: OvermindParentStatus, parentSession: string): { code: string; message: string } | null {
@@ -390,6 +422,9 @@ export function registerOvermindRoutes(
       if (!parentSession) {
         return reply.code(400).send({ error: "'parent_session' must be a non-empty string" });
       }
+      if (!SESSION_NAME_RE.test(parentSession)) {
+        return sendInvalidSessionName(reply, "parent_session", parentSession);
+      }
       if (!path.isAbsolute(appPath)) {
         return reply.code(400).send({ error: "'app_path' must be an absolute path" });
       }
@@ -459,6 +494,9 @@ export function registerOvermindRoutes(
           return reply.code(400).send({ error: "'parent_session' must be a non-empty string" });
         }
         input.parent_session = request.body.parent_session.trim();
+        if (!SESSION_NAME_RE.test(input.parent_session)) {
+          return sendInvalidSessionName(reply, "parent_session", input.parent_session);
+        }
       }
       if (request.body?.notes !== undefined) {
         if (request.body.notes !== null && typeof request.body.notes !== "string") {
@@ -558,6 +596,17 @@ export function registerOvermindRoutes(
         typeof label === "string" && label.trim() !== "" &&
         typeof session === "string" && session.trim() !== "";
       const isAttachShape = hasRunDir && !isLegacyShape;
+      let submittedTasks: OvermindTask[] | undefined;
+      if (tasks !== undefined) {
+        const validation = validateSubmittedTaskList(tasks);
+        if (!validation.ok) {
+          return sendInvalidTaskList(reply, validation);
+        }
+        submittedTasks = validation.tasks;
+      }
+      if (current_task !== undefined && current_task !== null && typeof current_task !== "string") {
+        return reply.code(400).send({ error: "'current_task' must be a string or null" });
+      }
 
       if (isAttachShape) {
         const forbiddenFields: Array<keyof RegisterBody> = [
@@ -605,7 +654,9 @@ export function registerOvermindRoutes(
           project_id: match.project.id,
           label: `${match.project.slug} · ${path.basename(match.run_dir) || "run"}`,
           run_dir: match.run_dir,
-          coordinator_session: match.project.parent_session
+          coordinator_session: match.project.parent_session,
+          current_task,
+          tasks: submittedTasks
         });
         let parentStatus: OvermindParentStatus = "unknown";
         try {
@@ -644,19 +695,17 @@ export function registerOvermindRoutes(
 
       // tmux session name shape — must match a valid identifier (alphanumeric + . _ -).
       // tmux's own grammar rejects whitespace, ':', and a few other chars; we tighten further.
-      const SESSION_NAME_RE = /^[A-Za-z0-9._-]{1,80}$/;
       if (!SESSION_NAME_RE.test(session)) {
-        return reply.code(400).send({
-          error: `'session' must be a tmux-safe identifier (letters, digits, dots, underscores, dashes; ≤80 chars). Got: '${session}'`
-        });
+        return sendInvalidSessionName(reply, "session", session);
       }
       if (child_sessions !== undefined) {
         if (!Array.isArray(child_sessions)) {
           return reply.code(400).send({ error: "'child_sessions' must be an array of strings" });
         }
-        for (const s of child_sessions) {
+        for (let i = 0; i < child_sessions.length; i++) {
+          const s = child_sessions[i];
           if (typeof s !== "string" || !SESSION_NAME_RE.test(s)) {
-            return reply.code(400).send({ error: `child_sessions entry '${s}' is not a tmux-safe identifier` });
+            return sendInvalidSessionName(reply, `child_sessions[${i}]`, s);
           }
         }
       }
@@ -684,33 +733,6 @@ export function registerOvermindRoutes(
         return reply.code(400).send({
           error: `'run_dir' must be an absolute path. Got: '${run_dir}'. Use the canonical path on disk; relative paths are ambiguous because overmind and the caller may have different cwds.`
         });
-      }
-
-      // tasks shape: array of { id: string, label: string, state: "done"|"processing"|"pending" }
-      if (tasks !== undefined) {
-        if (!Array.isArray(tasks)) {
-          return reply.code(400).send({ error: "'tasks' must be an array" });
-        }
-        const VALID_TASK_STATES = new Set(["done", "processing", "pending"]);
-        for (let i = 0; i < tasks.length; i++) {
-          const t = tasks[i] as { id?: unknown; label?: unknown; state?: unknown };
-          if (typeof t?.id !== "string" || !t.id.trim()) {
-            return reply.code(400).send({ error: `tasks[${i}].id must be a non-empty string` });
-          }
-          if (typeof t.label !== "string" || !t.label.trim()) {
-            return reply.code(400).send({ error: `tasks[${i}].label must be a non-empty string` });
-          }
-          if (typeof t.state !== "string" || !VALID_TASK_STATES.has(t.state)) {
-            return reply.code(400).send({
-              error: `tasks[${i}].state must be one of done|processing|pending. Got: '${t.state}'`
-            });
-          }
-        }
-      }
-
-      // current_task is optional, but if present must be a string.
-      if (current_task !== undefined && current_task !== null && typeof current_task !== "string") {
-        return reply.code(400).send({ error: "'current_task' must be a string or null" });
       }
 
       // JROM 2026-05-24: "why the fuck do we allow a fake parent session" — validate
@@ -744,7 +766,7 @@ export function registerOvermindRoutes(
       // yet). Re-registers/upserts may omit tasks to update only other fields — the
       // destructive-overwrite safeguard below preserves the existing list in that case.
       const isNewParentSession = !existingBySession;
-      if (isNewParentSession && (!Array.isArray(tasks) || tasks.length === 0)) {
+      if (isNewParentSession && (!submittedTasks || submittedTasks.length === 0)) {
         return reply.code(400).send({
           error:
             "Overmind: please include a non-empty `tasks` array in your /register payload. " +
@@ -847,8 +869,8 @@ export function registerOvermindRoutes(
       // existing tasklist — which is exactly how the HRIS / AGJ-51 rows lost their
       // tasks on 2026-05-24. Preserve the existing tasks + current_task in that case.
       const effectiveTasks =
-        Array.isArray(tasks) && tasks.length > 0
-          ? tasks
+        submittedTasks && submittedTasks.length > 0
+          ? submittedTasks
           : existingBySession?.tasks ?? [];
       const effectiveCurrentTask =
         current_task !== undefined ? current_task : existingBySession?.current_task ?? null;
@@ -941,8 +963,15 @@ export function registerOvermindRoutes(
       if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
 
       const { workflow_id, run_dir, session, current_task, tasks } = request.body || {};
-      if (!hasWorkflowLookupKey({ workflow_id, run_dir, session }) || !Array.isArray(tasks)) {
+      if (!hasWorkflowLookupKey({ workflow_id, run_dir, session }) || tasks === undefined) {
         return reply.code(400).send({ error: "workflow_id, run_dir, or session and tasks are required" });
+      }
+      if (current_task !== undefined && current_task !== null && typeof current_task !== "string") {
+        return reply.code(400).send({ error: "'current_task' must be a string or null" });
+      }
+      const validation = validateSubmittedTaskList(tasks);
+      if (!validation.ok) {
+        return sendInvalidTaskList(reply, validation);
       }
 
       const workflow = await overmindService.findWorkflow({ workflow_id, run_dir, session });
@@ -950,7 +979,7 @@ export function registerOvermindRoutes(
         return reply.code(404).send({ error: "Workflow not found" });
       }
 
-      return { workflow: overmindService.setTasks(workflow.id, current_task ?? null, tasks) };
+      return { workflow: overmindService.setTasks(workflow.id, current_task ?? null, validation.tasks) };
     }
   );
 
@@ -965,6 +994,12 @@ export function registerOvermindRoutes(
       }
       if (!Array.isArray(child_sessions)) {
         return reply.code(400).send({ error: "child_sessions is required" });
+      }
+      for (let i = 0; i < child_sessions.length; i++) {
+        const childSession = child_sessions[i];
+        if (typeof childSession !== "string" || !SESSION_NAME_RE.test(childSession)) {
+          return sendInvalidSessionName(reply, `child_sessions[${i}]`, childSession);
+        }
       }
       if (child_roles !== undefined && !Array.isArray(child_roles)) {
         return reply.code(400).send({ error: "child_roles must be an array" });

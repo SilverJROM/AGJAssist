@@ -209,6 +209,49 @@ describe("Overmind routes", () => {
     expect(duplicateAppPath.statusCode).toBe(409);
   });
 
+  it("rejects malformed project parent_session names with corrective hints", async () => {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/overmind/projects",
+      headers: authHeader(),
+      payload: {
+        slug: "bad-parent",
+        app_path: tempProjectPath(),
+        parent_session: "AGJ:51"
+      }
+    });
+    expect(created.statusCode).toBe(422);
+    expect(created.json()).toMatchObject({
+      ok: false,
+      code: "invalid-session-name",
+      field: "parent_session",
+      value: "AGJ:51"
+    });
+
+    const appPath = tempProjectPath();
+    overmindService.createProject({
+      slug: "patch-parent",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: null
+    });
+    const patched = await app.inject({
+      method: "PATCH",
+      url: "/api/overmind/projects/patch-parent",
+      headers: authHeader(),
+      payload: {
+        parent_session: "AGJ 51"
+      }
+    });
+    expect(patched.statusCode).toBe(422);
+    expect(patched.json()).toMatchObject({
+      ok: false,
+      code: "invalid-session-name",
+      field: "parent_session",
+      value: "AGJ 51"
+    });
+  });
+
   it("rejects overmind project creation for loopback token, viewer JWT, missing auth, and invalid app_path", async () => {
     const payload = {
       slug: "blocked",
@@ -1290,35 +1333,119 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
   });
 
-  it("sanitizes markdown table chrome out of tasks on /register and /tasks", async () => {
-    const reg = await lifecyclePost("/api/overmind/register", {
+  it("rejects garbage task rows on /register and /tasks with corrective hints", async () => {
+    const rowIdRegister = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
       label: "trash-paste",
       session: "tp-route",
       run_dir: "/tmp/overmind/trash-paste-route",
       current_task: "| # | Batch | Owner | Status | Notes |",
       tasks: [
-        { id: "row-1", label: "| # | Batch | Owner | Status | Notes |", state: "pending" },
-        { id: "row-2", label: "|---|-------|-------|--------|-------|", state: "pending" },
-        { id: "row-3", label: "| B0 | Design memo rev | codex-impl | DONE | …", state: "pending" }
+        { id: "B0", label: "Design memo rev", state: "pending" },
+        { id: "row-1", label: "Parser fallback", state: "pending" }
+      ]
+    });
+    expect(rowIdRegister.statusCode).toBe(422);
+    expect(rowIdRegister.json()).toMatchObject({
+      ok: false,
+      code: "invalid-task-list",
+      hint: expect.stringContaining("row-N")
+    });
+    expect(rowIdRegister.json().invalid_tasks).toContainEqual(expect.objectContaining({
+      index: 1,
+      field: "id",
+      value: "row-1"
+    }));
+
+    const trashLabelRegister = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "trash-label",
+      session: "trash-label-route",
+      run_dir: "/tmp/overmind/trash-label-route",
+      tasks: [
+        { id: "B1", label: "|---|---|---|", state: "pending" }
+      ]
+    });
+    expect(trashLabelRegister.statusCode).toBe(422);
+    expect(trashLabelRegister.json().invalid_tasks).toContainEqual(expect.objectContaining({
+      index: 0,
+      field: "label"
+    }));
+
+    const reg = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "valid-task-route",
+      session: "valid-task-route",
+      run_dir: "/tmp/overmind/valid-task-route",
+      tasks: [
+        { id: "B0", label: "Design memo rev", state: "pending" }
       ]
     });
     expect(reg.statusCode).toBe(201);
-    expect(reg.json().workflow.tasks.map((t: { id: string }) => t.id)).toEqual(["row-3"]);
-    expect(reg.json().workflow.current_task).toBeNull();
 
-    const upd = await lifecyclePost("/api/overmind/tasks", {
+    const invalidStateUpdate = await lifecyclePost("/api/overmind/tasks", {
       token: OVERMIND_TOKEN,
-      session: "tp-route",
-      current_task: "|---|---|---|",
+      session: "valid-task-route",
+      current_task: "Still valid",
       tasks: [
-        { id: "row-a", label: "|---|---|---|", state: "pending" },
-        { id: "row-b", label: "Real follow-up", state: "processing" }
+        { id: "B0", label: "Design memo rev", state: "done" },
+        { id: "B1", label: "Bad state", state: "blocked" }
       ]
     });
-    expect(upd.statusCode).toBe(200);
-    expect(upd.json().workflow.tasks.map((t: { id: string }) => t.id)).toEqual(["row-b"]);
-    expect(upd.json().workflow.current_task).toBeNull();
+    expect(invalidStateUpdate.statusCode).toBe(422);
+    expect(invalidStateUpdate.json()).toMatchObject({
+      ok: false,
+      code: "invalid-task-list",
+      invalid_tasks: [expect.objectContaining({
+        index: 1,
+        field: "state",
+        value: "blocked"
+      })]
+    });
+
+    const validUpdate = await lifecyclePost("/api/overmind/tasks", {
+      token: OVERMIND_TOKEN,
+      session: "valid-task-route",
+      current_task: "Real follow-up",
+      tasks: [
+        { id: "B0", label: "Design memo rev", state: "done" },
+        { id: "B1", label: "Real follow-up", state: "processing" }
+      ]
+    });
+    expect(validUpdate.statusCode).toBe(200);
+    expect(validUpdate.json().workflow.tasks.map((t: { id: string }) => t.id)).toEqual(["B0", "B1"]);
+    expect(validUpdate.json().workflow.current_task).toBe("Real follow-up");
+  });
+
+  it("rejects garbage task rows on attach-shaped /register", async () => {
+    const appPath = tempProjectPath();
+    const runDir = path.join(appPath, "plans", "b9b", "attach-task-validation");
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "attach-task-validation",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: null
+    });
+
+    const rejected = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir,
+      tasks: [
+        { id: "row-9", label: "Fallback row", state: "pending" }
+      ]
+    });
+
+    expect(rejected.statusCode).toBe(422);
+    expect(rejected.json()).toMatchObject({
+      ok: false,
+      code: "invalid-task-list",
+      invalid_tasks: [expect.objectContaining({
+        index: 0,
+        field: "id",
+        value: "row-9"
+      })]
+    });
   });
 
   it("addresses lifecycle updates by workflow_id and run_dir without session, while preserving legacy session fallback", async () => {
@@ -1354,6 +1481,21 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     expect(children.statusCode).toBe(200);
     expect(children.json().workflow.child_sessions).toEqual(["identity-child"]);
     expect(children.json().workflow.child_roles).toEqual(["tester"]);
+
+    const malformedChild = await lifecyclePost("/api/overmind/children", {
+      token: OVERMIND_TOKEN,
+      workflow_id: workflowId,
+      run_dir: "/tmp/overmind/identity-route",
+      child_sessions: ["identity:child"],
+      child_roles: ["tester"]
+    });
+    expect(malformedChild.statusCode).toBe(422);
+    expect(malformedChild.json()).toMatchObject({
+      ok: false,
+      code: "invalid-session-name",
+      field: "child_sessions[0]",
+      hint: expect.stringContaining("letters")
+    });
 
     const byRunDir = await lifecyclePost("/api/overmind/complete", {
       token: OVERMIND_TOKEN,
