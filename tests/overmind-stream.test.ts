@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 import { OvermindStreamManager } from "../src/api/websocket/overmind-stream-manager.js";
 import { AuthService } from "../src/auth/auth-service.js";
@@ -24,6 +24,12 @@ import {
   taskGlyph,
   totalElapsedMs
 } from "../src/web/public/overmind-helpers.js";
+
+const isAgentPaneMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../src/services/overmind/agent-pane.js", () => ({
+  isAgentPane: isAgentPaneMock
+}));
 
 class FakeSocket extends EventEmitter {
   readyState = WebSocket.OPEN;
@@ -162,6 +168,11 @@ describe("OvermindStreamManager", () => {
 });
 
 describe("Overmind watcher stream callback", () => {
+  beforeEach(() => {
+    isAgentPaneMock.mockReset();
+    isAgentPaneMock.mockResolvedValue("codex");
+  });
+
   it("calls onUpdate with the refreshed workflow list after tick updates", async () => {
     let rows = [workflow({ last_pane_hash: null })];
     const overmindService = {
@@ -169,7 +180,8 @@ describe("Overmind watcher stream callback", () => {
       update: vi.fn((id: number, fields: Partial<OvermindWorkflow>) => {
         rows = rows.map(row => row.id === id ? { ...row, ...fields } : row);
         return rows.find(row => row.id === id) || null;
-      })
+      }),
+      getParentSessionForWorkflow: vi.fn(() => null)
     } as unknown as OvermindService;
     const tmuxService = {
       capturePane: vi.fn(async () => "quiet pane"),
@@ -196,7 +208,8 @@ describe("Overmind watcher stream callback", () => {
       update: vi.fn((id: number, fields: Partial<OvermindWorkflow>) => {
         rows = rows.map(row => row.id === id ? { ...row, ...fields } : row);
         return rows.find(row => row.id === id) || null;
-      })
+      }),
+      getParentSessionForWorkflow: vi.fn(() => null)
     } as unknown as OvermindService;
     const tmuxService = {
       capturePane: vi.fn(async (target: string) => {
@@ -231,7 +244,8 @@ describe("Overmind watcher stream callback", () => {
       update: vi.fn((id: number, fields: Partial<OvermindWorkflow>) => {
         rows = rows.map(row => row.id === id ? { ...row, ...fields } : row);
         return rows.find(row => row.id === id) || null;
-      })
+      }),
+      getParentSessionForWorkflow: vi.fn(() => null)
     } as unknown as OvermindService;
     const tmuxService = {
       capturePane: vi.fn(async (target: string) => {

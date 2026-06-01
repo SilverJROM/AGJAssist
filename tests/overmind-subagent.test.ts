@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OvermindWatcher } from "../src/services/overmind-watcher.js";
 import { hashPane } from "../src/services/overmind/pane-utils.js";
 import {
@@ -11,6 +11,17 @@ import {
 } from "../src/services/overmind/subagent-detection.js";
 import { OvermindService, OvermindWorkflow } from "../src/services/overmind-service.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
+
+const isAgentPaneMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../src/services/overmind/agent-pane.js", () => ({
+  isAgentPane: isAgentPaneMock
+}));
+
+beforeEach(() => {
+  isAgentPaneMock.mockReset();
+  isAgentPaneMock.mockResolvedValue("codex");
+});
 
 // ─── Minimal workflow factory ────────────────────────────────────────────────
 function wf(overrides: Partial<OvermindWorkflow> = {}): OvermindWorkflow {
@@ -63,6 +74,7 @@ function makeService(workflow: OvermindWorkflow) {
       Object.assign(store, fields);
     }),
     get: vi.fn(() => store),
+    getParentSessionForWorkflow: vi.fn(() => null),
     _store: store
   } as unknown as OvermindService & { _store: OvermindWorkflow };
 }

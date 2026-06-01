@@ -19,6 +19,12 @@ import { OvermindWatcher } from "../src/services/overmind-watcher.js";
 import { hashPane } from "../src/services/overmind/pane-utils.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 
+const isAgentPaneMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../src/services/overmind/agent-pane.js", () => ({
+  isAgentPane: isAgentPaneMock
+}));
+
 const TEST_DB = path.join("data", "test-overmind-brain.sqlite");
 const QUIET_PANE = Array.from({ length: 45 }, (_, i) => `quiet coordinator line ${i + 1}`).join("\n");
 const CHILD_PANE = "child quiet pane";
@@ -107,6 +113,8 @@ let runDirs: string[];
 
 beforeEach(() => {
   cleanupDb();
+  isAgentPaneMock.mockReset();
+  isAgentPaneMock.mockResolvedValue("codex");
   db = new DatabaseService(TEST_DB);
   db.ensureOwner(111222);
   service = new OvermindService(db);
@@ -169,7 +177,7 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
     expect(tmux.sendAndSubmit).toHaveBeenCalledWith(
       "coord-1",
-      "Coordinator: inspect callbacks.md and report STATUS."
+      "overmind: Coordinator: inspect callbacks.md and report STATUS."
     );
     expect(tmux.sendAndSubmit.mock.calls.every((call: [string, string]) => call[0] === "coord-1")).toBe(true);
     expect(updated?.status).toBe("stuck");
@@ -297,7 +305,7 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
     expect(tmux.sendAndSubmit).toHaveBeenCalledWith(
       "coord-1",
-      "Coordinator: resolve the human-waiting state from north-star context."
+      "overmind: Coordinator: resolve the human-waiting state from north-star context."
     );
   });
 });
@@ -350,7 +358,7 @@ describe("Overmind completion-edge verification (all tasks done, no /complete)",
     expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
     expect(tmux.sendAndSubmit).toHaveBeenCalledWith(
       "coord-1",
-      "Overmind: list shows all done — POST /complete if finished, else update it."
+      "overmind: Overmind: list shows all done — POST /complete if finished, else update it."
     );
 
     // Same all-done signature next tick: held quietly, no second Sonnet call, no token spend.

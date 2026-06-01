@@ -18,6 +18,12 @@ import {
 import { hashPane } from "../src/services/overmind/pane-utils.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 
+const isAgentPaneMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../src/services/overmind/agent-pane.js", () => ({
+  isAgentPane: isAgentPaneMock
+}));
+
 const TEST_DB = path.join("data", "test-overmind-decision.sqlite");
 const CHILD_PANE = "child pane is quiet";
 
@@ -88,6 +94,8 @@ let tempHome: string;
 
 beforeEach(() => {
   cleanupDb();
+  isAgentPaneMock.mockReset();
+  isAgentPaneMock.mockResolvedValue("codex");
   originalHome = process.env.HOME;
   tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "overmind-decision-home-"));
   process.env.HOME = tempHome;
@@ -157,7 +165,7 @@ describe("Overmind decision interception", () => {
     expect(tmux.sendCommand).toHaveBeenNthCalledWith(
       1,
       "coord-1",
-      "Use targeted vitest for this batch.",
+      "overmind: Use targeted vitest for this batch.",
       true,
       true
     );

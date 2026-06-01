@@ -1,7 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OvermindService, OvermindWorkflow } from "../src/services/overmind-service.js";
 import { OvermindWatcher, RECONCILE_MS } from "../src/services/overmind-watcher.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
+
+const isAgentPaneMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../src/services/overmind/agent-pane.js", () => ({
+  isAgentPane: isAgentPaneMock
+}));
 
 // Minimal OvermindWorkflow factory — only the fields reconcile() and tick() care about.
 function workflow(overrides: Partial<OvermindWorkflow> = {}): OvermindWorkflow {
@@ -50,7 +56,8 @@ function makeServiceStub(rows: OvermindWorkflow[]): OvermindService {
   return {
     list: vi.fn(() => rows),
     update: vi.fn(),
-    get: vi.fn()
+    get: vi.fn(),
+    getParentSessionForWorkflow: vi.fn(() => null)
   } as unknown as OvermindService;
 }
 
@@ -75,6 +82,11 @@ function makeTmuxMock(opts: {
 }
 
 describe("OvermindWatcher.reconcile()", () => {
+  beforeEach(() => {
+    isAgentPaneMock.mockReset();
+    isAgentPaneMock.mockResolvedValue("codex");
+  });
+
   it("sends a demand when parent alive and an unresolved gap exists (info_request set)", async () => {
     const wf = workflow({ info_request: "roster" });
     const service = makeServiceStub([wf]);
@@ -122,6 +134,7 @@ describe("OvermindWatcher.reconcile()", () => {
     const service = makeServiceStub([wf]);
     const tmux = makeTmuxMock({ sessionAlive: false });
     const watcher = new OvermindWatcher(service, tmux);
+    isAgentPaneMock.mockResolvedValue("no-session");
 
     await watcher.reconcile([wf]);
 
@@ -212,6 +225,9 @@ describe("OvermindWatcher.reconcile()", () => {
       }
     });
     const watcher = new OvermindWatcher(service, tmux);
+    isAgentPaneMock.mockImplementation(async (target: string) =>
+      target === "coord-d" ? "no-session" : "codex"
+    );
 
     await watcher.reconcile(rows);
 

@@ -127,4 +127,33 @@ describe("sendGuardedParentNudge", () => {
     expect(send).not.toHaveBeenCalled();
     expect(service.get(workflow.id)?.parent_status).toBe("no-session");
   });
+
+  it("sends to the coordinator when parent resolution fails instead of throwing", async () => {
+    const workflow = service.register({
+      label: "resolver-fail",
+      coordinator_session: "legacy-parent",
+      run_dir: path.join(tmpDir, "resolver-fail-run")
+    });
+    const send = vi.fn(async () => true);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(service, "getParentSessionForWorkflow").mockImplementation(() => {
+      throw new Error("resolver unavailable");
+    });
+
+    const result = await sendGuardedParentNudge(
+      workflow,
+      "overmind: resolver fallback",
+      { overmindService: service },
+      send
+    );
+
+    expect(result).toMatchObject({
+      sent: true,
+      parentSession: "legacy-parent",
+      paneKind: "unknown"
+    });
+    expect(isAgentPaneMock).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledWith("legacy-parent", "overmind: resolver fallback");
+    expect(warn.mock.calls[0][0]).toContain("parent session resolution failed");
+  });
 });

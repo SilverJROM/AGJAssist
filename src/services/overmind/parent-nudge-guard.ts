@@ -29,9 +29,15 @@ export async function sendGuardedParentNudge(
   deps: GuardedParentNudgeDeps,
   send: ParentSend
 ): Promise<GuardedParentNudgeResult> {
-  const parentSession = deps.overmindService.getParentSessionForWorkflow(workflow.id) ??
-    workflow.coordinator_session;
-  const paneKind = await isAgentPane(parentSession);
+  const { parentSession, resolverFailed } = resolveParentSession(workflow, deps);
+  let paneKind: AgentPaneKind = "unknown";
+  if (!resolverFailed) {
+    try {
+      paneKind = await isAgentPane(parentSession);
+    } catch (error) {
+      console.warn(`[overmind] parent session "${parentSession}" classification failed — sending nudge as unknown for run ${workflow.id}:`, error);
+    }
+  }
 
   if (paneKind === "bare-bash" || paneKind === "no-session") {
     await markParentOrphaned(workflow, parentSession, paneKind, deps);
@@ -45,6 +51,30 @@ export async function sendGuardedParentNudge(
 
   await send(parentSession, message);
   return { sent: true, parentSession, paneKind };
+}
+
+function resolveParentSession(
+  workflow: OvermindWorkflow,
+  deps: GuardedParentNudgeDeps
+): { parentSession: string; resolverFailed: boolean } {
+  const fallback = workflow.coordinator_session;
+  const resolver = (deps.overmindService as {
+    getParentSessionForWorkflow?: (id: number) => string | null;
+  }).getParentSessionForWorkflow;
+
+  if (typeof resolver !== "function") {
+    return { parentSession: fallback, resolverFailed: false };
+  }
+
+  try {
+    return {
+      parentSession: resolver.call(deps.overmindService, workflow.id) ?? fallback,
+      resolverFailed: false
+    };
+  } catch (error) {
+    console.warn(`[overmind] parent session resolution failed for run ${workflow.id} — sending nudge to coordinator as unknown:`, error);
+    return { parentSession: fallback, resolverFailed: true };
+  }
 }
 
 async function markParentOrphaned(
