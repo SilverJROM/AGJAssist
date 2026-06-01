@@ -14,3 +14,7 @@
 [projcore callback] batch-b12c PROPOSED workflow identity retrofit v28 table rebuild + workflow_id/run_dir resolver plan ready; awaiting APPROVED-PLAN
 [projcore callback] batch-b12c APPROVED-PLAN implementing v28 explicit-column rebuild + workflow_id/run_dir lifecycle lookup
 [projcore callback] batch-b12c DONE workflow identity retrofit committed; v28 rebuild row-survival tests + workflow_id/run_dir lifecycle tests passing
+[projcore callback] batch-b12c VALIDATED PASS real seeded v27->v28 migration preserved all rows/columns; constraints, resolver, build, targeted tests pass
+[projcore callback] batch-b12d PROPOSED owner-JWT-only project create route + overmind_projects service plan ready; awaiting APPROVED-PLAN
+[projcore callback] batch-b12d APPROVED-PLAN implementing owner-JWT-only POST /api/overmind/projects; loopback token is never accepted for mutation
+[projcore callback] batch-b12d DONE owner-JWT-only POST /api/overmind/projects + overmind_projects service helpers committed; targeted route/service tests and build pass

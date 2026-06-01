@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { AppConfig } from "../../config/config.js";
@@ -19,6 +20,14 @@ import type { NudgeStateService } from "../../services/nudge-state-service.js";
 
 interface TokenBody {
   token?: string;
+}
+
+interface CreateProjectBody extends TokenBody {
+  slug?: string;
+  app_path?: string;
+  parent_session?: string;
+  notes?: string | null;
+  created_by?: string;
 }
 
 interface SendBody {
@@ -74,6 +83,9 @@ interface AskUpdateCooldownBody extends TokenBody {
 }
 
 const REGISTER_CONFLICT_NUDGE_COOLDOWN_MS = 30 * 60 * 1000;
+const PROJECT_MUTATION_FORBIDDEN = {
+  error: "projects are JROM-managed; ask JROM to create via dashboard"
+};
 
 function buildProjectTreeConflictMessage(existing: OvermindWorkflow): string {
   return (
@@ -111,6 +123,49 @@ function requireLoopbackAndToken(
   }
 
   return true;
+}
+
+function hasLoopbackOvermindCredential(
+  request: FastifyRequest<{ Body?: TokenBody }>,
+  expectedToken: string
+): boolean {
+  if (!isLoopbackAddress(request.ip)) return false;
+
+  const headerToken = request.headers["x-overmind-token"];
+  const token = request.body?.token || (Array.isArray(headerToken) ? headerToken[0] : headerToken);
+  return token === expectedToken;
+}
+
+function requireOwnerJwtForProjectMutation(
+  request: FastifyRequest<{ Body?: TokenBody }>,
+  reply: FastifyReply,
+  authService: AuthService,
+  expectedToken: string
+): boolean {
+  const forbidden = (): false => {
+    reply.code(403).send(PROJECT_MUTATION_FORBIDDEN);
+    return false;
+  };
+
+  const header = request.headers.authorization;
+  if (typeof header === "string" && header.startsWith("Bearer ")) {
+    const token = header.slice(7).trim();
+    const user = token ? authService.verifyToken(token) : null;
+    if (user?.role === "owner") {
+      request.sessionUser = user;
+      return true;
+    }
+    if (user) return forbidden();
+    if (hasLoopbackOvermindCredential(request, expectedToken)) return forbidden();
+
+    reply.code(401).send({ error: "Invalid or expired token" });
+    return false;
+  }
+
+  if (hasLoopbackOvermindCredential(request, expectedToken)) return forbidden();
+
+  reply.code(401).send({ error: "Missing or invalid authorization header" });
+  return false;
 }
 
 function parseWorkflowId(id: string): number | null {
@@ -155,6 +210,54 @@ export function registerOvermindRoutes(
   nudgeState?: NudgeStateService
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
+
+  app.post<{ Body: CreateProjectBody }>(
+    "/api/overmind/projects",
+    async (request, reply) => {
+      if (!requireOwnerJwtForProjectMutation(request, reply, authService, config.overmind.token)) return;
+
+      const slug = typeof request.body?.slug === "string" ? request.body.slug.trim() : "";
+      const appPath = typeof request.body?.app_path === "string" ? request.body.app_path.trim() : "";
+      const parentSession = typeof request.body?.parent_session === "string" ? request.body.parent_session.trim() : "";
+      const notes = typeof request.body?.notes === "string" ? request.body.notes : null;
+
+      if (!slug) {
+        return reply.code(400).send({ error: "'slug' must be a non-empty string" });
+      }
+      if (!appPath) {
+        return reply.code(400).send({ error: "'app_path' must be a non-empty string" });
+      }
+      if (!parentSession) {
+        return reply.code(400).send({ error: "'parent_session' must be a non-empty string" });
+      }
+      if (!path.isAbsolute(appPath)) {
+        return reply.code(400).send({ error: "'app_path' must be an absolute path" });
+      }
+      if (!fs.existsSync(appPath)) {
+        return reply.code(400).send({ error: "'app_path' must exist on disk" });
+      }
+
+      try {
+        const project = overmindService.createProject({
+          slug,
+          app_path: appPath,
+          parent_session: parentSession,
+          notes
+        });
+        return reply.code(201).send({ project });
+      } catch (error) {
+        if (
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          error.code === "SQLITE_CONSTRAINT_UNIQUE"
+        ) {
+          return reply.code(409).send({ error: "project slug or app_path already exists" });
+        }
+        throw error;
+      }
+    }
+  );
 
   app.post<{ Body: RegisterBody }>(
     "/api/overmind/register",

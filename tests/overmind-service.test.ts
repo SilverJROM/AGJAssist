@@ -89,6 +89,33 @@ describe("OvermindService", () => {
     ]);
   });
 
+  it("creates and reads overmind_projects and counts non-terminal active runs", () => {
+    const project = service.createProject({
+      slug: "agjassist",
+      app_path: "/home/agjrom/TGBOTS/AGJAssist",
+      parent_session: "AGJ-51",
+      notes: "Primary project"
+    });
+
+    expect(project.id).toBeGreaterThan(0);
+    expect(project.created_by).toBe("JROM");
+    expect(service.getProjectBySlug("agjassist")?.app_path).toBe("/home/agjrom/TGBOTS/AGJAssist");
+    expect(service.getProjectByAppPath("/home/agjrom/TGBOTS/AGJAssist")?.slug).toBe("agjassist");
+    expect(service.listProjects().map((row) => row.slug)).toEqual(["agjassist"]);
+
+    db.prepare(
+      `INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir, status, tasks)
+       VALUES (?, 'active-run', 'AGJ-51', '/tmp/agjassist/active', 'active', '[]')`
+    ).run(project.id);
+    db.prepare(
+      `INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir, status, tasks)
+       VALUES (?, 'done-run', 'AGJ-52', '/tmp/agjassist/done', 'completed', '[]')`
+    ).run(project.id);
+
+    expect(service.activeRunsCountForProjectSlug("agjassist")).toBe(1);
+    expect(service.activeRunsCountForProjectSlug("missing")).toBe(0);
+  });
+
   it("round-trips register, list, get, getBySession, updates, status, tasks, and delete", () => {
     const created = service.register({
       label: "lkcamp",

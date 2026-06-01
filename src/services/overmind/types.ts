@@ -66,6 +66,24 @@ export interface RunSummary {
   done_tasks: number;
 }
 
+export interface OvermindProject {
+  id: number;
+  slug: string;
+  app_path: string;
+  parent_session: string;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateOvermindProjectInput {
+  slug: string;
+  app_path: string;
+  parent_session: string;
+  notes?: string | null;
+}
+
 export interface OvermindWorkflow {
   id: number;
   label: string;

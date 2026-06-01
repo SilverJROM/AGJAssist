@@ -4,6 +4,8 @@ import path from "node:path";
 import {
   OvermindChildSessionStatus,
   OvermindParentStatus,
+  CreateOvermindProjectInput,
+  OvermindProject,
   OvermindTask,
   OvermindTaskHistoryEntry,
   OvermindTaskLogEntry,
@@ -24,6 +26,8 @@ export type {
   OvermindChildSessionStatus,
   OvermindChildStatus,
   OvermindParentStatus,
+  CreateOvermindProjectInput,
+  OvermindProject,
   OvermindTask,
   OvermindTaskHistoryEntry,
   OvermindTaskLogEntry,
@@ -87,6 +91,17 @@ interface OvermindTaskHistoryRow {
   total: number;
 }
 
+interface OvermindProjectRow {
+  id: number;
+  slug: string;
+  app_path: string;
+  parent_session: string;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const PROJECT_TREE_TERMINAL_STATUSES = new Set<OvermindWorkflowStatus>(["completed", "failed", "paused"]);
 
 export interface OvermindWorkflowLookup {
@@ -104,6 +119,62 @@ const PROJECT_ROOT_DEPTH = 5;
 
 export class OvermindService {
   constructor(private readonly db: DatabaseService) {}
+
+  createProject(input: CreateOvermindProjectInput): OvermindProject {
+    const row = this.db
+      .prepare(
+        `INSERT INTO overmind_projects (
+          slug,
+          app_path,
+          parent_session,
+          notes,
+          created_by
+        ) VALUES (?, ?, ?, ?, 'JROM')
+        RETURNING *`
+      )
+      .get(
+        input.slug,
+        input.app_path,
+        input.parent_session,
+        input.notes ?? null
+      ) as OvermindProjectRow;
+
+    return this.mapProjectRow(row);
+  }
+
+  getProjectBySlug(slug: string): OvermindProject | null {
+    const row = this.db
+      .prepare("SELECT * FROM overmind_projects WHERE slug = ?")
+      .get(slug) as OvermindProjectRow | undefined;
+    return row ? this.mapProjectRow(row) : null;
+  }
+
+  getProjectByAppPath(appPath: string): OvermindProject | null {
+    const row = this.db
+      .prepare("SELECT * FROM overmind_projects WHERE app_path = ?")
+      .get(appPath) as OvermindProjectRow | undefined;
+    return row ? this.mapProjectRow(row) : null;
+  }
+
+  listProjects(): OvermindProject[] {
+    const rows = this.db
+      .prepare("SELECT * FROM overmind_projects ORDER BY slug ASC, id ASC")
+      .all() as OvermindProjectRow[];
+    return rows.map((row) => this.mapProjectRow(row));
+  }
+
+  activeRunsCountForProjectSlug(slug: string): number {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM overmind_workflows w
+         JOIN overmind_projects p ON p.id = w.project_id
+         WHERE p.slug = ?
+           AND w.status NOT IN ('completed', 'failed', 'paused')`
+      )
+      .get(slug) as { count: number } | undefined;
+    return row?.count ?? 0;
+  }
 
   register(input: RegisterOvermindWorkflowInput): OvermindWorkflow {
     let tasks = sanitizeTaskList(input.tasks);
@@ -734,6 +805,10 @@ export class OvermindService {
       task_log: this.parseJsonArray<OvermindTaskLogEntry>(row.task_log),
       child_statuses: this.parseJsonArray<OvermindChildSessionStatus>(row.child_statuses)
     };
+  }
+
+  private mapProjectRow(row: OvermindProjectRow): OvermindProject {
+    return { ...row };
   }
 
   private parseJsonArray<T>(value: string): T[] {

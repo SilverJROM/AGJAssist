@@ -93,6 +93,7 @@ let db: DatabaseService;
 let authService: AuthService;
 let overmindService: OvermindService;
 let ovmSession: OvmSessionManager;
+let tempProjectDirs: string[] = [];
 
 function authHeader(): { authorization: string } {
   const loginCode = authService.generateLoginCode(111222);
@@ -101,8 +102,23 @@ function authHeader(): { authorization: string } {
   return { authorization: `Bearer ${auth!.token}` };
 }
 
+function viewerAuthHeader(): { authorization: string } {
+  authService.addUser(333444, "viewer");
+  const loginCode = authService.generateLoginCode(333444);
+  const auth = authService.authenticateWithCode(loginCode);
+  expect(auth).not.toBeNull();
+  return { authorization: `Bearer ${auth!.token}` };
+}
+
+function tempProjectPath(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "overmind-project-"));
+  tempProjectDirs.push(dir);
+  return dir;
+}
+
 beforeEach(async () => {
   cleanup();
+  tempProjectDirs = [];
   db = new DatabaseService(TEST_DB);
   db.ensureOwner(111222);
   authService = new AuthService(db, BOT_TOKEN, JWT_SECRET, 24);
@@ -123,10 +139,130 @@ beforeEach(async () => {
 afterEach(async () => {
   await app.close();
   db.close();
+  for (const dir of tempProjectDirs) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
   cleanup();
 });
 
 describe("Overmind routes", () => {
+  it("creates overmind projects with owner JWT only and forces created_by to JROM", async () => {
+    const appPath = tempProjectPath();
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/overmind/projects",
+      headers: authHeader(),
+      payload: {
+        slug: "agjassist",
+        app_path: appPath,
+        parent_session: "AGJ-51",
+        notes: "Primary AGJAssist run",
+        created_by: "projcore"
+      }
+    });
+
+    expect(created.statusCode).toBe(201);
+    expect(created.json().project).toMatchObject({
+      slug: "agjassist",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: "Primary AGJAssist run",
+      created_by: "JROM"
+    });
+    expect(overmindService.getProjectBySlug("agjassist")?.created_by).toBe("JROM");
+
+    const duplicateSlug = await app.inject({
+      method: "POST",
+      url: "/api/overmind/projects",
+      headers: authHeader(),
+      payload: {
+        slug: "agjassist",
+        app_path: tempProjectPath(),
+        parent_session: "AGJ-99"
+      }
+    });
+    expect(duplicateSlug.statusCode).toBe(409);
+
+    const duplicateAppPath = await app.inject({
+      method: "POST",
+      url: "/api/overmind/projects",
+      headers: authHeader(),
+      payload: {
+        slug: "agjassist-copy",
+        app_path: appPath,
+        parent_session: "AGJ-99"
+      }
+    });
+    expect(duplicateAppPath.statusCode).toBe(409);
+  });
+
+  it("rejects overmind project creation for loopback token, viewer JWT, missing auth, and invalid app_path", async () => {
+    const payload = {
+      slug: "blocked",
+      app_path: tempProjectPath(),
+      parent_session: "AGJ-51"
+    };
+    const forbidden = { error: "projects are JROM-managed; ask JROM to create via dashboard" };
+
+    const loopbackOnly = await app.inject({
+      method: "POST",
+      url: "/api/overmind/projects",
+      remoteAddress: "127.0.0.1",
+      headers: {
+        "x-overmind-token": OVERMIND_TOKEN
+      },
+      payload
+    });
+    expect(loopbackOnly.statusCode).toBe(403);
+    expect(loopbackOnly.json()).toEqual(forbidden);
+
+    const viewer = await app.inject({
+      method: "POST",
+      url: "/api/overmind/projects",
+      headers: viewerAuthHeader(),
+      payload: {
+        ...payload,
+        slug: "viewer-blocked"
+      }
+    });
+    expect(viewer.statusCode).toBe(403);
+    expect(viewer.json()).toEqual(forbidden);
+
+    const noAuth = await app.inject({
+      method: "POST",
+      url: "/api/overmind/projects",
+      payload: {
+        ...payload,
+        slug: "no-auth-blocked"
+      }
+    });
+    expect(noAuth.statusCode).toBe(401);
+
+    const relativePath = await app.inject({
+      method: "POST",
+      url: "/api/overmind/projects",
+      headers: authHeader(),
+      payload: {
+        slug: "relative",
+        app_path: "relative/path",
+        parent_session: "AGJ-51"
+      }
+    });
+    expect(relativePath.statusCode).toBe(400);
+
+    const missingPath = await app.inject({
+      method: "POST",
+      url: "/api/overmind/projects",
+      headers: authHeader(),
+      payload: {
+        slug: "missing",
+        app_path: path.join(os.tmpdir(), "overmind-project-missing-b12d"),
+        parent_session: "AGJ-51"
+      }
+    });
+    expect(missingPath.statusCode).toBe(400);
+  });
+
   it("registers and upserts workflows from localhost with the shared token", async () => {
     const first = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
