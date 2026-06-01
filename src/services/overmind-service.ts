@@ -6,6 +6,7 @@ import {
   OvermindParentStatus,
   CreateOvermindProjectInput,
   OvermindProject,
+  UpdateOvermindProjectInput,
   OvermindTask,
   OvermindTaskHistoryEntry,
   OvermindTaskLogEntry,
@@ -28,6 +29,7 @@ export type {
   OvermindParentStatus,
   CreateOvermindProjectInput,
   OvermindProject,
+  UpdateOvermindProjectInput,
   OvermindTask,
   OvermindTaskHistoryEntry,
   OvermindTaskLogEntry,
@@ -174,6 +176,47 @@ export class OvermindService {
       )
       .get(slug) as { count: number } | undefined;
     return row?.count ?? 0;
+  }
+
+  updateProjectBySlug(slug: string, input: UpdateOvermindProjectInput): OvermindProject | null {
+    const assignments: string[] = [];
+    const params: unknown[] = [];
+
+    if (input.parent_session !== undefined) {
+      assignments.push("parent_session = ?");
+      params.push(input.parent_session);
+    }
+    if (input.notes !== undefined) {
+      assignments.push("notes = ?");
+      params.push(input.notes);
+    }
+    if (assignments.length === 0) {
+      return this.getProjectBySlug(slug);
+    }
+
+    assignments.push("updated_at = datetime('now')");
+    const row = this.db
+      .prepare(
+        `UPDATE overmind_projects
+         SET ${assignments.join(", ")}
+         WHERE slug = ?
+         RETURNING *`
+      )
+      .get(...params, slug) as OvermindProjectRow | undefined;
+    return row ? this.mapProjectRow(row) : null;
+  }
+
+  deleteProjectBySlug(slug: string): boolean {
+    const project = this.getProjectBySlug(slug);
+    if (!project) return false;
+
+    this.db
+      .prepare("UPDATE overmind_workflows SET project_id = NULL WHERE project_id = ?")
+      .run(project.id);
+    const result = this.db
+      .prepare("DELETE FROM overmind_projects WHERE slug = ?")
+      .run(slug);
+    return result.changes > 0;
   }
 
   register(input: RegisterOvermindWorkflowInput): OvermindWorkflow {

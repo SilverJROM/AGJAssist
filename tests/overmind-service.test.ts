@@ -114,6 +114,23 @@ describe("OvermindService", () => {
 
     expect(service.activeRunsCountForProjectSlug("agjassist")).toBe(1);
     expect(service.activeRunsCountForProjectSlug("missing")).toBe(0);
+
+    const updated = service.updateProjectBySlug("agjassist", {
+      parent_session: "AGJ-99",
+      notes: null
+    });
+    expect(updated).toMatchObject({
+      slug: "agjassist",
+      app_path: "/home/agjrom/TGBOTS/AGJAssist",
+      parent_session: "AGJ-99",
+      notes: null,
+      created_by: "JROM"
+    });
+    expect(service.updateProjectBySlug("missing", { parent_session: "AGJ-99" })).toBeNull();
+
+    expect(service.deleteProjectBySlug("missing")).toBe(false);
+    expect(service.deleteProjectBySlug("agjassist")).toBe(true);
+    expect(service.getProjectBySlug("agjassist")).toBeNull();
   });
 
   it("round-trips register, list, get, getBySession, updates, status, tasks, and delete", () => {

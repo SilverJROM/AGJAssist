@@ -6,6 +6,7 @@ import { createAuthMiddleware } from "../../auth/auth-middleware.js";
 import { AuthService } from "../../auth/auth-service.js";
 import {
   OvermindService,
+  OvermindProject,
   OvermindTask,
   OvermindWorkflow,
   OvermindWorkflowStatus,
@@ -28,6 +29,17 @@ interface CreateProjectBody extends TokenBody {
   parent_session?: string;
   notes?: string | null;
   created_by?: string;
+}
+
+interface UpdateProjectBody extends TokenBody {
+  slug?: string;
+  app_path?: string;
+  parent_session?: string;
+  notes?: string | null;
+}
+
+interface ProjectParams {
+  slug: string;
 }
 
 interface SendBody {
@@ -126,13 +138,14 @@ function requireLoopbackAndToken(
 }
 
 function hasLoopbackOvermindCredential(
-  request: FastifyRequest<{ Body?: TokenBody }>,
+  request: FastifyRequest,
   expectedToken: string
 ): boolean {
   if (!isLoopbackAddress(request.ip)) return false;
 
   const headerToken = request.headers["x-overmind-token"];
-  const token = request.body?.token || (Array.isArray(headerToken) ? headerToken[0] : headerToken);
+  const body = request.body as TokenBody | undefined;
+  const token = body?.token || (Array.isArray(headerToken) ? headerToken[0] : headerToken);
   return token === expectedToken;
 }
 
@@ -163,6 +176,32 @@ function requireOwnerJwtForProjectMutation(
   }
 
   if (hasLoopbackOvermindCredential(request, expectedToken)) return forbidden();
+
+  reply.code(401).send({ error: "Missing or invalid authorization header" });
+  return false;
+}
+
+function requireProjectReadAuth(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  authService: AuthService,
+  expectedToken: string
+): boolean {
+  const header = request.headers.authorization;
+  if (typeof header === "string" && header.startsWith("Bearer ")) {
+    const token = header.slice(7).trim();
+    const user = token ? authService.verifyToken(token) : null;
+    if (user) {
+      request.sessionUser = user;
+      return true;
+    }
+    if (!hasLoopbackOvermindCredential(request, expectedToken)) {
+      reply.code(401).send({ error: "Invalid or expired token" });
+      return false;
+    }
+  }
+
+  if (hasLoopbackOvermindCredential(request, expectedToken)) return true;
 
   reply.code(401).send({ error: "Missing or invalid authorization header" });
   return false;
@@ -211,6 +250,11 @@ export function registerOvermindRoutes(
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
 
+  const withActiveRunsCount = (project: OvermindProject) => ({
+    ...project,
+    active_runs_count: overmindService.activeRunsCountForProjectSlug(project.slug)
+  });
+
   app.post<{ Body: CreateProjectBody }>(
     "/api/overmind/projects",
     async (request, reply) => {
@@ -256,6 +300,89 @@ export function registerOvermindRoutes(
         }
         throw error;
       }
+    }
+  );
+
+  app.get(
+    "/api/overmind/projects",
+    async (request, reply) => {
+      if (!requireProjectReadAuth(request, reply, authService, config.overmind.token)) return;
+
+      return {
+        projects: overmindService.listProjects().map(withActiveRunsCount)
+      };
+    }
+  );
+
+  app.get<{ Params: ProjectParams }>(
+    "/api/overmind/projects/:slug",
+    async (request, reply) => {
+      if (!requireProjectReadAuth(request, reply, authService, config.overmind.token)) return;
+
+      const project = overmindService.getProjectBySlug(request.params.slug);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      return { project: withActiveRunsCount(project) };
+    }
+  );
+
+  app.patch<{ Params: ProjectParams; Body: UpdateProjectBody }>(
+    "/api/overmind/projects/:slug",
+    async (request, reply) => {
+      if (!requireOwnerJwtForProjectMutation(request, reply, authService, config.overmind.token)) return;
+
+      if (request.body?.slug !== undefined || request.body?.app_path !== undefined) {
+        return reply.code(400).send({ error: "slug and app_path are immutable" });
+      }
+
+      const input: { parent_session?: string; notes?: string | null } = {};
+      if (request.body?.parent_session !== undefined) {
+        if (typeof request.body.parent_session !== "string" || !request.body.parent_session.trim()) {
+          return reply.code(400).send({ error: "'parent_session' must be a non-empty string" });
+        }
+        input.parent_session = request.body.parent_session.trim();
+      }
+      if (request.body?.notes !== undefined) {
+        if (request.body.notes !== null && typeof request.body.notes !== "string") {
+          return reply.code(400).send({ error: "'notes' must be a string or null" });
+        }
+        input.notes = request.body.notes;
+      }
+      if (input.parent_session === undefined && input.notes === undefined) {
+        return reply.code(400).send({ error: "parent_session or notes is required" });
+      }
+
+      const project = overmindService.updateProjectBySlug(request.params.slug, input);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      return { project: withActiveRunsCount(project) };
+    }
+  );
+
+  app.delete<{ Params: ProjectParams; Body: TokenBody }>(
+    "/api/overmind/projects/:slug",
+    async (request, reply) => {
+      if (!requireOwnerJwtForProjectMutation(request, reply, authService, config.overmind.token)) return;
+
+      const project = overmindService.getProjectBySlug(request.params.slug);
+      if (!project) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const activeRuns = overmindService.activeRunsCountForProjectSlug(request.params.slug);
+      if (activeRuns > 0) {
+        return reply.code(409).send({
+          error: "project has active runs; complete or cancel them first",
+          active_runs: activeRuns
+        });
+      }
+
+      overmindService.deleteProjectBySlug(request.params.slug);
+      return { ok: true };
     }
   );
 

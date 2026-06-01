@@ -263,6 +263,215 @@ describe("Overmind routes", () => {
     expect(missingPath.statusCode).toBe(400);
   });
 
+  it("reads overmind projects with loopback token or viewer JWT and includes active_runs_count", async () => {
+    const first = overmindService.createProject({
+      slug: "agjassist",
+      app_path: tempProjectPath(),
+      parent_session: "AGJ-51",
+      notes: "Primary project"
+    });
+    overmindService.createProject({
+      slug: "receiptbot",
+      app_path: tempProjectPath(),
+      parent_session: "RS-1",
+      notes: null
+    });
+
+    db.prepare(
+      `INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir, status, tasks)
+       VALUES (?, 'active-run', 'AGJ-51', '/tmp/agjassist/active', 'active', '[]')`
+    ).run(first.id);
+    db.prepare(
+      `INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir, status, tasks)
+       VALUES (?, 'working-run', 'AGJ-52', '/tmp/agjassist/working', 'working', '[]')`
+    ).run(first.id);
+    db.prepare(
+      `INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir, status, tasks)
+       VALUES (?, 'done-run', 'AGJ-53', '/tmp/agjassist/done', 'completed', '[]')`
+    ).run(first.id);
+
+    const loopbackList = await app.inject({
+      method: "GET",
+      url: "/api/overmind/projects",
+      remoteAddress: "127.0.0.1",
+      headers: {
+        "x-overmind-token": OVERMIND_TOKEN
+      }
+    });
+    expect(loopbackList.statusCode).toBe(200);
+    expect(loopbackList.json().projects).toEqual([
+      expect.objectContaining({ slug: "agjassist", active_runs_count: 2 }),
+      expect.objectContaining({ slug: "receiptbot", active_runs_count: 0 })
+    ]);
+
+    const viewerOne = await app.inject({
+      method: "GET",
+      url: "/api/overmind/projects/agjassist",
+      headers: viewerAuthHeader()
+    });
+    expect(viewerOne.statusCode).toBe(200);
+    expect(viewerOne.json().project).toMatchObject({
+      slug: "agjassist",
+      active_runs_count: 2
+    });
+
+    const missing = await app.inject({
+      method: "GET",
+      url: "/api/overmind/projects/missing",
+      headers: viewerAuthHeader()
+    });
+    expect(missing.statusCode).toBe(404);
+
+    const noAuth = await app.inject({
+      method: "GET",
+      url: "/api/overmind/projects"
+    });
+    expect(noAuth.statusCode).toBe(401);
+  });
+
+  it("patches overmind projects only for owner JWT and keeps slug/app_path immutable", async () => {
+    const project = overmindService.createProject({
+      slug: "agjassist",
+      app_path: tempProjectPath(),
+      parent_session: "AGJ-51",
+      notes: "Before"
+    });
+
+    const patched = await app.inject({
+      method: "PATCH",
+      url: "/api/overmind/projects/agjassist",
+      headers: authHeader(),
+      payload: {
+        parent_session: "AGJ-99",
+        notes: null
+      }
+    });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json().project).toMatchObject({
+      id: project.id,
+      slug: "agjassist",
+      app_path: project.app_path,
+      parent_session: "AGJ-99",
+      notes: null,
+      active_runs_count: 0
+    });
+
+    const immutableSlug = await app.inject({
+      method: "PATCH",
+      url: "/api/overmind/projects/agjassist",
+      headers: authHeader(),
+      payload: {
+        slug: "renamed",
+        parent_session: "AGJ-100"
+      }
+    });
+    expect(immutableSlug.statusCode).toBe(400);
+    expect(overmindService.getProjectBySlug("agjassist")?.parent_session).toBe("AGJ-99");
+
+    const immutableAppPath = await app.inject({
+      method: "PATCH",
+      url: "/api/overmind/projects/agjassist",
+      headers: authHeader(),
+      payload: {
+        app_path: tempProjectPath(),
+        notes: "blocked"
+      }
+    });
+    expect(immutableAppPath.statusCode).toBe(400);
+
+    const loopbackOnly = await app.inject({
+      method: "PATCH",
+      url: "/api/overmind/projects/agjassist",
+      remoteAddress: "127.0.0.1",
+      headers: {
+        "x-overmind-token": OVERMIND_TOKEN
+      },
+      payload: {
+        parent_session: "AGJ-100"
+      }
+    });
+    expect(loopbackOnly.statusCode).toBe(403);
+
+    const viewer = await app.inject({
+      method: "PATCH",
+      url: "/api/overmind/projects/agjassist",
+      headers: viewerAuthHeader(),
+      payload: {
+        parent_session: "AGJ-100"
+      }
+    });
+    expect(viewer.statusCode).toBe(403);
+
+    const missing = await app.inject({
+      method: "PATCH",
+      url: "/api/overmind/projects/missing",
+      headers: authHeader(),
+      payload: {
+        parent_session: "AGJ-100"
+      }
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+
+  it("guards overmind project delete with active runs and owner-only auth", async () => {
+    const project = overmindService.createProject({
+      slug: "agjassist",
+      app_path: tempProjectPath(),
+      parent_session: "AGJ-51",
+      notes: null
+    });
+    const activeRun = db.prepare(
+      `INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir, status, tasks)
+       VALUES (?, 'working-run', 'AGJ-51', '/tmp/agjassist/working', 'working', '[]')`
+    ).run(project.id).lastInsertRowid as number;
+
+    const loopbackOnly = await app.inject({
+      method: "DELETE",
+      url: "/api/overmind/projects/agjassist",
+      remoteAddress: "127.0.0.1",
+      headers: {
+        "x-overmind-token": OVERMIND_TOKEN
+      }
+    });
+    expect(loopbackOnly.statusCode).toBe(403);
+
+    const viewer = await app.inject({
+      method: "DELETE",
+      url: "/api/overmind/projects/agjassist",
+      headers: viewerAuthHeader()
+    });
+    expect(viewer.statusCode).toBe(403);
+
+    const guarded = await app.inject({
+      method: "DELETE",
+      url: "/api/overmind/projects/agjassist",
+      headers: authHeader()
+    });
+    expect(guarded.statusCode).toBe(409);
+    expect(guarded.json()).toEqual({
+      error: "project has active runs; complete or cancel them first",
+      active_runs: 1
+    });
+    expect(overmindService.getProjectBySlug("agjassist")).not.toBeNull();
+
+    overmindService.setStatus(activeRun, "completed");
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: "/api/overmind/projects/agjassist",
+      headers: authHeader()
+    });
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.json()).toEqual({ ok: true });
+    expect(overmindService.getProjectBySlug("agjassist")).toBeNull();
+
+    const missing = await app.inject({
+      method: "DELETE",
+      url: "/api/overmind/projects/agjassist",
+      headers: authHeader()
+    });
+    expect(missing.statusCode).toBe(404);
+  });
+
   it("registers and upserts workflows from localhost with the shared token", async () => {
     const first = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,

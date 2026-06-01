@@ -84,6 +84,11 @@ export interface CreateOvermindProjectInput {
   notes?: string | null;
 }
 
+export interface UpdateOvermindProjectInput {
+  parent_session?: string;
+  notes?: string | null;
+}
+
 export interface OvermindWorkflow {
   id: number;
   label: string;

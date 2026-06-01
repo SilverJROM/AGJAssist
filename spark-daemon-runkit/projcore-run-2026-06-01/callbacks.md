@@ -18,3 +18,7 @@
 [projcore callback] batch-b12d PROPOSED owner-JWT-only project create route + overmind_projects service plan ready; awaiting APPROVED-PLAN
 [projcore callback] batch-b12d APPROVED-PLAN implementing owner-JWT-only POST /api/overmind/projects; loopback token is never accepted for mutation
 [projcore callback] batch-b12d DONE owner-JWT-only POST /api/overmind/projects + overmind_projects service helpers committed; targeted route/service tests and build pass
+[projcore callback] batch-b12d VALIDATED PASS owner JWT creates with created_by forced; loopback-token-only and viewer JWT are 403; no-auth 401; dup/bad-path checks pass
+[projcore callback] batch-b12e PROPOSED GET/PATCH/DELETE overmind_projects route plan ready; awaiting APPROVED-PLAN
+[projcore callback] batch-b12e APPROVED-PLAN implementing GET/PATCH/DELETE overmind_projects routes with shared active-runs count guard
+[projcore callback] batch-b12e DONE GET/PATCH/DELETE overmind_projects routes committed; targeted route/service tests and build pass
