@@ -10,6 +10,13 @@ const CLAUDE_AGENT_RE =
 const CODEX_AGENT_RE = /OpenAI Codex|codex --dangerously-bypass|gpt-5|▌/;
 const BARE_BASH_RE = /^[a-z]+@[a-z-]+:/m;
 
+function isMissingExecutableError(error: unknown): boolean {
+  return typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "ENOENT";
+}
+
 export function classifyAgentPaneText(pane: string): Exclude<AgentPaneKind, "no-session"> {
   if (CLAUDE_AGENT_RE.test(pane)) return "claude";
   if (CODEX_AGENT_RE.test(pane)) return "codex";
@@ -22,7 +29,8 @@ export async function isAgentPane(session: string): Promise<AgentPaneKind> {
 
   try {
     await execFileAsync("tmux", ["has-session", "-t", session]);
-  } catch {
+  } catch (error) {
+    if (isMissingExecutableError(error)) return "unknown";
     return "no-session";
   }
 

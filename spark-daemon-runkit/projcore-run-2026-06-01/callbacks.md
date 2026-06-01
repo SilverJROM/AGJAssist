@@ -26,3 +26,6 @@
 [projcore callback] batch-b12f PROPOSED Dual-shape register plan ready: legacy label+session preserved; new run_dir-only attach walks projects and returns 201/404/422. DISPATCH-MARKER: AGJ-B12F
 [projcore callback] batch-b12f APPROVED-PLAN Implementing run_dir-only attach with legacy register preserved. DISPATCH-MARKER: AGJ-B12F
 [projcore callback] batch-b12f DONE Implemented run_dir-only project attach with 422/404 responses, project/run_dir idempotent upsert, legacy register preserved, tests/build green. DISPATCH-MARKER: AGJ-B12F
+[projcore callback] batch-b12f VALIDATED PASS real dist app.inject confirms attach idempotent/no-dup, required 404/422 bodies, legacy register, omitted-tasks preserve, and child-add/rm compatibility. DISPATCH-MARKER: AGJ-VAL-B12F
+[projcore callback] batch-b12g PROPOSED attach warn-check after registerAttached; persist on existing parent_status and return parent_warning for bare-bash/no-session; awaiting APPROVED-PLAN. DISPATCH-MARKER: AGJ-B12G
+[projcore callback] batch-b12g DONE attach register parent warn-check implemented; bare-bash/no-session warn-only 201 with persisted parent_status + parent_warning, detector failures fall back to unknown/no warning; targeted tests and build green. DISPATCH-MARKER: AGJ-B12G

@@ -18,6 +18,8 @@ import { OvermindStreamManager } from "../websocket/overmind-stream-manager.js";
 import type { OvmSessionManager } from "../../services/ovm-session.js";
 import type { TmuxService } from "../../tmux/tmux-service.js";
 import type { NudgeStateService } from "../../services/nudge-state-service.js";
+import { isAgentPane, type AgentPaneKind } from "../../services/overmind/agent-pane.js";
+import type { OvermindParentStatus } from "../../services/overmind/types.js";
 
 interface TokenBody {
   token?: string;
@@ -101,6 +103,28 @@ const REGISTER_CONFLICT_NUDGE_COOLDOWN_MS = 30 * 60 * 1000;
 const PROJECT_MUTATION_FORBIDDEN = {
   error: "projects are JROM-managed; ask JROM to create via dashboard"
 };
+
+function normalizeRegisterParentStatus(kind: AgentPaneKind): OvermindParentStatus {
+  if (kind === "claude" || kind === "codex") return "ok";
+  if (kind === "bare-bash" || kind === "no-session") return kind;
+  return "unknown";
+}
+
+function parentWarningFor(status: OvermindParentStatus, parentSession: string): { code: string; message: string } | null {
+  if (status === "bare-bash") {
+    return {
+      code: "parent-session-bare-bash",
+      message: `Project parent_session '${parentSession}' is a bare shell, not an agent pane. Registration succeeded; start Claude/Codex in that tmux session so Overmind nudges do not paste into bash.`
+    };
+  }
+  if (status === "no-session") {
+    return {
+      code: "parent-session-no-session",
+      message: `Project parent_session '${parentSession}' does not exist. Registration succeeded; create/start that tmux session so Overmind can reach the parent agent.`
+    };
+  }
+  return null;
+}
 
 function buildProjectTreeConflictMessage(existing: OvermindWorkflow): string {
   return (
@@ -431,17 +455,28 @@ export function registerOvermindRoutes(
           });
         }
 
-        const workflow = overmindService.registerAttached({
+        let workflow = overmindService.registerAttached({
           project_id: match.project.id,
           label: `${match.project.slug} · ${path.basename(match.run_dir) || "run"}`,
           run_dir: match.run_dir
         });
+        let parentStatus: OvermindParentStatus = "unknown";
+        try {
+          parentStatus = normalizeRegisterParentStatus(await isAgentPane(match.project.parent_session));
+        } catch {
+          parentStatus = "unknown";
+        }
+        workflow = overmindService.update(workflow.id, { parent_status: parentStatus }) ?? workflow;
+        const parentWarning = parentWarningFor(parentStatus, match.project.parent_session);
+
         return reply.code(201).send({
           workflow,
           workflow_id: workflow.id,
           project_id: match.project.id,
           project_slug: match.project.slug,
-          parent_session: match.project.parent_session
+          parent_session: match.project.parent_session,
+          parent_status: parentStatus,
+          ...(parentWarning ? { parent_warning: parentWarning } : {})
         });
       }
 

@@ -14,7 +14,14 @@ export type OvermindWorkflowStatus =
   | "failed";
 
 export type OvermindTaskState = "done" | "processing" | "pending";
-export type OvermindParentStatus = "working" | "idle" | "waiting_human" | "awaiting_decision" | "stuck";
+export type OvermindRegisterParentStatus = "ok" | "bare-bash" | "no-session" | "unknown";
+export type OvermindParentStatus =
+  | "working"
+  | "idle"
+  | "waiting_human"
+  | "awaiting_decision"
+  | "stuck"
+  | OvermindRegisterParentStatus;
 export type OvermindChildStatus = "working" | "idle" | "closed";
 
 export interface OvermindChildSessionStatus {

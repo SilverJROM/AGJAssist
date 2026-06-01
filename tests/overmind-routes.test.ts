@@ -4,6 +4,7 @@ import { DatabaseService } from "../src/db/database.js";
 import { AuthService } from "../src/auth/auth-service.js";
 import { OvermindService } from "../src/services/overmind-service.js";
 import { registerOvermindRoutes } from "../src/api/routes/overmind-routes.js";
+import * as agentPane from "../src/services/overmind/agent-pane.js";
 import { AppConfig } from "../src/config/config.js";
 import { OvmSessionManager } from "../src/services/ovm-session.js";
 import type { TmuxService } from "../src/tmux/tmux-service.js";
@@ -139,6 +140,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await app.close();
   db.close();
+  vi.restoreAllMocks();
   for (const dir of tempProjectDirs) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -546,6 +548,107 @@ describe("Overmind routes", () => {
     expect(idempotent.statusCode).toBe(201);
     expect(idempotent.json().workflow_id).toBe(firstBody.workflow_id);
     expect(overmindService.list()).toHaveLength(1);
+  });
+
+  it("records ok parent_status and no warning when attach parent_session is an agent pane", async () => {
+    vi.spyOn(agentPane, "isAgentPane").mockResolvedValue("codex");
+    const appPath = tempProjectPath();
+    const runDir = path.join(appPath, "plans", "b12g", "agent-parent");
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "agent-parent",
+      app_path: appPath,
+      parent_session: "AGJ-codex",
+      notes: null
+    });
+
+    const attached = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir
+    });
+
+    expect(attached.statusCode).toBe(201);
+    const body = attached.json();
+    expect(body.parent_status).toBe("ok");
+    expect(body.parent_warning).toBeUndefined();
+    expect(body.workflow.parent_status).toBe("ok");
+    expect(overmindService.get(body.workflow_id)?.parent_status).toBe("ok");
+    expect(agentPane.isAgentPane).toHaveBeenCalledWith("AGJ-codex");
+  });
+
+  it("warns but still returns 201 when attach parent_session is bare-bash", async () => {
+    vi.spyOn(agentPane, "isAgentPane").mockResolvedValue("bare-bash");
+    const appPath = tempProjectPath();
+    const runDir = path.join(appPath, "plans", "b12g", "bare-parent");
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "bare-parent",
+      app_path: appPath,
+      parent_session: "AGJ-bare",
+      notes: null
+    });
+
+    const attached = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir
+    });
+
+    expect(attached.statusCode).toBe(201);
+    const body = attached.json();
+    expect(body.parent_status).toBe("bare-bash");
+    expect(body.parent_warning).toMatchObject({ code: "parent-session-bare-bash" });
+    expect(body.workflow.parent_status).toBe("bare-bash");
+    expect(overmindService.get(body.workflow_id)?.parent_status).toBe("bare-bash");
+  });
+
+  it("warns but still returns 201 when attach parent_session does not exist", async () => {
+    vi.spyOn(agentPane, "isAgentPane").mockResolvedValue("no-session");
+    const appPath = tempProjectPath();
+    const runDir = path.join(appPath, "plans", "b12g", "missing-parent");
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "missing-parent",
+      app_path: appPath,
+      parent_session: "AGJ-missing",
+      notes: null
+    });
+
+    const attached = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir
+    });
+
+    expect(attached.statusCode).toBe(201);
+    const body = attached.json();
+    expect(body.parent_status).toBe("no-session");
+    expect(body.parent_warning).toMatchObject({ code: "parent-session-no-session" });
+    expect(body.workflow.parent_status).toBe("no-session");
+    expect(overmindService.get(body.workflow_id)?.parent_status).toBe("no-session");
+  });
+
+  it("keeps attach registration non-fatal when the parent warn-check throws", async () => {
+    vi.spyOn(agentPane, "isAgentPane").mockRejectedValue(new Error("tmux unavailable"));
+    const appPath = tempProjectPath();
+    const runDir = path.join(appPath, "plans", "b12g", "unknown-parent");
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "unknown-parent",
+      app_path: appPath,
+      parent_session: "AGJ-unknown",
+      notes: null
+    });
+
+    const attached = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir
+    });
+
+    expect(attached.statusCode).toBe(201);
+    const body = attached.json();
+    expect(body.parent_status).toBe("unknown");
+    expect(body.parent_warning).toBeUndefined();
+    expect(body.workflow.parent_status).toBe("unknown");
+    expect(overmindService.get(body.workflow_id)?.parent_status).toBe("unknown");
   });
 
   it("returns 404 with searched_up_to when run_dir-only register has no containing project", async () => {
