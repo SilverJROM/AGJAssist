@@ -60,3 +60,6 @@
 [projcore callback] batch-b12o VALIDATED PASS 1 acceptance file and 7 tests pass; T12.1-T12.5 outcomes covered with no skip/only and T12.4 callback assertion present; build green; commit 8fed881 conventional and scoped. DISPATCH-MARKER: AGJ-VAL-B12O
 [projcore callback] batch-b12p PROPOSED acceptance sweep will extend B12o app.inject/AuthService/temp-DB harness; T12.6 API-path+DB with B12j screenshot reference, T12.7 409-then-200 delete guard, T12.8 bare-bash 201 warning. DISPATCH-MARKER: AGJ-B12P
 [projcore callback] batch-b12p DONE acceptance spec covers T12.6 API-path+DB create, T12.7 delete 409-then-200, T12.8 bare-bash 201 warning; targeted acceptance and build green. DISPATCH-MARKER: AGJ-B12P
+[projcore callback] batch-b12q PROPOSED Reading batch brief, B12m migration helpers, and B12o/B12p acceptance harness before plan; live :3101 and wf=4 will not be touched. DISPATCH-MARKER: AGJ-B12Q-R2
+[projcore callback] batch-b12q APPROVED-PLAN Implementing deterministic T12.9 helper dry-run acceptance and T12.10 temp-DB AGJ attach re-proof; live :3101/wf=4/db untouched. DISPATCH-MARKER: AGJ-B12Q-R2
+[projcore callback] batch-b12q DONE T12.9-T12.10 acceptance spec and B12q artifacts complete; targeted acceptance and build green; live :3101/wf=4/db untouched. DISPATCH-MARKER: AGJ-B12Q-R2
