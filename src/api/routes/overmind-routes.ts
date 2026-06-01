@@ -495,6 +495,51 @@ export function registerOvermindRoutes(
     }
   );
 
+  app.get(
+    "/api/overmind/register/describe",
+    async (request, reply) => {
+      if (!requireLoopbackAndTokenCredential(request, reply, config.overmind.token)) return;
+
+      return {
+        ok: true,
+        version: 1,
+        register: {
+          method: "POST",
+          path: "/api/overmind/register",
+          required: ["run_dir", "token"],
+          forbidden: ["label", "session", "parent_session", "project_slug"],
+          input_schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["run_dir", "token"],
+            properties: {
+              run_dir: {
+                type: "string",
+                minLength: 1,
+                description: "Absolute path under a registered overmind project."
+              },
+              token: {
+                type: "string",
+                minLength: 1,
+                description: "Overmind lifecycle token. May also be supplied as x-overmind-token."
+              }
+            }
+          },
+          notes: "Attach registration accepts only run_dir and token; identity is derived server-side from the registered project whose app_path contains run_dir.",
+          example: {
+            run_dir: "<abs path under a registered project>",
+            token: "<overmind token>"
+          }
+        },
+        projects: overmindService.listProjects().map((project) => ({
+          slug: project.slug,
+          app_path: project.app_path,
+          parent_session: project.parent_session
+        }))
+      };
+    }
+  );
+
   app.post<{ Body: RegisterBody }>(
     "/api/overmind/register",
     async (request, reply) => {

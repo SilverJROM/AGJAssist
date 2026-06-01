@@ -362,6 +362,63 @@ describe("Overmind routes", () => {
     expect(noAuth.statusCode).toBe(401);
   });
 
+  it("describes attach registration with a live project list and loopback token auth", async () => {
+    const appPath = tempProjectPath();
+    overmindService.createProject({
+      slug: "agjassist",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: "Primary project"
+    });
+
+    const response = await lifecycleGetWithTokenHeader("/api/overmind/register/describe");
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      ok: true,
+      version: 1,
+      register: {
+        method: "POST",
+        path: "/api/overmind/register",
+        required: ["run_dir", "token"],
+        forbidden: ["label", "session", "parent_session", "project_slug"],
+        input_schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["run_dir", "token"],
+          properties: {
+            run_dir: expect.objectContaining({ type: "string", minLength: 1 }),
+            token: expect.objectContaining({ type: "string", minLength: 1 })
+          }
+        },
+        example: {
+          run_dir: "<abs path under a registered project>",
+          token: "<overmind token>"
+        }
+      },
+      projects: [
+        {
+          slug: "agjassist",
+          app_path: appPath,
+          parent_session: "AGJ-51"
+        }
+      ]
+    });
+    expect(response.json().register.notes).toContain("identity is derived server-side");
+
+    const missingToken = await app.inject({
+      method: "GET",
+      url: "/api/overmind/register/describe",
+      remoteAddress: "127.0.0.1"
+    });
+    expect(missingToken.statusCode).toBe(401);
+    expect(missingToken.json()).toEqual({ error: "Missing or invalid overmind token" });
+
+    const nonLoopback = await lifecycleGetWithTokenHeader("/api/overmind/register/describe", "10.0.0.5");
+    expect(nonLoopback.statusCode).toBe(403);
+    expect(nonLoopback.json()).toEqual({ error: "Overmind lifecycle endpoints are localhost-only" });
+  });
+
   it("patches overmind projects only for owner JWT and keeps slug/app_path immutable", async () => {
     const project = overmindService.createProject({
       slug: "agjassist",
