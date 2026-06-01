@@ -415,6 +415,32 @@ export class DatabaseService {
         }
       }
 
+      // Migration: v26 → v27: project source-of-truth table and nullable workflow FK
+      if (current && current.version < 27) {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS overmind_projects (
+            id INTEGER PRIMARY KEY,
+            slug TEXT UNIQUE NOT NULL,
+            app_path TEXT UNIQUE NOT NULL,
+            parent_session TEXT NOT NULL,
+            notes TEXT,
+            created_by TEXT NOT NULL DEFAULT 'JROM',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `);
+
+        const workflowCols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const workflowColNames = new Set(workflowCols.map((c) => c.name));
+        if (!workflowColNames.has("project_id")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN project_id INTEGER REFERENCES overmind_projects(id)");
+        }
+
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_overmind_projects_app_path ON overmind_projects(app_path)");
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_overmind_workflows_project_id ON overmind_workflows(project_id)");
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_overmind_workflows_project_status ON overmind_workflows(project_id, status)");
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);

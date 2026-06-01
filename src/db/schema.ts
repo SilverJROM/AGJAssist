@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 26;
+export const SCHEMA_VERSION = 27;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -303,8 +303,21 @@ CREATE TABLE IF NOT EXISTS reminder_alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_ra_reminder ON reminder_alerts(reminder_id);
 
+CREATE TABLE IF NOT EXISTS overmind_projects (
+  id INTEGER PRIMARY KEY,
+  slug TEXT UNIQUE NOT NULL,
+  app_path TEXT UNIQUE NOT NULL,
+  parent_session TEXT NOT NULL,
+  notes TEXT,
+  created_by TEXT NOT NULL DEFAULT 'JROM',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_overmind_projects_app_path ON overmind_projects(app_path);
+
 CREATE TABLE IF NOT EXISTS overmind_workflows (
   id INTEGER PRIMARY KEY,
+  project_id INTEGER REFERENCES overmind_projects(id),
   label TEXT NOT NULL,
   display_name TEXT,
   coordinator_session TEXT NOT NULL UNIQUE,
@@ -370,14 +383,15 @@ export const DEFAULT_SAFETY_PATTERNS = [
 ];
 
 /**
- * Indexes that depend on columns added via v23 ALTER (notes.folder_id +
- * notes.pinned). Kept outside SCHEMA_SQL because running them inside the
- * template would fail on existing DBs that haven't applied v23 yet — that
- * was the N1a boot crash on 2026-05-23. Called by the fresh-DB code path in
- * DatabaseService.initSchema(); the upgrade path creates these inside the
- * v23 migration block.
+ * Indexes that depend on columns added via ALTER on the upgrade path. Kept
+ * outside SCHEMA_SQL because running them inside the template would fail on
+ * existing DBs before the relevant migration block adds the column. Called by
+ * the fresh-DB code path in DatabaseService.initSchema(); the upgrade path
+ * creates these inside the corresponding migration block.
  */
 export function applyFreshDbExtras(db: Database.Database): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folder_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_overmind_workflows_project_id ON overmind_workflows(project_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_overmind_workflows_project_status ON overmind_workflows(project_id, status)");
 }
