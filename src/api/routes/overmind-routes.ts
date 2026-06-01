@@ -20,6 +20,7 @@ import type { OvmSessionManager } from "../../services/ovm-session.js";
 import type { TmuxService } from "../../tmux/tmux-service.js";
 import type { NudgeStateService } from "../../services/nudge-state-service.js";
 import { isAgentPane, type AgentPaneKind } from "../../services/overmind/agent-pane.js";
+import { augmentWorkflowSparkHealth } from "../../services/overmind/spark-health.js";
 import type { OvermindParentStatus } from "../../services/overmind/types.js";
 
 interface TokenBody {
@@ -923,7 +924,7 @@ export function registerOvermindRoutes(
     "/api/overmind/workflows",
     { preHandler: authMiddleware },
     async (request) => {
-      return { workflows: overmindService.list(request.query.status) };
+      return { workflows: augmentWorkflowSparkHealth(overmindService.list(request.query.status)) };
     }
   );
 

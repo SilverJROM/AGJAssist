@@ -176,6 +176,14 @@ ambiguous_output="$(spark_collect_run_signals "ambiguous-run" "${ambiguous_run}"
 assert_eq "AMBIGUOUS" "$(printf '%s\n' "${ambiguous_output}" | field_value classification)" "fixture AMBIGUOUS from busy frozen pane"
 assert_eq "2" "$(printf '%s\n' "${ambiguous_output}" | field_value unchanged_ticks)" "fixture unchanged tick counter"
 assert_eq "AMBIGUOUS" "$(spark_state_get_run_field "${ambiguous_key}" "last_classification" "")" "cache stores classification"
+last_ambiguous_at="$(spark_state_get_run_field "${ambiguous_key}" "last_ambiguous_at" "")"
+if [[ -z "${last_ambiguous_at}" ]]; then
+  printf 'FAIL cache stores last_ambiguous_at on AMBIGUOUS\n' >&2
+  exit 1
+fi
+printf 'PASS cache stores last_ambiguous_at on AMBIGUOUS\n'
+spark_write_run_cache "${ambiguous_key}" "$(spark_signal_callbacks_count "${ambiguous_run}")" "$(spark_signal_git_head "${ambiguous_run}")" "HEALTHY" "${ambiguous_session}"$'\t'"$(spark_signal_pane_hash "${ambiguous_session}")"$'\n' "${ambiguous_session}"$'\t'"0"$'\n'
+assert_eq "${last_ambiguous_at}" "$(spark_state_get_run_field "${ambiguous_key}" "last_ambiguous_at" "")" "cache preserves last_ambiguous_at after recovery"
 
 python3 -m json.tool "${SPARK_DAEMON_STATE_CACHE}" >/dev/null
 if compgen -G "${SPARK_DAEMON_TELEMETRY_DIR}/spark-daemon-state.json.tmp.*" >/dev/null; then

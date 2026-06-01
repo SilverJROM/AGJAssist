@@ -1009,6 +1009,53 @@ body {
   color: var(--text);
   font-weight: 600;
 }
+.overmind-spark-tile {
+  align-items: center;
+  background: var(--ovm-bg, rgba(139,148,158,0.12));
+  border: 1px solid var(--ovm-border, var(--border));
+  border-radius: 6px;
+  color: var(--text);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 8px;
+  min-height: 36px;
+  padding: 7px 9px;
+}
+.overmind-spark-state {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  min-width: 0;
+}
+.overmind-spark-state strong {
+  color: var(--ovm-accent, var(--text));
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.overmind-spark-dot {
+  background: var(--ovm-accent, var(--text-secondary));
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--ovm-bg, rgba(139,148,158,0.12));
+  flex: 0 0 8px;
+  height: 8px;
+  width: 8px;
+}
+.overmind-spark-meta {
+  color: var(--text-secondary);
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  font-size: 11px;
+  gap: 4px 10px;
+  justify-content: flex-end;
+  line-height: 1.25;
+  min-width: 0;
+  text-align: right;
+}
 .overmind-status {
   display: flex;
   align-items: center;

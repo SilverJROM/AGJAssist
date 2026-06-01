@@ -505,6 +505,65 @@ describe("Overmind routes", () => {
     expect(missing.statusCode).toBe(404);
   });
 
+  it("adds spark_health to workflow dashboard reads from the daemon state cache", async () => {
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "spark-health-cache-"));
+    tempProjectDirs.push(cacheDir);
+    const cachePath = path.join(cacheDir, "spark-daemon-state.json");
+    const previousCachePath = process.env.SPARK_DAEMON_STATE_CACHE;
+
+    const activeId = db.prepare(
+      `INSERT INTO overmind_workflows (label, coordinator_session, run_dir, status, tasks)
+       VALUES ('spark-active', 'AGJ-51', '/tmp/spark-active', 'working', '[]')`
+    ).run().lastInsertRowid as number;
+    db.prepare(
+      `INSERT INTO overmind_workflows (label, coordinator_session, run_dir, status, tasks)
+       VALUES ('spark-unknown', 'AGJ-52', '/tmp/spark-unknown', 'active', '[]')`
+    ).run();
+
+    const lastTick = new Date().toISOString();
+    const lastAmbiguousAt = new Date(Date.now() - 17 * 60 * 1000).toISOString();
+    fs.writeFileSync(cachePath, JSON.stringify({
+      runs: {
+        [String(activeId)]: {
+          last_classification: "ALERT-MEDIUM",
+          last_tick: lastTick,
+          last_ambiguous_at: lastAmbiguousAt
+        }
+      }
+    }));
+
+    try {
+      process.env.SPARK_DAEMON_STATE_CACHE = cachePath;
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/overmind/workflows",
+        headers: authHeader()
+      });
+
+      expect(response.statusCode).toBe(200);
+      const workflows = response.json().workflows;
+      const active = workflows.find((workflow: { id: number }) => workflow.id === activeId);
+      const unknown = workflows.find((workflow: { label: string }) => workflow.label === "spark-unknown");
+      expect(active.spark_health).toMatchObject({
+        state: "ALERT-MEDIUM",
+        last_classification: lastTick
+      });
+      expect(active.spark_health.minutes_since_ambiguous).toBeGreaterThanOrEqual(17);
+      expect(active.spark_health.minutes_since_ambiguous).toBeLessThan(20);
+      expect(unknown.spark_health).toEqual({
+        state: "UNKNOWN",
+        last_classification: null,
+        minutes_since_ambiguous: null
+      });
+    } finally {
+      if (previousCachePath === undefined) {
+        delete process.env.SPARK_DAEMON_STATE_CACHE;
+      } else {
+        process.env.SPARK_DAEMON_STATE_CACHE = previousCachePath;
+      }
+    }
+  });
+
   it("serves project-backed active runs for the spark daemon", async () => {
     const empty = await lifecycleGetWithTokenHeader("/api/overmind/runs/active");
     expect(empty.statusCode).toBe(200);

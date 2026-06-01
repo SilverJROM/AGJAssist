@@ -302,6 +302,59 @@ function renderOvermindStatusValue(status, fallback = '—') {
   return html`<span class=${'overmind-session-status ' + colorClass}>${label}</span>`;
 }
 
+function normalizeSparkHealth(workflow) {
+  const health = workflow?.spark_health || {};
+  return {
+    state: health.state || 'UNKNOWN',
+    lastClassification: health.last_classification || null,
+    minutesSinceAmbiguous: Number.isFinite(health.minutes_since_ambiguous) ? health.minutes_since_ambiguous : null
+  };
+}
+
+function sparkHealthColorClass(state) {
+  switch (state) {
+    case 'HEALTHY':
+      return 'ovm-green';
+    case 'CRASHED':
+    case 'ALERT-HARD':
+      return 'ovm-red';
+    case 'AMBIGUOUS':
+    case 'ALERT-SOFT':
+    case 'ALERT-MEDIUM':
+    case 'IDLE-CLEAN':
+      return 'ovm-yellow';
+    case 'UNKNOWN':
+    default:
+      return 'ovm-grey';
+  }
+}
+
+function formatSparkTime(value) {
+  if (!value) return '—';
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return value;
+  return new Date(parsed).toLocaleString();
+}
+
+function renderSparkHealthTile(workflow) {
+  if (!isActiveStatus(workflow.status)) return null;
+  const health = normalizeSparkHealth(workflow);
+  const colorClass = sparkHealthColorClass(health.state);
+  const ambiguousLabel = health.minutesSinceAmbiguous == null ? '—' : `${health.minutesSinceAmbiguous}m`;
+  return html`
+    <div class=${'overmind-spark-tile ' + colorClass} title=${'Spark watchdog: ' + health.state}>
+      <div class="overmind-spark-state">
+        <span class="overmind-spark-dot" aria-hidden="true"></span>
+        <strong>${health.state}</strong>
+      </div>
+      <div class="overmind-spark-meta">
+        <span>last ${formatSparkTime(health.lastClassification)}</span>
+        <span>ambiguous ${ambiguousLabel}</span>
+      </div>
+    </div>
+  `;
+}
+
 // Auth
 function Login() {
   const [error, setError] = useState('');
@@ -1228,6 +1281,7 @@ function OvermindWorkflows() {
                   <div class="overmind-task-line"><span><strong>task#${currentTask.id}:</strong> ${workflow.current_task || '—'}</span><span class="overmind-task-count">${doneTasks}/${totalTasks}</span></div>
                   <div>${currentTask.description}</div>
                 </div>
+                ${renderSparkHealthTile(workflow)}
 
                 ${isExpanded && html`
                   <div class="overmind-expanded">

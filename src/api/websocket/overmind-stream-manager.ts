@@ -1,6 +1,7 @@
 import { WebSocket } from "ws";
 import { AuthService } from "../../auth/auth-service.js";
 import { OvermindService, OvermindWorkflow } from "../../services/overmind-service.js";
+import { augmentWorkflowSparkHealth } from "../../services/overmind/spark-health.js";
 
 export class OvermindStreamManager {
   private readonly clients = new Set<WebSocket>();
@@ -18,7 +19,7 @@ export class OvermindStreamManager {
       return;
     }
 
-    this.sendJson(ws, { type: "snapshot", workflows: this.overmindService.list() });
+    this.sendJson(ws, { type: "snapshot", workflows: augmentWorkflowSparkHealth(this.overmindService.list()) });
     this.clients.add(ws);
 
     ws.on("message", (data: Buffer | string) => {
@@ -37,7 +38,7 @@ export class OvermindStreamManager {
   }
 
   broadcast(workflows: OvermindWorkflow[] = this.overmindService.list()): void {
-    const message = JSON.stringify({ type: "update", workflows });
+    const message = JSON.stringify({ type: "update", workflows: augmentWorkflowSparkHealth(workflows) });
     for (const client of this.clients) {
       if (client.readyState !== WebSocket.OPEN) {
         this.removeClient(client);

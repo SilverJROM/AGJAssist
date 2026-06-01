@@ -38,6 +38,8 @@ export type {
   OvermindWorkflowStatus,
   RegisterOvermindWorkflowInput,
   RunSummary,
+  SparkHealth,
+  SparkHealthState,
   UpdateOvermindWorkflowInput
 } from "./overmind/types.js";
 

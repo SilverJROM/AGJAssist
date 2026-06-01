@@ -23,6 +23,21 @@ export type OvermindParentStatus =
   | "stuck"
   | OvermindRegisterParentStatus;
 export type OvermindChildStatus = "working" | "idle" | "closed";
+export type SparkHealthState =
+  | "HEALTHY"
+  | "IDLE-CLEAN"
+  | "CRASHED"
+  | "AMBIGUOUS"
+  | "ALERT-SOFT"
+  | "ALERT-MEDIUM"
+  | "ALERT-HARD"
+  | "UNKNOWN";
+
+export interface SparkHealth {
+  state: SparkHealthState;
+  last_classification: string | null;
+  minutes_since_ambiguous: number | null;
+}
 
 export interface OvermindChildSessionStatus {
   session: string;
@@ -132,6 +147,7 @@ export interface OvermindWorkflow {
   paused_by: string | null;
   last_parent_update_at: string | null;
   evidence_idle_threshold_override_minutes: number | null;
+  spark_health?: SparkHealth;
   created_at: string;
   updated_at: string;
 }
