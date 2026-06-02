@@ -1,7 +1,7 @@
 import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput, cleanTerminalOutput } from './terminal-chat-state.js';
+import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput, formatTerminalOutput } from './terminal-chat-state.js';
 import {
   AVAILABLE_BOTTOM_NAV_TABS,
   DEFAULT_BOTTOM_NAV_TAB_IDS,
@@ -2496,7 +2496,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
             <span>${lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : status}</span>
           </div>
           <div class="terminal-chat-content">
-            ${formatFriendlyTerminalOutput(cleanTerminalOutput(snapshot), lineLimit) || (sending ? 'Running command...' : status === 'loading' ? 'Loading terminal output...' : status === 'error' ? 'Terminal output unavailable.' : `Connected to ${target}. Waiting for terminal output...`)}
+            ${formatFriendlyTerminalOutput(formatTerminalOutput(snapshot), lineLimit) || (sending ? 'Running command...' : status === 'loading' ? 'Loading terminal output...' : status === 'error' ? 'Terminal output unavailable.' : `Connected to ${target}. Waiting for terminal output...`)}
           </div>
           ${sending && html`
             <div class="terminal-chat-inline-status">

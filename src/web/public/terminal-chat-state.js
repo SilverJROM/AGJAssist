@@ -45,6 +45,82 @@ export function cleanTerminalOutput(text) {
     .trim();
 }
 
+function _isBlankLine(line) {
+  return line.trim() === "";
+}
+
+function _isBoxDrawingLine(line) {
+  return /[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬]/u.test(line);
+}
+
+function _isStructuredLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed) return true;
+  return _isBoxDrawingLine(line)
+    || /^\s{2,}\S/.test(line)
+    || /^(?:[-*+]|\d+[.)])\s+/.test(trimmed)
+    || /^[>|$#]\s?/.test(trimmed)
+    || /^(?:at\s+\S+|\w*Error:|Traceback\b|File\s+".+")/.test(trimmed)
+    || /^[\[{(].*[\]})]$/.test(trimmed)
+    || /^[A-Za-z0-9_.-]+\s*[:=]\s*\S/.test(trimmed)
+    || /\s{2,}\S/.test(trimmed)
+    || /\t/.test(line)
+    || /\|/.test(trimmed);
+}
+
+function _looksLikeWrappedContinuation(previousLine, nextLine) {
+  const previous = previousLine.trim();
+  const next = nextLine.trim();
+  if (!previous || !next) return false;
+  if (_isStructuredLine(previousLine) || _isStructuredLine(nextLine)) return false;
+  if (previous.length < 35) return false;
+  if (/[.!?;:)\]}]$/.test(previous)) return false;
+  if (/^[A-Z][A-Z0-9_ -]{2,}:?$/.test(previous)) return false;
+  if (/^[A-Z]/.test(next) && !/^(?:and|or|but|the|a|an|to|from|for|with|without|in|on|as|of)\b/i.test(next)) {
+    return false;
+  }
+  return /^[a-z0-9('"`]/i.test(next);
+}
+
+function _reflowHardWrappedLines(lines) {
+  const output = [];
+
+  for (const line of lines) {
+    if (output.length > 0 && _looksLikeWrappedContinuation(output[output.length - 1], line)) {
+      output[output.length - 1] = `${output[output.length - 1].trimEnd()} ${line.trimStart()}`;
+    } else {
+      output.push(line);
+    }
+  }
+
+  return output;
+}
+
+/**
+ * Format a raw tmux pane capture for proportional app display.
+ * Keeps structured output intact while making prose-like wrapped terminal text readable.
+ */
+export function formatTerminalOutput(raw) {
+  const cleaned = cleanTerminalOutput(raw);
+  if (!cleaned) return "";
+
+  const normalizedLines = cleaned
+    .split("\n")
+    .map(line => line.replace(/[ \t]+$/g, ""));
+
+  const collapsedBlankLines = [];
+  for (const line of normalizedLines) {
+    if (_isBlankLine(line) && _isBlankLine(collapsedBlankLines[collapsedBlankLines.length - 1] || "")) {
+      continue;
+    }
+    collapsedBlankLines.push(line);
+  }
+
+  return _reflowHardWrappedLines(collapsedBlankLines)
+    .join("\n")
+    .trim();
+}
+
 export function diffTerminalOutput(beforeText, afterText) {
   const before = normalizeTerminalOutput(beforeText);
   const after = normalizeTerminalOutput(afterText);
