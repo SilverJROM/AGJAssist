@@ -5,7 +5,8 @@ import {
   classifyWorkflow
 } from "../src/services/overmind/classifier.js";
 import { determineActiveSessionAttribution } from "../src/services/overmind/active-session-attribution.js";
-import { extractBody, hashPane, hasActiveTurn } from "../src/services/overmind/pane-utils.js";
+import { decideRunIdle } from "../src/services/overmind/idle-decision.js";
+import { extractBody, hashPane, hasActiveTurn, hasBusySignal } from "../src/services/overmind/pane-utils.js";
 
 const NOW = "2026-05-21T12:00:00.000Z";
 
@@ -29,6 +30,17 @@ describe("extractBody", () => {
     expect(extractBody(first)).toBe("Coordinator output");
     expect(extractBody(second)).toBe("Coordinator output");
     expect(hashPane(first)).toBe(hashPane(second));
+  });
+
+  it("does not strip agent content lines that start with a model name but lack the footer separator", () => {
+    const pane = [
+      "Sonnet correctly handled the FK constraint.",
+      "Opus is better for long reasoning tasks.",
+      "gpt-5.3-codex · ~/TGBOTS/AGJAssist"
+    ].join("\n");
+    expect(extractBody(pane)).toBe(
+      "Sonnet correctly handled the FK constraint.\nOpus is better for long reasoning tasks."
+    );
   });
 
   it("keeps substantive pane body content distinct after stripping chrome", () => {
@@ -59,6 +71,72 @@ describe("extractBody", () => {
 
   it("treats real spinner esc lines as active turns", () => {
     expect(hasActiveTurn("✻ Working… (5s · esc to interrupt)")).toBe(true);
+  });
+
+  it("detects spark-compatible busy signals beyond active-turn chrome", () => {
+    expect(hasBusySignal("Working (mock tier-1 ambiguous fixture)")).toBe(true);
+    expect(hasBusySignal("─ Worked for 2m 15s ─")).toBe(true);
+    expect(hasBusySignal("quiet pane")).toBe(false);
+  });
+});
+
+describe("decideRunIdle", () => {
+  it("treats a busy child as active even when the coordinator is static", () => {
+    const decision = decideRunIdle({
+      coordinatorPane: "same quiet coordinator pane",
+      childPanes: ["quiet child", "Working (9s)\nesc to interrupt"],
+      childStatuses: [
+        { session: "child-a", status: "idle" },
+        { session: "child-b", status: "working" }
+      ],
+      lastActivityAt: "2026-05-21T10:00:00.000Z",
+      lastParentUpdateAt: "2026-05-21T10:00:00.000Z",
+      taskLog: [],
+      trackedArtifactActivityMs: 0,
+      gitHeadActivityMs: 0,
+      nowMs: Date.parse(NOW),
+      idleThresholdMs: 30 * 60_000
+    });
+
+    expect(decision.idle).toBe(false);
+    expect(decision.childBusy).toBe(true);
+    expect(decision.childWorking).toBe(true);
+  });
+
+  it("treats recent artifact or parent activity as active", () => {
+    const decision = decideRunIdle({
+      coordinatorPane: "same quiet coordinator pane",
+      childPanes: ["quiet child"],
+      childStatuses: [{ session: "child-a", status: "idle" }],
+      lastActivityAt: "2026-05-21T10:00:00.000Z",
+      lastParentUpdateAt: "2026-05-21T11:45:00.000Z",
+      taskLog: [],
+      trackedArtifactActivityMs: 0,
+      gitHeadActivityMs: 0,
+      nowMs: Date.parse(NOW),
+      idleThresholdMs: 30 * 60_000
+    });
+
+    expect(decision.idle).toBe(false);
+    expect(decision.recentActivity).toBe(true);
+  });
+
+  it("returns idle only when panes are quiet and all activity signals are stale", () => {
+    const decision = decideRunIdle({
+      coordinatorPane: "same quiet coordinator pane",
+      childPanes: ["quiet child"],
+      childStatuses: [{ session: "child-a", status: "idle" }],
+      lastActivityAt: "2026-05-21T10:00:00.000Z",
+      lastParentUpdateAt: "2026-05-21T10:00:00.000Z",
+      taskLog: [{ at: "2026-05-21T10:00:00.000Z", current_task: "B1", done: 0, total: 1 }],
+      trackedArtifactActivityMs: Date.parse("2026-05-21T10:00:00.000Z"),
+      gitHeadActivityMs: 0,
+      nowMs: Date.parse(NOW),
+      idleThresholdMs: 30 * 60_000
+    });
+
+    expect(decision.idle).toBe(true);
+    expect(decision.active).toBe(false);
   });
 });
 
@@ -364,9 +442,24 @@ describe("per-session classifiers", () => {
     })).toBe("stuck");
   });
 
+  it("classifies a parent with an in-flight subagent as working even if hash is stable", () => {
+    const pane = "● Agent(B4 Training + Evaluation + Violations)\n  ⎿  Backgrounded agent (↓ to manage)";
+    expect(classifyParentSession({
+      coordinatorPane: pane,
+      coordinatorHashPrev: hashPane(pane),
+      stuckSincePrev: null,
+      now: NOW
+    })).toBe("working");
+  });
+
   it("classifies child panes by pane change, idle, or closed", () => {
     expect(classifyChildSessionStatus({
       pane: "Thinking\nesc to interrupt",
+      exists: true,
+      paneHashChanged: false
+    })).toBe("working");
+    expect(classifyChildSessionStatus({
+      pane: "Working (mock tier-1 ambiguous fixture)",
       exists: true,
       paneHashChanged: false
     })).toBe("working");

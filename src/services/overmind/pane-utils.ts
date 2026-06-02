@@ -22,6 +22,12 @@ export function hasActiveTurn(pane: string): boolean {
     .some((line) => /esc to interrupt/i.test(line) && !statusBarChromeRe.test(line));
 }
 
+/** Spark-compatible busy signal: a real active-turn marker, a codex/Claude
+ *  Working timer, or a final Worked-for marker still visible in the pane. */
+export function hasBusySignal(pane: string): boolean {
+  return hasActiveTurn(pane) || /Working \(|Worked for\s+/i.test(pane);
+}
+
 /** Strips ANSI + trailing blank lines + recognised chrome lines (spinners, the
  *  status bar, model footer, cwd footer, turn-indicator lines) and returns the
  *  remaining body the agent actually wrote. */
@@ -47,7 +53,7 @@ export function isPaneChromeLine(line: string): boolean {
   const spinnerGlyphs = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷";
   const leadingSpinnerRe = new RegExp(`^\\s*[${spinnerGlyphs}]`, "u");
   const statusChromeRe = /bypass permissions|ctrl\+t|to manage|for agents|\/ps to view|\/stop|\bshells?\b|\bmonitors?\b|\/model/i;
-  const modelFooterRe = /^\s*(gpt-5|sonnet|opus|haiku)\b/i;
+  const modelFooterRe = /^\s*(gpt-5|sonnet|opus|haiku|claude)\b.*[·•]\s*~\//i;
   const cwdFooterRe = /[·•]\s*~\/\S*\s*$/;
   const turnChromeRe = /esc to interrupt|Working \(|Waiting for|Compacting|Thinking/i;
 

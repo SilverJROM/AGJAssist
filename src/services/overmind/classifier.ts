@@ -8,7 +8,7 @@ import {
   OvermindParentStatus,
   OvermindWorkflowStatus
 } from "../overmind-service.js";
-import { hashPane, hasActiveTurn } from "./pane-utils.js";
+import { hashPane, hasBusySignal } from "./pane-utils.js";
 import { subAgentInFlight } from "./subagent-detection.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -118,7 +118,8 @@ export function classifyWorkflow(input: ClassifyWorkflowInput): ClassifyResult {
   const coordinatorHashChanged =
     input.coordinatorHashPrev !== null && coordinatorHash !== input.coordinatorHashPrev;
   const childPaneHashChanged = input.childPaneHashChanged === true;
-  const activeTurn = hasActiveTurn(input.coordinatorPane) || input.childPanes.some((pane) => hasActiveTurn(pane));
+  const activeTurn =
+    hasBusySignal(input.coordinatorPane) || input.childPanes.some((pane) => hasBusySignal(pane));
   // In-process sub-agent running inside the coordinator counts as active work.
   const subAgentRunning = subAgentInFlight(input.coordinatorPane);
 
@@ -167,7 +168,7 @@ export function classifyParentSession(input: ClassifyParentSessionInput): Overmi
   const coordinatorHashChanged =
     input.coordinatorHashPrev !== null && coordinatorHash !== input.coordinatorHashPrev;
 
-  if (hasActiveTurn(input.coordinatorPane) || coordinatorHashChanged) {
+  if (hasBusySignal(input.coordinatorPane) || coordinatorHashChanged || subAgentInFlight(input.coordinatorPane)) {
     return "working";
   }
 
@@ -192,7 +193,7 @@ export function classifyChildSessionStatus(input: {
   paneHashChanged?: boolean;
 }): OvermindChildSessionStatus["status"] {
   if (!input.exists) return "closed";
-  return hasActiveTurn(input.pane) || input.paneHashChanged === true ? "working" : "idle";
+  return hasBusySignal(input.pane) || input.paneHashChanged === true ? "working" : "idle";
 }
 
 // ─── Internal helpers (exported for unit tests + the watcher re-export shim) ─

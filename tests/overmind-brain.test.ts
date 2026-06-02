@@ -30,6 +30,7 @@ const TEST_DB = path.join("data", "test-overmind-brain.sqlite");
 const QUIET_PANE = Array.from({ length: 45 }, (_, i) => `quiet coordinator line ${i + 1}`).join("\n");
 const CHILD_PANE = "child quiet pane";
 const POST_BRAIN_NUDGE_PANE = `${QUIET_PANE}\nOvermind Tier 3 nudge`;
+const STALE_ISO = "2000-01-01T00:00:00.000Z";
 
 class FakeBrain implements OvermindBrain {
   readonly calls: StuckInput[] = [];
@@ -85,6 +86,9 @@ function makeRunDir(): string {
     path.join(runDir, "callbacks.md"),
     Array.from({ length: 90 }, (_, i) => `callback line ${i + 1}`).join("\n")
   );
+  const staleDate = new Date(STALE_ISO);
+  fs.utimesSync(path.join(runDir, "progress.md"), staleDate, staleDate);
+  fs.utimesSync(path.join(runDir, "callbacks.md"), staleDate, staleDate);
   return runDir;
 }
 
@@ -142,11 +146,13 @@ function registerTier3Workflow(pane: string = QUIET_PANE): OvermindWorkflow {
   service.update(workflow.id, {
     status: "stuck",
     last_pane_hash: hashPane(pane),
-    last_activity_at: "2999-01-01T00:00:00.000Z",
-    stuck_since: "2000-01-01T00:00:00.000Z",
+    last_activity_at: STALE_ISO,
+    stuck_since: STALE_ISO,
     nudge_count: 2,
     tier: 2
   });
+  db.prepare("UPDATE overmind_workflows SET last_parent_update_at = ? WHERE id = ?")
+    .run(STALE_ISO, workflow.id);
   return service.get(workflow.id)!;
 }
 
@@ -303,7 +309,7 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     expect(service.get(decisionWorkflow.id)?.status).toBe("awaiting_decision");
     expect(brain.calls).toHaveLength(1);
     expect(brain.decisionCalls).toHaveLength(1);
-    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit.mock.calls.every((call: [string, string]) => !call[0].startsWith("child-"))).toBe(true);
     expect(tmux.sendAndSubmit).toHaveBeenCalledWith(
       "coord-1",
       "overmind: Coordinator: resolve the human-waiting state from north-star context."

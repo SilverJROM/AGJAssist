@@ -3,7 +3,7 @@
 // overmind-watcher.ts in batch B4a of the modularization refactor (per DEC-002,
 // kept separate from classifier.ts because the responsibility is distinct).
 
-import { hasActiveTurn } from "./pane-utils.js";
+import { hasBusySignal } from "./pane-utils.js";
 
 export interface ActiveSessionAttribution {
   active_session: string | null;
@@ -21,14 +21,14 @@ export function determineActiveSessionAttribution(input: {
   childSessions: string[];
   childPanes: string[];
 }): ActiveSessionAttribution {
-  if (hasActiveTurn(input.coordinatorPane)) {
+  if (hasBusySignal(input.coordinatorPane)) {
     return {
       active_session: input.coordinatorSession,
       active_role: "parent"
     };
   }
 
-  const activeChildIndex = input.childPanes.findIndex((pane) => hasActiveTurn(pane));
+  const activeChildIndex = input.childPanes.findIndex((pane) => hasBusySignal(pane));
   if (activeChildIndex >= 0) {
     return {
       active_session: input.childSessions[activeChildIndex] ?? null,

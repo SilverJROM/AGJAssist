@@ -108,42 +108,52 @@ afterEach(() => {
 
 describe("Overmind watcher nudge ladder", () => {
   it("does NOT nudge a stuck workflow whose monitoring is paused, then resumes nudging", async () => {
+    const staleIso = "2000-01-01T00:00:00.000Z";
+    const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-paused-stuck-"));
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "hris",
       coordinator_session: "coord-paused",
       child_sessions: ["child-paused"],
-      run_dir: "/tmp/overmind-nudge"
+      run_dir: runDir
     });
-    service.update(workflow.id, {
-      last_pane_hash: hashPane(QUIET_PANE),
-      stuck_since: "2000-01-01T00:00:00.000Z"
-    });
-    service.setMonitoringPaused(workflow.id, true, "jrom");
+    try {
+      service.update(workflow.id, {
+        last_pane_hash: hashPane(QUIET_PANE),
+        last_activity_at: staleIso,
+        stuck_since: staleIso
+      });
+      setWorkflowParentUpdate(workflow.id, staleIso);
+      service.setMonitoringPaused(workflow.id, true, "jrom");
 
-    const tmux = makeTmuxMock({
-      "coord-paused": QUIET_PANE,
-      "child-paused": "child quiet pane"
-    });
-    const watcher = new OvermindWatcher(service, tmux);
+      const tmux = makeTmuxMock({
+        "coord-paused": QUIET_PANE,
+        "child-paused": "child quiet pane"
+      });
+      const watcher = new OvermindWatcher(service, tmux);
 
-    // Paused: status display still refreshes, but NO nudge is sent.
-    await watcher.tick();
-    let updated = service.get(workflow.id);
-    expect(updated?.monitoring_paused).toBe(true);
-    expect(updated?.nudge_count).toBe(0);
-    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+      // Paused: status display still refreshes, but NO nudge is sent.
+      await watcher.tick();
+      let updated = service.get(workflow.id);
+      expect(updated?.monitoring_paused).toBe(true);
+      expect(updated?.nudge_count).toBe(0);
+      expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
 
-    // Resume: the next stuck tick nudges normally.
-    service.setMonitoringPaused(workflow.id, false, null);
-    await watcher.tick();
-    updated = service.get(workflow.id);
-    expect(updated?.monitoring_paused).toBe(false);
-    expect(updated?.nudge_count).toBe(1);
-    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
-    expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-paused", CANNED_NUDGE);
+      // Resume: the next stuck tick nudges normally.
+      service.setMonitoringPaused(workflow.id, false, null);
+      setWorkflowParentUpdate(workflow.id, staleIso);
+      await watcher.tick();
+      updated = service.get(workflow.id);
+      expect(updated?.monitoring_paused).toBe(false);
+      expect(updated?.nudge_count).toBe(1);
+      expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+      expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-paused", CANNED_NUDGE);
+    } finally {
+      fs.rmSync(runDir, { recursive: true, force: true });
+    }
   });
 
   it("sends Tier 1 and Tier 2 nudges to the coordinator only, then stops", async () => {
+    const staleIso = "2000-01-01T00:00:00.000Z";
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "hris",
       coordinator_session: "coord-1",
@@ -152,8 +162,10 @@ describe("Overmind watcher nudge ladder", () => {
     });
     service.update(workflow.id, {
       last_pane_hash: hashPane(QUIET_PANE),
-      stuck_since: "2000-01-01T00:00:00.000Z"
+      last_activity_at: staleIso,
+      stuck_since: staleIso
     });
+    setWorkflowParentUpdate(workflow.id, staleIso);
 
     const tmux = makeTmuxMock({
       "coord-1": QUIET_PANE,
@@ -318,6 +330,7 @@ describe("Overmind watcher nudge ladder", () => {
   });
 
   it("nudges a frozen coordinator with stale Waiting for recap text after the stuck threshold", async () => {
+    const staleIso = "2000-01-01T00:00:00.000Z";
     const staleWaitingPane = [
       "Recap:",
       "Waiting for codex proposal review from earlier.",
@@ -331,8 +344,10 @@ describe("Overmind watcher nudge ladder", () => {
     });
     service.update(workflow.id, {
       last_pane_hash: hashPane(staleWaitingPane),
-      stuck_since: "2000-01-01T00:00:00.000Z"
+      last_activity_at: staleIso,
+      stuck_since: staleIso
     });
+    setWorkflowParentUpdate(workflow.id, staleIso);
 
     const tmux = makeTmuxMock({
       "coord-lkcamp": staleWaitingPane,
@@ -351,6 +366,7 @@ describe("Overmind watcher nudge ladder", () => {
   });
 
   it("treats Overmind's own nudge text as the stuck baseline so the next tick escalates", async () => {
+    const staleIso = "2000-01-01T00:00:00.000Z";
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "self-nudge",
       coordinator_session: "coord-4",
@@ -359,8 +375,10 @@ describe("Overmind watcher nudge ladder", () => {
     });
     service.update(workflow.id, {
       last_pane_hash: hashPane(QUIET_PANE),
-      stuck_since: "2000-01-01T00:00:00.000Z"
+      last_activity_at: staleIso,
+      stuck_since: staleIso
     });
+    setWorkflowParentUpdate(workflow.id, staleIso);
 
     let coordinatorCaptures = 0;
     const tmux = {
@@ -416,8 +434,13 @@ function makeSettingsStub(
   } as unknown as AppSettingsService;
 }
 
+function setWorkflowParentUpdate(workflowId: number, iso: string): void {
+  db.prepare("UPDATE overmind_workflows SET last_parent_update_at = ? WHERE id = ?").run(iso, workflowId);
+}
+
 describe("Idle-nudge cooldown", () => {
   it("sends ONE nudge on first stuck tick, then skips the second tick within cooldown (nudge_count unchanged)", async () => {
+    const staleIso = "2000-01-01T00:00:00.000Z";
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "cooldown-test",
       coordinator_session: "coord-cd",
@@ -426,8 +449,10 @@ describe("Idle-nudge cooldown", () => {
     });
     service.update(workflow.id, {
       last_pane_hash: hashPane(QUIET_PANE),
-      stuck_since: "2000-01-01T00:00:00.000Z"
+      last_activity_at: staleIso,
+      stuck_since: staleIso
     });
+    setWorkflowParentUpdate(workflow.id, staleIso);
 
     const tmux = makeTmuxMock({ "coord-cd": QUIET_PANE, "child-cd": "child quiet pane" });
     // 20-minute cooldown (default).
@@ -452,6 +477,7 @@ describe("Idle-nudge cooldown", () => {
   });
 
   it("sends a second nudge once the cooldown window has elapsed", async () => {
+    const staleIso = "2000-01-01T00:00:00.000Z";
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "cooldown-expire",
       coordinator_session: "coord-ce",
@@ -460,8 +486,10 @@ describe("Idle-nudge cooldown", () => {
     });
     service.update(workflow.id, {
       last_pane_hash: hashPane(QUIET_PANE),
-      stuck_since: "2000-01-01T00:00:00.000Z"
+      last_activity_at: staleIso,
+      stuck_since: staleIso
     });
+    setWorkflowParentUpdate(workflow.id, staleIso);
 
     const tmux = makeTmuxMock({ "coord-ce": QUIET_PANE, "child-ce": "child quiet pane" });
     // 5-minute cooldown so we can easily "expire" it without waiting.
@@ -484,6 +512,7 @@ describe("Idle-nudge cooldown", () => {
 
 describe("All-sessions idle nudge", () => {
   it("fires the unified all-idle message after the apparent-idle grace without incrementing nudge_count", async () => {
+    const staleIso = new Date(Date.now() - 90 * 60 * 1000).toISOString();
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "path2-idle",
       coordinator_session: "coord-path2",
@@ -491,8 +520,10 @@ describe("All-sessions idle nudge", () => {
       run_dir: "/tmp/overmind-nudge"
     });
     service.update(workflow.id, {
-      last_pane_hash: hashPane(QUIET_PANE)
+      last_pane_hash: hashPane(QUIET_PANE),
+      last_activity_at: staleIso
     });
+    setWorkflowParentUpdate(workflow.id, staleIso);
 
     const tmux = makeTmuxMock({
       "coord-path2": QUIET_PANE,
@@ -510,7 +541,75 @@ describe("All-sessions idle nudge", () => {
     expect(tmux.sendAndSubmit.mock.calls[0][1]).toContain("[OVERMIND] subagent <name> ~<N>min");
   });
 
+  it("does not fire when the coordinator is static but a registered child is busy", async () => {
+    const staleIso = new Date(Date.now() - 90 * 60 * 1000).toISOString();
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "path2-child-busy",
+      coordinator_session: "coord-child-busy",
+      child_sessions: ["child-busy"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.update(workflow.id, {
+      last_pane_hash: hashPane(QUIET_PANE),
+      last_activity_at: staleIso,
+      stuck_since: staleIso
+    });
+    setWorkflowParentUpdate(workflow.id, staleIso);
+
+    const tmux = makeTmuxMock({
+      "coord-child-busy": QUIET_PANE,
+      "child-busy": "Working (9s)\nesc to interrupt"
+    });
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20));
+    (watcher as any).apparentIdleSince.set(workflow.id, Date.now() - 11 * 60 * 1000);
+
+    await watcher.tick();
+
+    const updated = service.get(workflow.id);
+    expect(updated?.status).toBe("working");
+    expect(updated?.stuck_since).toBeNull();
+    expect(updated?.child_statuses).toEqual([{ session: "child-busy", status: "working" }]);
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+  });
+
+  it("does not fire when tracked artifacts are fresh within the idle threshold", async () => {
+    const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-path2-fresh-progress-"));
+    const staleIso = new Date(Date.now() - 90 * 60 * 1000).toISOString();
+    try {
+      fs.writeFileSync(path.join(runDir, "progress.md"), "B9c still running\n");
+      const workflow = registerAttachedWorkflowFixture(service, {
+        label: "path2-fresh-progress",
+        coordinator_session: "coord-fresh-progress",
+        child_sessions: ["child-fresh-progress"],
+        run_dir: runDir
+      });
+      service.update(workflow.id, {
+        last_pane_hash: hashPane(QUIET_PANE),
+        last_activity_at: staleIso,
+        stuck_since: staleIso
+      });
+      setWorkflowParentUpdate(workflow.id, staleIso);
+
+      const tmux = makeTmuxMock({
+        "coord-fresh-progress": QUIET_PANE,
+        "child-fresh-progress": "child quiet pane"
+      });
+      const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(20, 45));
+      (watcher as any).apparentIdleSince.set(workflow.id, Date.now() - 11 * 60 * 1000);
+
+      await watcher.tick();
+
+      const updated = service.get(workflow.id);
+      expect(updated?.status).toBe("working");
+      expect(updated?.stuck_since).toBeNull();
+      expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(runDir, { recursive: true, force: true });
+    }
+  });
+
   it("does not fire within the shared cooldown after a stuck nudge", async () => {
+    const staleIso = "2000-01-01T00:00:00.000Z";
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "path1-blocks-path2",
       coordinator_session: "coord-path12",
@@ -519,8 +618,10 @@ describe("All-sessions idle nudge", () => {
     });
     service.update(workflow.id, {
       last_pane_hash: hashPane(QUIET_PANE),
-      stuck_since: "2000-01-01T00:00:00.000Z"
+      last_activity_at: staleIso,
+      stuck_since: staleIso
     });
+    setWorkflowParentUpdate(workflow.id, staleIso);
 
     const tmux = makeTmuxMock({
       "coord-path12": QUIET_PANE,
@@ -549,6 +650,7 @@ describe("Artifact fail-safe idle nudge", () => {
   }
 
   it("fires despite a working pane when tracked artifacts are older than the effective threshold", async () => {
+    const staleIso = new Date(Date.now() - 70 * 60 * 1000).toISOString();
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "ask-update-once",
       coordinator_session: "coord-ask-once",
@@ -558,8 +660,11 @@ describe("Artifact fail-safe idle nudge", () => {
       current_task: "A1",
       tasks: [{ id: "A1", label: "Work", state: "processing" }]
     });
-    service.update(workflow.id, { last_pane_hash: hashPane("old coordinator pane") });
-    setLastParentUpdate(workflow.id, new Date(Date.now() - 70 * 60 * 1000).toISOString());
+    service.update(workflow.id, {
+      last_pane_hash: hashPane("old coordinator pane"),
+      last_activity_at: staleIso
+    });
+    setLastParentUpdate(workflow.id, staleIso);
 
     const tmux = makeTmuxMock({
       "coord-ask-once": "new coordinator pane output",
@@ -574,6 +679,7 @@ describe("Artifact fail-safe idle nudge", () => {
   });
 
   it("re-arms once the in-memory cooldown elapses", async () => {
+    const staleIso = new Date(Date.now() - 90 * 60 * 1000).toISOString();
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "ask-update-rearm",
       coordinator_session: "coord-ask-rearm",
@@ -583,8 +689,11 @@ describe("Artifact fail-safe idle nudge", () => {
       current_task: "A1",
       tasks: [{ id: "A1", label: "Work", state: "processing" }]
     });
-    service.update(workflow.id, { last_pane_hash: hashPane("old rearm pane") });
-    setLastParentUpdate(workflow.id, new Date(Date.now() - 90 * 60 * 1000).toISOString());
+    service.update(workflow.id, {
+      last_pane_hash: hashPane("old rearm pane"),
+      last_activity_at: staleIso
+    });
+    setLastParentUpdate(workflow.id, staleIso);
 
     const tmux = makeTmuxMock({
       "coord-ask-rearm": "new rearm pane output",
@@ -599,11 +708,13 @@ describe("Artifact fail-safe idle nudge", () => {
     expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ARTIFACT_FAILSAFE_TEXT))).toHaveLength(1);
 
     (watcher as any).cooldowns.recordFired(workflow.id, "unified_idle_nudge", Date.now() - 11 * 60 * 1000);
+    service.update(workflow.id, { last_activity_at: staleIso });
     await watcher.tick();
     expect(tmux.sendAndSubmit.mock.calls.filter((call: [string, string]) => call[1].includes(ARTIFACT_FAILSAFE_TEXT))).toHaveLength(2);
   });
 
   it("respects per-workflow override (override cooldown beats system default)", async () => {
+    const staleIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "ask-update-override",
       coordinator_session: "coord-ask-override",
@@ -613,9 +724,12 @@ describe("Artifact fail-safe idle nudge", () => {
       current_task: "A1",
       tasks: [{ id: "A1", label: "Work", state: "processing" }]
     });
-    service.update(workflow.id, { last_pane_hash: hashPane("old override pane") });
+    service.update(workflow.id, {
+      last_pane_hash: hashPane("old override pane"),
+      last_activity_at: staleIso
+    });
     service.setEvidenceIdleThresholdOverride(workflow.id, 5);
-    setLastParentUpdate(workflow.id, new Date(Date.now() - 10 * 60 * 1000).toISOString());
+    setLastParentUpdate(workflow.id, staleIso);
 
     const tmux = makeTmuxMock({
       "coord-ask-override": "new override pane output",
@@ -683,7 +797,10 @@ describe("Artifact fail-safe idle nudge", () => {
         current_task: "B1",
         tasks: [{ id: "B1", label: "Work", state: "processing" }]
       });
-      service.update(workflow.id, { last_pane_hash: hashPane("old pane") });
+      service.update(workflow.id, {
+        last_pane_hash: hashPane("old pane"),
+        last_activity_at: new Date(Date.now() - 90 * 60 * 1000).toISOString()
+      });
       // last_parent_update_at = 90min ago (stale by itself), but progress.md was
       // just written (current mtime) so MAX-of-three = now → no nag.
       setLastParentUpdate(workflow.id, new Date(Date.now() - 90 * 60 * 1000).toISOString());
@@ -719,7 +836,10 @@ describe("Artifact fail-safe idle nudge", () => {
         current_task: "B1",
         tasks: [{ id: "B1", label: "Work", state: "processing" }]
       });
-      service.update(workflow.id, { last_pane_hash: hashPane("old pane") });
+      service.update(workflow.id, {
+        last_pane_hash: hashPane("old pane"),
+        last_activity_at: oldDate.toISOString()
+      });
       setLastParentUpdate(workflow.id, oldDate.toISOString());
 
       const tmux = makeTmuxMock({
@@ -756,8 +876,12 @@ describe("Artifact fail-safe idle nudge", () => {
         current_task: "B1",
         tasks: [{ id: "B1", label: "Work", state: "processing" }]
       });
-      service.update(workflow.id, { last_pane_hash: hashPane("old pane") });
-      setLastParentUpdate(workflow.id, new Date(Date.now() - 90 * 60 * 1000).toISOString());
+      const staleIso = new Date(Date.now() - 90 * 60 * 1000).toISOString();
+      service.update(workflow.id, {
+        last_pane_hash: hashPane("old pane"),
+        last_activity_at: staleIso
+      });
+      setLastParentUpdate(workflow.id, staleIso);
 
       const tmux = makeTmuxMock({
         "coord-v2-nf": "new pane output",
@@ -790,6 +914,7 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
   });
 
   it("cooldown holds after simulated pm2 restart (new OvermindWatcher + same NudgeStateService)", async () => {
+    const staleIso = "2000-01-01T00:00:00.000Z";
     // ── Setup ──────────────────────────────────────────────────────────────────
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "restart-persist",
@@ -799,8 +924,10 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
     });
     service.update(workflow.id, {
       last_pane_hash: hashPane(QUIET_PANE),
-      stuck_since: "2000-01-01T00:00:00.000Z"
+      last_activity_at: staleIso,
+      stuck_since: staleIso
     });
+    setWorkflowParentUpdate(workflow.id, staleIso);
 
     const tmux = makeTmuxMock({ "coord-rp": QUIET_PANE, "child-rp": "child quiet pane" });
     // 30-minute cooldown, same as the live setting.
@@ -840,6 +967,7 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
   });
 
   it("ask-update cooldown also survives watcher reconstruction with the same persisted state file", async () => {
+    const staleIso = new Date(Date.now() - 120 * 60 * 1000).toISOString();
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "ask-update-restart-persist",
       coordinator_session: "coord-ask-rp",
@@ -849,9 +977,12 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
       current_task: "A1",
       tasks: [{ id: "A1", label: "Work", state: "processing" }]
     });
-    service.update(workflow.id, { last_pane_hash: hashPane("old pane") });
+    service.update(workflow.id, {
+      last_pane_hash: hashPane("old pane"),
+      last_activity_at: staleIso
+    });
     db.prepare("UPDATE overmind_workflows SET last_parent_update_at = ? WHERE id = ?")
-      .run(new Date(Date.now() - 120 * 60 * 1000).toISOString(), workflow.id);
+      .run(staleIso, workflow.id);
 
     const nudgeState = new NudgeStateService();
     await nudgeState.load();

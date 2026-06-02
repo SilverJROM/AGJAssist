@@ -20,6 +20,7 @@ export interface ArtifactFailsafeDeps {
   notify?: OvermindNotify;
   TERMINAL_STATUSES: OvermindWorkflowStatus[];
   subagentInFlight?: boolean;
+  activeWorkInProgress?: boolean;
 }
 
 export interface ArtifactFailsafeResult {
@@ -52,14 +53,16 @@ export async function maybeFireArtifactFailsafe(
   if (
     workflow.monitoring_paused ||
     deps.subagentInFlight ||
+    deps.activeWorkInProgress ||
     deps.TERMINAL_STATUSES.includes(workflow.status)
   ) {
     return { fired: false };
   }
 
+  const activityApiMs = parseTimestampMs(workflow.last_activity_at);
   const parentApiMs = parseTimestampMs(workflow.last_parent_update_at);
   const artifactMtimeMs = await getLastTrackedArtifactActivityMs(resolvedRunDir);
-  const lastActivityMs = Math.max(parentApiMs, artifactMtimeMs);
+  const lastActivityMs = Math.max(activityApiMs, parentApiMs, artifactMtimeMs);
   if (lastActivityMs === 0) return { fired: false };
 
   const nowMs = Date.now();

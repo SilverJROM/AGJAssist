@@ -268,6 +268,8 @@ describe("Path 2: apparent-idle >10 min → shared unified idle cooldown", () =>
     const pane = "coordinator idle recap";
     const workflow = wf({
       last_pane_hash: hashPane(pane),
+      last_activity_at: "2000-01-01T00:00:00.000Z",
+      last_parent_update_at: "2000-01-01T00:00:00.000Z",
       stuck_since: "2000-01-01T00:00:00.000Z"
     });
     const service = makeService(workflow);

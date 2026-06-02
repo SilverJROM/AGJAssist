@@ -1,6 +1,5 @@
-import { readdir, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import {
   OvermindChildSessionStatus,
   OvermindParentStatus,
@@ -56,7 +55,12 @@ import { determineActiveSessionAttribution } from "./overmind/active-session-att
 import { assessRegistrationCompleteness } from "./overmind/completeness.js";
 import type { CompletenessResult } from "./overmind/completeness.js";
 import { WatcherCooldowns } from "./overmind/cooldowns.js";
-import { maybeFireArtifactFailsafe } from "./overmind/idle-detector.js";
+import {
+  effectiveUnifiedIdleThresholdMs,
+  getLastTrackedArtifactActivityMs,
+  maybeFireArtifactFailsafe
+} from "./overmind/idle-detector.js";
+import { decideRunIdle } from "./overmind/idle-decision.js";
 import { EvidenceReader } from "./overmind/evidence-reader.js";
 import { cleanupWorkflowState } from "./overmind/workflow-cleanup.js";
 import {
@@ -173,12 +177,22 @@ export class OvermindWatcher {
   private async tickWorkflow(workflow: OvermindWorkflow): Promise<void> {
     const now = new Date().toISOString();
     const resolvedRunDir = await this.resolveRunDir(workflow);
-    const [coordinatorPane, childSnapshots, mtimeAdvanced, runDirExists, coordinatorSessionExists] = await Promise.all([
+    const [
+      coordinatorPane,
+      childSnapshots,
+      mtimeAdvanced,
+      runDirExists,
+      coordinatorSessionExists,
+      trackedArtifactActivityMs,
+      gitHeadActivityMs
+    ] = await Promise.all([
       this.capturePaneSafe(workflow.coordinator_session),
       Promise.all(workflow.child_sessions.map((target) => this.captureChildSession(target))),
       runDirMtimeAdvanced(resolvedRunDir, workflow.last_activity_at),
       pathExists(resolvedRunDir),
-      this.sessionExistsSafe(workflow.coordinator_session)
+      this.sessionExistsSafe(workflow.coordinator_session),
+      getLastTrackedArtifactActivityMs(resolvedRunDir),
+      gitHeadActivityMsBestEffort(resolvedRunDir)
     ]);
     const childPanes = childSnapshots.map((child) => child.pane);
     const childHashChanges = this.updateChildPaneHashes(
@@ -250,6 +264,35 @@ export class OvermindWatcher {
     }
     const nowMs = Date.now();
     const wid = workflow.id;
+    const idleDecision = decideRunIdle({
+      coordinatorPane,
+      childPanes,
+      childStatuses,
+      lastActivityAt: workflow.last_activity_at,
+      lastParentUpdateAt: workflow.last_parent_update_at,
+      taskLog: workflow.task_log ?? [],
+      trackedArtifactActivityMs,
+      gitHeadActivityMs,
+      nowMs,
+      idleThresholdMs: effectiveUnifiedIdleThresholdMs(workflow, this.appSettings)
+    });
+    const suppressProblemStatus = idleDecision.active && (result.status === "stuck" || result.stuckSince !== null);
+    const busyPaneActive =
+      idleDecision.coordinatorBusy || idleDecision.childBusy || idleDecision.childWorking;
+    const effectiveResult = suppressProblemStatus
+      ? {
+        ...result,
+        status: "working" as const,
+        stuckSince: null,
+        lastActivityAt: result.lastActivityAt ?? (busyPaneActive ? now : null)
+      }
+      : result;
+    if (
+      effectiveParentStatus === "stuck" &&
+      (idleDecision.childBusy || idleDecision.childWorking || idleDecision.recentActivity)
+    ) {
+      effectiveParentStatus = "idle";
+    }
     const ackMatch = parseSubagentAckFromPane(coordinatorPane);
     if (ackMatch && !this.subagentInFlight.has(wid)) {
       const expectedEndAt = ackMatch.expectedMinutes
@@ -289,12 +332,7 @@ export class OvermindWatcher {
     }
     const currentSaEntry = this.subagentInFlight.get(wid);
     if (!currentSaEntry) {
-      const parentNotWorking = parentStatus !== "working";
-      const allChildrenQuiet = childStatuses.every(
-        (c) => c.status === "idle" || c.status === "closed"
-      );
-      const apparentIdle = parentNotWorking && allChildrenQuiet;
-      if (apparentIdle) {
+      if (idleDecision.idle) {
         if (!this.apparentIdleSince.has(wid)) {
           this.apparentIdleSince.set(wid, nowMs);
         }
@@ -336,30 +374,33 @@ export class OvermindWatcher {
         }
       }
     }
-    const artifactFailsafe = await maybeFireArtifactFailsafe(workflow, resolvedRunDir, {
-      overmindService: this.overmindService,
-      tmuxService: this.tmuxService,
-      cooldowns: this.cooldowns,
-      appSettings: this.appSettings,
-      nudgeState: this.nudgeState,
-      notify: this.notify,
-      TERMINAL_STATUSES,
-      subagentInFlight: this.subagentInFlight.has(wid)
-    });
+    const artifactFailsafe = effectiveResult.status === "stuck"
+      ? { fired: false }
+      : await maybeFireArtifactFailsafe(workflow, resolvedRunDir, {
+        overmindService: this.overmindService,
+        tmuxService: this.tmuxService,
+        cooldowns: this.cooldowns,
+        appSettings: this.appSettings,
+        nudgeState: this.nudgeState,
+        notify: this.notify,
+        TERMINAL_STATUSES,
+        subagentInFlight: this.subagentInFlight.has(wid),
+        activeWorkInProgress: busyPaneActive
+      });
     if (artifactFailsafe.parent_status) {
       effectiveParentStatus = artifactFailsafe.parent_status;
     }
     if (this.subagentInFlight.has(wid)) {
       this.overmindService.update(workflow.id, {
         status: "working",
-        pending_decision: result.pendingDecision,
-        last_pane_hash: result.coordinatorHash,
+        pending_decision: effectiveResult.pendingDecision,
+        last_pane_hash: effectiveResult.coordinatorHash,
         stuck_since: null,
         active_session: activeAttribution.active_session,
         active_role: activeAttribution.active_role,
         parent_status: effectiveParentStatus,
         child_statuses: childStatuses,
-        ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
+        ...(effectiveResult.lastActivityAt ? { last_activity_at: effectiveResult.lastActivityAt } : {})
       });
       return;
     }
@@ -367,7 +408,7 @@ export class OvermindWatcher {
       await handleAllTasksDone(
         workflow,
         coordinatorPane,
-        result.coordinatorHash,
+        effectiveResult.coordinatorHash,
         activeAttribution,
         effectiveParentStatus,
         childStatuses,
@@ -392,8 +433,8 @@ export class OvermindWatcher {
     });
     const nudgeFields = info.requestedThisTick
       ? { nudge_count: workflow.nudge_count, tier: workflow.tier }
-      : result.status === "awaiting_decision"
-        ? await applyDecisionInterception(workflow, result.pendingDecision, {
+      : effectiveResult.status === "awaiting_decision"
+        ? await applyDecisionInterception(workflow, effectiveResult.pendingDecision, {
           overmindService: this.overmindService,
           tmuxService: this.tmuxService,
           brain: this.brain,
@@ -402,7 +443,7 @@ export class OvermindWatcher {
           cooldowns: this.cooldowns,
           notify: this.notify
         })
-        : await applyNudgeLadder(workflow, result.status, coordinatorPane, {
+        : await applyNudgeLadder(workflow, effectiveResult.status, coordinatorPane, {
           overmindService: this.overmindService,
           tmuxService: this.tmuxService,
           brain: this.brain,
@@ -412,12 +453,12 @@ export class OvermindWatcher {
           notify: this.notify
         });
     this.overmindService.update(workflow.id, {
-      status: nudgeFields.status ?? result.status,
+      status: nudgeFields.status ?? effectiveResult.status,
       pending_decision: nudgeFields.pending_decision !== undefined
         ? nudgeFields.pending_decision
-        : result.pendingDecision,
-      last_pane_hash: info.last_pane_hash ?? nudgeFields.last_pane_hash ?? result.coordinatorHash,
-      stuck_since: nudgeFields.stuck_since !== undefined ? nudgeFields.stuck_since : result.stuckSince,
+        : effectiveResult.pendingDecision,
+      last_pane_hash: info.last_pane_hash ?? nudgeFields.last_pane_hash ?? effectiveResult.coordinatorHash,
+      stuck_since: nudgeFields.stuck_since !== undefined ? nudgeFields.stuck_since : effectiveResult.stuckSince,
       active_session: activeAttribution.active_session,
       active_role: activeAttribution.active_role,
       parent_status: info.parent_status ?? nudgeFields.parent_status ?? effectiveParentStatus,
@@ -425,7 +466,7 @@ export class OvermindWatcher {
       info_request: info.info_request,
       info_check: info.info_check,
       ...nudgeFields,
-      ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
+      ...(effectiveResult.lastActivityAt ? { last_activity_at: effectiveResult.lastActivityAt } : {})
     });
   }
   private async resolveRunDir(workflow: OvermindWorkflow): Promise<string> {
@@ -583,6 +624,28 @@ async function runDirMtimeAdvanced(runDir: string, lastActivityAt: string | null
   );
   return Math.max(...mtimes) > lastActivityMs;
 }
+
+async function gitHeadActivityMsBestEffort(runDir: string): Promise<number> {
+  const gitDir = path.join(runDir, ".git");
+  try {
+    const headPath = path.join(gitDir, "HEAD");
+    const [headRaw, headStat] = await Promise.all([
+      readFile(headPath, "utf8"),
+      stat(headPath)
+    ]);
+    const refMatch = /^ref:\s*(.+)\s*$/m.exec(headRaw);
+    if (!refMatch) return headStat.mtimeMs;
+    try {
+      const refStat = await stat(path.join(gitDir, refMatch[1]));
+      return Math.max(headStat.mtimeMs, refStat.mtimeMs);
+    } catch {
+      return headStat.mtimeMs;
+    }
+  } catch {
+    return 0;
+  }
+}
+
 function parseTimestamp(value: string | null): number | null {
   if (!value) return null;
   const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
