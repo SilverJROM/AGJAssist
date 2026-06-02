@@ -859,7 +859,7 @@ describe("Overmind routes", () => {
     expect(first.statusCode).toBe(201);
     const firstBody = first.json();
     expect(firstBody.workflow.coordinator_session).toBe("lkcamp-12");
-    expect(firstBody.workflow.tasks).toEqual([{ id: "A2", label: "Routes", state: "processing" }]);
+    expect(firstBody.workflow.tasks).toEqual([{ id: "A2", label: "Routes", state: "processing", estimate_min: null }]);
 
     const firstChildren = await lifecyclePost("/api/overmind/children", {
       token: OVERMIND_TOKEN,
@@ -1260,7 +1260,7 @@ describe("Overmind routes", () => {
     });
     expect(omittedTasks.statusCode).toBe(201);
     expect(omittedTasks.json().workflow.tasks).toEqual([
-      { id: "T1", label: "Initial", state: "processing" }
+      { id: "T1", label: "Initial", state: "processing", estimate_min: null }
     ]);
 
     const emptyTasks = await lifecyclePost("/api/overmind/register", {
@@ -1270,9 +1270,52 @@ describe("Overmind routes", () => {
     });
     expect(emptyTasks.statusCode).toBe(201);
     expect(emptyTasks.json().workflow.tasks).toEqual([
-      { id: "T1", label: "Initial", state: "processing" }
+      { id: "T1", label: "Initial", state: "processing", estimate_min: null }
     ]);
     expect(overmindService.list()).toHaveLength(1);
+  });
+
+  it("stores and returns optional task estimates on register and task updates", async () => {
+    const runDir = "/tmp/projectz-estimates";
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "projectz-estimates",
+      app_path: runDir,
+      parent_session: "pz-estimates",
+      notes: null
+    });
+
+    const registered = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir,
+      tasks: [
+        { id: "B10", label: "Parser estimate", state: "processing", estimate_min: 25 },
+        { id: "B11", label: "No estimate", state: "pending" }
+      ]
+    });
+    expect(registered.statusCode).toBe(201);
+    expect(registered.json().workflow.tasks).toEqual([
+      { id: "B10", label: "Parser estimate", state: "processing", estimate_min: 25 },
+      { id: "B11", label: "No estimate", state: "pending", estimate_min: null }
+    ]);
+
+    const updated = await lifecyclePost("/api/overmind/tasks", {
+      token: OVERMIND_TOKEN,
+      session: "pz-estimates",
+      current_task: "Estimate update",
+      tasks: [
+        { id: "B10", label: "Parser estimate", state: "done", estimate_min: 25 },
+        { id: "B12", label: "Invalid estimate", state: "processing", estimate_min: "later" },
+        { id: "B13", label: "Non-positive estimate", state: "pending", estimate_min: 0 }
+      ]
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().workflow.tasks).toEqual([
+      { id: "B10", label: "Parser estimate", state: "done", estimate_min: 25 },
+      { id: "B12", label: "Invalid estimate", state: "processing", estimate_min: null },
+      { id: "B13", label: "Non-positive estimate", state: "pending", estimate_min: null }
+    ]);
+    expect(updated.json().workflow.current_task).toBe("Estimate update");
   });
 
   it("rejects garbage task rows on /register and /tasks with corrective hints", async () => {
@@ -1575,8 +1618,8 @@ describe("Overmind routes", () => {
     expect(tasks.statusCode).toBe(200);
     expect(tasks.json().workflow.current_task).toBe("A2 validation");
     expect(tasks.json().workflow.tasks).toEqual([
-      { id: "A1", label: "Schema", state: "done" },
-      { id: "A2", label: "Routes", state: "processing" }
+      { id: "A1", label: "Schema", state: "done", estimate_min: null },
+      { id: "A2", label: "Routes", state: "processing", estimate_min: null }
     ]);
 
     const complete = await lifecyclePost("/api/overmind/complete", {

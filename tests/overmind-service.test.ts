@@ -222,7 +222,7 @@ describe("OvermindService", () => {
     expect(created.status).toBe("active");
     expect(created.display_name).toBeNull();
     expect(created.child_sessions).toEqual(["lkcdx-may20"]);
-    expect(created.tasks[0]).toEqual({ id: "A1", label: "Schema", state: "processing" });
+    expect(created.tasks[0]).toEqual({ id: "A1", label: "Schema", state: "processing", estimate_min: null });
     expect(created.active_session).toBeNull();
     expect(created.active_role).toBeNull();
     expect(created.ended_at).toBeNull();
@@ -277,8 +277,8 @@ describe("OvermindService", () => {
     ]);
     expect(tasks?.current_task).toBe("A1 verify");
     expect(tasks?.tasks).toEqual([
-      { id: "A1", label: "Schema", state: "done" },
-      { id: "A2", label: "Endpoints", state: "pending" }
+      { id: "A1", label: "Schema", state: "done", estimate_min: null },
+      { id: "A2", label: "Endpoints", state: "pending", estimate_min: null }
     ]);
     expect(tasks?.task_log).toHaveLength(1);
     expect(tasks?.task_log[0]).toMatchObject({ current_task: "A1 verify", done: 1, total: 2 });
@@ -609,7 +609,7 @@ describe("OvermindService", () => {
     expect(upserted.child_sessions).toEqual(["hrcdx-33", "hrcdx-34"]);
     expect(upserted.run_dir).toBe("/tmp/overmind/hris");
     expect(upserted.current_task).toBe("Restarted");
-    expect(upserted.tasks).toEqual([{ id: "A1", label: "Restart", state: "processing" }]);
+    expect(upserted.tasks).toEqual([{ id: "A1", label: "Restart", state: "processing", estimate_min: null }]);
     expect(upserted.pending_decision).toBeNull();
     expect(upserted.active_session).toBeNull();
     expect(upserted.active_role).toBeNull();

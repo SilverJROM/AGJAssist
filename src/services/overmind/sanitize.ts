@@ -35,8 +35,17 @@ export function isTrashTaskLabel(label: string | null | undefined): boolean {
   return false;
 }
 
+function normalizeEstimateMin(value: unknown): number | null {
+  return Number.isInteger(value) && typeof value === "number" && value > 0 ? value : null;
+}
+
 export function sanitizeTaskList(tasks: OvermindTask[] | undefined): OvermindTask[] {
-  return (tasks ?? []).filter((t) => !isTrashTaskLabel(t?.label));
+  return (tasks ?? [])
+    .filter((t) => !isTrashTaskLabel(t?.label))
+    .map((task) => ({
+      ...task,
+      estimate_min: normalizeEstimateMin(task?.estimate_min)
+    }));
 }
 
 export function sanitizeCurrentTask(current: string | null | undefined): string | null {
@@ -76,7 +85,7 @@ export function validateSubmittedTaskList(tasks: unknown): TaskListValidation {
       return;
     }
 
-    const t = task as { id?: unknown; label?: unknown; state?: unknown };
+    const t = task as { id?: unknown; label?: unknown; state?: unknown; estimate_min?: unknown };
     if (typeof t.id !== "string" || !t.id.trim()) {
       invalidTasks.push({
         index,
@@ -132,7 +141,8 @@ export function validateSubmittedTaskList(tasks: unknown): TaskListValidation {
     validTasks.push({
       id: id.trim(),
       label: label.trim(),
-      state
+      state,
+      estimate_min: normalizeEstimateMin(t.estimate_min)
     });
   });
 

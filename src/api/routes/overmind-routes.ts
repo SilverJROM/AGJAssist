@@ -458,7 +458,8 @@ function taskSchema(): Record<string, unknown> {
     properties: {
       id: { type: "string", minLength: 1 },
       label: { type: "string", minLength: 1, maxLength: MAX_TASK_LABEL_LENGTH },
-      state: { type: "string", enum: ["done", "processing", "pending"] }
+      state: { type: "string", enum: ["done", "processing", "pending"] },
+      estimate_min: { type: ["integer", "null"], minimum: 1 }
     }
   };
 }
@@ -503,7 +504,7 @@ function discoveryEndpoints(): DiscoveryEndpoint[] {
       example: {
         run_dir: "<registered run_dir>",
         current_task: "B12 implementation",
-        tasks: [{ id: "B12", label: "OVM discovery and envelopes", state: "processing" }],
+        tasks: [{ id: "B12", label: "OVM discovery and envelopes", state: "processing", estimate_min: 25 }],
         token: "<overmind token>"
       }
     },

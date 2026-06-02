@@ -17,6 +17,24 @@ describe("overmind task submission validation", () => {
     expect(validation.tasks.map((task) => task.id)).toEqual(["B9b", "REQ-10", "A1"]);
   });
 
+  it("normalizes optional task estimates without rejecting otherwise valid tasks", () => {
+    const validation = validateSubmittedTaskList([
+      { id: "B10", label: "Parser estimate", state: "processing", estimate_min: 25 },
+      { id: "B11", label: "No estimate", state: "pending" },
+      { id: "B12", label: "Negative estimate", state: "pending", estimate_min: -1 },
+      { id: "B13", label: "Text estimate", state: "pending", estimate_min: "soon" }
+    ]);
+
+    expect(validation.ok).toBe(true);
+    expect(validation.invalid_tasks).toEqual([]);
+    expect(validation.tasks).toEqual([
+      { id: "B10", label: "Parser estimate", state: "processing", estimate_min: 25 },
+      { id: "B11", label: "No estimate", state: "pending", estimate_min: null },
+      { id: "B12", label: "Negative estimate", state: "pending", estimate_min: null },
+      { id: "B13", label: "Text estimate", state: "pending", estimate_min: null }
+    ]);
+  });
+
   it("rejects row-N fallback IDs, trash labels, and invalid states", () => {
     expect(isGarbageTaskId("row-149")).toBe(true);
     expect(isGarbageTaskId("row-b")).toBe(false);
