@@ -907,6 +907,7 @@ export function registerOvermindRoutes(
         });
       }
 
+      const existingWorkflow = overmindService.getByProjectRunDir(match.project.id, match.run_dir);
       let workflow = overmindService.registerAttached({
         project_id: match.project.id,
         label: `${match.project.slug} · ${path.basename(match.run_dir) || "run"}`,
@@ -923,6 +924,16 @@ export function registerOvermindRoutes(
       }
       workflow = overmindService.update(workflow.id, { parent_status: parentStatus }) ?? workflow;
       const parentWarning = parentWarningFor(parentStatus, match.project.parent_session);
+      if (!existingWorkflow) {
+        streamManager?.broadcast(undefined, {
+          kind: "overmind-registration",
+          project_slug: match.project.slug,
+          workflow_id: workflow.id,
+          label: workflow.label,
+          run_dir: workflow.run_dir,
+          at: new Date().toISOString()
+        });
+      }
 
       return reply.code(201).send({
         workflow,

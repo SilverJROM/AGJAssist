@@ -8,6 +8,7 @@ import * as agentPane from "../src/services/overmind/agent-pane.js";
 import { AppConfig } from "../src/config/config.js";
 import { OvmSessionManager } from "../src/services/ovm-session.js";
 import type { OvermindTask } from "../src/services/overmind/types.js";
+import type { OvermindStreamManager } from "../src/api/websocket/overmind-stream-manager.js";
 import type { TmuxService } from "../src/tmux/tmux-service.js";
 import { NudgeStateService } from "../src/services/nudge-state-service.js";
 import fs from "node:fs";
@@ -106,6 +107,7 @@ let db: DatabaseService;
 let authService: AuthService;
 let overmindService: OvermindService;
 let ovmSession: OvmSessionManager;
+let streamBroadcast: ReturnType<typeof vi.fn>;
 let tempProjectDirs: string[] = [];
 
 function authHeader(): { authorization: string } {
@@ -177,6 +179,10 @@ beforeEach(async () => {
   db.ensureOwner(111222);
   authService = new AuthService(db, BOT_TOKEN, JWT_SECRET, 24);
   overmindService = new OvermindService(db);
+  streamBroadcast = vi.fn();
+  const streamManager = {
+    broadcast: streamBroadcast
+  } as unknown as OvermindStreamManager;
   ovmSession = {
     status: vi.fn(async () => ({ open: true, status: "open", since: "2026-05-21T00:00:00.000Z" })),
     open: vi.fn(async () => ({ open: true, status: "open", opened: true, since: "2026-05-21T00:00:00.000Z" })),
@@ -186,7 +192,7 @@ beforeEach(async () => {
     getReply: vi.fn(async () => null)
   };
   app = Fastify({ logger: false });
-  registerOvermindRoutes(app, testConfig(), authService, overmindService, undefined, undefined, ovmSession);
+  registerOvermindRoutes(app, testConfig(), authService, overmindService, undefined, streamManager, ovmSession);
   await app.ready();
 });
 
@@ -924,6 +930,93 @@ describe("Overmind routes", () => {
     expect(idempotent.statusCode).toBe(201);
     expect(idempotent.json().workflow_id).toBe(firstBody.workflow_id);
     expect(overmindService.list()).toHaveLength(1);
+  });
+
+  it("announces a successful first attach registration over the Overmind stream", async () => {
+    const appPath = tempProjectPath();
+    const runDir = path.join(appPath, "plans", "b5", "run-1");
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "agjassist",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: null
+    });
+
+    const attached = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir
+    });
+
+    expect(attached.statusCode).toBe(201);
+    const body = attached.json();
+    expect(streamBroadcast).toHaveBeenCalledOnce();
+    expect(streamBroadcast).toHaveBeenCalledWith(undefined, expect.objectContaining({
+      kind: "overmind-registration",
+      project_slug: "agjassist",
+      workflow_id: body.workflow_id,
+      label: "agjassist · run-1",
+      run_dir: fs.realpathSync(runDir)
+    }));
+  });
+
+  it("does not announce an idempotent attach registration for an existing project/run_dir", async () => {
+    const appPath = tempProjectPath();
+    const runDir = path.join(appPath, "plans", "b5", "run-1");
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "agjassist",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: null
+    });
+
+    const first = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir
+    });
+    expect(first.statusCode).toBe(201);
+    expect(streamBroadcast).toHaveBeenCalledOnce();
+
+    streamBroadcast.mockClear();
+    const second = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir
+    });
+
+    expect(second.statusCode).toBe(201);
+    expect(second.json().workflow_id).toBe(first.json().workflow_id);
+    expect(streamBroadcast).not.toHaveBeenCalled();
+  });
+
+  it("does not announce rejected attach registrations", async () => {
+    const unmatchedRunDir = path.join(tempProjectPath(), "unknown-run");
+    fs.mkdirSync(unmatchedRunDir, { recursive: true });
+
+    const noProject = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: unmatchedRunDir
+    });
+    expect(noProject.statusCode).toBe(404);
+    expect(streamBroadcast).not.toHaveBeenCalled();
+
+    const appPath = tempProjectPath();
+    const runDir = path.join(appPath, "plans", "b5", "run-2");
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "agjassist",
+      app_path: appPath,
+      parent_session: "AGJ-51",
+      notes: null
+    });
+
+    const forbidden = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      run_dir: runDir,
+      label: "caller supplied label"
+    });
+    expect(forbidden.statusCode).toBe(422);
+    expect(streamBroadcast).not.toHaveBeenCalled();
   });
 
   it("adds children to an attached workflow by canonicalized run_dir without workflow_id", async () => {

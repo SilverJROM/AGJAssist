@@ -805,7 +805,9 @@ function OvermindWorkflows() {
   const [workflowTab, setWorkflowTab] = useState('active');
   const [failsafeThresholdSystemMin, setFailsafeThresholdSystemMin] = useState(30);
   const [failsafeToast, setFailsafeToast] = useState('');
+  const [registrationToast, setRegistrationToast] = useState('');
   const streamStatusRef = useRef(streamStatus);
+  const registrationToastTimer = useRef(null);
 
   useEffect(() => {
     streamStatusRef.current = streamStatus;
@@ -1022,6 +1024,14 @@ function OvermindWorkflows() {
           setLoading(false);
           setError('');
           setNow(Date.now());
+          if (msg.type === 'update' && msg.announcement?.kind === 'overmind-registration') {
+            const announcement = msg.announcement;
+            const label = announcement.label || announcement.run_dir || ('workflow #' + announcement.workflow_id);
+            const project = announcement.project_slug ? announcement.project_slug + ': ' : '';
+            setRegistrationToast('Registered ' + project + label);
+            if (registrationToastTimer.current) clearTimeout(registrationToastTimer.current);
+            registrationToastTimer.current = setTimeout(() => setRegistrationToast(''), 3200);
+          }
         } else if (msg.type === 'error') {
           setError(msg.message || 'Workflow stream error.');
         }
@@ -1030,6 +1040,7 @@ function OvermindWorkflows() {
 
     return () => {
       closed = true;
+      if (registrationToastTimer.current) clearTimeout(registrationToastTimer.current);
       ws.close();
     };
   }, []);
@@ -1054,6 +1065,7 @@ function OvermindWorkflows() {
       ${error && html`<div class="overmind-alert">${error}</div>`}
       ${historyError && workflowTab === 'history' && html`<div class="overmind-alert">${historyError}</div>`}
       ${failsafeToast && html`<div class="toast">${failsafeToast}</div>`}
+      ${registrationToast && html`<div class="toast">${registrationToast}</div>`}
 
       <div class="overmind-tabs" role="tablist" aria-label="Workflow status filters">
         <button

@@ -3,6 +3,17 @@ import { AuthService } from "../../auth/auth-service.js";
 import { OvermindService, OvermindWorkflow } from "../../services/overmind-service.js";
 import { augmentWorkflowSparkHealth } from "../../services/overmind/spark-health.js";
 
+export interface OvermindRegistrationAnnouncement {
+  kind: "overmind-registration";
+  project_slug: string;
+  workflow_id: number;
+  label: string;
+  run_dir: string;
+  at: string;
+}
+
+export type OvermindStreamAnnouncement = OvermindRegistrationAnnouncement;
+
 export class OvermindStreamManager {
   private readonly clients = new Set<WebSocket>();
 
@@ -37,8 +48,12 @@ export class OvermindStreamManager {
     ws.on("error", () => this.removeClient(ws));
   }
 
-  broadcast(workflows: OvermindWorkflow[] = this.overmindService.list()): void {
-    const message = JSON.stringify({ type: "update", workflows: augmentWorkflowSparkHealth(workflows) });
+  broadcast(workflows: OvermindWorkflow[] = this.overmindService.list(), announcement?: OvermindStreamAnnouncement): void {
+    const message = JSON.stringify({
+      type: "update",
+      workflows: augmentWorkflowSparkHealth(workflows),
+      ...(announcement ? { announcement } : {})
+    });
     for (const client of this.clients) {
       if (client.readyState !== WebSocket.OPEN) {
         this.removeClient(client);

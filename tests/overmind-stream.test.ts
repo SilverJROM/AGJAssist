@@ -132,6 +132,35 @@ describe("OvermindStreamManager", () => {
     });
   });
 
+  it("can include a registration announcement on an update broadcast", async () => {
+    const updated = workflow({ id: 12, label: "agjassist · run-1", run_dir: "/tmp/agjassist/run-1" });
+    const { manager } = makeManager();
+    const socket = new FakeSocket();
+
+    await manager.handleConnection(socket as unknown as WebSocket, "good");
+    manager.broadcast([updated], {
+      kind: "overmind-registration",
+      project_slug: "agjassist",
+      workflow_id: updated.id,
+      label: updated.label,
+      run_dir: updated.run_dir,
+      at: "2026-06-02T00:00:00.000Z"
+    });
+
+    expect(parseLast(socket)).toMatchObject({
+      type: "update",
+      workflows: [expect.objectContaining(updated)],
+      announcement: {
+        kind: "overmind-registration",
+        project_slug: "agjassist",
+        workflow_id: 12,
+        label: "agjassist · run-1",
+        run_dir: "/tmp/agjassist/run-1",
+        at: "2026-06-02T00:00:00.000Z"
+      }
+    });
+  });
+
   it("rejects invalid tokens before subscribing", async () => {
     const { manager } = makeManager();
     const socket = new FakeSocket();
