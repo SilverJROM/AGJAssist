@@ -12,7 +12,6 @@ import {
   OvermindTaskLogEntry,
   OvermindWorkflow,
   OvermindWorkflowStatus,
-  RegisterOvermindWorkflowInput,
   RunSummary,
   UpdateOvermindWorkflowInput
 } from "./overmind/types.js";
@@ -36,7 +35,6 @@ export type {
   OvermindTaskState,
   OvermindWorkflow,
   OvermindWorkflowStatus,
-  RegisterOvermindWorkflowInput,
   RunSummary,
   SparkHealth,
   SparkHealthState,
@@ -111,8 +109,6 @@ interface ActiveRunRow extends OvermindWorkflowRow {
   project_parent_session: string;
 }
 
-const PROJECT_TREE_TERMINAL_STATUSES = new Set<OvermindWorkflowStatus>(["completed", "failed", "paused"]);
-
 export interface OvermindWorkflowLookup {
   workflow_id?: number | string | null;
   run_dir?: string | null;
@@ -130,13 +126,6 @@ export interface OvermindActiveRun {
   project_slug: string;
   parent_session: string;
 }
-
-// Depth of components shared between two run_dirs that counts as "same project".
-// pathComponents returns [root, ...nonEmpty]; for /home/agjrom/<bucket>/<proj>/...
-// that's [/, home, agjrom, bucket, proj, ...] — so depth 5 means the project
-// leaf is the same. Two sub-trees with at least this much shared ancestry are
-// the same project; less = truly different projects (e.g. AGJAssist vs RS).
-const PROJECT_ROOT_DEPTH = 5;
 
 export class OvermindService {
   constructor(private readonly db: DatabaseService) {}
@@ -389,187 +378,6 @@ export class OvermindService {
       throw new Error(`Failed to load workflow ${row.id} after attached register`);
     }
     return registered;
-  }
-
-  register(input: RegisterOvermindWorkflowInput): OvermindWorkflow {
-    let tasks = sanitizeTaskList(input.tasks);
-    const currentTask = sanitizeCurrentTask(input.current_task);
-
-    // On re-register (upsert), preserve evidence-promoted "done" states — same
-    // invariant as setTasks. Only applies when incoming IDs overlap with existing
-    // (zero overlap = genuinely new run, skip merge to avoid stale state carry-over).
-    const existingForSession = this.getBySession(input.coordinator_session);
-    if (existingForSession?.tasks?.length && tasks.length > 0) {
-      const prevById = new Map(existingForSession.tasks.map(t => [t.id, t]));
-      const overlap = tasks.some(t => prevById.has(t.id));
-      if (overlap) {
-        tasks = tasks.map(t =>
-          t.state !== "done" && prevById.get(t.id)?.state === "done"
-            ? { ...t, state: "done" as const }
-            : t
-        );
-      }
-    }
-
-    const now = this.isoNow();
-    const endedAt = this.computeEndedAt(tasks, "active", null, now);
-    const childRolesJson = JSON.stringify(input.child_roles ?? []);
-    const existingId = existingForSession?.id ?? null;
-    const row = (existingId
-      ? this.db
-          .prepare(
-            `UPDATE overmind_workflows
-             SET label = ?,
-                 child_sessions = ?,
-                 child_roles = CASE WHEN ? = '[]' THEN child_roles ELSE ? END,
-                 run_dir = ?,
-                 status = 'active',
-                 current_task = ?,
-                 tasks = ?,
-                 pending_decision = NULL,
-                 active_session = NULL,
-                 active_role = NULL,
-                 ended_at = ?,
-                 task_log = '[]',
-                 stuck_since = NULL,
-                 nudge_count = 0,
-                 tier = 0,
-                 last_notified_transition = NULL,
-                 completion_check = NULL,
-                 accumulated_ms = accumulated_ms + ?,
-                 run_started_at = ?,
-                 updated_at = ?
-             WHERE id = ?
-             RETURNING *`
-          )
-          .get(
-            input.label,
-            JSON.stringify(input.child_sessions ?? []),
-            childRolesJson,
-            childRolesJson,
-            input.run_dir,
-            currentTask,
-            JSON.stringify(tasks),
-            endedAt,
-            this.priorRunElapsedMs(input.coordinator_session, now),
-            now,
-            now,
-            existingId
-          )
-      : this.db
-          .prepare(
-            `INSERT INTO overmind_workflows (
-              label,
-              coordinator_session,
-              child_sessions,
-              child_roles,
-              run_dir,
-              status,
-              current_task,
-              tasks,
-              pending_decision,
-              active_session,
-              active_role,
-              ended_at,
-              task_log,
-              stuck_since,
-              nudge_count,
-              tier,
-              last_notified_transition,
-              run_started_at,
-              accumulated_ms,
-              updated_at
-            ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, NULL, NULL, NULL, ?, '[]', NULL, 0, 0, NULL, ?, 0, ?)
-            RETURNING *`
-          )
-          .get(
-            input.label,
-            input.coordinator_session,
-            JSON.stringify(input.child_sessions ?? []),
-            childRolesJson,
-            input.run_dir,
-            currentTask,
-            JSON.stringify(tasks),
-            endedAt,
-            now,
-            now
-          )) as OvermindWorkflowRow;
-
-    this.touchParentUpdate(row.id);
-    const registered = this.get(row.id);
-    if (!registered) {
-      throw new Error(`Failed to load workflow ${row.id} after register`);
-    }
-    return registered;
-  }
-
-  /**
-   * Returns true when two run_dirs sit in the same project tree.
-   *
-   * Two cases mean "same project":
-   *   1. One path is a component-aligned prefix of the other (deeper sub-dir of
-   *      the same root — e.g. /lokalcamp vs /lokalcamp/plan/cwa).
-   *   2. They share a common ancestor at least PROJECT_ROOT_DEPTH deep — i.e.
-   *      both run_dirs are inside the same project's tree even if neither
-   *      path-prefixes the other (e.g. /lokalcamp/plan/cwa AND
-   *      /lokalcamp/plan/home-dnd are siblings under /home/agjrom/websites/lokalcamp/
-   *      = depth 5 with the leading root — both belong to project 'lokalcamp').
-   *      Cross-project paths like /TGBOTS/AGJAssist vs /TGBOTS/RS share only
-   *      4 components (root + home + agjrom + TGBOTS), below threshold → false.
-   *
-   * JROM 2026-05-24 (second pass): the original strict rule was too tight —
-   * it 409-blocked a parent (lkcamp-12) from re-registering on the same
-   * coord_session for a NEW phase of the SAME project. Allow same-project-root
-   * reuse while still rejecting truly cross-project upserts.
-   */
-  async sharesProjectTree(runDirA: string, runDirB: string): Promise<boolean> {
-    const a = this.pathComponents(await this.canonicalizeRunDir(runDirA));
-    const b = this.pathComponents(await this.canonicalizeRunDir(runDirB));
-    if (this.pathPrefixDepth(a, b) > 0 || this.pathPrefixDepth(b, a) > 0) return true;
-    return this.commonPrefixDepth(a, b) >= PROJECT_ROOT_DEPTH;
-  }
-
-  async findProjectTreeMatch(incomingRunDir: string): Promise<OvermindWorkflow | null> {
-    const rows = this.list();
-    if (rows.length === 0) return null;
-
-    const incomingCanonical = await this.canonicalizeRunDir(incomingRunDir);
-    const incomingComponents = this.pathComponents(incomingCanonical);
-    const candidates: Array<{ workflow: OvermindWorkflow; depth: number; updatedAtMs: number }> = [];
-
-    for (const workflow of rows) {
-      const workflowCanonical = await this.canonicalizeRunDir(workflow.run_dir);
-      const workflowComponents = this.pathComponents(workflowCanonical);
-      const existingPrefixDepth = this.pathPrefixDepth(workflowComponents, incomingComponents);
-      const incomingPrefixDepth = this.pathPrefixDepth(incomingComponents, workflowComponents);
-      // Either direction's prefix match counts; otherwise siblings under a
-      // deep-enough shared project root also count (project_root_depth gate).
-      let depth = Math.max(existingPrefixDepth, incomingPrefixDepth);
-      if (depth <= 0) {
-        const common = this.commonPrefixDepth(workflowComponents, incomingComponents);
-        if (common >= PROJECT_ROOT_DEPTH) depth = common;
-      }
-      if (depth <= 0) continue;
-      candidates.push({
-        workflow,
-        depth,
-        updatedAtMs: this.parseTimestampMs(workflow.updated_at)
-      });
-    }
-
-    if (candidates.length === 0) return null;
-    const maxDepth = Math.max(...candidates.map((candidate) => candidate.depth));
-    const depthWinners = candidates.filter((candidate) => candidate.depth === maxDepth);
-    const activeWinners = depthWinners.filter(
-      (candidate) => !PROJECT_TREE_TERMINAL_STATUSES.has(candidate.workflow.status)
-    );
-    const pool = activeWinners.length > 0 ? activeWinners : depthWinners;
-    pool.sort((a, b) => {
-      const byUpdated = b.updatedAtMs - a.updatedAtMs;
-      if (byUpdated !== 0) return byUpdated;
-      return b.workflow.id - a.workflow.id;
-    });
-    return pool[0]?.workflow ?? null;
   }
 
   list(status?: OvermindWorkflowStatus): OvermindWorkflow[] {
@@ -1120,29 +928,6 @@ export class OvermindService {
     return previousEndedAt;
   }
 
-  private priorRunElapsedMs(coordinatorSession: string, now: string): number {
-    const existing = this.db
-      .prepare(
-        "SELECT run_started_at, created_at, ended_at FROM overmind_workflows WHERE coordinator_session = ?"
-      )
-      .get(coordinatorSession) as
-      | { run_started_at: string | null; created_at: string | null; ended_at: string | null }
-      | undefined;
-    if (!existing) return 0;
-
-    const start = this.parseTimestampMs(existing.run_started_at ?? existing.created_at);
-    const end = this.parseTimestampMs(existing.ended_at ?? now);
-    if (Number.isNaN(start) || Number.isNaN(end) || end < start) return 0;
-    return end - start;
-  }
-
-  private parseTimestampMs(value: string | null): number {
-    if (!value) return NaN;
-    return Date.parse(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
-      ? `${value.replace(" ", "T")}Z`
-      : value);
-  }
-
   private async canonicalizeRunDir(runDir: string): Promise<string> {
     const resolved = path.resolve(runDir);
     try {
@@ -1150,32 +935,6 @@ export class OvermindService {
     } catch {
       return resolved;
     }
-  }
-
-  private pathComponents(target: string): string[] {
-    const normalized = path.resolve(target);
-    const root = path.parse(normalized).root;
-    const tail = normalized.slice(root.length).split(path.sep).filter(Boolean);
-    return [root, ...tail];
-  }
-
-  /** Number of leading components shared between two path-component arrays. */
-  private commonPrefixDepth(a: string[], b: string[]): number {
-    const limit = Math.min(a.length, b.length);
-    let depth = 0;
-    for (let i = 0; i < limit; i++) {
-      if (a[i] === b[i]) depth++;
-      else break;
-    }
-    return depth;
-  }
-
-  private pathPrefixDepth(prefix: string[], full: string[]): number {
-    if (prefix.length > full.length) return 0;
-    for (let idx = 0; idx < prefix.length; idx += 1) {
-      if (prefix[idx] !== full[idx]) return 0;
-    }
-    return prefix.length;
   }
 
   private touchParentUpdate(workflowId: number): void {

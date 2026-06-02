@@ -6,6 +6,7 @@ import { DatabaseService } from "../src/db/database.js";
 import { NudgeStateService } from "../src/services/nudge-state-service.js";
 import { OvermindService } from "../src/services/overmind-service.js";
 import { sendGuardedParentNudge } from "../src/services/overmind/parent-nudge-guard.js";
+import { registerAttachedWorkflowFixture } from "./overmind-fixtures.js";
 
 const isAgentPaneMock = vi.hoisted(() => vi.fn());
 
@@ -61,12 +62,13 @@ describe("sendGuardedParentNudge", () => {
     expect(send).toHaveBeenCalledWith("project-parent", "overmind: check status");
   });
 
-  it("falls back to legacy coordinator_session when workflow has no project_id", async () => {
-    const workflow = service.register({
-      label: "legacy",
+  it("falls back to coordinator_session when project parent resolution returns none", async () => {
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "project-backed",
       coordinator_session: "legacy-parent",
       run_dir: path.join(tmpDir, "legacy-run")
     });
+    vi.spyOn(service, "getParentSessionForWorkflow").mockReturnValue(null);
     const send = vi.fn(async () => true);
 
     const result = await sendGuardedParentNudge(
@@ -129,7 +131,7 @@ describe("sendGuardedParentNudge", () => {
   });
 
   it("sends to the coordinator when parent resolution fails instead of throwing", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "resolver-fail",
       coordinator_session: "legacy-parent",
       run_dir: path.join(tmpDir, "resolver-fail-run")

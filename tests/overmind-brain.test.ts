@@ -18,6 +18,7 @@ import { OvermindService, OvermindWorkflow } from "../src/services/overmind-serv
 import { OvermindWatcher } from "../src/services/overmind-watcher.js";
 import { hashPane } from "../src/services/overmind/pane-utils.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
+import { registerAttachedWorkflowFixture } from "./overmind-fixtures.js";
 
 const isAgentPaneMock = vi.hoisted(() => vi.fn());
 
@@ -132,7 +133,7 @@ afterEach(() => {
 function registerTier3Workflow(pane: string = QUIET_PANE): OvermindWorkflow {
   const runDir = makeRunDir();
   runDirs.push(runDir);
-  const workflow = service.register({
+  const workflow = registerAttachedWorkflowFixture(service, {
     label: "projcore A6a",
     coordinator_session: "coord-1",
     child_sessions: ["child-1"],
@@ -267,7 +268,7 @@ describe("Overmind Tier-3 Sonnet brain plumbing", () => {
     // never fires.
     const decisionRunDir = makeRunDir();
     runDirs.push(decisionRunDir);
-    const decisionWorkflow = service.register({
+    const decisionWorkflow = registerAttachedWorkflowFixture(service, {
       label: "decision workflow",
       coordinator_session: "coord-2",
       child_sessions: ["child-2"],
@@ -322,7 +323,7 @@ class FakeLlm implements LlmProvider {
 function registerAllDoneWorkflow(): OvermindWorkflow {
   const runDir = makeRunDir();
   runDirs.push(runDir);
-  const workflow = service.register({
+  const workflow = registerAttachedWorkflowFixture(service, {
     label: "projcore lkvc",
     coordinator_session: "coord-1",
     child_sessions: ["child-1"],

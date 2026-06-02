@@ -1087,6 +1087,25 @@ describe("Overmind routes", () => {
 
   });
 
+  it("rejects legacy label/session register payloads with the attach-only contract error", async () => {
+    const rejected = await lifecyclePost("/api/overmind/register", {
+      token: OVERMIND_TOKEN,
+      label: "legacy",
+      session: "legacy-session",
+      run_dir: "/tmp/overmind/legacy-register-removed",
+      tasks: [{ id: "B1", label: "Legacy", state: "pending" }]
+    });
+
+    expect(rejected.statusCode).toBe(422);
+    expect(rejected.json()).toMatchObject({
+      ok: false,
+      error: "legacy-register-removed",
+      code: "legacy-register-removed",
+      hint: "registration is attach-only now — POST {run_dir, token}; identity is derived from the project. See GET /api/overmind/register/describe"
+    });
+    expect(overmindService.list()).toHaveLength(0);
+  });
+
   it("preserves existing tasks when attach re-register omits or sends an empty tasks array", async () => {
     const runDir = "/tmp/projectz-checkin";
     fs.mkdirSync(runDir, { recursive: true });
@@ -1318,13 +1337,13 @@ describe("Overmind routes", () => {
       VALUES ('parent-route', '/tmp/overmind/parent-route-app', 'AGJ-51')
     `).run();
     const project = db.prepare("SELECT id FROM overmind_projects WHERE slug = 'parent-route'").get() as { id: number };
-    const workflow = overmindService.register({
+    const workflow = overmindService.registerAttached({
+      project_id: project.id,
       label: "parent-route",
       coordinator_session: "parent-route-session",
       run_dir: "/tmp/overmind/parent-route-app/run",
       tasks: [{ id: "B12c", label: "Identity", state: "processing" }]
     });
-    db.prepare("UPDATE overmind_workflows SET project_id = ? WHERE id = ?").run(project.id, workflow.id);
 
     expect(overmindService.getParentSessionForWorkflow(workflow.id)).toBe("AGJ-51");
   });

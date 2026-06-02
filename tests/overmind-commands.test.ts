@@ -6,6 +6,7 @@ import { AppConfig } from "../src/config/config.js";
 import { DatabaseService } from "../src/db/database.js";
 import { OvermindService } from "../src/services/overmind-service.js";
 import type { OvmSessionManager } from "../src/services/ovm-session.js";
+import { registerAttachedWorkflowFixture } from "./overmind-fixtures.js";
 
 const TEST_DB = path.join("data", "test-overmind-commands.sqlite");
 
@@ -90,7 +91,7 @@ afterEach(() => {
 
 describe("Overmind Telegram commands", () => {
   it("formats active workflow status rows with icons, current task, and task counts", async () => {
-    const first = service.register({
+    const first = registerAttachedWorkflowFixture(service, {
       label: "Build QA",
       coordinator_session: "build-qa:0.0",
       child_sessions: ["build-worker:0.0"],
@@ -104,7 +105,7 @@ describe("Overmind Telegram commands", () => {
     });
     service.setStatus(first.id, "working");
 
-    const second = service.register({
+    const second = registerAttachedWorkflowFixture(service, {
       label: "Blocked run",
       coordinator_session: "blocked-run:0.0",
       run_dir: "/tmp/blocked-run",
@@ -112,7 +113,7 @@ describe("Overmind Telegram commands", () => {
     });
     service.setStatus(second.id, "waiting_human");
 
-    const completed = service.register({
+    const completed = registerAttachedWorkflowFixture(service, {
       label: "Old run",
       coordinator_session: "old-run:0.0",
       run_dir: "/tmp/old-run"
@@ -127,7 +128,7 @@ describe("Overmind Telegram commands", () => {
   });
 
   it("renders a full tasklist and validates unknown or missing ids", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "Task run",
       coordinator_session: "task-run:0.0",
       run_dir: "/tmp/task-run",
@@ -155,7 +156,7 @@ describe("Overmind Telegram commands", () => {
   });
 
   it("pauses, resumes, drops workflows, and reports empty status", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "Mutable run",
       coordinator_session: "mutable-run:0.0",
       run_dir: "/tmp/mutable-run"

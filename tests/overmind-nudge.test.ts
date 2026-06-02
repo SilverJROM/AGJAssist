@@ -17,6 +17,7 @@ import { hashPane } from "../src/services/overmind/pane-utils.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 import type { AppSettingsService, OvermindCooldowns } from "../src/services/app-settings-service.js";
 import { NudgeStateService } from "../src/services/nudge-state-service.js";
+import { registerAttachedWorkflowFixture } from "./overmind-fixtures.js";
 
 const isAgentPaneMock = vi.hoisted(() => vi.fn());
 
@@ -107,7 +108,7 @@ afterEach(() => {
 
 describe("Overmind watcher nudge ladder", () => {
   it("does NOT nudge a stuck workflow whose monitoring is paused, then resumes nudging", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "hris",
       coordinator_session: "coord-paused",
       child_sessions: ["child-paused"],
@@ -143,7 +144,7 @@ describe("Overmind watcher nudge ladder", () => {
   });
 
   it("sends Tier 1 and Tier 2 nudges to the coordinator only, then stops", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "hris",
       coordinator_session: "coord-1",
       child_sessions: ["child-1"],
@@ -183,7 +184,7 @@ describe("Overmind watcher nudge ladder", () => {
   });
 
   it("fail-safe: when all tasks are done but completion was never reported, nudges the coordinator once and flips off 'working'", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "lkvc",
       coordinator_session: "coord-done",
       child_sessions: ["child-done"],
@@ -215,7 +216,7 @@ describe("Overmind watcher nudge ladder", () => {
   });
 
   it("resets nudge count and tier when the workflow returns to working", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "lkcamp",
       coordinator_session: "coord-2",
       child_sessions: ["child-2"],
@@ -245,7 +246,7 @@ describe("Overmind watcher nudge ladder", () => {
   });
 
   it("persists parent active-session attribution when the coordinator pane is busy", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "parent-active",
       coordinator_session: "coord-parent",
       child_sessions: ["child-parent"],
@@ -267,7 +268,7 @@ describe("Overmind watcher nudge ladder", () => {
   });
 
   it("persists child active-session attribution when only a child pane is busy", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "child-active",
       coordinator_session: "coord-child",
       child_sessions: ["child-a", "child-b"],
@@ -290,7 +291,7 @@ describe("Overmind watcher nudge ladder", () => {
   });
 
   it("persists null active-session attribution when no pane is busy", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "none-active",
       coordinator_session: "coord-none",
       child_sessions: ["child-none"],
@@ -322,7 +323,7 @@ describe("Overmind watcher nudge ladder", () => {
       "Waiting for codex proposal review from earlier.",
       "Composer is empty."
     ].join("\n");
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "lkcamp",
       coordinator_session: "coord-lkcamp",
       child_sessions: ["child-lkcamp"],
@@ -350,7 +351,7 @@ describe("Overmind watcher nudge ladder", () => {
   });
 
   it("treats Overmind's own nudge text as the stuck baseline so the next tick escalates", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "self-nudge",
       coordinator_session: "coord-4",
       child_sessions: ["child-4"],
@@ -417,7 +418,7 @@ function makeSettingsStub(
 
 describe("Idle-nudge cooldown", () => {
   it("sends ONE nudge on first stuck tick, then skips the second tick within cooldown (nudge_count unchanged)", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "cooldown-test",
       coordinator_session: "coord-cd",
       child_sessions: ["child-cd"],
@@ -451,7 +452,7 @@ describe("Idle-nudge cooldown", () => {
   });
 
   it("sends a second nudge once the cooldown window has elapsed", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "cooldown-expire",
       coordinator_session: "coord-ce",
       child_sessions: ["child-ce"],
@@ -483,7 +484,7 @@ describe("Idle-nudge cooldown", () => {
 
 describe("All-sessions idle nudge", () => {
   it("fires the unified all-idle message after the apparent-idle grace without incrementing nudge_count", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "path2-idle",
       coordinator_session: "coord-path2",
       child_sessions: ["child-path2"],
@@ -510,7 +511,7 @@ describe("All-sessions idle nudge", () => {
   });
 
   it("does not fire within the shared cooldown after a stuck nudge", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "path1-blocks-path2",
       coordinator_session: "coord-path12",
       child_sessions: ["child-path12"],
@@ -548,7 +549,7 @@ describe("Artifact fail-safe idle nudge", () => {
   }
 
   it("fires despite a working pane when tracked artifacts are older than the effective threshold", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "ask-update-once",
       coordinator_session: "coord-ask-once",
       child_sessions: ["child-ask-once"],
@@ -573,7 +574,7 @@ describe("Artifact fail-safe idle nudge", () => {
   });
 
   it("re-arms once the in-memory cooldown elapses", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "ask-update-rearm",
       coordinator_session: "coord-ask-rearm",
       child_sessions: ["child-ask-rearm"],
@@ -603,7 +604,7 @@ describe("Artifact fail-safe idle nudge", () => {
   });
 
   it("respects per-workflow override (override cooldown beats system default)", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "ask-update-override",
       coordinator_session: "coord-ask-override",
       child_sessions: ["child-ask-override"],
@@ -632,7 +633,7 @@ describe("Artifact fail-safe idle nudge", () => {
     fs.mkdirSync("/tmp/overmind-nudge/paused", { recursive: true });
     fs.mkdirSync("/tmp/overmind-nudge/completed", { recursive: true });
 
-    const pausedWorkflow = service.register({
+    const pausedWorkflow = registerAttachedWorkflowFixture(service, {
       label: "ask-update-paused",
       coordinator_session: "coord-ask-paused",
       child_sessions: ["child-ask-paused"],
@@ -643,7 +644,7 @@ describe("Artifact fail-safe idle nudge", () => {
     service.setMonitoringPaused(pausedWorkflow.id, true, "jrom");
     setLastParentUpdate(pausedWorkflow.id, new Date(Date.now() - 90 * 60 * 1000).toISOString());
 
-    const completedWorkflow = service.register({
+    const completedWorkflow = registerAttachedWorkflowFixture(service, {
       label: "ask-update-completed",
       coordinator_session: "coord-ask-completed",
       child_sessions: ["child-ask-completed"],
@@ -673,7 +674,7 @@ describe("Artifact fail-safe idle nudge", () => {
     const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-nudge-v2-progress-"));
     fs.writeFileSync(path.join(runDir, "progress.md"), "B1 done — fresh\n");
     try {
-      const workflow = service.register({
+      const workflow = registerAttachedWorkflowFixture(service, {
         label: "v2-progress-fresh",
         coordinator_session: "coord-v2-pf",
         child_sessions: ["child-v2-pf"],
@@ -709,7 +710,7 @@ describe("Artifact fail-safe idle nudge", () => {
     fs.utimesSync(path.join(runDir, "progress.md"), oldDate, oldDate);
     fs.utimesSync(path.join(runDir, "callbacks.md"), oldDate, oldDate);
     try {
-      const workflow = service.register({
+      const workflow = registerAttachedWorkflowFixture(service, {
         label: "v2-all-stale",
         coordinator_session: "coord-v2-as",
         child_sessions: ["child-v2-as"],
@@ -746,7 +747,7 @@ describe("Artifact fail-safe idle nudge", () => {
     // returns 0 for both, so MAX falls back to last_parent_update_at.
     const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-nudge-v2-no-files-"));
     try {
-      const workflow = service.register({
+      const workflow = registerAttachedWorkflowFixture(service, {
         label: "v2-no-files",
         coordinator_session: "coord-v2-nf",
         child_sessions: ["child-v2-nf"],
@@ -790,7 +791,7 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
 
   it("cooldown holds after simulated pm2 restart (new OvermindWatcher + same NudgeStateService)", async () => {
     // ── Setup ──────────────────────────────────────────────────────────────────
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "restart-persist",
       coordinator_session: "coord-rp",
       child_sessions: ["child-rp"],
@@ -839,7 +840,7 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
   });
 
   it("ask-update cooldown also survives watcher reconstruction with the same persisted state file", async () => {
-    const workflow = service.register({
+    const workflow = registerAttachedWorkflowFixture(service, {
       label: "ask-update-restart-persist",
       coordinator_session: "coord-ask-rp",
       child_sessions: ["child-ask-rp"],
@@ -884,17 +885,17 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
   });
 
   it("terminal status cleanup forgets persisted cooldown entries for completed, failed, and paused workflows", async () => {
-    const completed = service.register({
+    const completed = registerAttachedWorkflowFixture(service, {
       label: "cleanup-completed",
       coordinator_session: "cleanup-completed-parent",
       run_dir: "/tmp/overmind-nudge/cleanup-completed"
     });
-    const failed = service.register({
+    const failed = registerAttachedWorkflowFixture(service, {
       label: "cleanup-failed",
       coordinator_session: "cleanup-failed-parent",
       run_dir: "/tmp/overmind-nudge/cleanup-failed"
     });
-    const paused = service.register({
+    const paused = registerAttachedWorkflowFixture(service, {
       label: "cleanup-paused",
       coordinator_session: "cleanup-paused-parent",
       run_dir: "/tmp/overmind-nudge/cleanup-paused"
@@ -945,7 +946,7 @@ describe("Overmind completion notifications", () => {
     registerOvermindRoutes(app, testConfig(), authService, service, notify);
     await app.ready();
 
-    service.register({
+    registerAttachedWorkflowFixture(service, {
       label: "projcore A5",
       coordinator_session: "coord-3",
       run_dir: "/tmp/overmind-nudge"

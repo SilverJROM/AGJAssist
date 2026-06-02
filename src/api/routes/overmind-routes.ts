@@ -8,7 +8,6 @@ import {
   OvermindService,
   OvermindProject,
   OvermindTask,
-  OvermindWorkflow,
   OvermindWorkflowStatus,
   OvermindActiveRun,
   RunSummary
@@ -123,7 +122,6 @@ interface ActiveRunsResponse {
   runs: ActiveRunResponseItem[];
 }
 
-const REGISTER_CONFLICT_NUDGE_COOLDOWN_MS = 30 * 60 * 1000;
 const SESSION_NAME_RE = /^[A-Za-z0-9._-]{1,80}$/;
 const PROJECT_MUTATION_FORBIDDEN = {
   error: "projects are JROM-managed; ask JROM to create via dashboard"
@@ -172,6 +170,16 @@ function sendInvalidTaskList(
   });
 }
 
+function sendLegacyRegisterRemoved(reply: FastifyReply): void {
+  reply.code(422).send({
+    ok: false,
+    error: "legacy-register-removed",
+    code: "legacy-register-removed",
+    message: "Legacy Overmind register payloads are no longer accepted.",
+    hint: "registration is attach-only now — POST {run_dir, token}; identity is derived from the project. See GET /api/overmind/register/describe"
+  });
+}
+
 function parentWarningFor(status: OvermindParentStatus, parentSession: string): { code: string; message: string } | null {
   if (status === "bare-bash") {
     return {
@@ -186,15 +194,6 @@ function parentWarningFor(status: OvermindParentStatus, parentSession: string): 
     };
   }
   return null;
-}
-
-function buildProjectTreeConflictMessage(existing: OvermindWorkflow): string {
-  return (
-    `Overmind: a workflow for this project tree is already registered as ` +
-    `'${existing.coordinator_session}' (id=${existing.id}). Please use that session name in your next ` +
-    `POST /api/overmind/register, /tasks, /complete, and /pause calls — overmind tracks one workflow per project tree. ` +
-    `Do NOT create new workflows for sub-phases of the same project.`
-  );
 }
 
 export function isLoopbackAddress(address: string | undefined): boolean {
@@ -590,12 +589,15 @@ export function registerOvermindRoutes(
     async (request, reply) => {
       if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
 
-      const { label, parent_label, parent_session, project_slug, session, child_sessions, child_roles, run_dir, current_task, tasks } = request.body || {};
+      const { label, session, run_dir, current_task, tasks } = request.body || {};
       const hasRunDir = typeof run_dir === "string" && run_dir.trim() !== "";
-      const isLegacyShape =
+      const isFullLegacyShape =
         typeof label === "string" && label.trim() !== "" &&
         typeof session === "string" && session.trim() !== "";
-      const isAttachShape = hasRunDir && !isLegacyShape;
+      if (!hasRunDir || isFullLegacyShape) {
+        return sendLegacyRegisterRemoved(reply);
+      }
+
       let submittedTasks: OvermindTask[] | undefined;
       if (tasks !== undefined) {
         const validation = validateSubmittedTaskList(tasks);
@@ -608,283 +610,73 @@ export function registerOvermindRoutes(
         return reply.code(400).send({ error: "'current_task' must be a string or null" });
       }
 
-      if (isAttachShape) {
-        const forbiddenFields: Array<keyof RegisterBody> = [
-          "label",
-          "parent_label",
-          "parent_session",
-          "project_slug",
-          "session"
-        ];
-        for (const field of forbiddenFields) {
-          if (request.body && request.body[field] !== undefined) {
-            return reply.code(422).send({
-              ok: false,
-              error: "forbidden-derived-field",
-              code: "forbidden-derived-field",
-              message: `Attach registration rejected forbidden derived field '${field}'.`,
-              hint: `identity is derived server-side; do not send ${field} — see GET /api/overmind/register/describe`,
-              field
-            });
-          }
-        }
-
-        if (!path.isAbsolute(run_dir)) {
-          return reply.code(400).send({
-            error: `'run_dir' must be an absolute path. Got: '${run_dir}'. Use the canonical path on disk; relative paths are ambiguous because overmind and the caller may have different cwds.`
-          });
-        }
-
-        const match = await overmindService.findProjectForRunDir(run_dir);
-        if (!match.project) {
-          const validProjects = validProjectsForRegister(overmindService);
-          return reply.code(404).send({
+      const forbiddenFields: Array<keyof RegisterBody> = [
+        "label",
+        "parent_label",
+        "parent_session",
+        "project_slug",
+        "session"
+      ];
+      for (const field of forbiddenFields) {
+        if (request.body && request.body[field] !== undefined) {
+          return reply.code(422).send({
             ok: false,
-            error: "no-project-for-run-dir",
-            code: "no-project-for-run-dir",
-            message: `No registered overmind project contains run_dir '${match.run_dir}'.`,
-            run_dir: match.run_dir,
-            searched_up_to: match.searched_up_to,
-            hint: `your run_dir ${match.run_dir} is not under any registered project; valid projects: ${validProjects.map((project) => `${project.slug} (${project.app_path})`).join(", ") || "none"}; use the correct run_dir or ask JROM to create the project`,
-            validProjects
-          });
-        }
-
-        let workflow = overmindService.registerAttached({
-          project_id: match.project.id,
-          label: `${match.project.slug} · ${path.basename(match.run_dir) || "run"}`,
-          run_dir: match.run_dir,
-          coordinator_session: match.project.parent_session,
-          current_task,
-          tasks: submittedTasks
-        });
-        let parentStatus: OvermindParentStatus = "unknown";
-        try {
-          parentStatus = normalizeRegisterParentStatus(await isAgentPane(match.project.parent_session));
-        } catch {
-          parentStatus = "unknown";
-        }
-        workflow = overmindService.update(workflow.id, { parent_status: parentStatus }) ?? workflow;
-        const parentWarning = parentWarningFor(parentStatus, match.project.parent_session);
-
-        return reply.code(201).send({
-          workflow,
-          workflow_id: workflow.id,
-          project_id: match.project.id,
-          project_slug: match.project.slug,
-          parent_session: match.project.parent_session,
-          parent_status: parentStatus,
-          ...(parentWarning ? { parent_warning: parentWarning } : {})
-        });
-      }
-
-      // JROM 2026-05-24: "we must validate all ... not some lame ass lazy not
-      // checking always accepting what is given to him". Full payload validation
-      // before we touch the database.
-
-      // Required string fields — type + non-empty (explicit checks so TS narrows).
-      if (typeof label !== "string" || !label.trim()) {
-        return reply.code(400).send({ error: "'label' must be a non-empty string" });
-      }
-      if (typeof session !== "string" || !session.trim()) {
-        return reply.code(400).send({ error: "'session' must be a non-empty string" });
-      }
-      if (typeof run_dir !== "string" || !run_dir.trim()) {
-        return reply.code(400).send({ error: "'run_dir' must be a non-empty string" });
-      }
-
-      // tmux session name shape — must match a valid identifier (alphanumeric + . _ -).
-      // tmux's own grammar rejects whitespace, ':', and a few other chars; we tighten further.
-      if (!SESSION_NAME_RE.test(session)) {
-        return sendInvalidSessionName(reply, "session", session);
-      }
-      if (child_sessions !== undefined) {
-        if (!Array.isArray(child_sessions)) {
-          return reply.code(400).send({ error: "'child_sessions' must be an array of strings" });
-        }
-        for (let i = 0; i < child_sessions.length; i++) {
-          const s = child_sessions[i];
-          if (typeof s !== "string" || !SESSION_NAME_RE.test(s)) {
-            return sendInvalidSessionName(reply, `child_sessions[${i}]`, s);
-          }
-        }
-      }
-      if (child_roles !== undefined) {
-        if (!Array.isArray(child_roles)) {
-          return reply.code(400).send({ error: "'child_roles' must be an array of strings" });
-        }
-        for (const r of child_roles) {
-          if (typeof r !== "string" || !r.trim()) {
-            return reply.code(400).send({ error: "every child_roles entry must be a non-empty string" });
-          }
-        }
-        if (Array.isArray(child_sessions) && child_roles.length !== child_sessions.length) {
-          return reply.code(400).send({
-            error: `child_roles length (${child_roles.length}) must match child_sessions length (${child_sessions.length}) — overmind labels them by index`
+            error: "forbidden-derived-field",
+            code: "forbidden-derived-field",
+            message: `Attach registration rejected forbidden derived field '${field}'.`,
+            hint: `identity is derived server-side; do not send ${field} — see GET /api/overmind/register/describe`,
+            field
           });
         }
       }
 
-      // run_dir must be an absolute path. (Existence is checked by the watcher's
-      // completeness layer; we don't require it on disk at register time because
-      // projcore may register before the run_dir is created — but it MUST be absolute,
-      // otherwise the watcher can't resolve it consistently across cwds.)
       if (!path.isAbsolute(run_dir)) {
         return reply.code(400).send({
           error: `'run_dir' must be an absolute path. Got: '${run_dir}'. Use the canonical path on disk; relative paths are ambiguous because overmind and the caller may have different cwds.`
         });
       }
 
-      // JROM 2026-05-24: "why the fuck do we allow a fake parent session" — validate
-      // the coordinator_session is a live tmux session BEFORE accepting the register.
-      // A fake session is unreachable for nudges and silently rots as "stuck". Only
-      // enforced when tmuxService is wired (always in prod; tests pass a mock).
-      if (tmuxService && typeof tmuxService.sessionExists === "function") {
-        let isAlive = false;
-        try {
-          isAlive = await tmuxService.sessionExists(session as string);
-        } catch {
-          isAlive = false;
-        }
-        if (!isAlive) {
-          return reply.code(400).send({
-            error:
-              `Overmind: coordinator_session '${session}' is not an alive tmux session. ` +
-              `Overmind tracks ACTIVE tmux sessions only — a non-existent parent is unreachable ` +
-              `for nudges and would silently sit as 'stuck' on the dashboard forever. ` +
-              `Run \`tmux new-session -d -s ${session}\` first (or use the session you actually want ` +
-              `overmind to track), then re-POST /api/overmind/register.`
-          });
-        }
-      }
-
-      // Step 1: existing coordinator_session keeps the current upsert behavior.
-      const existingBySession = overmindService.getBySession(session);
-
-      // JROM 2026-05-24: "when a new parent session submits a start status demand a
-      // proper tasklist". Applies to INSERTs only (no row for this coordinator_session
-      // yet). Re-registers/upserts may omit tasks to update only other fields — the
-      // destructive-overwrite safeguard below preserves the existing list in that case.
-      const isNewParentSession = !existingBySession;
-      if (isNewParentSession && (!submittedTasks || submittedTasks.length === 0)) {
-        return reply.code(400).send({
-          error:
-            "Overmind: please include a non-empty `tasks` array in your /register payload. " +
-            "Build it from queue.md / your batch plan / req-matrix.md — overmind needs the " +
-            "tasklist to track this run, and an empty register leaves the dashboard at 0/0 " +
-            "which is unactionable."
+      const match = await overmindService.findProjectForRunDir(run_dir);
+      if (!match.project) {
+        const validProjects = validProjectsForRegister(overmindService);
+        return reply.code(404).send({
+          ok: false,
+          error: "no-project-for-run-dir",
+          code: "no-project-for-run-dir",
+          message: `No registered overmind project contains run_dir '${match.run_dir}'.`,
+          run_dir: match.run_dir,
+          searched_up_to: match.searched_up_to,
+          hint: `your run_dir ${match.run_dir} is not under any registered project; valid projects: ${validProjects.map((project) => `${project.slug} (${project.app_path})`).join(", ") || "none"}; use the correct run_dir or ask JROM to create the project`,
+          validProjects
         });
       }
-      // Cross-project upsert guard (JROM 2026-05-24): if the parent re-registers
-      // their existing coordinator_session BUT the new run_dir sits in a different
-      // project tree than the existing row's run_dir, that's the receiptbot-on-AGJ-51
-      // destructive-overwrite bug. The session row should track ONE project tree
-      // forever — pick a different coordinator_session for genuinely different work.
-      if (existingBySession) {
-        const sharesTree = await overmindService.sharesProjectTree(
-          existingBySession.run_dir,
-          run_dir
-        );
-        if (!sharesTree) {
-          const correctiveAdvice =
-            `Overmind: coordinator_session '${session}' is currently tracking the project tree ` +
-            `'${existingBySession.run_dir}' (workflow id=${existingBySession.id}, label='${existingBySession.label}'). ` +
-            `You tried to re-register it pointing at '${run_dir}', which is a DIFFERENT project tree. ` +
-            `Don't reuse a parent session for unrelated projects — pick a fresh coordinator_session for this work ` +
-            `(e.g. '${session}-${path.basename(run_dir)}' or a project-specific name). One workflow per project tree.`;
-          if (tmuxService) {
-            try {
-              const parentAlive = typeof tmuxService.sessionExists === "function"
-                ? await tmuxService.sessionExists(session)
-                : true;
-              if (parentAlive) {
-                const nowMs = Date.now();
-                const lastSentAt =
-                  nudgeState?.getRegisterAdviceCooldown(session, existingBySession.id) ?? 0;
-                if (nowMs - lastSentAt >= REGISTER_CONFLICT_NUDGE_COOLDOWN_MS) {
-                  const delivered = await tmuxService.sendAndSubmit(session, correctiveAdvice);
-                  if (delivered) {
-                    nudgeState?.setRegisterAdviceCooldown(session, existingBySession.id, nowMs);
-                  }
-                }
-              }
-            } catch (error) {
-              console.error("Overmind cross-project upsert advice send failed:", error);
-            }
-          }
-          return reply.code(409).send({
-            error: correctiveAdvice,
-            existing_session_tracks: {
-              id: existingBySession.id,
-              coordinator_session: existingBySession.coordinator_session,
-              label: existingBySession.label,
-              run_dir: existingBySession.run_dir
-            }
-          });
-        }
-      }
 
-      if (!existingBySession) {
-        // Step 2: enforce one workflow per project tree via run_dir prefix matching.
-        const projectTreeMatch = await overmindService.findProjectTreeMatch(run_dir);
-        if (projectTreeMatch && projectTreeMatch.coordinator_session !== session) {
-          const correctiveAdvice = buildProjectTreeConflictMessage(projectTreeMatch);
-
-          if (tmuxService) {
-            try {
-              const parentAlive = typeof tmuxService.sessionExists === "function"
-                ? await tmuxService.sessionExists(session)
-                : true;
-              if (parentAlive) {
-                const nowMs = Date.now();
-                const lastSentAt = nudgeState?.getRegisterAdviceCooldown(session, projectTreeMatch.id) ?? 0;
-                if (nowMs - lastSentAt >= REGISTER_CONFLICT_NUDGE_COOLDOWN_MS) {
-                  const delivered = await tmuxService.sendAndSubmit(session, correctiveAdvice);
-                  if (delivered) {
-                    nudgeState?.setRegisterAdviceCooldown(session, projectTreeMatch.id, nowMs);
-                  }
-                }
-              }
-            } catch (error) {
-              console.error("Overmind register corrective advice send failed:", error);
-            }
-          }
-
-          return reply.code(409).send({
-            error: correctiveAdvice,
-            use_existing: {
-              id: projectTreeMatch.id,
-              coordinator_session: projectTreeMatch.coordinator_session,
-              label: projectTreeMatch.label,
-              run_dir: projectTreeMatch.run_dir
-            }
-          });
-        }
-      }
-
-      // Step 3: brand-new tree OR same-session upsert.
-      //
-      // Destructive-overwrite safeguard (JROM 2026-05-24): a re-register against an
-      // existing session that omits `tasks` (or sends []) used to silently wipe the
-      // existing tasklist — which is exactly how the HRIS / AGJ-51 rows lost their
-      // tasks on 2026-05-24. Preserve the existing tasks + current_task in that case.
-      const effectiveTasks =
-        submittedTasks && submittedTasks.length > 0
-          ? submittedTasks
-          : existingBySession?.tasks ?? [];
-      const effectiveCurrentTask =
-        current_task !== undefined ? current_task : existingBySession?.current_task ?? null;
-
-      const workflow = overmindService.register({
-        label,
-        coordinator_session: session,
-        child_sessions,
-        child_roles,
-        run_dir,
-        current_task: effectiveCurrentTask,
-        tasks: effectiveTasks
+      let workflow = overmindService.registerAttached({
+        project_id: match.project.id,
+        label: `${match.project.slug} · ${path.basename(match.run_dir) || "run"}`,
+        run_dir: match.run_dir,
+        coordinator_session: match.project.parent_session,
+        current_task,
+        tasks: submittedTasks
       });
-      return reply.code(201).send({ workflow, reminder: `Setup checklist (required after every register): (1) Watcher — run: PROJCORE_POLL_SECONDS=15 PROJCORE_BUSY_MARKERS='esc to interrupt|Working (|Waiting for' bash ~/.claude/agents/watchers/projcore-watcher.sh ${workflow.coordinator_session} <status_file> <issue_id> — catches idle/completion in ~20s; (2) Wakeup fallback — call ScheduleWakeup with a long interval (1200s+) so the loop restarts if the watcher exits early. Both are required — watcher alone misses overnight stalls; wakeup alone is too slow for normal completions.` });
+      let parentStatus: OvermindParentStatus = "unknown";
+      try {
+        parentStatus = normalizeRegisterParentStatus(await isAgentPane(match.project.parent_session));
+      } catch {
+        parentStatus = "unknown";
+      }
+      workflow = overmindService.update(workflow.id, { parent_status: parentStatus }) ?? workflow;
+      const parentWarning = parentWarningFor(parentStatus, match.project.parent_session);
+
+      return reply.code(201).send({
+        workflow,
+        workflow_id: workflow.id,
+        project_id: match.project.id,
+        project_slug: match.project.slug,
+        parent_session: match.project.parent_session,
+        parent_status: parentStatus,
+        ...(parentWarning ? { parent_warning: parentWarning } : {})
+      });
     }
   );
 

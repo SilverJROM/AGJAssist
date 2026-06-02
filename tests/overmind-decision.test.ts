@@ -17,6 +17,7 @@ import {
 } from "../src/services/overmind-watcher.js";
 import { hashPane } from "../src/services/overmind/pane-utils.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
+import { registerAttachedWorkflowFixture } from "./overmind-fixtures.js";
 
 const isAgentPaneMock = vi.hoisted(() => vi.fn());
 
@@ -123,7 +124,7 @@ afterEach(() => {
 function registerDecisionWorkflow(decisionPane: string): OvermindWorkflow {
   const runDir = makeRunDir();
   runDirs.push(runDir);
-  const workflow = service.register({
+  const workflow = registerAttachedWorkflowFixture(service, {
     label: "projcore A6b",
     coordinator_session: "coord-1",
     child_sessions: ["child-1"],

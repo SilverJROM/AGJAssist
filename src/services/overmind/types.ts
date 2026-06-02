@@ -152,16 +152,6 @@ export interface OvermindWorkflow {
   updated_at: string;
 }
 
-export interface RegisterOvermindWorkflowInput {
-  label: string;
-  coordinator_session: string;
-  child_sessions?: string[];
-  child_roles?: string[];
-  run_dir: string;
-  current_task?: string | null;
-  tasks?: OvermindTask[];
-}
-
 export interface UpdateOvermindWorkflowInput {
   label?: string;
   coordinator_session?: string;
