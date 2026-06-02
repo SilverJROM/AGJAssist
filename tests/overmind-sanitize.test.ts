@@ -9,7 +9,7 @@ describe("overmind task submission validation", () => {
     const validation = validateSubmittedTaskList([
       { id: "B9b", label: "Submission integrity", state: "processing" },
       { id: "REQ-10", label: "Reject garbage", state: "pending" },
-      { id: "A1", label: "Done work", state: "done" }
+      { id: "A1", label: "x".repeat(120), state: "done" }
     ]);
 
     expect(validation.ok).toBe(true);
@@ -32,6 +32,21 @@ describe("overmind task submission validation", () => {
       expect.objectContaining({ index: 0, field: "id", value: "row-149" }),
       expect.objectContaining({ index: 1, field: "label" }),
       expect.objectContaining({ index: 2, field: "state", value: "blocked" })
+    ]);
+  });
+
+  it("rejects task labels longer than 120 characters", () => {
+    const validation = validateSubmittedTaskList([
+      { id: "B12", label: "x".repeat(121), state: "pending" }
+    ]);
+
+    expect(validation.ok).toBe(false);
+    expect(validation.invalid_tasks).toEqual([
+      expect.objectContaining({
+        index: 0,
+        field: "label",
+        reason: "label must be 120 characters or fewer"
+      })
     ]);
   });
 });

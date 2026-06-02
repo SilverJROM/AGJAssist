@@ -12,6 +12,7 @@ const TABLE_SEPARATOR_RE = /^[\s|\-:=_*]+$/;
 const TABLE_HEADER_RE = /^\s*\|\s*#\s*\|/i;
 const GARBAGE_TASK_ID_RE = /^row-\d+$/;
 const VALID_TASK_STATES = new Set<OvermindTaskState>(["done", "processing", "pending"]);
+export const MAX_TASK_LABEL_LENGTH = 120;
 
 export interface InvalidOvermindTask {
   index: number;
@@ -97,6 +98,13 @@ export function validateSubmittedTaskList(tasks: unknown): TaskListValidation {
         index,
         field: "label",
         reason: "label must be a non-empty string",
+        value: t.label
+      });
+    } else if (t.label.trim().length > MAX_TASK_LABEL_LENGTH) {
+      invalidTasks.push({
+        index,
+        field: "label",
+        reason: "label must be 120 characters or fewer",
         value: t.label
       });
     } else if (isTrashTaskLabel(t.label)) {

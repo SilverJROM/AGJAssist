@@ -490,6 +490,46 @@ describe("Overmind routes", () => {
       ]
     });
     expect(response.json().register.notes).toContain("identity is derived server-side");
+    expect(response.json().endpoints.map((endpoint: { name: string }) => endpoint.name)).toEqual([
+      "register",
+      "tasks",
+      "children",
+      "complete",
+      "pause",
+      "resume"
+    ]);
+
+    const fullResponse = await lifecycleGetWithTokenHeader("/api/overmind/describe");
+    expect(fullResponse.statusCode).toBe(200);
+    const fullBody = fullResponse.json();
+    expect(fullBody).toMatchObject({
+      ok: true,
+      version: 2,
+      projects: [
+        {
+          slug: "agjassist",
+          app_path: appPath,
+          parent_session: "AGJ-51"
+        }
+      ]
+    });
+    expect(fullBody.endpoints.map((endpoint: { name: string }) => endpoint.name)).toEqual([
+      "register",
+      "tasks",
+      "children",
+      "complete",
+      "pause",
+      "resume"
+    ]);
+    for (const name of ["register", "tasks", "children", "complete"]) {
+      const endpoint = fullBody.endpoints.find((candidate: { name: string }) => candidate.name === name);
+      expect(endpoint).toMatchObject({
+        method: "POST",
+        auth: expect.stringContaining("loopback"),
+        input_schema: expect.objectContaining({ type: "object" }),
+        example: expect.any(Object)
+      });
+    }
 
     const missingToken = await app.inject({
       method: "GET",
@@ -1222,18 +1262,39 @@ describe("Overmind routes", () => {
       })]
     });
 
+    const overlongLabelUpdate = await lifecyclePost("/api/overmind/tasks", {
+      token: OVERMIND_TOKEN,
+      session: "valid-task-route",
+      current_task: "Overlong label",
+      tasks: [
+        { id: "B0", label: "x".repeat(121), state: "processing" }
+      ]
+    });
+    expect(overlongLabelUpdate.statusCode).toBe(422);
+    expect(overlongLabelUpdate.json()).toMatchObject({
+      ok: false,
+      code: "invalid-task-list",
+      hint: expect.stringContaining("label ≤120 chars; a task title is not a paragraph"),
+      invalid_tasks: [expect.objectContaining({
+        index: 0,
+        field: "label",
+        reason: "label must be 120 characters or fewer"
+      })]
+    });
+
     const validUpdate = await lifecyclePost("/api/overmind/tasks", {
       token: OVERMIND_TOKEN,
       session: "valid-task-route",
       current_task: "Real follow-up",
       tasks: [
         { id: "B0", label: "Design memo rev", state: "done" },
-        { id: "B1", label: "Real follow-up", state: "processing" }
+        { id: "B1", label: "x".repeat(120), state: "processing" }
       ]
     });
     expect(validUpdate.statusCode).toBe(200);
     expect(validUpdate.json().workflow.tasks.map((t: { id: string }) => t.id)).toEqual(["B0", "B1"]);
     expect(validUpdate.json().workflow.current_task).toBe("Real follow-up");
+    expect(validUpdate.json().workflow.tasks[1].label).toHaveLength(120);
   });
 
   it("rejects garbage task rows on attach-shaped /register", async () => {
@@ -1288,6 +1349,19 @@ describe("Overmind routes", () => {
     expect(byId.json().workflow.current_task).toBe("By id");
     expect(byId.json().workflow.tasks[0].state).toBe("done");
 
+    const missingTasks = await lifecyclePost("/api/overmind/tasks", {
+      token: OVERMIND_TOKEN,
+      workflow_id: workflowId
+    });
+    expect(missingTasks.statusCode).toBe(400);
+    expect(missingTasks.json()).toMatchObject({
+      ok: false,
+      error: "workflow_id, run_dir, or session and tasks are required",
+      code: "missing-task-update-fields",
+      message: expect.stringContaining("tasks"),
+      hint: expect.stringContaining("tasks")
+    });
+
     const children = await lifecyclePost("/api/overmind/children", {
       token: OVERMIND_TOKEN,
       workflow_id: workflowId,
@@ -1298,6 +1372,19 @@ describe("Overmind routes", () => {
     expect(children.statusCode).toBe(200);
     expect(children.json().workflow.child_sessions).toEqual(["identity-child"]);
     expect(children.json().workflow.child_roles).toEqual(["tester"]);
+
+    const missingChildren = await lifecyclePost("/api/overmind/children", {
+      token: OVERMIND_TOKEN,
+      workflow_id: workflowId
+    });
+    expect(missingChildren.statusCode).toBe(400);
+    expect(missingChildren.json()).toMatchObject({
+      ok: false,
+      error: "child_sessions is required",
+      code: "missing-child-sessions",
+      message: expect.stringContaining("child_sessions"),
+      hint: expect.stringContaining("child_sessions")
+    });
 
     const malformedChild = await lifecyclePost("/api/overmind/children", {
       token: OVERMIND_TOKEN,
@@ -1407,11 +1494,30 @@ describe("Overmind routes", () => {
     expect(complete.statusCode).toBe(200);
     expect(complete.json().workflow.status).toBe("completed");
 
+    const missingLookup = await lifecyclePost("/api/overmind/complete", {
+      token: OVERMIND_TOKEN
+    });
+    expect(missingLookup.statusCode).toBe(400);
+    expect(missingLookup.json()).toMatchObject({
+      ok: false,
+      error: "workflow_id, run_dir, or session is required",
+      code: "missing-workflow-lookup",
+      message: expect.stringContaining("workflow_id"),
+      hint: expect.stringContaining("workflow_id")
+    });
+
     const missing = await lifecyclePost("/api/overmind/complete", {
       token: OVERMIND_TOKEN,
       session: "unknown"
     });
     expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toMatchObject({
+      ok: false,
+      error: "Workflow not found",
+      code: "workflow-not-found",
+      message: "Workflow not found.",
+      hint: expect.stringContaining("re-register")
+    });
   });
 
   it("pauses, resumes, and drops workflows from localhost with the shared token", async () => {
@@ -1594,11 +1700,22 @@ describe("Overmind routes", () => {
 
     const pauseMissingToken = await lifecyclePost(`/api/overmind/workflows/${workflowId}/pause`, {});
     expect(pauseMissingToken.statusCode).toBe(401);
+    expect(pauseMissingToken.json()).toMatchObject({
+      ok: false,
+      error: "Missing or invalid overmind token",
+      code: "invalid-overmind-token",
+      hint: expect.stringContaining("body.token")
+    });
 
     const resumeBadToken = await lifecyclePost(`/api/overmind/workflows/${workflowId}/resume`, {
       token: "wrong"
     });
     expect(resumeBadToken.statusCode).toBe(401);
+    expect(resumeBadToken.json()).toMatchObject({
+      ok: false,
+      code: "invalid-overmind-token",
+      message: expect.stringContaining("token")
+    });
 
     const dropMissingToken = await lifecycleDelete(`/api/overmind/workflows/${workflowId}`, {});
     expect(dropMissingToken.statusCode).toBe(401);
@@ -1611,11 +1728,23 @@ describe("Overmind routes", () => {
       token: OVERMIND_TOKEN
     });
     expect(pause.statusCode).toBe(404);
+    expect(pause.json()).toMatchObject({
+      ok: false,
+      error: "Workflow not found",
+      code: "workflow-not-found",
+      hint: expect.stringContaining("re-register")
+    });
 
     const resume = await lifecyclePost("/api/overmind/workflows/999/resume", {
       token: OVERMIND_TOKEN
     });
     expect(resume.statusCode).toBe(404);
+    expect(resume.json()).toMatchObject({
+      ok: false,
+      error: "Workflow not found",
+      code: "workflow-not-found",
+      hint: expect.stringContaining("re-register")
+    });
 
     const drop = await lifecycleDelete("/api/overmind/workflows/999", {
       token: OVERMIND_TOKEN

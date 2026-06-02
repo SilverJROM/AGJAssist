@@ -21,7 +21,11 @@ import type { NudgeStateService } from "../../services/nudge-state-service.js";
 import { isAgentPane, type AgentPaneKind } from "../../services/overmind/agent-pane.js";
 import { augmentWorkflowSparkHealth } from "../../services/overmind/spark-health.js";
 import type { OvermindParentStatus } from "../../services/overmind/types.js";
-import { validateSubmittedTaskList, type TaskListValidation } from "../../services/overmind/sanitize.js";
+import {
+  MAX_TASK_LABEL_LENGTH,
+  validateSubmittedTaskList,
+  type TaskListValidation
+} from "../../services/overmind/sanitize.js";
 
 interface TokenBody {
   token?: string;
@@ -122,6 +126,18 @@ interface ActiveRunsResponse {
   runs: ActiveRunResponseItem[];
 }
 
+interface DiscoveryEndpoint {
+  name: string;
+  method: string;
+  path: string;
+  auth: string;
+  required: string[];
+  forbidden: string[];
+  input_schema: Record<string, unknown>;
+  notes: string;
+  example: Record<string, unknown>;
+}
+
 const SESSION_NAME_RE = /^[A-Za-z0-9._-]{1,80}$/;
 const PROJECT_MUTATION_FORBIDDEN = {
   error: "projects are JROM-managed; ask JROM to create via dashboard"
@@ -156,6 +172,25 @@ function sendInvalidSessionName(
   });
 }
 
+function sendAgentClientError(
+  reply: FastifyReply,
+  statusCode: number,
+  code: string,
+  message: string,
+  hint: string,
+  extra: Record<string, unknown> = {},
+  error: string = code
+): void {
+  reply.code(statusCode).send({
+    ok: false,
+    error,
+    code,
+    message,
+    hint,
+    ...extra
+  });
+}
+
 function sendInvalidTaskList(
   reply: FastifyReply,
   validation: TaskListValidation
@@ -165,7 +200,7 @@ function sendInvalidTaskList(
     error: "invalid-task-list",
     code: "invalid-task-list",
     message: "Task list rejected because at least one submitted row is not a real Overmind task.",
-    hint: "Rebuild tasks from queue.md with real IDs and labels; skip unparseable rows instead of sending row-N fallback IDs.",
+    hint: `Rebuild tasks from queue.md with real IDs and labels; skip unparseable rows instead of sending row-N fallback IDs; label ≤${MAX_TASK_LABEL_LENGTH} chars; a task title is not a paragraph.`,
     invalid_tasks: validation.invalid_tasks
   });
 }
@@ -210,7 +245,36 @@ function requireLoopbackAndToken(
   reply: FastifyReply,
   expectedToken: string
 ): boolean {
-  return requireLoopbackAndTokenCredential(request, reply, expectedToken);
+  if (!isLoopbackAddress(request.ip)) {
+    sendAgentClientError(
+      reply,
+      403,
+      "localhost-only",
+      "Overmind lifecycle endpoints are localhost-only.",
+      "Call this endpoint from 127.0.0.1/localhost; remote lifecycle writes are rejected.",
+      {},
+      "Overmind lifecycle endpoints are localhost-only"
+    );
+    return false;
+  }
+
+  const headerToken = request.headers["x-overmind-token"];
+  const body = request.body as TokenBody | undefined;
+  const token = body?.token || (Array.isArray(headerToken) ? headerToken[0] : headerToken);
+  if (!token || token !== expectedToken) {
+    sendAgentClientError(
+      reply,
+      401,
+      "invalid-overmind-token",
+      "Missing or invalid overmind token.",
+      "Send the configured Overmind token in body.token or the x-overmind-token header.",
+      {},
+      "Missing or invalid overmind token"
+    );
+    return false;
+  }
+
+  return true;
 }
 
 function requireLoopbackAndTokenCredential(
@@ -351,6 +415,200 @@ function mapActiveRunForDaemon(activeRun: OvermindActiveRun): ActiveRunResponseI
     })),
     dispatch_manifests: listDispatchManifests(workflow.run_dir)
   };
+}
+
+function registerDiscoveryEndpoint(): DiscoveryEndpoint {
+  return {
+    name: "register",
+    method: "POST",
+    path: "/api/overmind/register",
+    auth: "loopback + overmind token in body.token or x-overmind-token",
+    required: ["run_dir", "token"],
+    forbidden: ["label", "session", "parent_session", "project_slug"],
+    input_schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["run_dir", "token"],
+      properties: {
+        run_dir: {
+          type: "string",
+          minLength: 1,
+          description: "Absolute path under a registered overmind project."
+        },
+        token: {
+          type: "string",
+          minLength: 1,
+          description: "Overmind lifecycle token. May also be supplied as x-overmind-token."
+        }
+      }
+    },
+    notes: "Attach registration accepts only run_dir and token; identity is derived server-side from the registered project whose app_path contains run_dir.",
+    example: {
+      run_dir: "<abs path under a registered project>",
+      token: "<overmind token>"
+    }
+  };
+}
+
+function taskSchema(): Record<string, unknown> {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["id", "label", "state"],
+    properties: {
+      id: { type: "string", minLength: 1 },
+      label: { type: "string", minLength: 1, maxLength: MAX_TASK_LABEL_LENGTH },
+      state: { type: "string", enum: ["done", "processing", "pending"] }
+    }
+  };
+}
+
+function workflowLookupAnyOf(): Record<string, unknown>[] {
+  return [
+    { required: ["workflow_id"] },
+    { required: ["run_dir"] },
+    { required: ["session"] }
+  ];
+}
+
+function discoveryEndpoints(): DiscoveryEndpoint[] {
+  const workflowLookupProperties = {
+    workflow_id: { type: ["integer", "string"], minLength: 1 },
+    run_dir: { type: "string", minLength: 1 },
+    session: { type: "string", minLength: 1 },
+    token: { type: "string", minLength: 1 }
+  };
+
+  return [
+    registerDiscoveryEndpoint(),
+    {
+      name: "tasks",
+      method: "POST",
+      path: "/api/overmind/tasks",
+      auth: "loopback + overmind token in body.token or x-overmind-token",
+      required: ["workflow_id|run_dir|session", "tasks", "token"],
+      forbidden: [],
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        anyOf: workflowLookupAnyOf(),
+        required: ["tasks", "token"],
+        properties: {
+          ...workflowLookupProperties,
+          current_task: { type: ["string", "null"] },
+          tasks: { type: "array", items: taskSchema() }
+        }
+      },
+      notes: "Replaces the workflow task list. Use state for done-ness; keep labels short.",
+      example: {
+        run_dir: "<registered run_dir>",
+        current_task: "B12 implementation",
+        tasks: [{ id: "B12", label: "OVM discovery and envelopes", state: "processing" }],
+        token: "<overmind token>"
+      }
+    },
+    {
+      name: "children",
+      method: "POST",
+      path: "/api/overmind/children",
+      auth: "loopback + overmind token in body.token or x-overmind-token",
+      required: ["workflow_id|run_dir|session", "child_sessions", "token"],
+      forbidden: [],
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        anyOf: workflowLookupAnyOf(),
+        required: ["child_sessions", "token"],
+        properties: {
+          ...workflowLookupProperties,
+          child_sessions: {
+            type: "array",
+            items: { type: "string", pattern: SESSION_NAME_RE.source }
+          },
+          child_roles: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional; when provided, length must match child_sessions."
+          }
+        }
+      },
+      notes: "Sets the complete child session roster for the workflow.",
+      example: {
+        workflow_id: 123,
+        child_sessions: ["AGJ-b12-codex"],
+        child_roles: ["implementer"],
+        token: "<overmind token>"
+      }
+    },
+    {
+      name: "complete",
+      method: "POST",
+      path: "/api/overmind/complete",
+      auth: "loopback + overmind token in body.token or x-overmind-token",
+      required: ["workflow_id|run_dir|session", "token"],
+      forbidden: [],
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        anyOf: workflowLookupAnyOf(),
+        required: ["token"],
+        properties: workflowLookupProperties
+      },
+      notes: "Marks a workflow completed and emits the completion transition notification once.",
+      example: {
+        run_dir: "<registered run_dir>",
+        token: "<overmind token>"
+      }
+    },
+    {
+      name: "pause",
+      method: "POST",
+      path: "/api/overmind/workflows/:id/pause",
+      auth: "loopback + overmind token in body.token or x-overmind-token",
+      required: ["id path parameter", "token"],
+      forbidden: [],
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["token"],
+        properties: {
+          token: { type: "string", minLength: 1 }
+        }
+      },
+      notes: "Pauses monitoring for a workflow as a relay of an explicit JROM/projcore control action.",
+      example: {
+        token: "<overmind token>"
+      }
+    },
+    {
+      name: "resume",
+      method: "POST",
+      path: "/api/overmind/workflows/:id/resume",
+      auth: "loopback + overmind token in body.token or x-overmind-token",
+      required: ["id path parameter", "token"],
+      forbidden: [],
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["token"],
+        properties: {
+          token: { type: "string", minLength: 1 }
+        }
+      },
+      notes: "Resumes monitoring for a paused workflow.",
+      example: {
+        token: "<overmind token>"
+      }
+    }
+  ];
+}
+
+function liveDiscoveryProjects(overmindService: OvermindService): Array<{ slug: string; app_path: string; parent_session: string }> {
+  return overmindService.listProjects().map((project) => ({
+    slug: project.slug,
+    app_path: project.app_path,
+    parent_session: project.parent_session
+  }));
 }
 
 // Best-effort JWT verification — returns the session user (owner role) when a
@@ -540,6 +798,20 @@ export function registerOvermindRoutes(
   );
 
   app.get(
+    "/api/overmind/describe",
+    async (request, reply) => {
+      if (!requireLoopbackAndTokenCredential(request, reply, config.overmind.token)) return;
+
+      return {
+        ok: true,
+        version: 2,
+        endpoints: discoveryEndpoints(),
+        projects: liveDiscoveryProjects(overmindService)
+      };
+    }
+  );
+
+  app.get(
     "/api/overmind/register/describe",
     async (request, reply) => {
       if (!requireLoopbackAndTokenCredential(request, reply, config.overmind.token)) return;
@@ -547,39 +819,9 @@ export function registerOvermindRoutes(
       return {
         ok: true,
         version: 1,
-        register: {
-          method: "POST",
-          path: "/api/overmind/register",
-          required: ["run_dir", "token"],
-          forbidden: ["label", "session", "parent_session", "project_slug"],
-          input_schema: {
-            type: "object",
-            additionalProperties: false,
-            required: ["run_dir", "token"],
-            properties: {
-              run_dir: {
-                type: "string",
-                minLength: 1,
-                description: "Absolute path under a registered overmind project."
-              },
-              token: {
-                type: "string",
-                minLength: 1,
-                description: "Overmind lifecycle token. May also be supplied as x-overmind-token."
-              }
-            }
-          },
-          notes: "Attach registration accepts only run_dir and token; identity is derived server-side from the registered project whose app_path contains run_dir.",
-          example: {
-            run_dir: "<abs path under a registered project>",
-            token: "<overmind token>"
-          }
-        },
-        projects: overmindService.listProjects().map((project) => ({
-          slug: project.slug,
-          app_path: project.app_path,
-          parent_session: project.parent_session
-        }))
+        register: registerDiscoveryEndpoint(),
+        endpoints: discoveryEndpoints(),
+        projects: liveDiscoveryProjects(overmindService)
       };
     }
   );
@@ -607,7 +849,15 @@ export function registerOvermindRoutes(
         submittedTasks = validation.tasks;
       }
       if (current_task !== undefined && current_task !== null && typeof current_task !== "string") {
-        return reply.code(400).send({ error: "'current_task' must be a string or null" });
+        return sendAgentClientError(
+          reply,
+          400,
+          "invalid-current-task",
+          "'current_task' must be a string or null.",
+          "Send current_task as a short string, null, or omit it.",
+          {},
+          "'current_task' must be a string or null"
+        );
       }
 
       const forbiddenFields: Array<keyof RegisterBody> = [
@@ -631,9 +881,15 @@ export function registerOvermindRoutes(
       }
 
       if (!path.isAbsolute(run_dir)) {
-        return reply.code(400).send({
-          error: `'run_dir' must be an absolute path. Got: '${run_dir}'. Use the canonical path on disk; relative paths are ambiguous because overmind and the caller may have different cwds.`
-        });
+        return sendAgentClientError(
+          reply,
+          400,
+          "invalid-run-dir",
+          `'run_dir' must be an absolute path. Got: '${run_dir}'.`,
+          "Use the canonical absolute path on disk; relative paths are ambiguous because overmind and the caller may have different cwds.",
+          {},
+          `'run_dir' must be an absolute path. Got: '${run_dir}'. Use the canonical path on disk; relative paths are ambiguous because overmind and the caller may have different cwds.`
+        );
       }
 
       const match = await overmindService.findProjectForRunDir(run_dir);
@@ -687,12 +943,28 @@ export function registerOvermindRoutes(
 
       const { workflow_id, run_dir, session } = request.body || {};
       if (!hasWorkflowLookupKey({ workflow_id, run_dir, session })) {
-        return reply.code(400).send({ error: "workflow_id, run_dir, or session is required" });
+        return sendAgentClientError(
+          reply,
+          400,
+          "missing-workflow-lookup",
+          "workflow_id, run_dir, or session is required.",
+          "Address the workflow by workflow_id, canonical run_dir, or the legacy session fallback.",
+          {},
+          "workflow_id, run_dir, or session is required"
+        );
       }
 
       const workflow = await overmindService.findWorkflow({ workflow_id, run_dir, session });
       if (!workflow) {
-        return reply.code(404).send({ error: "Workflow not found" });
+        return sendAgentClientError(
+          reply,
+          404,
+          "workflow-not-found",
+          "Workflow not found.",
+          "Use the workflow_id returned by /register, the canonical run_dir, or re-register before completing.",
+          {},
+          "Workflow not found"
+        );
       }
 
       const completed = overmindService.setStatus(workflow.id, "completed", { touchParentUpdate: true });
@@ -756,10 +1028,26 @@ export function registerOvermindRoutes(
 
       const { workflow_id, run_dir, session, current_task, tasks } = request.body || {};
       if (!hasWorkflowLookupKey({ workflow_id, run_dir, session }) || tasks === undefined) {
-        return reply.code(400).send({ error: "workflow_id, run_dir, or session and tasks are required" });
+        return sendAgentClientError(
+          reply,
+          400,
+          "missing-task-update-fields",
+          "workflow_id, run_dir, or session and tasks are required.",
+          "Send one workflow lookup key plus tasks: [{id,label,state}].",
+          {},
+          "workflow_id, run_dir, or session and tasks are required"
+        );
       }
       if (current_task !== undefined && current_task !== null && typeof current_task !== "string") {
-        return reply.code(400).send({ error: "'current_task' must be a string or null" });
+        return sendAgentClientError(
+          reply,
+          400,
+          "invalid-current-task",
+          "'current_task' must be a string or null.",
+          "Send current_task as a short string, null, or omit it.",
+          {},
+          "'current_task' must be a string or null"
+        );
       }
       const validation = validateSubmittedTaskList(tasks);
       if (!validation.ok) {
@@ -768,7 +1056,15 @@ export function registerOvermindRoutes(
 
       const workflow = await overmindService.findWorkflow({ workflow_id, run_dir, session });
       if (!workflow) {
-        return reply.code(404).send({ error: "Workflow not found" });
+        return sendAgentClientError(
+          reply,
+          404,
+          "workflow-not-found",
+          "Workflow not found.",
+          "Use the workflow_id returned by /register, the canonical run_dir, or re-register before updating tasks.",
+          {},
+          "Workflow not found"
+        );
       }
 
       return { workflow: overmindService.setTasks(workflow.id, current_task ?? null, validation.tasks) };
@@ -782,10 +1078,26 @@ export function registerOvermindRoutes(
 
       const { workflow_id, run_dir, session, child_sessions, child_roles } = request.body || {};
       if (!hasWorkflowLookupKey({ workflow_id, run_dir, session })) {
-        return reply.code(400).send({ error: "workflow_id, run_dir, or session is required" });
+        return sendAgentClientError(
+          reply,
+          400,
+          "missing-workflow-lookup",
+          "workflow_id, run_dir, or session is required.",
+          "Address the workflow by workflow_id, canonical run_dir, or the legacy session fallback.",
+          {},
+          "workflow_id, run_dir, or session is required"
+        );
       }
       if (!Array.isArray(child_sessions)) {
-        return reply.code(400).send({ error: "child_sessions is required" });
+        return sendAgentClientError(
+          reply,
+          400,
+          "missing-child-sessions",
+          "child_sessions is required.",
+          "Send child_sessions as an array of tmux-safe session names.",
+          {},
+          "child_sessions is required"
+        );
       }
       for (let i = 0; i < child_sessions.length; i++) {
         const childSession = child_sessions[i];
@@ -794,18 +1106,40 @@ export function registerOvermindRoutes(
         }
       }
       if (child_roles !== undefined && !Array.isArray(child_roles)) {
-        return reply.code(400).send({ error: "child_roles must be an array" });
+        return sendAgentClientError(
+          reply,
+          400,
+          "invalid-child-roles",
+          "child_roles must be an array.",
+          "Omit child_roles or send an array whose length matches child_sessions.",
+          {},
+          "child_roles must be an array"
+        );
       }
       const roles = child_roles ?? [];
       if (roles.length > 0 && roles.length !== child_sessions.length) {
-        return reply.code(400).send({
-          error: `child_roles length (${roles.length}) must match child_sessions length (${child_sessions.length})`
-        });
+        return sendAgentClientError(
+          reply,
+          400,
+          "child-role-count-mismatch",
+          `child_roles length (${roles.length}) must match child_sessions length (${child_sessions.length}).`,
+          "Send one role per child session, or omit child_roles.",
+          {},
+          `child_roles length (${roles.length}) must match child_sessions length (${child_sessions.length})`
+        );
       }
 
       const workflow = await overmindService.findWorkflow({ workflow_id, run_dir, session });
       if (!workflow) {
-        return reply.code(404).send({ error: "Workflow not found" });
+        return sendAgentClientError(
+          reply,
+          404,
+          "workflow-not-found",
+          "Workflow not found.",
+          "Use the workflow_id returned by /register, the canonical run_dir, or re-register before updating children.",
+          {},
+          "Workflow not found"
+        );
       }
 
       return { workflow: overmindService.setChildren(workflow.id, child_sessions, roles) };
@@ -844,14 +1178,30 @@ export function registerOvermindRoutes(
 
       const id = parseWorkflowId(request.params.id);
       if (id === null) {
-        return reply.code(400).send({ error: "Invalid workflow id" });
+        return sendAgentClientError(
+          reply,
+          400,
+          "invalid-workflow-id",
+          "Invalid workflow id.",
+          "Use the numeric workflow_id returned by /register in the URL path.",
+          {},
+          "Invalid workflow id"
+        );
       }
 
       // projcore RELAY of a JROM-initiated pause. projcore must never call this on its own
       // initiative (see projcore.md §2.11) — only when JROM explicitly tells it to.
       const workflow = overmindService.setMonitoringPaused(id, true, "projcore-relay");
       if (!workflow) {
-        return reply.code(404).send({ error: "Workflow not found" });
+        return sendAgentClientError(
+          reply,
+          404,
+          "workflow-not-found",
+          "Workflow not found.",
+          "Use the numeric workflow_id returned by /register, or re-register before pausing.",
+          {},
+          "Workflow not found"
+        );
       }
 
       streamManager?.broadcast();
@@ -866,12 +1216,28 @@ export function registerOvermindRoutes(
 
       const id = parseWorkflowId(request.params.id);
       if (id === null) {
-        return reply.code(400).send({ error: "Invalid workflow id" });
+        return sendAgentClientError(
+          reply,
+          400,
+          "invalid-workflow-id",
+          "Invalid workflow id.",
+          "Use the numeric workflow_id returned by /register in the URL path.",
+          {},
+          "Invalid workflow id"
+        );
       }
 
       const workflow = overmindService.setMonitoringPaused(id, false, null);
       if (!workflow) {
-        return reply.code(404).send({ error: "Workflow not found" });
+        return sendAgentClientError(
+          reply,
+          404,
+          "workflow-not-found",
+          "Workflow not found.",
+          "Use the numeric workflow_id returned by /register, or re-register before resuming.",
+          {},
+          "Workflow not found"
+        );
       }
 
       streamManager?.broadcast();
