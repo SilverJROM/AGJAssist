@@ -33,7 +33,7 @@ afterEach(() => {
 describe("migration v23", () => {
   it("creates latest schema version", () => {
     const row = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(row.version).toBe(26);
+    expect(row.version).toBe(28);
   });
 
   it("creates the note_folders table", () => {
@@ -90,9 +90,9 @@ describe("migration v23", () => {
 });
 
 describe("migration v26", () => {
-  it("creates latest schema version (26)", () => {
+  it("creates latest schema version", () => {
     const row = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(row.version).toBe(26);
+    expect(row.version).toBe(28);
   });
 
   it("notes table has font_size column with default 15", () => {

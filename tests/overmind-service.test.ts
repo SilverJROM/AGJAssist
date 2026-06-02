@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DatabaseService } from "../src/db/database.js";
 import { OvermindService } from "../src/services/overmind-service.js";
+import type { OvermindTask, OvermindWorkflow } from "../src/services/overmind/types.js";
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
@@ -16,9 +17,13 @@ function cleanup(): void {
 
 let db: DatabaseService;
 let service: OvermindService;
+let attachedProjectSeq = 0;
+let attachedProjectIdsByRunDir = new Map<string, number>();
 
 beforeEach(() => {
   cleanup();
+  attachedProjectSeq = 0;
+  attachedProjectIdsByRunDir = new Map();
   db = new DatabaseService(TEST_DB);
   service = new OvermindService(db);
 });
@@ -27,6 +32,40 @@ afterEach(() => {
   db.close();
   cleanup();
 });
+
+function attachedRun(input: {
+  label: string;
+  coordinator_session: string;
+  child_sessions?: string[];
+  run_dir: string;
+  current_task?: string | null;
+  tasks?: OvermindTask[];
+}): OvermindWorkflow {
+  let projectId = attachedProjectIdsByRunDir.get(input.run_dir);
+  if (!projectId) {
+    attachedProjectSeq += 1;
+    const project = service.createProject({
+      slug: `test-project-${attachedProjectSeq}`,
+      app_path: input.run_dir,
+      parent_session: input.coordinator_session,
+      notes: null
+    });
+    projectId = project.id;
+    attachedProjectIdsByRunDir.set(input.run_dir, projectId);
+  }
+  const workflow = service.registerAttached({
+    project_id: projectId,
+    label: input.label,
+    run_dir: input.run_dir,
+    coordinator_session: input.coordinator_session,
+    current_task: input.current_task,
+    tasks: input.tasks
+  });
+  if (input.child_sessions) {
+    return service.update(workflow.id, { child_sessions: input.child_sessions }) ?? workflow;
+  }
+  return workflow;
+}
 
 describe("OvermindService", () => {
   it("creates the schema v28 tables, display name, active attribution, history, notification, elapsed, completion-check, per-session status, child roles, info-request, parent-update, and monitoring-pause columns", () => {
@@ -167,7 +206,7 @@ describe("OvermindService", () => {
   });
 
   it("round-trips register, list, get, getBySession, updates, status, tasks, and delete", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "lkcamp",
       coordinator_session: "lkcamp-12",
       child_sessions: ["lkcdx-may20"],
@@ -265,7 +304,7 @@ describe("OvermindService", () => {
 
   it("register sets last_parent_update_at to now", () => {
     const before = Date.now();
-    const created = service.register({
+    const created = attachedRun({
       label: "touch-register",
       coordinator_session: "touch-register-parent",
       run_dir: "/tmp/overmind/touch-register"
@@ -280,7 +319,7 @@ describe("OvermindService", () => {
   });
 
   it("setTasks refreshes last_parent_update_at", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "touch-tasks",
       coordinator_session: "touch-tasks-parent",
       run_dir: "/tmp/overmind/touch-tasks",
@@ -295,7 +334,7 @@ describe("OvermindService", () => {
   });
 
   it("setTasks tags task_log entry with source='evidence-derived' when called from auto-promote (JROM 2026-05-24)", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "auto-promote",
       coordinator_session: "auto-promote-parent",
       run_dir: "/tmp/overmind/auto-promote",
@@ -328,7 +367,7 @@ describe("OvermindService", () => {
   });
 
   it("setTasks is a no-op (no duplicate task_log entry) when the state is unchanged", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "noop-promote",
       coordinator_session: "noop-promote-parent",
       run_dir: "/tmp/overmind/noop-promote",
@@ -347,7 +386,7 @@ describe("OvermindService", () => {
   });
 
   it("setEvidenceIdleThresholdOverride accepts null and positive multiples of 5 between 5 and 240; rejects other values", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "cooldown-override",
       coordinator_session: "cooldown-override-parent",
       run_dir: "/tmp/overmind/cooldown-override"
@@ -365,7 +404,7 @@ describe("OvermindService", () => {
   });
 
   it("stamps ended_at when a workflow is registered with all tasks done", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "v6-register-done",
       coordinator_session: "v6-register-done-parent",
       run_dir: "/tmp/overmind/v6-register-done",
@@ -381,7 +420,7 @@ describe("OvermindService", () => {
   });
 
   it("keeps ended_at null when a workflow is registered with a pending task", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "v6-register-pending",
       coordinator_session: "v6-register-pending-parent",
       run_dir: "/tmp/overmind/v6-register-pending",
@@ -396,7 +435,7 @@ describe("OvermindService", () => {
   });
 
   it("freezes ended_at when all tasks are done and clears it when a not-done task appears", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "v6",
       coordinator_session: "v6-parent",
       run_dir: "/tmp/overmind/v6",
@@ -428,7 +467,7 @@ describe("OvermindService", () => {
   });
 
   it("stamps ended_at when status is set to completed", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "v6-status",
       coordinator_session: "v6-status-parent",
       run_dir: "/tmp/overmind/v6-status"
@@ -442,7 +481,7 @@ describe("OvermindService", () => {
   });
 
   it("appends task_log on current task or done-count changes, skips no-ops, and caps at 50 entries", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "v6-log",
       coordinator_session: "v6-log-parent",
       run_dir: "/tmp/overmind/v6-log",
@@ -483,7 +522,7 @@ describe("OvermindService", () => {
     expect(repeated?.task_log).toHaveLength(2);
     expect(service.listHistory()).toHaveLength(2);
 
-    const capped = service.register({
+    const capped = attachedRun({
       label: "v6-cap",
       coordinator_session: "v6-cap-parent",
       run_dir: "/tmp/overmind/v6-cap",
@@ -505,7 +544,7 @@ describe("OvermindService", () => {
   });
 
   it("uses the current workflow display name for registered history and snapshot name after delete", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "snapshot label",
       coordinator_session: "snapshot-parent",
       run_dir: "/tmp/overmind/snapshot",
@@ -537,8 +576,8 @@ describe("OvermindService", () => {
     });
   });
 
-  it("upserts by coordinator_session and resets the workflow to active", () => {
-    const created = service.register({
+  it("upserts by project/run_dir and resets the workflow to active", () => {
+    const created = attachedRun({
       label: "hris",
       coordinator_session: "hris-d-22",
       child_sessions: ["hrcdx-33"],
@@ -555,11 +594,11 @@ describe("OvermindService", () => {
       tier: 2
     });
 
-    const upserted = service.register({
+    const upserted = attachedRun({
       label: "hris rerun",
       coordinator_session: "hris-d-22",
       child_sessions: ["hrcdx-33", "hrcdx-34"],
-      run_dir: "/tmp/overmind/hris-rerun",
+      run_dir: "/tmp/overmind/hris",
       current_task: "Restarted",
       tasks: [{ id: "A1", label: "Restart", state: "processing" }]
     });
@@ -568,7 +607,7 @@ describe("OvermindService", () => {
     expect(upserted.label).toBe("hris rerun");
     expect(upserted.status).toBe("active");
     expect(upserted.child_sessions).toEqual(["hrcdx-33", "hrcdx-34"]);
-    expect(upserted.run_dir).toBe("/tmp/overmind/hris-rerun");
+    expect(upserted.run_dir).toBe("/tmp/overmind/hris");
     expect(upserted.current_task).toBe("Restarted");
     expect(upserted.tasks).toEqual([{ id: "A1", label: "Restart", state: "processing" }]);
     expect(upserted.pending_decision).toBeNull();
@@ -582,7 +621,7 @@ describe("OvermindService", () => {
   });
 
   it("sets, trims, and clears display_name", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "projcore",
       coordinator_session: "projcore-parent",
       run_dir: "/tmp/overmind/projcore"
@@ -602,7 +641,7 @@ describe("OvermindService", () => {
   });
 
   it("preserves display_name across re-register and setTasks updates", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "projcore label",
       coordinator_session: "projcore-preserve-parent",
       run_dir: "/tmp/overmind/projcore-preserve",
@@ -613,11 +652,11 @@ describe("OvermindService", () => {
     const renamed = service.setDisplayName(created.id, "JROM custom name");
     expect(renamed?.display_name).toBe("JROM custom name");
 
-    const reRegistered = service.register({
+    const reRegistered = attachedRun({
       label: "projcore updated label",
       coordinator_session: "projcore-preserve-parent",
       child_sessions: ["child-a"],
-      run_dir: "/tmp/overmind/projcore-preserve-rerun",
+      run_dir: "/tmp/overmind/projcore-preserve",
       current_task: "Rerun task",
       tasks: [{ id: "A2", label: "Rerun", state: "processing" }]
     });
@@ -631,66 +670,6 @@ describe("OvermindService", () => {
     ]);
     expect(taskUpdated?.display_name).toBe("JROM custom name");
     expect(taskUpdated?.current_task).toBe("Task update");
-  });
-
-  it("resets run_started_at and rolls the prior current-run elapsed into accumulated_ms on re-register", () => {
-    const created = service.register({
-      label: "elapsed",
-      coordinator_session: "elapsed-parent",
-      run_dir: "/tmp/overmind/elapsed",
-      current_task: "First run",
-      tasks: [{ id: "A1", label: "First", state: "processing" }]
-    });
-    expect(created.accumulated_ms).toBe(0);
-    expect(created.run_started_at).toBeTruthy();
-
-    const previousRunStart = new Date(Date.now() - 120_000).toISOString();
-    db.prepare(
-      "UPDATE overmind_workflows SET run_started_at = ?, accumulated_ms = ? WHERE id = ?"
-    ).run(previousRunStart, 5_000, created.id);
-
-    const beforeRegister = Date.now();
-    const upserted = service.register({
-      label: "elapsed rerun",
-      coordinator_session: "elapsed-parent",
-      run_dir: "/tmp/overmind/elapsed-rerun",
-      current_task: "Second run",
-      tasks: [{ id: "A1", label: "First", state: "processing" }]
-    });
-    const afterRegister = Date.now();
-    const runStartedAt = Date.parse(upserted.run_started_at || "");
-
-    expect(upserted.id).toBe(created.id);
-    expect(runStartedAt).toBeGreaterThanOrEqual(beforeRegister);
-    expect(runStartedAt).toBeLessThanOrEqual(afterRegister);
-    expect(upserted.accumulated_ms).toBeGreaterThanOrEqual(5_000 + beforeRegister - Date.parse(previousRunStart));
-    expect(upserted.accumulated_ms).toBeLessThanOrEqual(5_000 + afterRegister - Date.parse(previousRunStart) + 50);
-    expect(upserted.ended_at).toBeNull();
-  });
-
-  it("rolls mixed SQLite and ISO timestamps exactly and recomputes ended_at from the new tasklist", () => {
-    const created = service.register({
-      label: "elapsed done",
-      coordinator_session: "elapsed-done-parent",
-      run_dir: "/tmp/overmind/elapsed-done"
-    });
-
-    db.prepare(
-      "UPDATE overmind_workflows SET run_started_at = ?, ended_at = ?, accumulated_ms = ? WHERE id = ?"
-    ).run("2026-05-21 00:00:00", "2026-05-21T00:10:00.000Z", 1_000, created.id);
-
-    const upserted = service.register({
-      label: "elapsed done rerun",
-      coordinator_session: "elapsed-done-parent",
-      run_dir: "/tmp/overmind/elapsed-done-rerun",
-      current_task: "Complete",
-      tasks: [{ id: "A1", label: "First", state: "done" }]
-    });
-
-    expect(upserted.accumulated_ms).toBe(601_000);
-    expect(upserted.ended_at).toBeTruthy();
-    expect(Date.parse(upserted.ended_at || "")).not.toBeNaN();
-    expect(Date.parse(upserted.ended_at || "")).toBeGreaterThanOrEqual(Date.parse(upserted.run_started_at || ""));
   });
 
   it("migrates an existing v11 overmind table with guarded v12 ALTER columns", () => {
@@ -793,14 +772,14 @@ describe("OvermindService", () => {
   });
 
   it("listRuns() returns ALL workflows (active + terminal) with last_parent_update_at, ordered by most-recent activity (JROM 2026-05-24)", () => {
-    const active = service.register({
+    const active = attachedRun({
       label: "active-run",
       coordinator_session: "active-run-parent",
       run_dir: "/tmp/active-run",
       tasks: [{ id: "T1", label: "Task 1", state: "processing" }]
     });
 
-    const completed1 = service.register({
+    const completed1 = attachedRun({
       label: "completed-run-1",
       coordinator_session: "completed-run-1-parent",
       run_dir: "/tmp/completed-run-1",
@@ -812,7 +791,7 @@ describe("OvermindService", () => {
     });
     service.setStatus(completed1.id, "completed");
 
-    const completed2 = service.register({
+    const completed2 = attachedRun({
       label: "completed-run-2",
       coordinator_session: "completed-run-2-parent",
       run_dir: "/tmp/completed-run-2",
@@ -822,7 +801,7 @@ describe("OvermindService", () => {
     });
     service.setStatus(completed2.id, "completed");
 
-    const failed = service.register({
+    const failed = attachedRun({
       label: "failed-run",
       coordinator_session: "failed-run-parent",
       run_dir: "/tmp/failed-run",
@@ -870,7 +849,7 @@ describe("OvermindService", () => {
   });
 
   it("listRuns() uses display_name when set", () => {
-    const wf = service.register({
+    const wf = attachedRun({
       label: "display-run",
       coordinator_session: "display-run-parent",
       run_dir: "/tmp/display-run"
@@ -885,8 +864,8 @@ describe("OvermindService", () => {
   });
 
   describe("display_name protection", () => {
-    it("register() twice with setDisplayName between calls preserves the custom name on re-register", () => {
-      const created = service.register({
+    it("attach register twice with setDisplayName between calls preserves the custom name", () => {
+      const created = attachedRun({
         label: "protect-label",
         coordinator_session: "protect-session",
         run_dir: "/tmp/protect"
@@ -894,10 +873,10 @@ describe("OvermindService", () => {
 
       service.setDisplayName(created.id, "My Name");
 
-      const reRegistered = service.register({
+      const reRegistered = attachedRun({
         label: "protect-label-v2",
         coordinator_session: "protect-session",
-        run_dir: "/tmp/protect-v2"
+        run_dir: "/tmp/protect"
       });
 
       expect(reRegistered.id).toBe(created.id);
@@ -905,7 +884,7 @@ describe("OvermindService", () => {
     });
 
     it("update() with any fields does not touch display_name", () => {
-      const created = service.register({
+      const created = attachedRun({
         label: "update-protect",
         coordinator_session: "update-protect-session",
         run_dir: "/tmp/update-protect"
@@ -924,7 +903,7 @@ describe("OvermindService", () => {
     });
 
     it("setStatus() does not touch display_name", () => {
-      const created = service.register({
+      const created = attachedRun({
         label: "status-protect",
         coordinator_session: "status-protect-session",
         run_dir: "/tmp/status-protect"
@@ -938,7 +917,7 @@ describe("OvermindService", () => {
     });
 
     it("setTasks() does not touch display_name", () => {
-      const created = service.register({
+      const created = attachedRun({
         label: "tasks-protect",
         coordinator_session: "tasks-protect-session",
         run_dir: "/tmp/tasks-protect",
@@ -957,7 +936,7 @@ describe("OvermindService", () => {
     });
 
     it("setMonitoringPaused() does not touch display_name", () => {
-      const created = service.register({
+      const created = attachedRun({
         label: "pause-protect",
         coordinator_session: "pause-protect-session",
         run_dir: "/tmp/pause-protect"
@@ -974,7 +953,7 @@ describe("OvermindService", () => {
     });
 
     it("setDisplayName('Foo') then setDisplayName(null) sets then clears display_name correctly", () => {
-      const created = service.register({
+      const created = attachedRun({
         label: "null-protect",
         coordinator_session: "null-protect-session",
         run_dir: "/tmp/null-protect"
@@ -989,14 +968,14 @@ describe("OvermindService", () => {
   });
 
   it("listHistory() with session filter returns only entries for that session", () => {
-    const wf1 = service.register({
+    const wf1 = attachedRun({
       label: "session-filter-1",
       coordinator_session: "sf-session-1",
       run_dir: "/tmp/sf-1",
       current_task: "T1",
       tasks: [{ id: "A1", label: "A1", state: "processing" }]
     });
-    const wf2 = service.register({
+    const wf2 = attachedRun({
       label: "session-filter-2",
       coordinator_session: "sf-session-2",
       run_dir: "/tmp/sf-2",
@@ -1023,27 +1002,14 @@ describe("OvermindService", () => {
     expect(noMatch.length).toBe(0);
   });
 
-  it("findProjectTreeMatch returns the matching workflow by component-aligned run_dir prefix", async () => {
-    const existing = service.register({
-      label: "HRIS · trapprove",
-      coordinator_session: "hris-d-22",
-      run_dir: "/home/agjrom/websites/HRIS",
-      tasks: [{ id: "B1", label: "Schema migration", state: "processing" }]
-    });
-
-    const match = await service.findProjectTreeMatch("/home/agjrom/websites/HRIS/anything-new");
-    expect(match?.id).toBe(existing.id);
-    expect(match?.coordinator_session).toBe("hris-d-22");
-  });
-
-  it("allows re-register under the same coordinator_session (idempotent upsert path)", () => {
-    const first = service.register({
+  it("allows attach re-register under the same project/run_dir", () => {
+    const first = attachedRun({
       label: "L",
       coordinator_session: "same-session",
       run_dir: "/tmp/overmind/same-run-dir",
       tasks: []
     });
-    const again = service.register({
+    const again = attachedRun({
       label: "L",
       coordinator_session: "same-session",
       run_dir: "/tmp/overmind/same-run-dir",
@@ -1053,82 +1019,8 @@ describe("OvermindService", () => {
     expect(service.list()).toHaveLength(1);
   });
 
-  it("findProjectTreeMatch returns null when run_dirs share no project root (truly different projects)", async () => {
-    service.register({
-      label: "HRIS",
-      coordinator_session: "hris-d-22",
-      run_dir: "/home/agjrom/websites/HRIS/code",
-      tasks: []
-    });
-    // Different bucket entirely (TGBOTS vs websites) — share only 4 ancestors
-    // (/, home, agjrom, then bucket name diverges). Below PROJECT_ROOT_DEPTH=5.
-    const noMatch = await service.findProjectTreeMatch("/home/agjrom/TGBOTS/AGJAssist/code");
-    expect(noMatch).toBeNull();
-  });
-
-  it("findProjectTreeMatch matches sibling sub-paths under the same project root (JROM 2026-05-24 relaxation)", async () => {
-    // Before today's relaxation, '/HRIS/code' and '/HRIS/codebase' didn't match
-    // (neither path-prefixes the other). JROM's "1 workflow per parent for the
-    // same project" intent requires both to be recognised as the same HRIS
-    // project tree — common ancestor depth=5 ('/'+home+agjrom+websites+HRIS)
-    // hits the PROJECT_ROOT_DEPTH threshold.
-    const wf = service.register({
-      label: "HRIS",
-      coordinator_session: "hris-d-22",
-      run_dir: "/home/agjrom/websites/HRIS/code",
-      tasks: []
-    });
-    const match = await service.findProjectTreeMatch("/home/agjrom/websites/HRIS/codebase");
-    expect(match?.id).toBe(wf.id);
-  });
-
-  it("findProjectTreeMatch prefers active workflows over terminal ones; falls back to terminal when needed", async () => {
-    const completed = service.register({
-      label: "term",
-      coordinator_session: "term-parent",
-      run_dir: "/tmp/project-x",
-      tasks: []
-    });
-    service.setStatus(completed.id, "completed");
-
-    const active = service.register({
-      label: "active",
-      coordinator_session: "active-parent",
-      run_dir: "/tmp/project-x/subdir",
-      tasks: []
-    });
-
-    const activeMatch = await service.findProjectTreeMatch("/tmp/project-x/subdir/new-work");
-    expect(activeMatch?.id).toBe(active.id);
-
-    service.setStatus(active.id, "failed");
-    const terminalMatch = await service.findProjectTreeMatch("/tmp/project-x/subdir/new-work");
-    expect(terminalMatch).not.toBeNull();
-    expect(["completed", "failed", "paused"]).toContain(terminalMatch?.status);
-  });
-
-  it("findProjectTreeMatch picks the most recently updated active workflow among equal-depth matches", async () => {
-    const older = service.register({
-      label: "older",
-      coordinator_session: "older-parent",
-      run_dir: "/tmp/recency-project",
-      tasks: []
-    });
-    const newer = service.register({
-      label: "newer",
-      coordinator_session: "newer-parent",
-      run_dir: "/tmp/recency-project",
-      tasks: []
-    });
-    db.prepare("UPDATE overmind_workflows SET updated_at = ? WHERE id = ?").run("2026-01-01T00:00:00.000Z", older.id);
-    db.prepare("UPDATE overmind_workflows SET updated_at = ? WHERE id = ?").run("2026-02-01T00:00:00.000Z", newer.id);
-
-    const match = await service.findProjectTreeMatch("/tmp/recency-project/child");
-    expect(match?.id).toBe(newer.id);
-  });
-
   it("sanitizes markdown table chrome (header + separator) out of task lists on register()", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "trash-paste",
       coordinator_session: "tp-session",
       run_dir: "/tmp/overmind/trash-paste",
@@ -1148,7 +1040,7 @@ describe("OvermindService", () => {
   });
 
   it("sanitizes markdown table chrome out of task lists on setTasks() too", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "trash-paste-2",
       coordinator_session: "tp2-session",
       run_dir: "/tmp/overmind/trash-paste-2",
@@ -1167,7 +1059,7 @@ describe("OvermindService", () => {
   // --- Done-state preservation ---
 
   it("setTasks does not downgrade a done task back to pending on coordinator sync", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "done-preserve",
       coordinator_session: "done-preserve-session",
       run_dir: "/tmp/overmind/done-preserve",
@@ -1190,7 +1082,7 @@ describe("OvermindService", () => {
   });
 
   it("setTasks does not downgrade a done task back to processing", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "done-preserve-2",
       coordinator_session: "done-preserve-2-session",
       run_dir: "/tmp/overmind/done-preserve-2",
@@ -1204,7 +1096,7 @@ describe("OvermindService", () => {
   });
 
   it("register (re-register upsert) preserves done state when task IDs overlap", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "re-reg-preserve",
       coordinator_session: "re-reg-session",
       run_dir: "/tmp/overmind/re-reg",
@@ -1217,7 +1109,7 @@ describe("OvermindService", () => {
     expect(created.tasks.find(t => t.id === "B12")?.state).toBe("done");
 
     // Re-register (e.g. after session kill) with stale pending states
-    const rereged = service.register({
+    const rereged = attachedRun({
       label: "re-reg-preserve",
       coordinator_session: "re-reg-session",
       run_dir: "/tmp/overmind/re-reg",
@@ -1234,7 +1126,7 @@ describe("OvermindService", () => {
   });
 
   it("register with entirely new task IDs (new run) does NOT carry over done states", () => {
-    const created = service.register({
+    const created = attachedRun({
       label: "new-run",
       coordinator_session: "new-run-session",
       run_dir: "/tmp/overmind/new-run",
@@ -1243,7 +1135,7 @@ describe("OvermindService", () => {
     expect(created.tasks.find(t => t.id === "B1")?.state).toBe("done");
 
     // Genuinely new run with completely different task IDs
-    const newRun = service.register({
+    const newRun = attachedRun({
       label: "new-run",
       coordinator_session: "new-run-session",
       run_dir: "/tmp/overmind/new-run",

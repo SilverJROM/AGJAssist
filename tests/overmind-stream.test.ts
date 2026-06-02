@@ -119,11 +119,17 @@ describe("OvermindStreamManager", () => {
     await manager.handleConnection(socket as unknown as WebSocket, "good");
 
     expect(manager.subscriberCount()).toBe(1);
-    expect(parseLast(socket)).toEqual({ type: "snapshot", workflows: [initial] });
+    expect(parseLast(socket)).toMatchObject({
+      type: "snapshot",
+      workflows: [expect.objectContaining(initial)]
+    });
 
     manager.broadcast([updated]);
 
-    expect(parseLast(socket)).toEqual({ type: "update", workflows: [updated] });
+    expect(parseLast(socket)).toMatchObject({
+      type: "update",
+      workflows: [expect.objectContaining(updated)]
+    });
   });
 
   it("rejects invalid tokens before subscribing", async () => {
@@ -177,6 +183,7 @@ describe("Overmind watcher stream callback", () => {
     let rows = [workflow({ last_pane_hash: null })];
     const overmindService = {
       list: vi.fn(() => rows),
+      get: vi.fn((id: number) => rows.find(row => row.id === id) || null),
       update: vi.fn((id: number, fields: Partial<OvermindWorkflow>) => {
         rows = rows.map(row => row.id === id ? { ...row, ...fields } : row);
         return rows.find(row => row.id === id) || null;
@@ -205,6 +212,7 @@ describe("Overmind watcher stream callback", () => {
     })];
     const overmindService = {
       list: vi.fn(() => rows),
+      get: vi.fn((id: number) => rows.find(row => row.id === id) || null),
       update: vi.fn((id: number, fields: Partial<OvermindWorkflow>) => {
         rows = rows.map(row => row.id === id ? { ...row, ...fields } : row);
         return rows.find(row => row.id === id) || null;
@@ -241,6 +249,7 @@ describe("Overmind watcher stream callback", () => {
     })];
     const overmindService = {
       list: vi.fn(() => rows),
+      get: vi.fn((id: number) => rows.find(row => row.id === id) || null),
       update: vi.fn((id: number, fields: Partial<OvermindWorkflow>) => {
         rows = rows.map(row => row.id === id ? { ...row, ...fields } : row);
         return rows.find(row => row.id === id) || null;

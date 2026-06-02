@@ -60,7 +60,7 @@ describe("OvmSessionService", () => {
     expect(tmux.sendCommand).toHaveBeenNthCalledWith(
       2,
       "OVM",
-      "Read /home/agjrom/TGBOTS/AGJAssist/plan/overmind/OVM_OPERATOR_PRIMER.md and operate as the Overmind operator per it. OVERMIND_TOKEN=ovm-test-token. Reply 'ready' when you've read it.",
+      "overmind: Read /home/agjrom/TGBOTS/AGJAssist/plan/overmind/OVM_OPERATOR_PRIMER.md and operate as the Overmind operator per it. OVERMIND_TOKEN=ovm-test-token. Reply 'ready' when you've read it.",
       true,
       true
     );

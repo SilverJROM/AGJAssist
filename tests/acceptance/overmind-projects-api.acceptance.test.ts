@@ -243,7 +243,7 @@ describe("T12.1-T12.5 Overmind projects/register acceptance", () => {
     expect(body.workflow).toMatchObject({
       id: body.workflow_id,
       project_id: project.id,
-      coordinator_session: null,
+      coordinator_session: "AGJ-51",
       run_dir: fs.realpathSync(runDir),
       parent_status: "ok"
     });
@@ -262,12 +262,14 @@ describe("T12.1-T12.5 Overmind projects/register acceptance", () => {
     const rejected = await registerRun({ run_dir: runDir });
 
     expect(rejected.statusCode).toBe(404);
-    expect(rejected.json()).toEqual({
+    expect(rejected.json()).toMatchObject({
+      ok: false,
       error: "no-project-for-run-dir",
+      code: "no-project-for-run-dir",
       run_dir: fs.realpathSync(runDir),
-      searched_up_to: path.parse(runDir).root,
-      hint: "Ask JROM to create a project for the containing app via POST /api/overmind/projects, then re-register."
+      searched_up_to: path.parse(runDir).root
     });
+    expect(rejected.json().hint).toContain("use the correct run_dir or ask JROM to create the project");
 
     const stub = http.createServer((_request, response) => {
       response.writeHead(404, { "content-type": "application/json" });
@@ -320,10 +322,13 @@ describe("T12.1-T12.5 Overmind projects/register acceptance", () => {
       });
 
       expect(rejected.statusCode).toBe(422);
-      expect(rejected.json()).toEqual({
+      expect(rejected.json()).toMatchObject({
+        ok: false,
         error: "forbidden-derived-field",
+        code: "forbidden-derived-field",
         field
       });
+      expect(rejected.json().hint).toContain(`do not send ${field}`);
     }
   );
 });

@@ -7,6 +7,7 @@ import { registerOvermindRoutes } from "../src/api/routes/overmind-routes.js";
 import * as agentPane from "../src/services/overmind/agent-pane.js";
 import { AppConfig } from "../src/config/config.js";
 import { OvmSessionManager } from "../src/services/ovm-session.js";
+import type { OvermindTask } from "../src/services/overmind/types.js";
 import type { TmuxService } from "../src/tmux/tmux-service.js";
 import { NudgeStateService } from "../src/services/nudge-state-service.js";
 import fs from "node:fs";
@@ -126,6 +127,47 @@ function tempProjectPath(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "overmind-project-"));
   tempProjectDirs.push(dir);
   return dir;
+}
+
+async function seedAttachedWorkflow(input: {
+  slug?: string;
+  parentSession: string;
+  runDir: string;
+  currentTask?: string | null;
+  tasks?: OvermindTask[];
+  childSessions?: string[];
+  childRoles?: string[];
+}) {
+  fs.mkdirSync(input.runDir, { recursive: true });
+  overmindService.createProject({
+    slug: input.slug ?? `seed-${input.parentSession}-${overmindService.listProjects().length + 1}`,
+    app_path: input.runDir,
+    parent_session: input.parentSession,
+    notes: null
+  });
+  const registered = await lifecyclePost("/api/overmind/register", {
+    token: OVERMIND_TOKEN,
+    run_dir: input.runDir,
+    current_task: input.currentTask,
+    tasks: input.tasks
+  });
+  expect(registered.statusCode).toBe(201);
+  let workflow = registered.json().workflow;
+  if (input.childSessions) {
+    const children = await lifecyclePost("/api/overmind/children", {
+      token: OVERMIND_TOKEN,
+      workflow_id: workflow.id,
+      child_sessions: input.childSessions,
+      child_roles: input.childRoles ?? input.childSessions.map(() => "child")
+    });
+    expect(children.statusCode).toBe(200);
+    workflow = children.json().workflow;
+  }
+  const body = registered.json();
+  return {
+    statusCode: registered.statusCode,
+    json: () => ({ ...body, workflow })
+  };
 }
 
 beforeEach(async () => {
@@ -752,40 +794,54 @@ describe("Overmind routes", () => {
     expect(nonLoopback.statusCode).toBe(403);
   });
 
-  it("registers and upserts workflows from localhost with the shared token", async () => {
+  it("attaches and upserts workflows from localhost with the shared token", async () => {
+    const runDir = "/tmp/lkcamp";
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "lkcamp",
+      app_path: runDir,
+      parent_session: "lkcamp-12",
+      notes: null
+    });
+
     const first = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
-      label: "lkcamp",
-      session: "lkcamp-12",
-      child_sessions: ["lkcdx-may20"],
-      run_dir: "/tmp/lkcamp",
+      run_dir: runDir,
       current_task: "A2 routes",
       tasks: [{ id: "A2", label: "Routes", state: "processing" }]
     });
-
     expect(first.statusCode).toBe(201);
     const firstBody = first.json();
     expect(firstBody.workflow.coordinator_session).toBe("lkcamp-12");
-    expect(firstBody.workflow.child_sessions).toEqual(["lkcdx-may20"]);
     expect(firstBody.workflow.tasks).toEqual([{ id: "A2", label: "Routes", state: "processing" }]);
+
+    const firstChildren = await lifecyclePost("/api/overmind/children", {
+      token: OVERMIND_TOKEN,
+      workflow_id: firstBody.workflow.id,
+      child_sessions: ["lkcdx-may20"],
+      child_roles: ["implementer"]
+    });
+    expect(firstChildren.statusCode).toBe(200);
+    expect(firstChildren.json().workflow.child_sessions).toEqual(["lkcdx-may20"]);
 
     const second = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
-      label: "lkcamp rerun",
-      session: "lkcamp-12",
-      child_sessions: ["lkcdx-may20", "lkcdx-extra"],
-      // Same project tree as first (deeper sub-path) — required by the cross-project
-      // upsert guard (JROM 2026-05-24).
-      run_dir: "/tmp/lkcamp/rerun",
+      run_dir: runDir,
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
-
     expect(second.statusCode).toBe(201);
     const secondBody = second.json();
     expect(secondBody.workflow.id).toBe(firstBody.workflow.id);
-    expect(secondBody.workflow.label).toBe("lkcamp rerun");
+    expect(secondBody.workflow.label).toBe("lkcamp · lkcamp");
     expect(secondBody.workflow.status).toBe("active");
-    expect(secondBody.workflow.child_sessions).toEqual(["lkcdx-may20", "lkcdx-extra"]);
+    const secondChildren = await lifecyclePost("/api/overmind/children", {
+      token: OVERMIND_TOKEN,
+      workflow_id: firstBody.workflow.id,
+      child_sessions: ["lkcdx-may20", "lkcdx-extra"],
+      child_roles: ["implementer", "reviewer"]
+    });
+    expect(secondChildren.statusCode).toBe(200);
+    expect(secondChildren.json().workflow.child_sessions).toEqual(["lkcdx-may20", "lkcdx-extra"]);
     expect(overmindService.list()).toHaveLength(1);
   });
 
@@ -1003,7 +1059,7 @@ describe("Overmind routes", () => {
     expect(rejected.json().hint).toContain("use the correct run_dir or ask JROM to create the project");
   });
 
-  it("rejects derived fields on run_dir-only register without blocking legacy register", async () => {
+  it("rejects derived fields on run_dir-only register", async () => {
     const appPath = tempProjectPath();
     const runDir = path.join(appPath, "run-forbidden");
     fs.mkdirSync(runDir, { recursive: true });
@@ -1029,316 +1085,56 @@ describe("Overmind routes", () => {
       field: "label"
     });
 
-    const legacy = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "legacy still works",
-      session: "legacy-b12f",
-      run_dir: "/tmp/legacy-b12f",
-      tasks: [{ id: "B12f", label: "Legacy", state: "processing" }]
-    });
-    expect(legacy.statusCode).toBe(201);
-    expect(legacy.json().workflow.coordinator_session).toBe("legacy-b12f");
   });
 
-  it("rejects /register with 400 when a NEW parent session omits tasks or sends an empty tasks array (JROM 2026-05-24)", async () => {
-    const noTasks = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "ProjectX",
-      session: "px-new",
-      run_dir: "/tmp/projectx-no-tasks"
-      // intentionally NO tasks — this test asserts the 400
+  it("preserves existing tasks when attach re-register omits or sends an empty tasks array", async () => {
+    const runDir = "/tmp/projectz-checkin";
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "projectz",
+      app_path: runDir,
+      parent_session: "pz-checkin",
+      notes: null
     });
-    expect(noTasks.statusCode).toBe(400);
-    expect(noTasks.json().error).toContain("non-empty `tasks` array");
-
-    const emptyTasks = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "ProjectY",
-      session: "py-new",
-      run_dir: "/tmp/projecty-empty-tasks",
-      tasks: []
-    });
-    expect(emptyTasks.statusCode).toBe(400);
-
-    // Same-session re-register without tasks is allowed — it's a check-in, not a start.
     const initial = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
-      label: "ProjectZ",
-      session: "pz-checkin",
-      run_dir: "/tmp/projectz-checkin",
+      run_dir: runDir,
       tasks: [{ id: "T1", label: "Initial", state: "processing" }]
     });
     expect(initial.statusCode).toBe(201);
-    const reregister = await lifecyclePost("/api/overmind/register", {
+    const omittedTasks = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
-      label: "ProjectZ updated",
-      session: "pz-checkin",
-      run_dir: "/tmp/projectz-checkin",
-      child_sessions: ["child-new"]
-      // intentionally NO tasks — testing that existing tasks are preserved on upsert
+      run_dir: runDir
     });
-    expect(reregister.statusCode).toBe(201);
-    // Existing tasks preserved (destructive-overwrite safeguard).
-    expect(reregister.json().workflow.tasks).toEqual([
+    expect(omittedTasks.statusCode).toBe(201);
+    expect(omittedTasks.json().workflow.tasks).toEqual([
       { id: "T1", label: "Initial", state: "processing" }
     ]);
-  });
 
-  it("rejects /register with 409 when a re-register against an existing coord session points at a different project tree (cross-project upsert guard — JROM 2026-05-24)", async () => {
-    // First register: AGJ-51 tracking AGJassist work
-    const first = await lifecyclePost("/api/overmind/register", {
+    const emptyTasks = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
-      label: "AGJAssist chat decom",
-      session: "AGJ-51",
-      run_dir: "/home/agjrom/TGBOTS/AGJAssist/plan/WK_0519/chat-notes",
-      tasks: [{ id: "T1", label: "B1", state: "processing" }]
+      run_dir: runDir,
+      tasks: []
     });
-    expect(first.statusCode).toBe(201);
-
-    // Same session, completely different project tree → must reject
-    const crossProject = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "receiptbot",
-      session: "AGJ-51",
-      run_dir: "/home/agjrom/TGBOTS/RS/plan/WK_0518/vat-decontam",
-      tasks: [{ id: "R1", label: "math validation rewrite", state: "processing" }]
-    });
-    expect(crossProject.statusCode).toBe(409);
-    const body = crossProject.json();
-    expect(body.existing_session_tracks.coordinator_session).toBe("AGJ-51");
-    expect(body.existing_session_tracks.label).toBe("AGJAssist chat decom");
-    expect(body.error).toContain("DIFFERENT project tree");
-
-    // The existing row was NOT clobbered.
-    const row = overmindService.get(first.json().workflow.id);
-    expect(row?.label).toBe("AGJAssist chat decom");
-    expect(row?.run_dir).toBe("/home/agjrom/TGBOTS/AGJAssist/plan/WK_0519/chat-notes");
-
-    // Same session, deeper sub-path within the SAME project tree → still allowed (upsert).
-    const sameProject = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "AGJAssist chat decom (deeper)",
-      session: "AGJ-51",
-      run_dir: "/home/agjrom/TGBOTS/AGJAssist/plan/WK_0519/chat-notes/projcore-run-2026-05-22",
-      tasks: [{ id: "T1", label: "B1", state: "done" }, { id: "T2", label: "B2", state: "processing" }]
-    });
-    expect(sameProject.statusCode).toBe(201);
-  });
-
-  it("rejects /register with 409 + use_existing when a different coordinator_session matches the same project tree", async () => {
-    const first = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "HRIS · trapprove",
-      session: "hris-d-22",
-      run_dir: "/home/agjrom/websites/HRIS",
-      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-    });
-    expect(first.statusCode).toBe(201);
-
-    const dup = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "HRIS · trapprove",
-      session: "hris-claude-main",
-      run_dir: "/home/agjrom/websites/HRIS/anything-new",
-      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-    });
-    expect(dup.statusCode).toBe(409);
-    const body = dup.json();
-    expect(body.use_existing.coordinator_session).toBe("hris-d-22");
-    expect(body.use_existing.id).toBe(first.json().workflow.id);
-    expect(body.error).toContain("one workflow per project tree");
-
-    // Only one workflow row exists — the duplicate did not persist.
+    expect(emptyTasks.statusCode).toBe(201);
+    expect(emptyTasks.json().workflow.tasks).toEqual([
+      { id: "T1", label: "Initial", state: "processing" }
+    ]);
     expect(overmindService.list()).toHaveLength(1);
-  });
-
-  it("allows registration when no project-tree match exists", async () => {
-    const first = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "AGJAssist",
-      session: "agjassist-parent",
-      run_dir: "/tmp/project-alpha",
-      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-    });
-    expect(first.statusCode).toBe(201);
-
-    const second = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "Different project",
-      session: "other-parent",
-      run_dir: "/tmp/project-beta",
-      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-    });
-    expect(second.statusCode).toBe(201);
-    expect(overmindService.list()).toHaveLength(2);
-  });
-
-  it("rejects /register with 409 even when the matching workflow is completed", async () => {
-    const first = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "HRIS completed",
-      session: "hris-completed-parent",
-      run_dir: "/tmp/hris-completed-root",
-      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-    });
-    expect(first.statusCode).toBe(201);
-
-    const markCompleted = await lifecyclePost("/api/overmind/complete", {
-      token: OVERMIND_TOKEN,
-      session: "hris-completed-parent"
-    });
-    expect(markCompleted.statusCode).toBe(200);
-    expect(markCompleted.json().workflow.status).toBe("completed");
-
-    const dup = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "HRIS completed retry",
-      session: "hris-other-parent",
-      run_dir: "/tmp/hris-completed-root/new-slice",
-      tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-    });
-    expect(dup.statusCode).toBe(409);
-    expect(dup.json().use_existing.coordinator_session).toBe("hris-completed-parent");
-    expect(overmindService.list()).toHaveLength(1);
-  });
-
-  describe("register corrective advice tmux send", () => {
-    function makeRegisterTmuxMock(aliveIncoming: boolean): TmuxService {
-      return {
-        sessionExists: vi.fn(async (target: string) => {
-          // owner-parent is always alive (the OWNING workflow's session — must pass
-          // the new /register session-existence validation, JROM 2026-05-24).
-          if (target === "owner-parent") return true;
-          if (target === "bad-parent") return aliveIncoming;
-          return false;
-        }),
-        sendAndSubmit: vi.fn(async () => true),
-        sendCommand: vi.fn(async () => ({ message: "sent", blocked: false })),
-        capturePane: vi.fn(async () => "")
-      } as unknown as TmuxService;
-    }
-
-    async function buildAppWithRegisterTmux(tmuxMock: TmuxService, nudgeState: NudgeStateService): Promise<FastifyInstance> {
-      const a = Fastify({ logger: false });
-      registerOvermindRoutes(
-        a,
-        testConfig(),
-        authService,
-        overmindService,
-        undefined,
-        undefined,
-        ovmSession,
-        tmuxMock,
-        nudgeState
-      );
-      await a.ready();
-      return a;
-    }
-
-    it("sends corrective advice via sendAndSubmit when the incoming coordinator_session is alive", async () => {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-register-advice-live-"));
-      const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
-      fs.mkdirSync(path.join(tmpDir, "data"), { recursive: true });
-      const nudgeState = new NudgeStateService();
-      await nudgeState.load();
-
-      const tmux = makeRegisterTmuxMock(true);
-      const a = await buildAppWithRegisterTmux(tmux, nudgeState);
-      try {
-        await a.inject({
-          method: "POST",
-          url: "/api/overmind/register",
-          remoteAddress: "127.0.0.1",
-          payload: {
-            token: OVERMIND_TOKEN,
-            label: "owner",
-            session: "owner-parent",
-            run_dir: "/tmp/register-owner-root",
-tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-}
-        });
-
-        const dup = await a.inject({
-          method: "POST",
-          url: "/api/overmind/register",
-          remoteAddress: "127.0.0.1",
-          payload: {
-            token: OVERMIND_TOKEN,
-            label: "dup",
-            session: "bad-parent",
-            run_dir: "/tmp/register-owner-root/new-phase",
-tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-}
-        });
-
-        expect(dup.statusCode).toBe(409);
-        expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
-        const [target, msg] = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
-        expect(target).toBe("bad-parent");
-        expect(msg).toContain("Please use that session name");
-      } finally {
-        await a.close();
-        cwdSpy.mockRestore();
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-      }
-    });
-
-    it("400-rejects (BEFORE the project-tree check) when the incoming coordinator_session is not alive — no corrective tmux send (JROM 2026-05-24 validation)", async () => {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agj-register-advice-dead-"));
-      const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmpDir);
-      fs.mkdirSync(path.join(tmpDir, "data"), { recursive: true });
-      const nudgeState = new NudgeStateService();
-      await nudgeState.load();
-
-      const tmux = makeRegisterTmuxMock(false);
-      const a = await buildAppWithRegisterTmux(tmux, nudgeState);
-      try {
-        await a.inject({
-          method: "POST",
-          url: "/api/overmind/register",
-          remoteAddress: "127.0.0.1",
-          payload: {
-            token: OVERMIND_TOKEN,
-            label: "owner",
-            session: "owner-parent",
-            run_dir: "/tmp/register-owner-root-2",
-tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-}
-        });
-
-        const dup = await a.inject({
-          method: "POST",
-          url: "/api/overmind/register",
-          remoteAddress: "127.0.0.1",
-          payload: {
-            token: OVERMIND_TOKEN,
-            label: "dup",
-            session: "bad-parent",
-            run_dir: "/tmp/register-owner-root-2/new-phase",
-tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-}
-        });
-
-        // A dead incoming coordinator_session is now rejected at the
-        // session-existence guard with 400 — short-circuits before the
-        // project-tree match even runs, so no corrective tmux send is attempted.
-        expect(dup.statusCode).toBe(400);
-        expect(dup.json().error).toContain("not an alive tmux session");
-        expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
-      } finally {
-        await a.close();
-        cwdSpy.mockRestore();
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-      }
-    });
   });
 
   it("rejects garbage task rows on /register and /tasks with corrective hints", async () => {
+    const rowIdRunDir = "/tmp/overmind/trash-paste-route";
+    fs.mkdirSync(rowIdRunDir, { recursive: true });
+    overmindService.createProject({
+      slug: "trash-paste",
+      app_path: rowIdRunDir,
+      parent_session: "tp-route",
+      notes: null
+    });
     const rowIdRegister = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
-      label: "trash-paste",
-      session: "tp-route",
-      run_dir: "/tmp/overmind/trash-paste-route",
+      run_dir: rowIdRunDir,
       current_task: "| # | Batch | Owner | Status | Notes |",
       tasks: [
         { id: "B0", label: "Design memo rev", state: "pending" },
@@ -1357,11 +1153,17 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       value: "row-1"
     }));
 
+    const trashLabelRunDir = "/tmp/overmind/trash-label-route";
+    fs.mkdirSync(trashLabelRunDir, { recursive: true });
+    overmindService.createProject({
+      slug: "trash-label",
+      app_path: trashLabelRunDir,
+      parent_session: "trash-label-route",
+      notes: null
+    });
     const trashLabelRegister = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
-      label: "trash-label",
-      session: "trash-label-route",
-      run_dir: "/tmp/overmind/trash-label-route",
+      run_dir: trashLabelRunDir,
       tasks: [
         { id: "B1", label: "|---|---|---|", state: "pending" }
       ]
@@ -1372,11 +1174,9 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       field: "label"
     }));
 
-    const reg = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "valid-task-route",
-      session: "valid-task-route",
-      run_dir: "/tmp/overmind/valid-task-route",
+    const reg = await seedAttachedWorkflow({
+      parentSession: "valid-task-route",
+      runDir: "/tmp/overmind/valid-task-route",
       tasks: [
         { id: "B0", label: "Design memo rev", state: "pending" }
       ]
@@ -1448,13 +1248,11 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
   });
 
-  it("addresses lifecycle updates by workflow_id and run_dir without session, while preserving legacy session fallback", async () => {
-    const reg = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "identity-route",
-      session: "identity-session",
-      run_dir: "/tmp/overmind/identity-route",
-      current_task: "Start",
+  it("addresses lifecycle updates by workflow_id and run_dir without session, while preserving session fallback", async () => {
+    const reg = await seedAttachedWorkflow({
+      parentSession: "identity-session",
+      runDir: "/tmp/overmind/identity-route",
+      currentTask: "Start",
       tasks: [{ id: "B12c", label: "Identity", state: "processing" }]
     });
     expect(reg.statusCode).toBe(201);
@@ -1533,8 +1331,6 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
 
   it("rejects lifecycle requests with missing or invalid token and non-loopback source", async () => {
     const missingToken = await lifecyclePost("/api/overmind/register", {
-      label: "bad",
-      session: "bad-1",
       run_dir: "/tmp/bad",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
@@ -1542,8 +1338,6 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
 
     const badToken = await lifecyclePost("/api/overmind/register", {
       token: "wrong",
-      label: "bad",
-      session: "bad-1",
       run_dir: "/tmp/bad",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
@@ -1555,21 +1349,17 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       remoteAddress: "10.0.0.10",
       payload: {
         token: OVERMIND_TOKEN,
-        label: "bad",
-        session: "bad-1",
         run_dir: "/tmp/bad",
-tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-}
+        tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
+      }
     });
     expect(nonLoopback.statusCode).toBe(403);
   });
 
   it("completes workflows and updates tasklists by session", async () => {
-    await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "hris",
-      session: "hris-d-22",
-      run_dir: "/tmp/hris",
+    await seedAttachedWorkflow({
+      parentSession: "hris-d-22",
+      runDir: "/tmp/hris",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
@@ -1606,11 +1396,9 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
   });
 
   it("pauses, resumes, and drops workflows from localhost with the shared token", async () => {
-    const registered = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "operator controls",
-      session: "ovm-controls-parent",
-      run_dir: "/tmp/ovm-controls",
+    const registered = await seedAttachedWorkflow({
+      parentSession: "ovm-controls-parent",
+      runDir: "/tmp/ovm-controls",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id;
@@ -1659,17 +1447,10 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     await appWithNudge.ready();
 
     try {
-      const registered = await appWithNudge.inject({
-        method: "POST",
-        url: "/api/overmind/register",
-        remoteAddress: "127.0.0.1",
-        payload: {
-          token: OVERMIND_TOKEN,
-          label: "nudge-delete",
-          session: "nudge-delete-parent",
-          run_dir: "/tmp/nudge-delete",
-          tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-        }
+      const registered = await seedAttachedWorkflow({
+        parentSession: "nudge-delete-parent",
+        runDir: "/tmp/nudge-delete",
+        tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       });
       expect(registered.statusCode).toBe(201);
       const workflowId = registered.json().workflow.id as number;
@@ -1697,11 +1478,9 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
   });
 
   it("DELETE /api/overmind/workflows/:id accepts JWT-owner auth (no overmind token) for the dashboard delete button (JROM 2026-05-24)", async () => {
-    const registered = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "owner-delete",
-      session: "owner-delete-parent",
-      run_dir: "/tmp/owner-delete",
+    const registered = await seedAttachedWorkflow({
+      parentSession: "owner-delete-parent",
+      runDir: "/tmp/owner-delete",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id as number;
@@ -1719,11 +1498,9 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
   });
 
   it("DELETE /api/overmind/workflows/:id rejects when neither JWT-owner nor token is provided", async () => {
-    const registered = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "unauth-delete",
-      session: "unauth-delete-parent",
-      run_dir: "/tmp/unauth-delete",
+    const registered = await seedAttachedWorkflow({
+      parentSession: "unauth-delete-parent",
+      runDir: "/tmp/unauth-delete",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id as number;
@@ -1740,11 +1517,9 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
 
   it("DELETE /api/overmind/history/:id removes a single task-history entry, JWT-owner only", async () => {
     // Register + push a task update so a history row exists
-    await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "history-del",
-      session: "history-del-parent",
-      run_dir: "/tmp/history-del",
+    await seedAttachedWorkflow({
+      parentSession: "history-del-parent",
+      runDir: "/tmp/history-del",
       tasks: [
         { id: "T1", label: "A", state: "processing" },
         { id: "T2", label: "B", state: "pending" }
@@ -1791,11 +1566,9 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
   });
 
   it("rejects operator control requests with missing or invalid token", async () => {
-    const registered = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "guarded controls",
-      session: "guarded-controls-parent",
-      run_dir: "/tmp/guarded-controls",
+    const registered = await seedAttachedWorkflow({
+      parentSession: "guarded-controls-parent",
+      runDir: "/tmp/guarded-controls",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id;
@@ -1832,11 +1605,9 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
   });
 
   it("requires JWT auth for workflow reads and returns registered rows", async () => {
-    await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "lkvc",
-      session: "lkvc-38",
-      run_dir: "/tmp/lkvc",
+    await seedAttachedWorkflow({
+      parentSession: "lkvc-38",
+      runDir: "/tmp/lkvc",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
 
@@ -1864,12 +1635,10 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
   });
 
   it("requires JWT auth for task history and keeps rows after workflow deletion", async () => {
-    const registered = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "archive label",
-      session: "archive-parent",
-      run_dir: "/tmp/archive",
-      current_task: "Seed",
+    const registered = await seedAttachedWorkflow({
+      parentSession: "archive-parent",
+      runDir: "/tmp/archive",
+      currentTask: "Seed",
       tasks: [{ id: "A1", label: "First", state: "processing" }]
     });
     const workflowId = registered.json().workflow.id;
@@ -1932,11 +1701,9 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
   });
 
   it("requires JWT auth to rename workflows and sets or clears display_name", async () => {
-    const registered = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "agjassist",
-      session: "agjassist-51",
-      run_dir: "/tmp/agjassist",
+    const registered = await seedAttachedWorkflow({
+      parentSession: "agjassist-51",
+      runDir: "/tmp/agjassist",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id;
@@ -1987,24 +1754,28 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
   });
 
   it("POST /api/overmind/register with display_name in body does NOT change an existing display_name", async () => {
-    // Register and set a custom display_name
+    const runDir = "/tmp/spoof-test";
+    fs.mkdirSync(runDir, { recursive: true });
+    overmindService.createProject({
+      slug: "spoof-test",
+      app_path: runDir,
+      parent_session: "spoof-session",
+      notes: null
+    });
+
+    // Attach and set a custom display_name
     const first = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
-      label: "spoof-test",
-      session: "spoof-session",
-      run_dir: "/tmp/spoof-test",
+      run_dir: runDir,
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = first.json().workflow.id;
     overmindService.setDisplayName(workflowId, "JROM Custom Title");
 
-    // Re-register with a spoofed display_name field in the body
+    // Re-attach with a spoofed display_name field in the body.
     const second = await lifecyclePost("/api/overmind/register", {
       token: OVERMIND_TOKEN,
-      label: "spoof-test-v2",
-      session: "spoof-session",
-      // Same project tree as first (cross-project upsert guard, JROM 2026-05-24).
-      run_dir: "/tmp/spoof-test/v2",
+      run_dir: runDir,
       display_name: "spoofed",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
@@ -2017,11 +1788,9 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
   });
 
   it("POST /api/overmind/workflows/:id/ask-update-cooldown sets and clears the override, JWT-authed", async () => {
-    const registered = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "ask-update-override",
-      session: "ask-update-override-parent",
-      run_dir: "/tmp/ask-update-override",
+    const registered = await seedAttachedWorkflow({
+      parentSession: "ask-update-override-parent",
+      runDir: "/tmp/ask-update-override",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id;
@@ -2055,11 +1824,9 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
   });
 
   it("POST /api/overmind/workflows/:id/ask-update-cooldown validation rejects 7, -5, 245, 4.5", async () => {
-    const registered = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "ask-update-validation",
-      session: "ask-update-validation-parent",
-      run_dir: "/tmp/ask-update-validation",
+    const registered = await seedAttachedWorkflow({
+      parentSession: "ask-update-validation-parent",
+      runDir: "/tmp/ask-update-validation",
       tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
     });
     const workflowId = registered.json().workflow.id;
@@ -2096,22 +1863,40 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       return a;
     }
 
+    function seedWorkflowForComplete(input: {
+      parentSession: string;
+      runDir: string;
+      tasks: OvermindTask[];
+      childSessions?: string[];
+    }) {
+      fs.mkdirSync(input.runDir, { recursive: true });
+      const project = overmindService.createProject({
+        slug: `complete-${input.parentSession}`,
+        app_path: input.runDir,
+        parent_session: input.parentSession,
+        notes: null
+      });
+      const workflow = overmindService.registerAttached({
+        project_id: project.id,
+        label: `complete ${input.parentSession}`,
+        run_dir: input.runDir,
+        coordinator_session: input.parentSession,
+        tasks: input.tasks
+      });
+      if (input.childSessions) {
+        overmindService.update(workflow.id, { child_sessions: input.childSessions });
+      }
+    }
+
     it("sends one sendCommand to coordinator_session containing child name + kill-session when ≥1 child is alive", async () => {
       const tmux = makeTmuxMock(new Set(["child-alive-1"]), ["parent-coord"]);
       const a = await buildAppWithTmux(tmux);
       try {
-        await a.inject({
-          method: "POST",
-          url: "/api/overmind/register",
-          remoteAddress: "127.0.0.1",
-          payload: {
-            token: OVERMIND_TOKEN,
-            label: "close-reminder-test",
-            session: "parent-coord",
-            child_sessions: ["child-alive-1"],
-            run_dir: "/tmp/close-test",
-tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-}
+        seedWorkflowForComplete({
+          parentSession: "parent-coord",
+          childSessions: ["child-alive-1"],
+          runDir: "/tmp/close-test",
+          tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
         });
 
         const complete = await a.inject({
@@ -2137,17 +1922,10 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       const tmux = makeTmuxMock(new Set(), ["parent-no-children"]);
       const a = await buildAppWithTmux(tmux);
       try {
-        await a.inject({
-          method: "POST",
-          url: "/api/overmind/register",
-          remoteAddress: "127.0.0.1",
-          payload: {
-            token: OVERMIND_TOKEN,
-            label: "no-children-test",
-            session: "parent-no-children",
-            run_dir: "/tmp/no-children",
-            tasks: [{ id: "t1", label: "Task 1", state: "done" }]
-          }
+        seedWorkflowForComplete({
+          parentSession: "parent-no-children",
+          runDir: "/tmp/no-children",
+          tasks: [{ id: "t1", label: "Task 1", state: "done" }]
         });
 
         const complete = await a.inject({
@@ -2169,18 +1947,11 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       const tmux = makeTmuxMock(new Set(), ["parent-dead-children"]); // nothing alive
       const a = await buildAppWithTmux(tmux);
       try {
-        await a.inject({
-          method: "POST",
-          url: "/api/overmind/register",
-          remoteAddress: "127.0.0.1",
-          payload: {
-            token: OVERMIND_TOKEN,
-            label: "dead-children-test",
-            session: "parent-dead-children",
-            child_sessions: ["child-dead-1", "child-dead-2"],
-            run_dir: "/tmp/dead-children",
-            tasks: [{ id: "t1", label: "Task 1", state: "done" }]
-          }
+        seedWorkflowForComplete({
+          parentSession: "parent-dead-children",
+          childSessions: ["child-dead-1", "child-dead-2"],
+          runDir: "/tmp/dead-children",
+          tasks: [{ id: "t1", label: "Task 1", state: "done" }]
         });
 
         const complete = await a.inject({
@@ -2200,18 +1971,11 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
 
     it("does NOT call sendCommand when no tmuxService is provided (existing behaviour unchanged)", async () => {
       // default app (no tmuxService) — uses the shared `app` from beforeEach
-      await app.inject({
-        method: "POST",
-        url: "/api/overmind/register",
-        remoteAddress: "127.0.0.1",
-        payload: {
-          token: OVERMIND_TOKEN,
-          label: "no-tmux-test",
-          session: "parent-no-tmux",
-          child_sessions: ["child-1"],
-          run_dir: "/tmp/no-tmux",
-tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
-}
+      seedWorkflowForComplete({
+        parentSession: "parent-no-tmux",
+        childSessions: ["child-1"],
+        runDir: "/tmp/no-tmux",
+        tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       });
 
       const complete = await app.inject({
@@ -2230,22 +1994,15 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       const tmux = makeTmuxMock(new Set(["child-alive-x"]), ["hris-partial-coord"]);
       const a = await buildAppWithTmux(tmux);
       try {
-        await a.inject({
-          method: "POST",
-          url: "/api/overmind/register",
-          remoteAddress: "127.0.0.1",
-          payload: {
-            token: OVERMIND_TOKEN,
-            label: "hris-partial",
-            session: "hris-partial-coord",
-            child_sessions: ["child-alive-x"],
-            run_dir: "/tmp/hris-partial",
-            tasks: [
-              { id: "T1", label: "Done task", state: "done" },
-              { id: "T2", label: "Still processing", state: "processing" },
-              { id: "T3", label: "Still pending", state: "pending" }
-            ]
-          }
+        seedWorkflowForComplete({
+          parentSession: "hris-partial-coord",
+          childSessions: ["child-alive-x"],
+          runDir: "/tmp/hris-partial",
+          tasks: [
+            { id: "T1", label: "Done task", state: "done" },
+            { id: "T2", label: "Still processing", state: "processing" },
+            { id: "T3", label: "Still pending", state: "pending" }
+          ]
         });
 
         const complete = await a.inject({
@@ -2278,21 +2035,14 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       const tmux = makeTmuxMock(new Set(), ["hris-ncp-coord"]); // no alive children
       const a = await buildAppWithTmux(tmux);
       try {
-        await a.inject({
-          method: "POST",
-          url: "/api/overmind/register",
-          remoteAddress: "127.0.0.1",
-          payload: {
-            token: OVERMIND_TOKEN,
-            label: "hris-no-children-partial",
-            session: "hris-ncp-coord",
-            child_sessions: ["child-dead-x"],
-            run_dir: "/tmp/hris-ncp",
-            tasks: [
-              { id: "X1", label: "Done", state: "done" },
-              { id: "X2", label: "Not done", state: "processing" }
-            ]
-          }
+        seedWorkflowForComplete({
+          parentSession: "hris-ncp-coord",
+          childSessions: ["child-dead-x"],
+          runDir: "/tmp/hris-ncp",
+          tasks: [
+            { id: "X1", label: "Done", state: "done" },
+            { id: "X2", label: "Not done", state: "processing" }
+          ]
         });
 
         const complete = await a.inject({
@@ -2324,21 +2074,14 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       const tmux = makeTmuxMock(new Set(["child-alive-y"]), ["hris-ad-coord"]);
       const a = await buildAppWithTmux(tmux);
       try {
-        await a.inject({
-          method: "POST",
-          url: "/api/overmind/register",
-          remoteAddress: "127.0.0.1",
-          payload: {
-            token: OVERMIND_TOKEN,
-            label: "hris-all-done",
-            session: "hris-ad-coord",
-            child_sessions: ["child-alive-y"],
-            run_dir: "/tmp/hris-ad",
-            tasks: [
-              { id: "Y1", label: "Done 1", state: "done" },
-              { id: "Y2", label: "Done 2", state: "done" }
-            ]
-          }
+        seedWorkflowForComplete({
+          parentSession: "hris-ad-coord",
+          childSessions: ["child-alive-y"],
+          runDir: "/tmp/hris-ad",
+          tasks: [
+            { id: "Y1", label: "Done 1", state: "done" },
+            { id: "Y2", label: "Done 2", state: "done" }
+          ]
         });
 
         const complete = await a.inject({
@@ -2369,20 +2112,13 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       const tmux = makeTmuxMock(new Set(), ["hris-adnc-coord"]); // all dead
       const a = await buildAppWithTmux(tmux);
       try {
-        await a.inject({
-          method: "POST",
-          url: "/api/overmind/register",
-          remoteAddress: "127.0.0.1",
-          payload: {
-            token: OVERMIND_TOKEN,
-            label: "hris-all-done-no-children",
-            session: "hris-adnc-coord",
-            child_sessions: ["child-dead-z"],
-            run_dir: "/tmp/hris-adnc",
-            tasks: [
-              { id: "Z1", label: "Done", state: "done" }
-            ]
-          }
+        seedWorkflowForComplete({
+          parentSession: "hris-adnc-coord",
+          childSessions: ["child-dead-z"],
+          runDir: "/tmp/hris-adnc",
+          tasks: [
+            { id: "Z1", label: "Done", state: "done" }
+          ]
         });
 
         const complete = await a.inject({
@@ -2454,20 +2190,16 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
 
   it("GET /api/overmind/runs requires JWT, returns ALL workflows (active + terminal) with correct shape (JROM 2026-05-24)", async () => {
     // register active + completed + failed workflows
-    const activeReg = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "runs-active",
-      session: "runs-active-parent",
-      run_dir: "/tmp/runs-active",
+    const activeReg = await seedAttachedWorkflow({
+      parentSession: "runs-active-parent",
+      runDir: "/tmp/runs-active",
       tasks: [{ id: "T1", label: "Task 1", state: "processing" }]
     });
     expect(activeReg.statusCode).toBe(201);
 
-    const compReg = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "runs-completed",
-      session: "runs-comp-parent",
-      run_dir: "/tmp/runs-completed",
+    const compReg = await seedAttachedWorkflow({
+      parentSession: "runs-comp-parent",
+      runDir: "/tmp/runs-completed",
       tasks: [
         { id: "A1", label: "Task A", state: "done" },
         { id: "A2", label: "Task B", state: "done" }
@@ -2479,11 +2211,9 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
       session: "runs-comp-parent"
     });
 
-    const failedReg = await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "runs-failed",
-      session: "runs-failed-parent",
-      run_dir: "/tmp/runs-failed",
+    const failedReg = await seedAttachedWorkflow({
+      parentSession: "runs-failed-parent",
+      runDir: "/tmp/runs-failed",
       tasks: [{ id: "F1", label: "Task F", state: "pending" }]
     });
     expect(failedReg.statusCode).toBe(201);
@@ -2535,20 +2265,16 @@ tasks: [{ id: "t1", label: "Task 1", state: "pending" }]
 
   it("GET /api/overmind/history?session=X filters to that session only", async () => {
     // set up two workflows with task transitions
-    await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "hist-filter-1",
-      session: "hist-filter-s1",
-      run_dir: "/tmp/hist-filter-1",
-      current_task: "T1",
+    await seedAttachedWorkflow({
+      parentSession: "hist-filter-s1",
+      runDir: "/tmp/hist-filter-1",
+      currentTask: "T1",
       tasks: [{ id: "A1", label: "A1", state: "processing" }]
     });
-    await lifecyclePost("/api/overmind/register", {
-      token: OVERMIND_TOKEN,
-      label: "hist-filter-2",
-      session: "hist-filter-s2",
-      run_dir: "/tmp/hist-filter-2",
-      current_task: "T2",
+    await seedAttachedWorkflow({
+      parentSession: "hist-filter-s2",
+      runDir: "/tmp/hist-filter-2",
+      currentTask: "T2",
       tasks: [{ id: "B1", label: "B1", state: "processing" }]
     });
 
