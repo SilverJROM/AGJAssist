@@ -23,6 +23,25 @@ interface SparkRunCache {
   last_ambiguous_at?: unknown;
 }
 
+// The daemon ticks ~every 30s. If a run's last_tick is older than this, the daemon
+// isn't actively classifying it (stopped / disabled / dropped), so its last
+// classification is FROZEN and must NOT drive the dashboard (e.g. a stale CRASHED
+// haunting a live run). 120s = 4x the tick interval.
+const STALE_TICK_MS = 120_000;
+// When spark data is stale, reflect the run's own liveness: an active run is healthy.
+const ACTIVE_HEALTHY_STATUSES = new Set<string>(["active", "working"]);
+
+function tickAgeMs(value: unknown, nowMs: number): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const ms = value > 1e12 ? value : value * 1000; // epoch ms vs seconds
+    return Math.max(0, nowMs - ms);
+  }
+  const ts = stringOrNull(value);
+  if (!ts) return null;
+  const parsed = Date.parse(ts);
+  return Number.isFinite(parsed) ? Math.max(0, nowMs - parsed) : null;
+}
+
 interface SparkStateCache {
   runs?: Record<string, SparkRunCache>;
 }
@@ -67,8 +86,18 @@ function readStateCache(): SparkStateCache {
   return {};
 }
 
-function healthForRun(run: SparkRunCache | undefined, nowMs: number): SparkHealth {
-  if (!run || typeof run !== "object") return defaultHealth();
+function healthForRun(run: SparkRunCache | undefined, nowMs: number, status?: string): SparkHealth {
+  const age = run && typeof run === "object" ? tickAgeMs(run.last_tick, nowMs) : null;
+  const stale = age === null || age > STALE_TICK_MS;
+  if (!run || typeof run !== "object" || stale) {
+    // Daemon isn't actively classifying this run (off / disabled / dropped) → never
+    // surface its frozen classification. Reflect the run's own liveness instead:
+    // an active/working run shows HEALTHY (green); anything else, UNKNOWN.
+    if (status && ACTIVE_HEALTHY_STATUSES.has(status)) {
+      return { state: "HEALTHY", last_classification: null, minutes_since_ambiguous: null };
+    }
+    return defaultHealth();
+  }
   return {
     state: normalizeState(run.last_classification),
     last_classification: stringOrNull(run.last_tick),
@@ -76,7 +105,7 @@ function healthForRun(run: SparkRunCache | undefined, nowMs: number): SparkHealt
   };
 }
 
-export function augmentWorkflowSparkHealth<T extends Pick<OvermindWorkflow, "id">>(
+export function augmentWorkflowSparkHealth<T extends Pick<OvermindWorkflow, "id" | "status">>(
   workflows: T[],
   nowMs = Date.now()
 ): Array<T & { spark_health: SparkHealth }> {
@@ -84,6 +113,6 @@ export function augmentWorkflowSparkHealth<T extends Pick<OvermindWorkflow, "id"
   const runs = cache.runs && typeof cache.runs === "object" ? cache.runs : {};
   return workflows.map((workflow) => ({
     ...workflow,
-    spark_health: healthForRun(runs[String(workflow.id)], nowMs)
+    spark_health: healthForRun(runs[String(workflow.id)], nowMs, workflow.status as string | undefined)
   }));
 }

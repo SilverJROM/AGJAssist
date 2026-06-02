@@ -707,14 +707,26 @@ describe("Overmind routes", () => {
       `INSERT INTO overmind_workflows (label, coordinator_session, run_dir, status, tasks)
        VALUES ('spark-unknown', 'AGJ-52', '/tmp/spark-unknown', 'active', '[]')`
     ).run();
+    // A run with a FROZEN CRASHED classification from a daemon that stopped ticking
+    // (the exact 2026-06-02 bug): the stale CRASHED must NOT haunt a live working run.
+    const staleId = db.prepare(
+      `INSERT INTO overmind_workflows (label, coordinator_session, run_dir, status, tasks)
+       VALUES ('spark-stale', 'AGJ-53', '/tmp/spark-stale', 'working', '[]')`
+    ).run().lastInsertRowid as number;
 
     const lastTick = new Date().toISOString();
     const lastAmbiguousAt = new Date(Date.now() - 17 * 60 * 1000).toISOString();
+    const staleTick = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10min ago = daemon stopped
     fs.writeFileSync(cachePath, JSON.stringify({
       runs: {
         [String(activeId)]: {
           last_classification: "ALERT-MEDIUM",
           last_tick: lastTick,
+          last_ambiguous_at: lastAmbiguousAt
+        },
+        [String(staleId)]: {
+          last_classification: "CRASHED",
+          last_tick: staleTick,
           last_ambiguous_at: lastAmbiguousAt
         }
       }
@@ -738,11 +750,15 @@ describe("Overmind routes", () => {
       });
       expect(active.spark_health.minutes_since_ambiguous).toBeGreaterThanOrEqual(17);
       expect(active.spark_health.minutes_since_ambiguous).toBeLessThan(20);
+      // Active run with no fresh spark data → HEALTHY (green), not UNKNOWN/red.
       expect(unknown.spark_health).toEqual({
-        state: "UNKNOWN",
+        state: "HEALTHY",
         last_classification: null,
         minutes_since_ambiguous: null
       });
+      // Stale frozen CRASHED (daemon stopped ticking) must NOT surface on a live run.
+      const stale = workflows.find((workflow: { label: string }) => workflow.label === "spark-stale");
+      expect(stale.spark_health.state).toBe("HEALTHY");
     } finally {
       if (previousCachePath === undefined) {
         delete process.env.SPARK_DAEMON_STATE_CACHE;
