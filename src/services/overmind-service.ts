@@ -774,6 +774,7 @@ export class OvermindService {
     }
 
     const now = this.isoNow();
+    tasks = this.withActualElapsedMinutes(existing.tasks, tasks, existing.task_log, now);
     const doneCount = this.countDoneTasks(tasks);
     const existingDoneCount = this.countDoneTasks(existing.tasks);
     const shouldLog = currentTask !== existing.current_task || doneCount !== existingDoneCount;
@@ -913,6 +914,52 @@ export class OvermindService {
     if (previousTask !== currentTask && previousDone !== done) return "current task and progress changed";
     if (previousTask !== currentTask) return "current task changed";
     return "progress changed";
+  }
+
+  private withActualElapsedMinutes(
+    previousTasks: OvermindTask[],
+    nextTasks: OvermindTask[],
+    taskLog: OvermindTaskLogEntry[],
+    doneAt: string
+  ): OvermindTask[] {
+    const previousById = new Map(previousTasks.map((task) => [task.id, task]));
+    return nextTasks.map((task) => {
+      const previous = previousById.get(task.id);
+      const preservedActual = task.actual_min ?? previous?.actual_min ?? null;
+      if (preservedActual !== null) {
+        return { ...task, actual_min: preservedActual };
+      }
+      if (previous?.state !== "processing" || task.state !== "done") {
+        return { ...task, actual_min: null };
+      }
+
+      const startedAt = this.findProcessingStartedAt(task, taskLog);
+      if (!startedAt) return { ...task, actual_min: null };
+
+      const startMs = Date.parse(startedAt);
+      const doneMs = Date.parse(doneAt);
+      if (!Number.isFinite(startMs) || !Number.isFinite(doneMs) || doneMs < startMs) {
+        return { ...task, actual_min: null };
+      }
+
+      return { ...task, actual_min: Math.max(0, Math.round((doneMs - startMs) / 60000)) };
+    });
+  }
+
+  private findProcessingStartedAt(task: OvermindTask, taskLog: OvermindTaskLogEntry[]): string | null {
+    const matches = taskLog.filter((entry) => this.taskLogEntryMatchesTask(entry, task));
+    if (matches.length !== 1) return null;
+    return matches[0].at;
+  }
+
+  private taskLogEntryMatchesTask(entry: OvermindTaskLogEntry, task: OvermindTask): boolean {
+    const currentTask = (entry.current_task ?? "").trim().toLowerCase();
+    const id = task.id.trim().toLowerCase();
+    const label = task.label.trim().toLowerCase();
+    if (!currentTask) return false;
+    if (currentTask === id || currentTask === label) return true;
+    if (id && currentTask.includes(id)) return true;
+    return label.length >= 8 && currentTask.includes(label);
   }
 
   private computeEndedAt(

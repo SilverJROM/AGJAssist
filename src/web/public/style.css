@@ -1443,6 +1443,22 @@ body {
   flex: 0 0 18px;
   text-align: center;
 }
+.overmind-task-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.overmind-task-duration {
+  color: var(--text-secondary);
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+.overmind-task-duration-over { color: var(--warning); }
+.overmind-task-duration-under { color: var(--success); }
+.overmind-task-duration-even { color: var(--text-secondary); }
 .overmind-history {
   border-top: 1px solid var(--border);
   padding-top: 8px;

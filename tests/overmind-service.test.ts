@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { DatabaseService } from "../src/db/database.js";
 import { OvermindService } from "../src/services/overmind-service.js";
 import type { OvermindTask, OvermindWorkflow } from "../src/services/overmind/types.js";
@@ -29,6 +29,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   db.close();
   cleanup();
 });
@@ -129,6 +130,45 @@ describe("OvermindService", () => {
     ]);
   });
 
+  it("records actual_min from a processing-to-done task_log span", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-02T10:00:00.000Z"));
+
+    const workflow = attachedRun({
+      label: "B11",
+      coordinator_session: "AGJ-51",
+      run_dir: "/tmp/b11-actual",
+      tasks: [
+        { id: "B11", label: "Estimate vs actual", state: "processing", estimate_min: 25 }
+      ]
+    });
+
+    const processing = service.setTasks(workflow.id, "B11 Estimate vs actual", [
+      { id: "B11", label: "Estimate vs actual", state: "processing", estimate_min: 25 }
+    ]);
+    expect(processing?.task_log).toEqual([
+      expect.objectContaining({
+        at: "2026-06-02T10:00:00.000Z",
+        current_task: "B11 Estimate vs actual"
+      })
+    ]);
+
+    vi.setSystemTime(new Date("2026-06-02T10:31:00.000Z"));
+    const done = service.setTasks(workflow.id, "B11 Estimate vs actual", [
+      { id: "B11", label: "Estimate vs actual", state: "done", estimate_min: 25 }
+    ]);
+
+    expect(done?.tasks).toEqual([
+      {
+        id: "B11",
+        label: "Estimate vs actual",
+        state: "done",
+        estimate_min: 25,
+        actual_min: 31
+      }
+    ]);
+  });
+
   it("creates and reads overmind_projects and counts non-terminal active runs", () => {
     const project = service.createProject({
       slug: "agjassist",
@@ -222,7 +262,7 @@ describe("OvermindService", () => {
     expect(created.status).toBe("active");
     expect(created.display_name).toBeNull();
     expect(created.child_sessions).toEqual(["lkcdx-may20"]);
-    expect(created.tasks[0]).toEqual({ id: "A1", label: "Schema", state: "processing", estimate_min: null });
+    expect(created.tasks[0]).toEqual({ id: "A1", label: "Schema", state: "processing", estimate_min: null, actual_min: null });
     expect(created.active_session).toBeNull();
     expect(created.active_role).toBeNull();
     expect(created.ended_at).toBeNull();
@@ -277,8 +317,8 @@ describe("OvermindService", () => {
     ]);
     expect(tasks?.current_task).toBe("A1 verify");
     expect(tasks?.tasks).toEqual([
-      { id: "A1", label: "Schema", state: "done", estimate_min: null },
-      { id: "A2", label: "Endpoints", state: "pending", estimate_min: null }
+      { id: "A1", label: "Schema", state: "done", estimate_min: null, actual_min: null },
+      { id: "A2", label: "Endpoints", state: "pending", estimate_min: null, actual_min: null }
     ]);
     expect(tasks?.task_log).toHaveLength(1);
     expect(tasks?.task_log[0]).toMatchObject({ current_task: "A1 verify", done: 1, total: 2 });
@@ -609,7 +649,7 @@ describe("OvermindService", () => {
     expect(upserted.child_sessions).toEqual(["hrcdx-33", "hrcdx-34"]);
     expect(upserted.run_dir).toBe("/tmp/overmind/hris");
     expect(upserted.current_task).toBe("Restarted");
-    expect(upserted.tasks).toEqual([{ id: "A1", label: "Restart", state: "processing", estimate_min: null }]);
+    expect(upserted.tasks).toEqual([{ id: "A1", label: "Restart", state: "processing", estimate_min: null, actual_min: null }]);
     expect(upserted.pending_decision).toBeNull();
     expect(upserted.active_session).toBeNull();
     expect(upserted.active_role).toBeNull();

@@ -39,12 +39,17 @@ function normalizeEstimateMin(value: unknown): number | null {
   return Number.isInteger(value) && typeof value === "number" && value > 0 ? value : null;
 }
 
+function normalizeActualMin(value: unknown): number | null {
+  return Number.isInteger(value) && typeof value === "number" && value >= 0 ? value : null;
+}
+
 export function sanitizeTaskList(tasks: OvermindTask[] | undefined): OvermindTask[] {
   return (tasks ?? [])
     .filter((t) => !isTrashTaskLabel(t?.label))
     .map((task) => ({
       ...task,
-      estimate_min: normalizeEstimateMin(task?.estimate_min)
+      estimate_min: normalizeEstimateMin(task?.estimate_min),
+      actual_min: normalizeActualMin(task?.actual_min)
     }));
 }
 
@@ -142,7 +147,8 @@ export function validateSubmittedTaskList(tasks: unknown): TaskListValidation {
       id: id.trim(),
       label: label.trim(),
       state,
-      estimate_min: normalizeEstimateMin(t.estimate_min)
+      estimate_min: normalizeEstimateMin(t.estimate_min),
+      actual_min: null
     });
   });
 

@@ -355,6 +355,23 @@ function renderSparkHealthTile(workflow) {
   `;
 }
 
+function taskDurationMeta(task) {
+  const estimate = Number.isInteger(task?.estimate_min) && task.estimate_min > 0 ? task.estimate_min : null;
+  const actual = Number.isInteger(task?.actual_min) && task.actual_min >= 0 ? task.actual_min : null;
+  if (estimate === null && actual === null) return null;
+  const actualText = actual === null ? '—' : actual + 'm';
+  return `${estimate === null ? 'est —' : 'est ' + estimate + 'm'} · actual ${actualText}`;
+}
+
+function taskDurationClass(task) {
+  const estimate = Number.isInteger(task?.estimate_min) && task.estimate_min > 0 ? task.estimate_min : null;
+  const actual = Number.isInteger(task?.actual_min) && task.actual_min >= 0 ? task.actual_min : null;
+  if (estimate === null || actual === null) return 'overmind-task-duration';
+  if (actual > estimate) return 'overmind-task-duration overmind-task-duration-over';
+  if (actual < estimate) return 'overmind-task-duration overmind-task-duration-under';
+  return 'overmind-task-duration overmind-task-duration-even';
+}
+
 // Auth
 function Login() {
   const [error, setError] = useState('');
@@ -1378,7 +1395,8 @@ function OvermindWorkflows() {
                           ${tasks.map(task => html`
                             <div class=${'overmind-task overmind-task-' + task.state} key=${task.id || task.label}>
                               <span class="overmind-task-glyph">${taskGlyph(task.state)}</span>
-                              <span>${task.label}</span>
+                              <span class="overmind-task-label">${task.label}</span>
+                              ${taskDurationMeta(task) && html`<span class=${taskDurationClass(task)}>${taskDurationMeta(task)}</span>`}
                             </div>
                           `)}
                         </div>
