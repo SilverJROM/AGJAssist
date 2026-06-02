@@ -30,6 +30,10 @@ import {
 
 const html = htm.bind(h);
 const OVM_TMUX_TARGET = 'OVM:0.0';
+const TERMINAL_FONT_STORAGE_KEY = 'agj_terminal_font_size';
+const TERMINAL_DEFAULT_FONT_SIZE = 13;
+const TERMINAL_MIN_FONT_SIZE = 8;
+const TERMINAL_MAX_FONT_SIZE = 28;
 
 // Telegram Mini App detection
 const isTgMiniApp = !!(window.Telegram?.WebApp?.initData);
@@ -1911,6 +1915,16 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [newSessionName, setNewSessionName] = useState('');
   const [friendlyMode, setFriendlyMode] = useState(isTgMiniApp);
   const [fullScreen, setFullScreen] = useState(false);
+  const [terminalFontSize, setTerminalFontSize] = useState(() => {
+    try {
+      const stored = Number(localStorage.getItem(TERMINAL_FONT_STORAGE_KEY));
+      return Number.isFinite(stored)
+        ? Math.min(TERMINAL_MAX_FONT_SIZE, Math.max(TERMINAL_MIN_FONT_SIZE, stored))
+        : TERMINAL_DEFAULT_FONT_SIZE;
+    } catch {
+      return TERMINAL_DEFAULT_FONT_SIZE;
+    }
+  });
 
   const previousRoute = (() => {
     try { return sessionStorage.getItem('agj_prev_route') || '/'; } catch { return '/'; }
@@ -1976,6 +1990,12 @@ function TerminalTab({ projectId, projectName } = {}) {
   const activePane = allPanes.find(p => p.target === activeTarget) || null;
   const hasTarget = !!activeTarget;
 
+  function updateTerminalFontSize(nextSize) {
+    const clamped = Math.min(TERMINAL_MAX_FONT_SIZE, Math.max(TERMINAL_MIN_FONT_SIZE, nextSize));
+    setTerminalFontSize(clamped);
+    try { localStorage.setItem(TERMINAL_FONT_STORAGE_KEY, String(clamped)); } catch {}
+  }
+
   const shell = html`
     <div class=${'terminal-shell' + (fullScreen ? ' terminal-shell-fullscreen' : '')}>
       <div class="terminal-shell-header">
@@ -1992,6 +2012,13 @@ function TerminalTab({ projectId, projectName } = {}) {
                   onclick=${() => setFriendlyMode(true)}>Friendly</button>
           <button class=${'btn btn-sm' + (!friendlyMode ? ' btn-primary' : '')}
                   onclick=${() => setFriendlyMode(false)}>Raw</button>
+          ${hasTarget && html`
+            <div class="terminal-font-controls" aria-label="Terminal font size controls">
+              <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(terminalFontSize - 1)} disabled=${terminalFontSize <= TERMINAL_MIN_FONT_SIZE} title="Decrease terminal font size">A-</button>
+              <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(TERMINAL_DEFAULT_FONT_SIZE)} disabled=${terminalFontSize === TERMINAL_DEFAULT_FONT_SIZE} title="Reset terminal font size">Reset</button>
+              <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(terminalFontSize + 1)} disabled=${terminalFontSize >= TERMINAL_MAX_FONT_SIZE} title="Increase terminal font size">A+</button>
+            </div>
+          `}
           ${isTgMiniApp && html`
             <button class="btn btn-sm" onclick=${() => {
               if (fullScreen) {
@@ -2065,7 +2092,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                     } : null}
                     onDisconnect=${() => setActiveTarget(null)}
                   />`
-                : html`<${TerminalView} target=${activeTarget} key=${activeTarget} onDisconnect=${() => setActiveTarget(null)} />`)
+                : html`<${TerminalView} target=${activeTarget} key=${activeTarget} fontSize=${terminalFontSize} onDisconnect=${() => setActiveTarget(null)} />`)
             : html`<div class="terminal-empty-state">
                 <strong>No terminal selected</strong>
                 <div>Select a pane to connect and start using terminal chat.</div>
@@ -2439,7 +2466,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
         <div class="terminal-chat-composer-row">
           <textarea class="terminal-chat-input-field"
                     value=${input}
-                    rows="1"
+                    rows="2"
                     placeholder="Type a terminal command..."
                     onInput=${e => setInput(e.target.value)}
                     onKeyDown=${e => {
@@ -2487,8 +2514,18 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
 }
 
 // Terminal View (xterm.js)
-function TerminalView({ target, onDisconnect }) {
+function TerminalView({ target, fontSize, onDisconnect }) {
   const [status, setStatus] = useState('connecting');
+  const termRef = useRef(null);
+  const fitAddonRef = useRef(null);
+
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    term.options.fontSize = fontSize;
+    fitAddonRef.current?.fit();
+    term.refresh(0, term.rows - 1);
+  }, [fontSize]);
 
   useEffect(() => {
     let ws, term, cleanup;
@@ -2523,7 +2560,7 @@ function TerminalView({ target, onDisconnect }) {
           brightWhite: '#ffffff'
         },
         fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-        fontSize: 13,
+        fontSize,
         lineHeight: 1.1,
         cursorBlink: false,
         scrollback: 5000,
@@ -2531,6 +2568,8 @@ function TerminalView({ target, onDisconnect }) {
       });
 
       const fitAddon = new FitAddon();
+      termRef.current = term;
+      fitAddonRef.current = fitAddon;
       term.loadAddon(fitAddon);
       term.open(container);
       fitAddon.fit();
@@ -2571,6 +2610,8 @@ function TerminalView({ target, onDisconnect }) {
         observer.disconnect();
         ws?.close();
         term?.dispose();
+        if (termRef.current === term) termRef.current = null;
+        if (fitAddonRef.current === fitAddon) fitAddonRef.current = null;
       };
     }
 

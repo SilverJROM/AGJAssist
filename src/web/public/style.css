@@ -156,6 +156,11 @@ body {
   overflow: hidden; position: relative;
 }
 .terminal-panel .xterm { height: 100%; }
+.terminal-font-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .terminal-shell {
   display: flex;
   flex-direction: column;
@@ -229,9 +234,9 @@ body {
 }
 .terminal-chat-input-field {
   flex: 1;
-  min-height: 36px;
+  min-height: 58px;
   max-height: 100px;
-  resize: none;
+  resize: vertical;
   background: #0d1117;
   border: 1px solid rgba(88,166,255,0.22);
   border-radius: 18px;
@@ -1706,7 +1711,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
   .terminal-chat-card { max-width: 100%; }
   .terminal-chat-content { font-size: 11px; line-height: 1.55; }
   .terminal-chat-composer { padding: 8px; }
-  .terminal-chat-input-field { min-height: 34px; font-size: 12px; }
+  .terminal-chat-input-field { min-height: 52px; font-size: 12px; }
   .overmind-tabs { display: flex; flex-wrap: wrap; align-self: stretch; }
   .overmind-tab { flex: 1 1 auto; }
   .ovm-console { min-height: 480px; }
