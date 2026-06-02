@@ -492,17 +492,60 @@ body {
 .overmind-project-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
 }
+.overmind-project-summary-row,
 .overmind-project-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
+.overmind-project-summary-row {
+  cursor: pointer;
+  min-height: 44px;
+}
+.overmind-project-summary-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.overmind-project-summary-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.overmind-project-chevron {
+  width: 14px;
+  flex: 0 0 14px;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  text-align: center;
+}
+.overmind-project-summary-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .overmind-project-card-header h3 {
   font-size: 15px;
   margin: 0;
+}
+.overmind-project-summary-text h3 {
+  font-size: 15px;
+  margin: 0;
+}
+.overmind-project-summary-text code {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .overmind-project-card-actions {
   display: flex;
@@ -510,6 +553,41 @@ body {
   justify-content: flex-end;
   gap: 6px;
   flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+.overmind-project-menu-wrap {
+  position: relative;
+}
+.overmind-project-menu-button {
+  width: 34px;
+  min-width: 34px;
+  padding-left: 0;
+  padding-right: 0;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.overmind-project-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 120;
+  min-width: 132px;
+}
+.overmind-project-menu .context-menu-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.overmind-project-menu .context-menu-item:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.overmind-project-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
 }
 .overmind-project-warning {
   display: flex;

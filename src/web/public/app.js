@@ -1491,6 +1491,8 @@ function OvermindProjects() {
   const [submitting, setSubmitting] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingSlug, setDeletingSlug] = useState('');
+  const [expandedProjectSlugs, setExpandedProjectSlugs] = useState({});
+  const [openProjectMenuSlug, setOpenProjectMenuSlug] = useState('');
 
   const loadProjects = useCallback(async () => {
     setError('');
@@ -1505,6 +1507,13 @@ function OvermindProjects() {
   }, []);
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
+
+  useEffect(() => {
+    if (!openProjectMenuSlug) return;
+    const close = () => setOpenProjectMenuSlug('');
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [openProjectMenuSlug]);
 
   function openCreate() {
     setForm(emptyForm);
@@ -1521,6 +1530,35 @@ function OvermindProjects() {
     });
     setEditError('');
     setActionError('');
+  }
+
+  function toggleProjectExpanded(slug) {
+    setExpandedProjectSlugs(current => {
+      const next = { ...current };
+      if (next[slug]) {
+        delete next[slug];
+      } else {
+        next[slug] = true;
+      }
+      return next;
+    });
+  }
+
+  function toggleProjectMenu(e, slug) {
+    e.stopPropagation();
+    setOpenProjectMenuSlug(current => current === slug ? '' : slug);
+  }
+
+  function handleProjectMenuEdit(e, project) {
+    e.stopPropagation();
+    setOpenProjectMenuSlug('');
+    openEdit(project);
+  }
+
+  function handleProjectMenuDelete(e, project) {
+    e.stopPropagation();
+    setOpenProjectMenuSlug('');
+    deleteProject(project);
   }
 
   function updateForm(field, value) {
@@ -1620,46 +1658,87 @@ function OvermindProjects() {
         <div class="empty-state">No Overmind projects yet.</div>
       ` : html`
         <div class="item-list overmind-project-list">
-          ${projects.map(project => html`
-            <section class="item-card overmind-project-card" key=${project.slug}>
-              <div class="overmind-project-card-header">
-                <h3>${project.slug}</h3>
-                <div class="overmind-project-card-actions">
-                  <span class=${'badge ' + (project.active_runs_count > 0 ? 'badge-active' : 'badge-draft')}>
-                    ${project.active_runs_count || 0} active
-                  </span>
-                  <button class="btn btn-sm" onclick=${() => openEdit(project)}>Edit</button>
-                  <button
-                    class="btn btn-sm btn-danger"
-                    onclick=${() => deleteProject(project)}
-                    disabled=${deletingSlug === project.slug}
-                  >
-                    ${deletingSlug === project.slug ? 'Deleting...' : 'Delete'}
-                  </button>
+          ${projects.map(project => {
+            const isExpanded = !!expandedProjectSlugs[project.slug];
+            const isMenuOpen = openProjectMenuSlug === project.slug;
+            return html`
+              <section class=${'item-card overmind-project-card' + (isExpanded ? ' is-expanded' : '')} key=${project.slug}>
+                <div
+                  class="overmind-project-summary-row"
+                  role="button"
+                  tabindex="0"
+                  aria-expanded=${isExpanded ? 'true' : 'false'}
+                  onclick=${() => toggleProjectExpanded(project.slug)}
+                  onkeydown=${e => {
+                    if (e.target !== e.currentTarget) return;
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleProjectExpanded(project.slug);
+                    }
+                  }}
+                >
+                  <div class="overmind-project-summary-main">
+                    <span class="overmind-project-chevron" aria-hidden="true">${isExpanded ? 'v' : '>'}</span>
+                    <div class="overmind-project-summary-text">
+                      <h3>${project.slug}</h3>
+                      <code>${project.app_path}</code>
+                    </div>
+                  </div>
+                  <div class="overmind-project-card-actions">
+                    <span class=${'badge ' + (project.active_runs_count > 0 ? 'badge-active' : 'badge-draft')}>
+                      ${project.active_runs_count || 0} active
+                    </span>
+                    <div class="overmind-project-menu-wrap">
+                      <button
+                        class="btn btn-sm overmind-project-menu-button"
+                        type="button"
+                        aria-label=${`Project actions for ${project.slug}`}
+                        aria-expanded=${isMenuOpen ? 'true' : 'false'}
+                        onclick=${e => toggleProjectMenu(e, project.slug)}
+                      >...</button>
+                      ${isMenuOpen && html`
+                        <div class="context-menu overmind-project-menu" onclick=${e => e.stopPropagation()}>
+                          <button class="context-menu-item" type="button" onclick=${e => handleProjectMenuEdit(e, project)}>Edit</button>
+                          <button
+                            class="context-menu-item context-menu-danger"
+                            type="button"
+                            onclick=${e => handleProjectMenuDelete(e, project)}
+                            disabled=${deletingSlug === project.slug}
+                          >
+                            ${deletingSlug === project.slug ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
+                      `}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              ${isParentWarning(project) && html`
-                <div class="overmind-project-warning">
-                  <strong>Parent ${project.latest_parent_status}</strong>
-                  <span>${project.parent_session}</span>
-                </div>
-              `}
-              <div class="overmind-project-field">
-                <span>app_path</span>
-                <code>${project.app_path}</code>
-              </div>
-              <div class="overmind-project-grid">
-                <div class="overmind-project-field">
-                  <span>parent_session</span>
-                  <strong>${project.parent_session}</strong>
-                </div>
-                <div class="overmind-project-field">
-                  <span>updated_at</span>
-                  <strong>${project.updated_at ? new Date(project.updated_at).toLocaleString() : '—'}</strong>
-                </div>
-              </div>
-            </section>
-          `)}
+                ${isExpanded && html`
+                  <div class="overmind-project-details">
+                    ${isParentWarning(project) && html`
+                      <div class="overmind-project-warning">
+                        <strong>Parent ${project.latest_parent_status}</strong>
+                        <span>${project.parent_session}</span>
+                      </div>
+                    `}
+                    <div class="overmind-project-field">
+                      <span>app_path</span>
+                      <code>${project.app_path}</code>
+                    </div>
+                    <div class="overmind-project-grid">
+                      <div class="overmind-project-field">
+                        <span>parent_session</span>
+                        <strong>${project.parent_session}</strong>
+                      </div>
+                      <div class="overmind-project-field">
+                        <span>updated_at</span>
+                        <strong>${project.updated_at ? new Date(project.updated_at).toLocaleString() : '—'}</strong>
+                      </div>
+                    </div>
+                  </div>
+                `}
+              </section>
+            `;
+          })}
         </div>
       `}
 
