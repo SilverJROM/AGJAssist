@@ -43,13 +43,18 @@ function normalizeActualMin(value: unknown): number | null {
   return Number.isInteger(value) && typeof value === "number" && value >= 0 ? value : null;
 }
 
+function normalizeStartedAt(value: unknown): string | null {
+  return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
+}
+
 export function sanitizeTaskList(tasks: OvermindTask[] | undefined): OvermindTask[] {
   return (tasks ?? [])
     .filter((t) => !isTrashTaskLabel(t?.label))
     .map((task) => ({
       ...task,
       estimate_min: normalizeEstimateMin(task?.estimate_min),
-      actual_min: normalizeActualMin(task?.actual_min)
+      actual_min: normalizeActualMin(task?.actual_min),
+      started_at: normalizeStartedAt(task?.started_at)
     }));
 }
 
@@ -90,7 +95,7 @@ export function validateSubmittedTaskList(tasks: unknown): TaskListValidation {
       return;
     }
 
-    const t = task as { id?: unknown; label?: unknown; state?: unknown; estimate_min?: unknown };
+    const t = task as { id?: unknown; label?: unknown; state?: unknown; estimate_min?: unknown; started_at?: unknown };
     if (typeof t.id !== "string" || !t.id.trim()) {
       invalidTasks.push({
         index,
@@ -148,7 +153,8 @@ export function validateSubmittedTaskList(tasks: unknown): TaskListValidation {
       label: label.trim(),
       state,
       estimate_min: normalizeEstimateMin(t.estimate_min),
-      actual_min: null
+      actual_min: null,
+      started_at: normalizeStartedAt(t.started_at)
     });
   });
 

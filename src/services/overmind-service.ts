@@ -774,7 +774,7 @@ export class OvermindService {
     }
 
     const now = this.isoNow();
-    tasks = this.withActualElapsedMinutes(existing.tasks, tasks, existing.task_log, now);
+    tasks = this.withActualElapsedMinutes(existing.tasks, tasks, now);
     const doneCount = this.countDoneTasks(tasks);
     const existingDoneCount = this.countDoneTasks(existing.tasks);
     const shouldLog = currentTask !== existing.current_task || doneCount !== existingDoneCount;
@@ -919,47 +919,34 @@ export class OvermindService {
   private withActualElapsedMinutes(
     previousTasks: OvermindTask[],
     nextTasks: OvermindTask[],
-    taskLog: OvermindTaskLogEntry[],
-    doneAt: string
+    now: string
   ): OvermindTask[] {
     const previousById = new Map(previousTasks.map((task) => [task.id, task]));
     return nextTasks.map((task) => {
       const previous = previousById.get(task.id);
       const preservedActual = task.actual_min ?? previous?.actual_min ?? null;
+      let startedAt = task.started_at ?? previous?.started_at ?? null;
+      if (task.state === "processing" && previous?.state !== "processing" && !startedAt) {
+        startedAt = now;
+      }
+
       if (preservedActual !== null) {
-        return { ...task, actual_min: preservedActual };
+        return { ...task, started_at: startedAt, actual_min: preservedActual };
       }
       if (previous?.state !== "processing" || task.state !== "done") {
-        return { ...task, actual_min: null };
+        return { ...task, started_at: startedAt, actual_min: null };
       }
 
-      const startedAt = this.findProcessingStartedAt(task, taskLog);
-      if (!startedAt) return { ...task, actual_min: null };
+      if (!startedAt) return { ...task, started_at: null, actual_min: null };
 
       const startMs = Date.parse(startedAt);
-      const doneMs = Date.parse(doneAt);
+      const doneMs = Date.parse(now);
       if (!Number.isFinite(startMs) || !Number.isFinite(doneMs) || doneMs < startMs) {
-        return { ...task, actual_min: null };
+        return { ...task, started_at: startedAt, actual_min: null };
       }
 
-      return { ...task, actual_min: Math.max(0, Math.round((doneMs - startMs) / 60000)) };
+      return { ...task, started_at: startedAt, actual_min: Math.max(0, Math.round((doneMs - startMs) / 60000)) };
     });
-  }
-
-  private findProcessingStartedAt(task: OvermindTask, taskLog: OvermindTaskLogEntry[]): string | null {
-    const matches = taskLog.filter((entry) => this.taskLogEntryMatchesTask(entry, task));
-    if (matches.length !== 1) return null;
-    return matches[0].at;
-  }
-
-  private taskLogEntryMatchesTask(entry: OvermindTaskLogEntry, task: OvermindTask): boolean {
-    const currentTask = (entry.current_task ?? "").trim().toLowerCase();
-    const id = task.id.trim().toLowerCase();
-    const label = task.label.trim().toLowerCase();
-    if (!currentTask) return false;
-    if (currentTask === id || currentTask === label) return true;
-    if (id && currentTask.includes(id)) return true;
-    return label.length >= 8 && currentTask.includes(label);
   }
 
   private computeEndedAt(

@@ -130,7 +130,7 @@ describe("OvermindService", () => {
     ]);
   });
 
-  it("records actual_min from a processing-to-done task_log span", () => {
+  it("records actual_min from a pending-to-processing-to-done task state span", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-02T10:00:00.000Z"));
 
@@ -139,19 +139,19 @@ describe("OvermindService", () => {
       coordinator_session: "AGJ-51",
       run_dir: "/tmp/b11-actual",
       tasks: [
-        { id: "B11", label: "Estimate vs actual", state: "processing", estimate_min: 25 }
+        { id: "B11", label: "Estimate vs actual", state: "pending", estimate_min: 25 }
       ]
     });
 
     const processing = service.setTasks(workflow.id, "B11 Estimate vs actual", [
       { id: "B11", label: "Estimate vs actual", state: "processing", estimate_min: 25 }
     ]);
-    expect(processing?.task_log).toEqual([
-      expect.objectContaining({
-        at: "2026-06-02T10:00:00.000Z",
-        current_task: "B11 Estimate vs actual"
-      })
-    ]);
+    expect(processing?.tasks[0]).toMatchObject({
+      id: "B11",
+      state: "processing",
+      started_at: "2026-06-02T10:00:00.000Z",
+      actual_min: null
+    });
 
     vi.setSystemTime(new Date("2026-06-02T10:31:00.000Z"));
     const done = service.setTasks(workflow.id, "B11 Estimate vs actual", [
@@ -164,9 +164,32 @@ describe("OvermindService", () => {
         label: "Estimate vs actual",
         state: "done",
         estimate_min: 25,
+        started_at: "2026-06-02T10:00:00.000Z",
         actual_min: 31
       }
     ]);
+  });
+
+  it("keeps actual_min null for a done task without a processing span", () => {
+    const workflow = attachedRun({
+      label: "B11-forward-only",
+      coordinator_session: "AGJ-51",
+      run_dir: "/tmp/b11-forward-only",
+      tasks: [
+        { id: "B11", label: "Estimate vs actual", state: "pending", estimate_min: 25 }
+      ]
+    });
+
+    const done = service.setTasks(workflow.id, "B11 Estimate vs actual", [
+      { id: "B11", label: "Estimate vs actual", state: "done", estimate_min: 25 }
+    ]);
+
+    expect(done?.tasks[0]).toMatchObject({
+      id: "B11",
+      state: "done",
+      started_at: null,
+      actual_min: null
+    });
   });
 
   it("creates and reads overmind_projects and counts non-terminal active runs", () => {
@@ -262,7 +285,7 @@ describe("OvermindService", () => {
     expect(created.status).toBe("active");
     expect(created.display_name).toBeNull();
     expect(created.child_sessions).toEqual(["lkcdx-may20"]);
-    expect(created.tasks[0]).toEqual({ id: "A1", label: "Schema", state: "processing", estimate_min: null, actual_min: null });
+    expect(created.tasks[0]).toEqual({ id: "A1", label: "Schema", state: "processing", estimate_min: null, actual_min: null, started_at: null });
     expect(created.active_session).toBeNull();
     expect(created.active_role).toBeNull();
     expect(created.ended_at).toBeNull();
@@ -317,8 +340,8 @@ describe("OvermindService", () => {
     ]);
     expect(tasks?.current_task).toBe("A1 verify");
     expect(tasks?.tasks).toEqual([
-      { id: "A1", label: "Schema", state: "done", estimate_min: null, actual_min: null },
-      { id: "A2", label: "Endpoints", state: "pending", estimate_min: null, actual_min: null }
+      { id: "A1", label: "Schema", state: "done", estimate_min: null, actual_min: null, started_at: null },
+      { id: "A2", label: "Endpoints", state: "pending", estimate_min: null, actual_min: null, started_at: null }
     ]);
     expect(tasks?.task_log).toHaveLength(1);
     expect(tasks?.task_log[0]).toMatchObject({ current_task: "A1 verify", done: 1, total: 2 });
@@ -649,7 +672,7 @@ describe("OvermindService", () => {
     expect(upserted.child_sessions).toEqual(["hrcdx-33", "hrcdx-34"]);
     expect(upserted.run_dir).toBe("/tmp/overmind/hris");
     expect(upserted.current_task).toBe("Restarted");
-    expect(upserted.tasks).toEqual([{ id: "A1", label: "Restart", state: "processing", estimate_min: null, actual_min: null }]);
+    expect(upserted.tasks).toEqual([{ id: "A1", label: "Restart", state: "processing", estimate_min: null, actual_min: null, started_at: null }]);
     expect(upserted.pending_decision).toBeNull();
     expect(upserted.active_session).toBeNull();
     expect(upserted.active_role).toBeNull();

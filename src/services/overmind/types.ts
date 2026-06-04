@@ -50,6 +50,7 @@ export interface OvermindTask {
   state: OvermindTaskState;
   estimate_min?: number | null;
   actual_min?: number | null;
+  started_at?: string | null;
 }
 
 export interface OvermindTaskLogEntry {

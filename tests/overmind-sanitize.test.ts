@@ -28,10 +28,10 @@ describe("overmind task submission validation", () => {
     expect(validation.ok).toBe(true);
     expect(validation.invalid_tasks).toEqual([]);
     expect(validation.tasks).toEqual([
-      { id: "B10", label: "Parser estimate", state: "processing", estimate_min: 25, actual_min: null },
-      { id: "B11", label: "No estimate", state: "pending", estimate_min: null, actual_min: null },
-      { id: "B12", label: "Negative estimate", state: "pending", estimate_min: null, actual_min: null },
-      { id: "B13", label: "Text estimate", state: "pending", estimate_min: null, actual_min: null }
+      { id: "B10", label: "Parser estimate", state: "processing", estimate_min: 25, actual_min: null, started_at: null },
+      { id: "B11", label: "No estimate", state: "pending", estimate_min: null, actual_min: null, started_at: null },
+      { id: "B12", label: "Negative estimate", state: "pending", estimate_min: null, actual_min: null, started_at: null },
+      { id: "B13", label: "Text estimate", state: "pending", estimate_min: null, actual_min: null, started_at: null }
     ]);
   });
 
