@@ -141,3 +141,52 @@
 ### Caveats
 
 - Live `wf=20` false-completion protection while `lkcamp-12` is busy is left for coord validation on the deployed dev watcher.
+
+## Issue-002 Iteration 1
+
+### User Report
+
+> we only have 2 status its active or its stuck where as if its stuck ovm should either making it active again or closing it not this stale workflow
+> always remove it from the list if they are already completed... fix this so this does not happen again.
+
+### Root Cause / Mechanism
+
+- The iter3 all-done closer used coordinator pane hash stability plus `STUCK_THRESHOLD_MS` to decide when a `working` all-done workflow should close.
+- Codex/Claude TUI panes can redraw or change cursor state even at an idle prompt, so `coordinatorHash !== workflow.last_pane_hash` can keep resetting `stuck_since`.
+- That made pane hash the source of truth for an already-complete task list, allowing an all-done run to linger as `working` indefinitely.
+- Remaining-task workflows do not enter `handleAllTasksDone`; they continue through the existing classifier and nudge ladder. The focused nudge tests verify stuck remaining-task runs are nudged and active panes are reactivated instead of being closed by this path.
+
+### Files Changed
+
+- `src/services/overmind/completion-detector.ts` - removed pane-hash idle gating and switched all-done closure to the persisted `completion_check` signature.
+- `tests/overmind-nudge.test.ts` - replaced pane-idle completion tests with task-list driven all-done tests, including the flapping-pane `working` case and remaining-task nudge preservation.
+- `tests/overmind-brain.test.ts` - updated the brain consult edge case to assert the first tick records all-done and the second tick closes without another brain call.
+
+### What Changed
+
+- First all-done tick (`completion_check !== signature`) records `completion_check = signature` and does not close yet.
+- Second all-done tick (`completion_check === signature`) closes unconditionally through `completeWorkflowOnce`, regardless of `status` or pane hash.
+- Brain `working` now only grants the one persisted-signature tick; it cannot keep a fully done registered task list open indefinitely.
+- Pane hash no longer influences completion of a fully done registered task list.
+
+### Verification
+
+- command or method: `npx tsc --noEmit`
+- result: PASS
+- evidence: completed with exit code 0.
+
+- command or method: `npx vitest run tests/overmind-nudge.test.ts tests/overmind-brain.test.ts`
+- result: PASS
+- evidence: 2 files passed, 37 tests passed.
+
+- command or method: `npx vitest run`
+- result: PASS
+- evidence: 41 files passed, 549 tests passed, 1 skipped.
+
+### Standing Rules
+
+- A fully done registered Overmind task list is the completion truth. Pane activity cannot keep it on the Active worklist beyond the bounded `completion_check` grace tick.
+
+### Caveats
+
+- No schema change was added; this uses the existing one-tick `completion_check` marker as the bounded grace.

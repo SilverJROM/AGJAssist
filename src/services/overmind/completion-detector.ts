@@ -16,7 +16,6 @@ import type { NudgeStateService } from "../nudge-state-service.js";
 import type { OvermindNotify } from "../overmind-watcher.js";
 import type { TmuxService } from "../../tmux/tmux-service.js";
 import type { ActiveSessionAttribution } from "./active-session-attribution.js";
-import { isPastStuckThreshold } from "./classifier.js";
 import { collectPriorDecisions } from "./decision-match.js";
 
 const BRAIN_COORDINATOR_TAIL_LINES = 40;
@@ -43,20 +42,12 @@ export async function handleAllTasksDone(
 ): Promise<void> {
   const doneCount = workflow.tasks.filter((task) => task.state === "done").length;
   const signature = `${doneCount}/${workflow.tasks.length}`;
-  const now = new Date().toISOString();
 
   if (workflow.completion_check === signature) {
-    const coordinatorActive =
-      workflow.status === "working" &&
-      coordinatorHash !== workflow.last_pane_hash;
-    const nextStuckSince =
-      workflow.status === "working" && !coordinatorActive
-        ? workflow.stuck_since ?? now
-        : null;
     deps.overmindService.update(workflow.id, {
       pending_decision: null,
       last_pane_hash: coordinatorHash,
-      stuck_since: nextStuckSince,
+      stuck_since: null,
       nudge_count: 0,
       tier: 0,
       active_session: attribution.active_session,
@@ -64,14 +55,7 @@ export async function handleAllTasksDone(
       parent_status: parentStatus,
       child_statuses: childStatuses
     });
-    if (workflow.status !== "working") {
-      await completeWorkflowOnce(workflow, deps);
-    } else if (
-      nextStuckSince &&
-      isPastStuckThreshold(nextStuckSince, now)
-    ) {
-      await completeWorkflowOnce(workflow, deps);
-    }
+    await completeWorkflowOnce(workflow, deps);
     return;
   }
 
@@ -106,8 +90,6 @@ export async function handleAllTasksDone(
     parent_status: parentStatus,
     child_statuses: childStatuses
   });
-
-  await completeWorkflowOnce(workflow, deps);
 }
 
 async function completeWorkflowOnce(
