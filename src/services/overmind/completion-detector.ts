@@ -55,6 +55,9 @@ export async function handleAllTasksDone(
       parent_status: parentStatus,
       child_statuses: childStatuses
     });
+    if (workflow.status !== "working") {
+      await completeWorkflowOnce(workflow, deps);
+    }
     return;
   }
 
@@ -90,6 +93,13 @@ export async function handleAllTasksDone(
     child_statuses: childStatuses
   });
 
+  await completeWorkflowOnce(workflow, deps);
+}
+
+async function completeWorkflowOnce(
+  workflow: OvermindWorkflow,
+  deps: CompletionDetectorDeps
+): Promise<void> {
   const completed = deps.overmindService.setStatus(workflow.id, "completed", { touchParentUpdate: true });
   if (
     workflow.status !== "completed" &&

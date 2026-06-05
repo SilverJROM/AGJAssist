@@ -57,3 +57,40 @@
 ## Caveats
 
 - Earlier I started a focused and full Vitest run in parallel; `overmind-nudge.test.ts` uses a shared SQLite test path, so that produced transient disk I/O failures. Sequential reruns passed.
+
+## Iteration 2 Send-Back
+
+### User Report
+
+> ...always remove it from the list if they are already completed... this is a bug on the app list, please fix this so this does not happen again.
+
+### Root Cause / Mechanism
+
+- Iteration 1 fixed workflows that newly reached an all-done signature.
+- Already-parked all-done workflows still hit the top `completion_check === signature` early-return in `handleAllTasksDone`.
+- That early-return cleared stuck/nudge state and returned before reaching the new terminal completion path, so runs like `status = "stuck"`, `completion_check = "23/23"`, and `23/23` tasks done stayed in Active forever.
+
+### Files Changed
+
+- `src/services/overmind/completion-detector.ts` - moved the terminal completion transition into `completeWorkflowOnce` and calls it from the early-return path when the workflow is not `working`.
+- `tests/overmind-nudge.test.ts` - added parked all-done regression coverage for non-`working` auto-complete and `working` stay-active behavior.
+
+### What Changed
+
+- Any all-done workflow whose completion signature is already recorded now auto-completes if its current status is not `working`.
+- Workflows currently marked `working` still use the existing early-return cleanup and remain active.
+- The iter1 newly-all-done completion path still uses the same `completeWorkflowOnce` terminal transition.
+
+### Verification
+
+- command or method: `npx tsc --noEmit && npx vitest run tests/overmind-nudge.test.ts tests/overmind-brain.test.ts && npx vitest run`
+- result: PASS
+- evidence: focused Overmind tests passed 37 tests; full suite passed 41 files, 549 tests, 1 skipped.
+
+### Standing Rules
+
+- Any server-validated all-done Overmind workflow that is not currently `working` must become terminal `completed`, even if its all-done `completion_check` was already recorded by an older tick.
+
+### Caveats
+
+- Live `wf=20` completion is left for coord validation after dev deploy and watcher tick, per the send-back brief.

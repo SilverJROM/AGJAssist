@@ -231,6 +231,83 @@ describe("Overmind watcher nudge ladder", () => {
     expect(notify).toHaveBeenCalledTimes(1);
   });
 
+  it("auto-completes already-parked all-done workflows on the completion-check early return", async () => {
+    const notify = vi.fn(async () => {});
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "parked-done",
+      coordinator_session: "coord-parked-done",
+      child_sessions: ["child-parked-done"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.setTasks(workflow.id, "all batches done — parked", [
+      { id: "b1", label: "B1", state: "done" },
+      { id: "b2", label: "B2", state: "done" }
+    ]);
+    service.update(workflow.id, {
+      status: "stuck",
+      completion_check: "2/2",
+      stuck_since: "2000-01-01T00:00:00.000Z",
+      nudge_count: 2,
+      tier: 2
+    });
+
+    const tmux = makeTmuxMock({
+      "coord-parked-done": "still parked after all tasks done",
+      "child-parked-done": "child idle"
+    });
+    const watcher = new OvermindWatcher(service, tmux, notify);
+
+    await watcher.tick();
+    const updated = service.get(workflow.id);
+    expect(updated?.status).toBe("completed");
+    expect(updated?.stuck_since).toBeNull();
+    expect(updated?.nudge_count).toBe(0);
+    expect(updated?.tier).toBe(0);
+    expect(updated?.last_notified_transition).toBe("done:completed");
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
+
+    await watcher.tick();
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps already-parked all-done workflows active when status is working", async () => {
+    const notify = vi.fn(async () => {});
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "parked-working",
+      coordinator_session: "coord-parked-working",
+      child_sessions: ["child-parked-working"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.setTasks(workflow.id, "all batches done but more work confirmed", [
+      { id: "b1", label: "B1", state: "done" },
+      { id: "b2", label: "B2", state: "done" }
+    ]);
+    service.update(workflow.id, {
+      status: "working",
+      completion_check: "2/2",
+      stuck_since: "2000-01-01T00:00:00.000Z",
+      nudge_count: 1,
+      tier: 1
+    });
+
+    const tmux = makeTmuxMock({
+      "coord-parked-working": "still doing follow-up work",
+      "child-parked-working": "child idle"
+    });
+    const watcher = new OvermindWatcher(service, tmux, notify);
+
+    await watcher.tick();
+    const updated = service.get(workflow.id);
+    expect(updated?.status).toBe("working");
+    expect(updated?.stuck_since).toBeNull();
+    expect(updated?.nudge_count).toBe(0);
+    expect(updated?.tier).toBe(0);
+    expect(updated?.last_notified_transition).toBeNull();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
   it("keeps all-done workflows active when the completion brain says they are still working", async () => {
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "lkvc",
