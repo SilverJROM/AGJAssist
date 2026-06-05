@@ -94,3 +94,50 @@
 ### Caveats
 
 - Live `wf=20` completion is left for coord validation after dev deploy and watcher tick, per the send-back brief.
+
+## Iteration 3 Send-Back
+
+### User Report
+
+> ...always remove it from the list if they are already completed... this is a bug on the app list, please fix this so this does not happen again.
+
+### Root Cause / Mechanism
+
+- Iteration 2 correctly completed already-parked all-done workflows when status was not `working`.
+- The remaining gap was the `working` early-return: a brain `working` verdict writes `status = "working"` and `completion_check = signature`.
+- Subsequent ticks hit `completion_check === signature`; because status was `working`, the early-return skipped completion and also wrote `stuck_since = null` every tick.
+- That meant an all-done run once classified `working` could never accumulate idle time and could remain Active forever after the coordinator stopped changing.
+
+### Files Changed
+
+- `src/services/overmind/completion-detector.ts` - added the frozen-working idle gate to the completion-check early-return using current pane hash vs previous `last_pane_hash` plus the standard stuck threshold.
+- `tests/overmind-nudge.test.ts` - added regression coverage for active working all-done, idle-under-threshold working all-done, and idle-past-threshold auto-completion.
+
+### What Changed
+
+- All-done `working` workflows now stay `working` while the coordinator pane hash changes.
+- When the coordinator pane hash is unchanged, `stuck_since` is started or preserved instead of being wiped.
+- Once the unchanged pane has been idle past `STUCK_THRESHOLD_MS`, the workflow auto-completes through the same guarded terminal transition.
+- No per-tick brain calls or nudges were added.
+
+### Verification
+
+- command or method: `npx tsc --noEmit`
+- result: PASS
+- evidence: completed with exit code 0.
+
+- command or method: `npx vitest run tests/overmind-nudge.test.ts tests/overmind-brain.test.ts`
+- result: PASS
+- evidence: 2 files passed, 40 tests passed.
+
+- command or method: `npx vitest run`
+- result: PASS
+- evidence: 41 files passed, 552 tests passed, 1 skipped.
+
+### Standing Rules
+
+- An all-done Overmind workflow may stay Active as `working` only while the coordinator pane is changing; once that pane is unchanged past the standard stuck threshold, it must become terminal `completed`.
+
+### Caveats
+
+- Live `wf=20` false-completion protection while `lkcamp-12` is busy is left for coord validation on the deployed dev watcher.
