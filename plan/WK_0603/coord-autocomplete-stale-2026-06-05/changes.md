@@ -190,3 +190,49 @@
 ### Caveats
 
 - No schema change was added; this uses the existing one-tick `completion_check` marker as the bounded grace.
+
+## Issue-002 Iteration 2
+
+### User Report
+
+> active list is ACTIVE or STUCK; a stuck run must be reactivated or CLOSED, never left stale. All-done = close (task list is truth).
+
+### Root Cause / Mechanism
+
+- Iteration 1 made `handleAllTasksDone` close all-done workflows using the persisted task-list signature.
+- The real stale run still never reached that handler because `OvermindWatcher.tickWorkflow` returned early when `subagentInFlight` was set.
+- The early-return order was: subagent-in-flight updates status to `working` and returns before the `allTasksComplete(workflow.tasks)` branch.
+- That is correct for workflows with remaining tasks, where an invisible subagent should suppress false idle nudges, but wrong for a fully done registered task list.
+- I checked the pre-completion returns in `tickWorkflow`; `monitoring_paused` is the only other one before the all-done branch and is an explicit user state, so I did not change it.
+
+### Files Changed
+
+- `src/services/overmind-watcher.ts` - changed the `subagentInFlight` early-return to apply only when the workflow still has remaining tasks.
+- `tests/overmind-nudge.test.ts` - added watcher coverage for all-done + subagent-in-flight closing, and remaining-tasks + subagent-in-flight staying `working`.
+
+### What Changed
+
+- `subagentInFlight` plus remaining tasks still updates the workflow as `working` and returns.
+- `subagentInFlight` plus all tasks done now falls through to `handleAllTasksDone`, so the existing task-list driven close path runs.
+
+### Verification
+
+- command or method: `npx tsc --noEmit`
+- result: PASS
+- evidence: completed with exit code 0.
+
+- command or method: `npx vitest run tests/overmind-nudge.test.ts tests/overmind-brain.test.ts tests/overmind-subagent.test.ts`
+- result: PASS
+- evidence: 3 files passed, 74 tests passed.
+
+- command or method: `npx vitest run`
+- result: PASS
+- evidence: 41 files passed, 551 tests passed, 1 skipped.
+
+### Standing Rules
+
+- Subagent-in-flight suppression protects only workflows with remaining registered tasks; it cannot hold a fully done task list on the Active worklist.
+
+### Caveats
+
+- Live `wf=20` completion after deploy is left for coord validation over the running watcher ticks.

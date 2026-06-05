@@ -390,7 +390,7 @@ export class OvermindWatcher {
     if (artifactFailsafe.parent_status) {
       effectiveParentStatus = artifactFailsafe.parent_status;
     }
-    if (this.subagentInFlight.has(wid)) {
+    if (this.subagentInFlight.has(wid) && !allTasksComplete(workflow.tasks)) {
       this.overmindService.update(workflow.id, {
         status: "working",
         pending_decision: effectiveResult.pendingDecision,

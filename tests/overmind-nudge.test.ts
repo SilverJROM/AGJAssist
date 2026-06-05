@@ -323,6 +323,65 @@ describe("Overmind watcher nudge ladder", () => {
     expect(notify).toHaveBeenCalledTimes(1);
   });
 
+  it("auto-completes all-done workflows even when subagentInFlight is set", async () => {
+    const notify = vi.fn(async () => {});
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "subagent-all-done",
+      coordinator_session: "coord-subagent-done",
+      child_sessions: ["child-subagent-done"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.setTasks(workflow.id, "all batches done with old subagent marker", [
+      { id: "b1", label: "B1", state: "done" },
+      { id: "b2", label: "B2", state: "done" }
+    ]);
+    service.update(workflow.id, {
+      status: "working",
+      completion_check: "2/2"
+    });
+
+    const tmux = makeTmuxMock({
+      "coord-subagent-done": "[OVERMIND] subagent lead ~30min\nidle prompt",
+      "child-subagent-done": "child idle"
+    });
+    const watcher = new OvermindWatcher(service, tmux, notify);
+
+    await watcher.tick();
+    const updated = service.get(workflow.id);
+    expect(updated?.status).toBe("completed");
+    expect(updated?.last_notified_transition).toBe("done:completed");
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps subagentInFlight workflows with remaining tasks working", async () => {
+    const notify = vi.fn(async () => {});
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "subagent-remaining",
+      coordinator_session: "coord-subagent-remaining",
+      child_sessions: ["child-subagent-remaining"],
+      run_dir: "/tmp/overmind-nudge",
+      tasks: [
+        { id: "b1", label: "B1", state: "done" },
+        { id: "b2", label: "B2", state: "processing" }
+      ]
+    });
+
+    const tmux = makeTmuxMock({
+      "coord-subagent-remaining": "[OVERMIND] subagent lead ~30min\nidle prompt",
+      "child-subagent-remaining": "child idle"
+    });
+    const watcher = new OvermindWatcher(service, tmux, notify);
+
+    await watcher.tick();
+    const updated = service.get(workflow.id);
+    expect(updated?.status).toBe("working");
+    expect(updated?.last_notified_transition).toBeNull();
+    expect(updated?.completion_check).toBeNull();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
   it("keeps brand-new brain-working all-done workflows active for one tick, then closes if still all done", async () => {
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "lkvc",
