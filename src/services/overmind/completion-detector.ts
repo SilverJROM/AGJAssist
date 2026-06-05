@@ -5,6 +5,7 @@ import {
   type CompletionVerdict,
   type OvermindBrain
 } from "../overmind-brain.js";
+import { buildDoneNotification } from "../overmind-notifications.js";
 import type {
   OvermindChildSessionStatus,
   OvermindParentStatus,
@@ -16,10 +17,7 @@ import type { OvermindNotify } from "../overmind-watcher.js";
 import type { TmuxService } from "../../tmux/tmux-service.js";
 import type { ActiveSessionAttribution } from "./active-session-attribution.js";
 import { collectPriorDecisions } from "./decision-match.js";
-import { hashPane } from "./pane-utils.js";
-import { sendGuardedParentNudge } from "./parent-nudge-guard.js";
 
-const CAPTURE_LINES = 200;
 const BRAIN_COORDINATOR_TAIL_LINES = 40;
 const BRAIN_RUN_FILE_TAIL_LINES = 80;
 const ALL_DONE_CONFIRM_NUDGE = DEFAULT_COMPLETION_CONSULT_TEXT;
@@ -79,37 +77,31 @@ export async function handleAllTasksDone(
     return;
   }
 
-  let lastPaneHash = coordinatorHash;
-  let nextParentStatus = parentStatus;
-  try {
-    const guarded = await sendGuardedParentNudge(
-      workflow,
-      "overmind: " + verdict.consultText!,
-      deps,
-      (target, text) => deps.tmuxService.sendAndSubmit(target, text)
-    );
-    if (guarded.sent) {
-      lastPaneHash = hashPane(await capturePaneSafe(deps.tmuxService, guarded.parentSession));
-    } else if (guarded.parent_status) {
-      nextParentStatus = guarded.parent_status;
-    }
-  } catch (error) {
-    console.error("Overmind completion consult nudge failed:", error);
-  }
-
   deps.overmindService.update(workflow.id, {
-    status: "waiting_human",
     pending_decision: null,
-    last_pane_hash: lastPaneHash,
+    last_pane_hash: coordinatorHash,
     stuck_since: null,
     nudge_count: 0,
     tier: 0,
     completion_check: signature,
     active_session: attribution.active_session,
     active_role: attribution.active_role,
-    parent_status: nextParentStatus,
+    parent_status: parentStatus,
     child_statuses: childStatuses
   });
+
+  const completed = deps.overmindService.setStatus(workflow.id, "completed", { touchParentUpdate: true });
+  if (
+    workflow.status !== "completed" &&
+    completed &&
+    deps.overmindService.markNotificationTransition(completed.id, "done:completed")
+  ) {
+    try {
+      await deps.notify?.(buildDoneNotification(completed));
+    } catch (error) {
+      console.error("Overmind DONE notify failed:", error);
+    }
+  }
 }
 
 async function assessCompletion(
@@ -143,14 +135,6 @@ async function assessCompletion(
       consultText: ALL_DONE_CONFIRM_NUDGE,
       reason: "Completion brain failed; deterministic consult to projcore."
     };
-  }
-}
-
-async function capturePaneSafe(tmuxService: TmuxService, target: string): Promise<string> {
-  try {
-    return await tmuxService.capturePane(target, CAPTURE_LINES);
-  } catch {
-    return "";
   }
 }
 

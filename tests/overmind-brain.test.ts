@@ -344,8 +344,9 @@ function registerAllDoneWorkflow(): OvermindWorkflow {
 }
 
 describe("Overmind completion-edge verification (all tasks done, no /complete)", () => {
-  it("consults projcore once (Sonnet), flips off 'working', and does NOT re-run Sonnet next tick", async () => {
+  it("consults projcore once (Sonnet), auto-completes, and does NOT re-run Sonnet next tick", async () => {
     registerAllDoneWorkflow();
+    const notify = vi.fn(async () => {});
     const brain = new FakeBrain(undefined, undefined, {
       action: "consult",
       consultText: "Overmind: list shows all done — POST /complete if finished, else update it.",
@@ -355,24 +356,23 @@ describe("Overmind completion-edge verification (all tasks done, no /complete)",
       { "coord-1": QUIET_PANE, "child-1": CHILD_PANE },
       `${QUIET_PANE}\nconsult sent`
     );
-    const watcher = new OvermindWatcher(service, tmux, undefined, brain);
+    const watcher = new OvermindWatcher(service, tmux, notify, brain);
 
     await watcher.tick();
     const after = service.getBySession("coord-1");
-    expect(after?.status).toBe("waiting_human");
+    expect(after?.status).toBe("completed");
     expect(after?.completion_check).toBe("2/2");
+    expect(after?.last_notified_transition).toBe("done:completed");
     expect(brain.completionCalls).toHaveLength(1);
-    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
-    expect(tmux.sendAndSubmit).toHaveBeenCalledWith(
-      "coord-1",
-      "overmind: Overmind: list shows all done — POST /complete if finished, else update it."
-    );
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
 
-    // Same all-done signature next tick: held quietly, no second Sonnet call, no token spend.
+    // Terminal workflows leave the active set: no second Sonnet call, no token spend.
     await watcher.tick();
     expect(brain.completionCalls).toHaveLength(1);
-    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
-    expect(service.getBySession("coord-1")?.status).toBe("waiting_human");
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(service.getBySession("coord-1")?.status).toBe("completed");
   });
 
   it("on a 'working' false-alarm verdict it sends no nudge and keeps monitoring", async () => {

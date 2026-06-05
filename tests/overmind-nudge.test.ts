@@ -9,10 +9,10 @@ import { AppConfig } from "../src/config/config.js";
 import { registerOvermindRoutes } from "../src/api/routes/overmind-routes.js";
 import { OvermindService } from "../src/services/overmind-service.js";
 import {
-  ALL_DONE_CONFIRM_NUDGE,
   CANNED_NUDGE,
   OvermindWatcher
 } from "../src/services/overmind-watcher.js";
+import type { OvermindBrain } from "../src/services/overmind-brain.js";
 import { hashPane } from "../src/services/overmind/pane-utils.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 import type { AppSettingsService, OvermindCooldowns } from "../src/services/app-settings-service.js";
@@ -195,7 +195,8 @@ describe("Overmind watcher nudge ladder", () => {
     expect(tmux.sendAndSubmit.mock.calls.every((call: [string, string]) => call[0] === "coord-1")).toBe(true);
   });
 
-  it("fail-safe: when all tasks are done but completion was never reported, nudges the coordinator once and flips off 'working'", async () => {
+  it("auto-completes when all tasks are done but completion was never reported", async () => {
+    const notify = vi.fn(async () => {});
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "lkvc",
       coordinator_session: "coord-done",
@@ -212,19 +213,57 @@ describe("Overmind watcher nudge ladder", () => {
       "coord-done": "✻ Cooked for 2m · recap: queue empty",
       "child-done": "child idle"
     });
-    const watcher = new OvermindWatcher(service, tmux);
+    const watcher = new OvermindWatcher(service, tmux, notify);
 
     await watcher.tick();
     let updated = service.get(workflow.id);
-    expect(updated?.status).toBe("waiting_human");
-    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
-    expect(tmux.sendAndSubmit).toHaveBeenLastCalledWith("coord-done", ALL_DONE_CONFIRM_NUDGE);
+    expect(updated?.status).toBe("completed");
+    expect(updated?.ended_at).not.toBeNull();
+    expect(updated?.last_notified_transition).toBe("done:completed");
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0][0]).toContain("✅ lkvc completed.");
 
-    // Subsequent ticks must NOT re-nudge (once per transition) and stay off "working".
+    // Subsequent ticks must not re-notify once the workflow is terminal.
     await watcher.tick();
     updated = service.get(workflow.id);
-    expect(updated?.status).toBe("waiting_human");
-    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(updated?.status).toBe("completed");
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps all-done workflows active when the completion brain says they are still working", async () => {
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "lkvc",
+      coordinator_session: "coord-working",
+      child_sessions: ["child-working"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.setTasks(workflow.id, "all batches done but follow-up in progress", [
+      { id: "b1", label: "B1", state: "done" },
+      { id: "b2", label: "B2", state: "done" }
+    ]);
+
+    const tmux = makeTmuxMock({
+      "coord-working": "Running post-completion verification",
+      "child-working": "child idle"
+    });
+    const notify = vi.fn(async () => {});
+    const brain = {
+      verifyCompletion: vi.fn(async () => ({
+        action: "working",
+        reason: "Coordinator is still performing verification."
+      }))
+    } as unknown as OvermindBrain;
+    const watcher = new OvermindWatcher(service, tmux, notify, brain);
+
+    await watcher.tick();
+
+    const updated = service.get(workflow.id);
+    expect(updated?.status).toBe("working");
+    expect(updated?.last_notified_transition).toBeNull();
+    expect(updated?.completion_check).toBe("2/2");
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("resets nudge count and tier when the workflow returns to working", async () => {
