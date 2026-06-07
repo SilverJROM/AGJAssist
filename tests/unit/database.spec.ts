@@ -69,7 +69,7 @@ describe("DatabaseService", () => {
       .prepare("SELECT version FROM schema_version")
       .get() as { version: number };
 
-    expect(version.version).toBe(28);
+    expect(version.version).toBe(29);
     db.close();
   });
 
@@ -121,7 +121,7 @@ describe("DatabaseService", () => {
     db.close();
   });
 
-  it("upgrades a v23 snapshot DB to v28 and adds last_parent_update_at + evidence_idle_threshold_override_minutes", () => {
+  it("upgrades a v23 snapshot DB to v29 and adds current overmind workflow columns", () => {
     cleanup();
     const raw = new Database(TEST_DB);
     raw.exec(`
@@ -167,11 +167,12 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(28);
+    expect(version.version).toBe(29);
     const upgradedCols = upgraded.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     const upgradedColNames = upgradedCols.map((c) => c.name);
     expect(upgradedColNames).toContain("last_parent_update_at");
     expect(upgradedColNames).toContain("evidence_idle_threshold_override_minutes");
+    expect(upgradedColNames).toContain("orphaned");
     upgraded.close();
   });
 
@@ -262,7 +263,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(28);
+    expect(version.version).toBe(29);
 
     const count = upgraded.prepare("SELECT COUNT(*) AS count FROM overmind_workflows").get() as { count: number };
     expect(count.count).toBe(2);
@@ -286,7 +287,8 @@ describe("DatabaseService", () => {
       tier: 2,
       accumulated_ms: 1234,
       monitoring_paused: 1,
-      evidence_idle_threshold_override_minutes: 35
+      evidence_idle_threshold_override_minutes: 35,
+      orphaned: 0
     });
 
     const legacy = upgraded.prepare("SELECT project_id, label, coordinator_session, run_dir FROM overmind_workflows WHERE id = 11").get();

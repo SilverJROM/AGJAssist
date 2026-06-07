@@ -150,6 +150,7 @@ export interface OvermindWorkflow {
   paused_by: string | null;
   last_parent_update_at: string | null;
   evidence_idle_threshold_override_minutes: number | null;
+  orphaned: boolean;
   spark_health?: SparkHealth;
   created_at: string;
   updated_at: string;
@@ -177,4 +178,5 @@ export interface UpdateOvermindWorkflowInput {
   child_statuses?: OvermindChildSessionStatus[];
   info_request?: string | null;
   info_check?: string | null;
+  orphaned?: boolean;
 }

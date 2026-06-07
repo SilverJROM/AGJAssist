@@ -208,6 +208,8 @@ export class OvermindWatcher {
         paneHashChanged: childHashChanges.get(session) === true
       })
     }));
+    const noLiveChildSession = childStatuses.every((child) => child.status === "closed");
+    const orphaned = !coordinatorSessionExists && noLiveChildSession;
     const parentStatus = classifyParentSession({
       coordinatorPane,
       coordinatorHashPrev: workflow.last_pane_hash,
@@ -258,6 +260,7 @@ export class OvermindWatcher {
         active_role: activeAttribution.active_role,
         parent_status: effectiveParentStatus,
         child_statuses: childStatuses,
+        orphaned,
         ...(result.lastActivityAt ? { last_activity_at: result.lastActivityAt } : {})
       });
       return;
@@ -400,6 +403,22 @@ export class OvermindWatcher {
         active_role: activeAttribution.active_role,
         parent_status: effectiveParentStatus,
         child_statuses: childStatuses,
+        orphaned,
+        ...(effectiveResult.lastActivityAt ? { last_activity_at: effectiveResult.lastActivityAt } : {})
+      });
+      return;
+    }
+    if (orphaned && !allTasksComplete(workflow.tasks)) {
+      this.overmindService.update(workflow.id, {
+        status: effectiveResult.status === "working" ? "stuck" : effectiveResult.status,
+        pending_decision: effectiveResult.pendingDecision,
+        last_pane_hash: effectiveResult.coordinatorHash,
+        stuck_since: effectiveResult.stuckSince ?? now,
+        active_session: activeAttribution.active_session,
+        active_role: activeAttribution.active_role,
+        parent_status: "no-session",
+        child_statuses: childStatuses,
+        orphaned: true,
         ...(effectiveResult.lastActivityAt ? { last_activity_at: effectiveResult.lastActivityAt } : {})
       });
       return;
@@ -410,8 +429,9 @@ export class OvermindWatcher {
         coordinatorPane,
         effectiveResult.coordinatorHash,
         activeAttribution,
-        effectiveParentStatus,
+        orphaned ? "no-session" : effectiveParentStatus,
         childStatuses,
+        orphaned,
         resolvedRunDir,
         {
           overmindService: this.overmindService,
@@ -465,6 +485,7 @@ export class OvermindWatcher {
       child_statuses: childStatuses,
       info_request: info.info_request,
       info_check: info.info_check,
+      orphaned: false,
       ...nudgeFields,
       ...(effectiveResult.lastActivityAt ? { last_activity_at: effectiveResult.lastActivityAt } : {})
     });

@@ -563,6 +563,17 @@ export class DatabaseService {
         }
       }
 
+      // Migration: v28 → v29: mark OVM runs whose parent coordinator and child
+      // sessions are all gone. Kept as a flag so the future ERROR tab can own
+      // display without changing the owner's completion path.
+      if (current && current.version < 29) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("orphaned")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN orphaned INTEGER NOT NULL DEFAULT 0");
+        }
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);

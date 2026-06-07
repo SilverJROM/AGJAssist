@@ -79,6 +79,7 @@ interface OvermindWorkflowRow {
   paused_by: string | null;
   last_parent_update_at: string | null;
   evidence_idle_threshold_override_minutes: number | null;
+  orphaned: number;
   created_at: string;
   updated_at: string;
 }
@@ -180,7 +181,8 @@ export class OvermindService {
          FROM overmind_workflows w
          JOIN overmind_projects p ON p.id = w.project_id
          WHERE p.slug = ?
-           AND w.status NOT IN ('completed', 'failed', 'paused')`
+           AND w.status NOT IN ('completed', 'failed', 'paused')
+           AND w.orphaned = 0`
       )
       .get(slug) as { count: number } | undefined;
     return row?.count ?? 0;
@@ -316,6 +318,7 @@ export class OvermindService {
                  tier = 0,
                  last_notified_transition = NULL,
                  completion_check = NULL,
+                 orphaned = 0,
                  run_started_at = COALESCE(run_started_at, ?),
                  updated_at = ?
              WHERE id = ?
@@ -488,6 +491,7 @@ export class OvermindService {
          FROM overmind_workflows w
          JOIN overmind_projects p ON p.id = w.project_id
          WHERE w.status NOT IN ('completed', 'failed', 'paused')
+           AND w.orphaned = 0
          ORDER BY datetime(w.created_at) ASC, w.id ASC`
       )
       .all() as ActiveRunRow[];
@@ -613,7 +617,8 @@ export class OvermindService {
       parent_status: fields.parent_status !== undefined ? fields.parent_status : existing.parent_status,
       child_statuses: fields.child_statuses ?? existing.child_statuses,
       info_request: fields.info_request !== undefined ? fields.info_request : existing.info_request,
-      info_check: fields.info_check !== undefined ? fields.info_check : existing.info_check
+      info_check: fields.info_check !== undefined ? fields.info_check : existing.info_check,
+      orphaned: fields.orphaned !== undefined ? fields.orphaned : existing.orphaned
     };
 
     this.db
@@ -640,6 +645,7 @@ export class OvermindService {
             child_statuses = ?,
             info_request = ?,
             info_check = ?,
+            orphaned = ?,
             updated_at = datetime('now')
         WHERE id = ?`
       )
@@ -665,6 +671,7 @@ export class OvermindService {
         JSON.stringify(next.child_statuses),
         next.info_request,
         next.info_check,
+        next.orphaned ? 1 : 0,
         id
       );
 
@@ -879,6 +886,7 @@ export class OvermindService {
     return {
       ...row,
       monitoring_paused: row.monitoring_paused === 1,
+      orphaned: row.orphaned === 1,
       child_sessions: this.parseJsonArray<string>(row.child_sessions),
       child_roles: this.parseJsonArray<string>(row.child_roles),
       tasks: this.parseJsonArray<OvermindTask>(row.tasks),

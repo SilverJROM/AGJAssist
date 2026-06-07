@@ -74,15 +74,17 @@ function testConfig(): AppConfig {
   };
 }
 
-function makeTmuxMock(panes: Record<string, string>) {
+function makeTmuxMock(panes: Record<string, string>, sessionAlive?: Record<string, boolean>) {
   return {
     capturePane: vi.fn(async (target: string) => panes[target] ?? ""),
     sendCommand: vi.fn(async () => ({ message: "sent", blocked: false })),
-    sendAndSubmit: vi.fn(async () => true)
+    sendAndSubmit: vi.fn(async () => true),
+    sessionExists: vi.fn(async (target: string) => sessionAlive?.[target] ?? true)
   } as unknown as TmuxService & {
     capturePane: ReturnType<typeof vi.fn>;
     sendCommand: ReturnType<typeof vi.fn>;
     sendAndSubmit: ReturnType<typeof vi.fn>;
+    sessionExists: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -196,7 +198,7 @@ describe("Overmind watcher nudge ladder", () => {
     expect(tmux.sendAndSubmit.mock.calls.every((call: [string, string]) => call[0] === "coord-1")).toBe(true);
   });
 
-  it("records all-done on first detection, then auto-completes on the following all-done tick", async () => {
+  it("nudges the live owner once for an all-done run and never auto-completes it", async () => {
     const notify = vi.fn(async () => {});
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "lkvc",
@@ -218,29 +220,25 @@ describe("Overmind watcher nudge ladder", () => {
 
     await watcher.tick();
     let updated = service.get(workflow.id);
-    expect(updated?.status).not.toBe("completed");
+    expect(updated?.status).toBe("active");
     expect(updated?.completion_check).toBe("2/2");
+    expect(updated?.orphaned).toBe(false);
     expect(updated?.last_notified_transition).toBeNull();
-    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit.mock.calls[0][0]).toBe("coord-done");
+    expect(tmux.sendAndSubmit.mock.calls[0][1]).toContain("POST /api/overmind/complete");
     expect(notify).not.toHaveBeenCalled();
 
     await watcher.tick();
     updated = service.get(workflow.id);
-    expect(updated?.status).toBe("completed");
+    expect(updated?.status).toBe("active");
     expect(updated?.ended_at).not.toBeNull();
-    expect(updated?.last_notified_transition).toBe("done:completed");
-    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify.mock.calls[0][0]).toContain("✅ lkvc completed.");
-
-    // Subsequent ticks must not re-notify once the workflow is terminal.
-    await watcher.tick();
-    updated = service.get(workflow.id);
-    expect(updated?.status).toBe("completed");
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(updated?.last_notified_transition).toBeNull();
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
   });
 
-  it("auto-completes already-parked all-done workflows on the completion-check early return", async () => {
+  it("keeps already-nudged all-done workflows parked without per-tick nudge spam", async () => {
     const notify = vi.fn(async () => {});
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "parked-done",
@@ -268,19 +266,87 @@ describe("Overmind watcher nudge ladder", () => {
 
     await watcher.tick();
     const updated = service.get(workflow.id);
-    expect(updated?.status).toBe("completed");
+    expect(updated?.status).toBe("stuck");
     expect(updated?.stuck_since).toBeNull();
     expect(updated?.nudge_count).toBe(0);
     expect(updated?.tier).toBe(0);
-    expect(updated?.last_notified_transition).toBe("done:completed");
+    expect(updated?.orphaned).toBe(false);
+    expect(updated?.last_notified_transition).toBeNull();
     expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
 
     await watcher.tick();
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
-  it("auto-completes already-parked working all-done workflows even when the coordinator pane changes", async () => {
+  it("marks all-done runs orphaned when the parent and children are dead, without nudging or completing", async () => {
+    const notify = vi.fn(async () => {});
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "dead-owner-done",
+      coordinator_session: "coord-dead-done",
+      child_sessions: ["child-dead-done"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.setTasks(workflow.id, "all batches done — owner gone", [
+      { id: "b1", label: "B1", state: "done" },
+      { id: "b2", label: "B2", state: "done" }
+    ]);
+
+    const tmux = makeTmuxMock(
+      {
+        "coord-dead-done": "",
+        "child-dead-done": ""
+      },
+      {
+        "coord-dead-done": false,
+        "child-dead-done": false
+      }
+    );
+    const watcher = new OvermindWatcher(service, tmux, notify);
+
+    await watcher.tick();
+    const updated = service.get(workflow.id);
+    expect(updated?.status).not.toBe("completed");
+    expect(updated?.orphaned).toBe(true);
+    expect(updated?.parent_status).toBe("no-session");
+    expect(updated?.completion_check).toBe("2/2");
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("clears orphaned when the parent session becomes alive again", async () => {
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "orphan-recovers",
+      coordinator_session: "coord-recovers",
+      child_sessions: ["child-recovers"],
+      run_dir: "/tmp/overmind-nudge"
+    });
+    service.update(workflow.id, {
+      orphaned: true,
+      parent_status: "no-session",
+      status: "stuck"
+    });
+
+    const tmux = makeTmuxMock(
+      {
+        "coord-recovers": "owner resumed",
+        "child-recovers": ""
+      },
+      {
+        "coord-recovers": true,
+        "child-recovers": false
+      }
+    );
+    const watcher = new OvermindWatcher(service, tmux);
+
+    await watcher.tick();
+    const updated = service.get(workflow.id);
+    expect(updated?.orphaned).toBe(false);
+    expect(updated?.parent_status).not.toBe("no-session");
+  });
+
+  it("keeps already-nudged working all-done workflows visible even when the coordinator pane changes", async () => {
     const notify = vi.fn(async () => {});
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "parked-working",
@@ -309,21 +375,22 @@ describe("Overmind watcher nudge ladder", () => {
 
     await watcher.tick();
     let updated = service.get(workflow.id);
-    expect(updated?.status).toBe("completed");
+    expect(updated?.status).toBe("working");
     expect(updated?.stuck_since).toBeNull();
     expect(updated?.nudge_count).toBe(0);
     expect(updated?.tier).toBe(0);
-    expect(updated?.last_notified_transition).toBe("done:completed");
+    expect(updated?.orphaned).toBe(false);
+    expect(updated?.last_notified_transition).toBeNull();
     expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
 
     await watcher.tick();
     updated = service.get(workflow.id);
-    expect(updated?.status).toBe("completed");
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(updated?.status).toBe("working");
+    expect(notify).not.toHaveBeenCalled();
   });
 
-  it("auto-completes all-done workflows even when subagentInFlight is set", async () => {
+  it("keeps all-done workflows visible even when subagentInFlight is set", async () => {
     const notify = vi.fn(async () => {});
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "subagent-all-done",
@@ -348,10 +415,10 @@ describe("Overmind watcher nudge ladder", () => {
 
     await watcher.tick();
     const updated = service.get(workflow.id);
-    expect(updated?.status).toBe("completed");
-    expect(updated?.last_notified_transition).toBe("done:completed");
+    expect(updated?.status).toBe("working");
+    expect(updated?.last_notified_transition).toBeNull();
     expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("keeps subagentInFlight workflows with remaining tasks working", async () => {
@@ -382,7 +449,7 @@ describe("Overmind watcher nudge ladder", () => {
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it("keeps brand-new brain-working all-done workflows active for one tick, then closes if still all done", async () => {
+  it("keeps brain-working all-done workflows active without auto-completing on later ticks", async () => {
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "lkvc",
       coordinator_session: "coord-working",
@@ -417,10 +484,11 @@ describe("Overmind watcher nudge ladder", () => {
     expect(notify).not.toHaveBeenCalled();
 
     await watcher.tick();
-    const completed = service.get(workflow.id);
-    expect(completed?.status).toBe("completed");
-    expect(completed?.last_notified_transition).toBe("done:completed");
-    expect(notify).toHaveBeenCalledTimes(1);
+    const stillWorking = service.get(workflow.id);
+    expect(stillWorking?.status).toBe("working");
+    expect(stillWorking?.last_notified_transition).toBeNull();
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it("resets nudge count and tier when the workflow returns to working", async () => {

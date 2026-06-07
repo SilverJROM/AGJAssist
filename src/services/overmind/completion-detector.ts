@@ -5,7 +5,6 @@ import {
   type CompletionVerdict,
   type OvermindBrain
 } from "../overmind-brain.js";
-import { buildDoneNotification } from "../overmind-notifications.js";
 import type {
   OvermindChildSessionStatus,
   OvermindParentStatus,
@@ -17,6 +16,7 @@ import type { OvermindNotify } from "../overmind-watcher.js";
 import type { TmuxService } from "../../tmux/tmux-service.js";
 import type { ActiveSessionAttribution } from "./active-session-attribution.js";
 import { collectPriorDecisions } from "./decision-match.js";
+import { sendGuardedParentNudge } from "./parent-nudge-guard.js";
 
 const BRAIN_COORDINATOR_TAIL_LINES = 40;
 const BRAIN_RUN_FILE_TAIL_LINES = 80;
@@ -37,6 +37,7 @@ export async function handleAllTasksDone(
   attribution: ActiveSessionAttribution,
   parentStatus: OvermindParentStatus,
   childStatuses: OvermindChildSessionStatus[],
+  isOrphaned: boolean,
   resolvedRunDir: string,
   deps: CompletionDetectorDeps
 ): Promise<void> {
@@ -53,9 +54,27 @@ export async function handleAllTasksDone(
       active_session: attribution.active_session,
       active_role: attribution.active_role,
       parent_status: parentStatus,
-      child_statuses: childStatuses
+      child_statuses: childStatuses,
+      orphaned: isOrphaned
     });
-    await completeWorkflowOnce(workflow, deps);
+    return;
+  }
+
+  if (isOrphaned) {
+    deps.overmindService.update(workflow.id, {
+      status: workflow.status === "working" ? "stuck" : workflow.status,
+      pending_decision: null,
+      last_pane_hash: coordinatorHash,
+      stuck_since: workflow.stuck_since ?? new Date().toISOString(),
+      nudge_count: 0,
+      tier: 0,
+      completion_check: signature,
+      active_session: attribution.active_session,
+      active_role: attribution.active_role,
+      parent_status: parentStatus,
+      child_statuses: childStatuses,
+      orphaned: true
+    });
     return;
   }
 
@@ -73,12 +92,25 @@ export async function handleAllTasksDone(
       active_session: attribution.active_session,
       active_role: attribution.active_role,
       parent_status: parentStatus,
-      child_statuses: childStatuses
+      child_statuses: childStatuses,
+      orphaned: false
     });
     return;
   }
 
+  await sendGuardedParentNudge(
+    workflow,
+    `overmind: ${verdict.consultText}`,
+    {
+      overmindService: deps.overmindService,
+      nudgeState: deps.nudgeState,
+      notify: deps.notify
+    },
+    (target, text) => deps.tmuxService.sendAndSubmit(target, text)
+  );
+
   deps.overmindService.update(workflow.id, {
+    status: workflow.status === "working" ? "stuck" : workflow.status,
     pending_decision: null,
     last_pane_hash: coordinatorHash,
     stuck_since: null,
@@ -88,26 +120,9 @@ export async function handleAllTasksDone(
     active_session: attribution.active_session,
     active_role: attribution.active_role,
     parent_status: parentStatus,
-    child_statuses: childStatuses
+    child_statuses: childStatuses,
+    orphaned: false
   });
-}
-
-async function completeWorkflowOnce(
-  workflow: OvermindWorkflow,
-  deps: CompletionDetectorDeps
-): Promise<void> {
-  const completed = deps.overmindService.setStatus(workflow.id, "completed", { touchParentUpdate: true });
-  if (
-    workflow.status !== "completed" &&
-    completed &&
-    deps.overmindService.markNotificationTransition(completed.id, "done:completed")
-  ) {
-    try {
-      await deps.notify?.(buildDoneNotification(completed));
-    } catch (error) {
-      console.error("Overmind DONE notify failed:", error);
-    }
-  }
 }
 
 async function assessCompletion(

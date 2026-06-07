@@ -344,7 +344,7 @@ function registerAllDoneWorkflow(): OvermindWorkflow {
 }
 
 describe("Overmind completion-edge verification (all tasks done, no /complete)", () => {
-  it("consults projcore once (Sonnet), records all-done, then auto-completes without re-running Sonnet", async () => {
+  it("consults projcore once (Sonnet), nudges the owner once, and never auto-completes", async () => {
     registerAllDoneWorkflow();
     const notify = vi.fn(async () => {});
     const brain = new FakeBrain(undefined, undefined, {
@@ -364,17 +364,21 @@ describe("Overmind completion-edge verification (all tasks done, no /complete)",
     expect(after?.completion_check).toBe("2/2");
     expect(after?.last_notified_transition).toBeNull();
     expect(brain.completionCalls).toHaveLength(1);
-    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledWith(
+      "coord-1",
+      "overmind: Overmind: list shows all done — POST /complete if finished, else update it."
+    );
     expect(notify).not.toHaveBeenCalled();
 
-    // Same all-done signature closes without a second Sonnet call or token spend.
+    // Same all-done signature stays parked without a second Sonnet call, nudge, or OVM completion.
     await watcher.tick();
     after = service.getBySession("coord-1");
     expect(brain.completionCalls).toHaveLength(1);
-    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
-    expect(notify).toHaveBeenCalledTimes(1);
-    expect(after?.status).toBe("completed");
-    expect(after?.last_notified_transition).toBe("done:completed");
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
+    expect(after?.status).not.toBe("completed");
+    expect(after?.last_notified_transition).toBeNull();
   });
 
   it("on a 'working' false-alarm verdict it sends no nudge and keeps monitoring", async () => {

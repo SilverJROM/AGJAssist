@@ -85,6 +85,7 @@ function workflow(overrides: Partial<OvermindWorkflow> = {}): OvermindWorkflow {
     paused_by: null,
     last_parent_update_at: null,
     evidence_idle_threshold_override_minutes: null,
+    orphaned: false,
     created_at: "2026-05-21T00:00:00.000Z",
     updated_at: "2026-05-21T00:00:00.000Z",
     ...overrides
