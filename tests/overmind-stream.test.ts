@@ -382,9 +382,10 @@ describe("Overmind public helpers", () => {
     expect(summarizeWorkflows([
       { status: "working" },
       { status: "waiting_human" },
+      { status: "stuck", orphaned: true },
       { status: "completed" },
       { status: "paused" }
-    ])).toEqual({ total: 4, active: 2 });
+    ])).toEqual({ total: 5, active: 2 });
     expect(summarizeWorkflows(null)).toEqual({ total: 0, active: 0 });
   });
 

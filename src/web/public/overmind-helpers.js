@@ -74,7 +74,7 @@ export function summarizeWorkflows(workflows) {
   const rows = Array.isArray(workflows) ? workflows : [];
   return {
     total: rows.length,
-    active: rows.filter(workflow => isActiveStatus(workflow?.status)).length
+    active: rows.filter(workflow => isActiveStatus(workflow?.status) && workflow?.orphaned !== true).length
   };
 }
 

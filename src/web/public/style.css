@@ -665,6 +665,14 @@ body {
   background: var(--bg);
   color: var(--text);
 }
+.overmind-tab-error {
+  color: #f85149;
+}
+.overmind-tab-error.active {
+  border-color: rgba(248,81,73,0.34);
+  background: rgba(248,81,73,0.12);
+  color: #f85149;
+}
 .ovm-console {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1090,6 +1098,14 @@ body {
 }
 .overmind-substatus strong {
   color: var(--text);
+  font-weight: 600;
+}
+.overmind-orphan-sessions {
+  color: var(--text);
+  font-weight: 500;
+}
+.overmind-orphan-reason {
+  color: #f85149;
   font-weight: 600;
 }
 .overmind-spark-tile {

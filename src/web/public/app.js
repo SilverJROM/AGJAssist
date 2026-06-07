@@ -1068,10 +1068,19 @@ function OvermindWorkflows() {
 
   if (loading) return html`<div class="loading">Loading workflows...</div>`;
 
-  const activeWorkflows = workflows.filter(workflow => isActiveStatus(workflow.status));
+  const orphanWorkflows = workflows.filter(workflow => workflow.orphaned === true);
+  const activeWorkflows = workflows.filter(workflow => isActiveStatus(workflow.status) && workflow.orphaned !== true);
   const completedWorkflows = workflows.filter(workflow => workflow.status === 'completed' || workflow.status === 'paused');
-  const visibleWorkflows = workflowTab === 'completed' ? completedWorkflows : activeWorkflows;
-  const tabEmptyText = workflowTab === 'completed' ? 'No completed workflows' : 'No active workflows';
+  const visibleWorkflows = workflowTab === 'completed'
+    ? completedWorkflows
+    : workflowTab === 'error'
+      ? orphanWorkflows
+      : activeWorkflows;
+  const tabEmptyText = workflowTab === 'completed'
+    ? 'No completed workflows'
+    : workflowTab === 'error'
+      ? 'No orphaned workflows'
+      : 'No active workflows';
 
   return html`
     <div class="overmind-page">
@@ -1106,6 +1115,15 @@ function OvermindWorkflows() {
           onclick=${() => setWorkflowTab('completed')}
         >
           Completed (${completedWorkflows.length})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected=${workflowTab === 'error'}
+          class=${'overmind-tab ' + (workflowTab === 'error' ? 'active overmind-tab-error' : 'overmind-tab-error')}
+          onclick=${() => setWorkflowTab('error')}
+        >
+          ERROR (${orphanWorkflows.length})
         </button>
         <button
           type="button"
@@ -1234,7 +1252,11 @@ function OvermindWorkflows() {
               role: (childRoles[i] && String(childRoles[i]).trim()) || (childSessions.length > 1 ? `child ${i + 1}` : 'child'),
               status: childSessionStatus(workflow, session)
             }));
-            const colorClass = statusColor(workflow.status);
+            const isOrphan = workflow.orphaned === true;
+            const orphanChildSummary = childAgents.length
+              ? childAgents.map(agent => `${agent.session || 'n/a'} (${agent.status || 'unknown'})`).join(', ')
+              : 'none';
+            const colorClass = isOrphan ? 'ovm-red' : statusColor(workflow.status);
             const isExpanded = !!expandedWorkflows[workflow.id];
             const runStartedAt = workflow.run_started_at || workflow.created_at;
             const currentElapsed = formatElapsed(currentElapsedMs(runStartedAt, workflow.ended_at, now));
@@ -1313,6 +1335,12 @@ function OvermindWorkflows() {
                 <div class="overmind-substatus">
                   <div class="overmind-task-line"><span><strong>task#${currentTask.id}:</strong> ${workflow.current_task || '—'}</span><span class="overmind-task-count">${doneTasks}/${totalTasks}</span></div>
                   <div>${currentTask.description}</div>
+                  ${isOrphan && html`
+                    <div class="overmind-orphan-sessions">
+                      Parent: ${workflow.coordinator_session || '—'} (${parentStatus || 'unknown'}) · Children: ${orphanChildSummary}
+                    </div>
+                    <div class="overmind-orphan-reason">No active parent session — orphaned (parent must resume or this needs cleanup)</div>
+                  `}
                 </div>
                 ${renderSparkHealthTile(workflow)}
 

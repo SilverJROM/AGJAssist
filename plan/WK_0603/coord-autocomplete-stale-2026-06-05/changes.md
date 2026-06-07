@@ -236,3 +236,108 @@
 ### Caveats
 
 - Live `wf=20` completion after deploy is left for coord validation over the running watcher ticks.
+
+## Issue-003 Iteration 1
+
+### User Report
+
+> "ask the parent agent to confirm, always nudge the owners of the task to complete it ovm does not do it"
+>
+> "ask owner agent again, ovm only reports what is given to him, the only exception i see here is if there i no active parent agent session anymore, with that we need to add a new tab named 'ERROR' where there is an orphan tasks with no parent, otherwise let the parent settle it he needs to complete it or start working again"
+
+### Root Cause / Mechanism
+
+- `handleAllTasksDone` used `completion_check` as a one-tick grace marker, then called `completeWorkflowOnce` on the next matching all-done tick.
+- `completeWorkflowOnce` called `overmindService.setStatus(id, "completed")`, which let OVM close runs from watcher judgment instead of waiting for the owner path at `POST /api/overmind/complete`.
+- The watcher already had parent and child tmux liveness in the same tick, but there was no persisted run flag for the special case where no parent coordinator session and no child session are alive.
+
+### Files Changed
+
+- `src/services/overmind/completion-detector.ts` - removed watcher-side completion and DONE notification; all-done now either sends one guarded owner-confirmation nudge per `completion_check` signature or marks the run orphaned when no owner/child session is alive.
+- `src/services/overmind-watcher.ts` - computes parent/child liveness, threads orphan detection into all-done handling, sets `orphaned=true` for dead-parent/dead-child runs with remaining tasks, and clears `orphaned=false` when the owner path is live again.
+- `src/services/overmind-service.ts`, `src/services/overmind/types.ts` - exposes the `orphaned` boolean in workflow payloads and excludes orphaned runs from daemon/project active-run counts.
+- `src/db/schema.ts`, `src/db/database.ts` - bumped schema to v29 and added `overmind_workflows.orphaned INTEGER NOT NULL DEFAULT 0`.
+- `tests/overmind-nudge.test.ts`, `tests/overmind-brain.test.ts` - replaced auto-complete assertions with owner-nudge, no-spam, orphan, and recovery coverage.
+- `tests/overmind-service.test.ts`, `tests/unit/database.spec.ts`, `tests/overmind-reconcile.test.ts`, `tests/overmind-stream.test.ts`, `tests/overmind-subagent.test.ts`, `tests/notes-migration.test.ts`, `tests/notes-folders.test.ts` - updated schema/type expectations for v29 and `orphaned`.
+
+### What Changed
+
+- OVM no longer calls `setStatus("completed")` from `handleAllTasksDone`.
+- All-done + live owner sends one guarded parent nudge asking the owner to confirm and `POST /api/overmind/complete`.
+- Repeated ticks for the same all-done signature do not re-nudge and do not complete.
+- Parent dead + no live child sets `orphaned=true` and suppresses nudges.
+- Parent alive on a later tick clears `orphaned=false`.
+- Owner completion remains the existing `/api/overmind/complete` path.
+
+### Verification
+
+- command or method: `npx tsc --noEmit`
+- result: PASS
+- evidence: completed with exit code 0.
+
+- command or method: `npx vitest run tests/overmind-nudge.test.ts tests/overmind-service.test.ts tests/unit/database.spec.ts tests/overmind-routes.test.ts`
+- result: PASS
+- evidence: 4 files passed, 135 tests passed.
+
+- command or method: `npx vitest run`
+- result: PASS
+- evidence: 41 files passed, 553 tests passed, 1 skipped.
+
+### Standing Rules
+
+- OVM is a reporter and nudger. OVM must not auto-complete or auto-resolve a run from watcher judgment.
+- The owner closes a run by posting `/api/overmind/complete`.
+- The only OVM-side exception is orphan detection: parent coordinator session dead and no live child session sets `orphaned=true`.
+
+### Caveats
+
+- The ERROR tab UI is intentionally not included; the backend now exposes `orphaned` for that follow-up.
+- Live all-done owner-nudge behavior is left for coord validation after dev deploy.
+
+## Issue-004 Iteration 1
+
+### User Report
+
+> "the only exception … no active parent agent session anymore … we need to add a new tab named 'ERROR' where there is an orphan tasks with no parent."
+
+### Root Cause / Mechanism
+
+- Issue-003 exposed `workflow.orphaned` in the backend payload, but the Overmind workflow view still derived its Active tab only from `isActiveStatus(workflow.status)`.
+- Because `orphaned` workflows can still have an active/stuck status, the UI had no separate ERROR bucket and would continue listing those rows in Active.
+- The dashboard quick-view summary used the same status-only active count, so orphaned active-status rows could inflate the active count there too.
+
+### Files Changed
+
+- `src/web/public/app.js` - added the ERROR tab with `ERROR (N)`, filtered Active to exclude `orphaned === true`, routed the ERROR tab to orphan-only workflows, and added the visible orphan reason line on orphan rows.
+- `src/web/public/style.css` - added restrained ERROR tab and orphan reason styling using the existing red OVM status color.
+- `src/web/public/overmind-helpers.js` - excluded orphaned workflows from the active quick-view count.
+- `tests/overmind-stream.test.ts` - added regression coverage that an orphaned stuck workflow is counted in total but excluded from active summary.
+
+### What Changed
+
+- Active tab now shows only active/stuck-style workflows where `orphaned !== true`.
+- ERROR tab shows only workflows where `orphaned === true`.
+- Orphan cards keep the existing workflow row rendering and show: "No active parent session — orphaned (parent must resume or this needs cleanup)".
+- Completed and History behavior is unchanged.
+
+### Verification
+
+- command or method: `npx tsc --noEmit`
+- result: PASS
+- evidence: completed with exit code 0.
+
+- command or method: `npx vitest run tests/overmind-stream.test.ts`
+- result: PASS
+- evidence: 1 file passed, 13 tests passed.
+
+- command or method: `npx vitest run`
+- result: PASS
+- evidence: 41 files passed, 553 tests passed, 1 skipped.
+
+### Standing Rules
+
+- Active workflow lists and counts must exclude `orphaned === true`; orphaned workflows belong only in ERROR until the parent session recovers or cleanup happens.
+
+### Caveats
+
+- Screenshot evidence is captured after dev deploy with a temporary live DB orphan fixture and then removed.
