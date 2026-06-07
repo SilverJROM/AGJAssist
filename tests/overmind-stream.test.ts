@@ -10,6 +10,7 @@ import { TmuxService } from "../src/tmux/tmux-service.js";
 import {
   buildOvermindWsUrl,
   buildTmuxWsUrl,
+  completedWorkflowsMostRecent,
   countDoneTasks,
   currentElapsedMs,
   elapsedMs,
@@ -387,6 +388,24 @@ describe("Overmind public helpers", () => {
       { status: "paused" }
     ])).toEqual({ total: 5, active: 2 });
     expect(summarizeWorkflows(null)).toEqual({ total: 0, active: 0 });
+  });
+
+  it("returns the most recent completed workflows at the selected limit", () => {
+    const rows = [
+      { id: 1, status: "completed", ended_at: "2026-06-01T00:00:00.000Z", updated_at: "2026-06-10T00:00:00.000Z" },
+      { id: 2, status: "completed", ended_at: null, updated_at: "2026-06-04T00:00:00.000Z" },
+      { id: 3, status: "working", ended_at: "2026-06-09T00:00:00.000Z", updated_at: "2026-06-09T00:00:00.000Z" },
+      { id: 4, status: "paused", ended_at: "2026-06-05T00:00:00.000Z", updated_at: "2026-06-05T00:00:00.000Z" },
+      { id: 5, status: "completed", ended_at: "2026-06-03T00:00:00.000Z", updated_at: "2026-06-03T00:00:00.000Z" },
+      { id: 6, status: "completed", ended_at: "2026-06-02T00:00:00.000Z", updated_at: "2026-06-02T00:00:00.000Z" },
+      { id: 7, status: "completed", ended_at: "2026-05-31T00:00:00.000Z", updated_at: "2026-05-31T00:00:00.000Z" },
+      { id: 8, status: "paused", ended_at: "2026-06-06T00:00:00.000Z", updated_at: "2026-06-06T00:00:00.000Z" }
+    ];
+
+    expect(completedWorkflowsMostRecent(rows, 5).map(row => row.id)).toEqual([8, 4, 2, 5, 6]);
+    expect(completedWorkflowsMostRecent(rows, 10).map(row => row.id)).toEqual([8, 4, 2, 5, 6, 1, 7]);
+    expect(completedWorkflowsMostRecent(rows, 15).map(row => row.id)).toEqual([8, 4, 2, 5, 6, 1, 7]);
+    expect(completedWorkflowsMostRecent(rows, 999).map(row => row.id)).toEqual([8, 4, 2, 5, 6, 1, 7]);
   });
 
   it("groups archived task history by workflow with newest entries first", () => {

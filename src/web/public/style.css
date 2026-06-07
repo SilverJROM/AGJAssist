@@ -673,6 +673,24 @@ body {
   background: rgba(248,81,73,0.12);
   color: #f85149;
 }
+.overmind-completed-controls {
+  align-items: center;
+  color: var(--text-secondary);
+  display: inline-flex;
+  gap: 8px;
+  font-size: 13px;
+}
+.overmind-completed-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font: inherit;
+  min-height: 30px;
+  padding: 4px 8px;
+  width: auto;
+  min-width: 64px;
+}
 .ovm-console {
   border: 1px solid var(--border);
   border-radius: var(--radius);

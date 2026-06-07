@@ -9,6 +9,7 @@ import {
   addBottomNavTab,
   buildOvermindWsUrl,
   buildTmuxWsUrl,
+  completedWorkflowsMostRecent,
   countDoneTasks,
   currentElapsedMs,
   formatElapsed,
@@ -824,6 +825,7 @@ function OvermindWorkflows() {
   const [runDrilldown, setRunDrilldown] = useState({});
   const [runDrilldownLoading, setRunDrilldownLoading] = useState({});
   const [workflowTab, setWorkflowTab] = useState('active');
+  const [completedLimit, setCompletedLimit] = useState(10);
   const [failsafeThresholdSystemMin, setFailsafeThresholdSystemMin] = useState(30);
   const [failsafeToast, setFailsafeToast] = useState('');
   const [registrationToast, setRegistrationToast] = useState('');
@@ -1070,7 +1072,8 @@ function OvermindWorkflows() {
 
   const orphanWorkflows = workflows.filter(workflow => workflow.orphaned === true);
   const activeWorkflows = workflows.filter(workflow => isActiveStatus(workflow.status) && workflow.orphaned !== true);
-  const completedWorkflows = workflows.filter(workflow => workflow.status === 'completed' || workflow.status === 'paused');
+  const completedTotal = workflows.filter(workflow => workflow.status === 'completed' || workflow.status === 'paused').length;
+  const completedWorkflows = completedWorkflowsMostRecent(workflows, completedLimit);
   const visibleWorkflows = workflowTab === 'completed'
     ? completedWorkflows
     : workflowTab === 'error'
@@ -1114,7 +1117,7 @@ function OvermindWorkflows() {
           class=${'overmind-tab ' + (workflowTab === 'completed' ? 'active' : '')}
           onclick=${() => setWorkflowTab('completed')}
         >
-          Completed (${completedWorkflows.length})
+          Completed (${completedTotal})
         </button>
         <button
           type="button"
@@ -1236,13 +1239,43 @@ function OvermindWorkflows() {
             })}
           </div>
         `}
+      ` : workflowTab === 'completed' ? html`
+        <div class="overmind-completed-controls">
+          <label for="overmind-completed-limit">Show past runs</label>
+          <select
+            id="overmind-completed-limit"
+            class="overmind-completed-select"
+            value=${String(completedLimit)}
+            onChange=${(e) => setCompletedLimit(Number(e.target.value))}
+          >
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
+          </select>
+        </div>
+        ${workflows.length === 0 ? html`
+          <div class="empty-state">No workflows registered.</div>
+        ` : visibleWorkflows.length === 0 ? html`
+          <div class="empty-state">${tabEmptyText}</div>
+        ` : html`
+          <div class="item-list overmind-list">
+            ${renderWorkflowCards(visibleWorkflows)}
+          </div>
+        `}
       ` : workflows.length === 0 ? html`
         <div class="empty-state">No workflows registered.</div>
       ` : visibleWorkflows.length === 0 ? html`
         <div class="empty-state">${tabEmptyText}</div>
       ` : html`
         <div class="item-list overmind-list">
-          ${visibleWorkflows.map(workflow => {
+          ${renderWorkflowCards(visibleWorkflows)}
+        </div>
+      `}
+    </div>
+  `;
+
+  function renderWorkflowCards(rows) {
+    return rows.map(workflow => {
             const tasks = Array.isArray(workflow.tasks) ? workflow.tasks : [];
             const doneCount = countDoneTasks(tasks);
             const childSessions = Array.isArray(workflow.child_sessions) ? workflow.child_sessions : [];
@@ -1438,11 +1471,8 @@ function OvermindWorkflows() {
                 `}
               </section>
             `;
-          })}
-        </div>
-      `}
-    </div>
-  `;
+          });
+  }
 }
 
 // Projects list (moved from old Dashboard)

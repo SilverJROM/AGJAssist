@@ -341,3 +341,50 @@
 ### Caveats
 
 - Screenshot evidence is captured after dev deploy with a temporary live DB orphan fixture and then removed.
+
+## Issue-005 Iteration 1
+
+### User Report
+
+> "on the completed tab, add a dropdown to show how many past runs has been done, like 5-10-15, and only show that."
+
+### Root Cause / Mechanism
+
+- The Completed tab used every workflow whose status was `completed` or `paused` as its visible list.
+- There was no tab-scoped limit state and no explicit most-recent-first sorting before rendering, so JROM could not restrict the Completed tab to the last 5/10/15 runs.
+
+### Files Changed
+
+- `src/web/public/app.js` - added Completed-tab-only dropdown state with default `10`, kept the Completed badge as the total available count, and rendered only the selected most-recent completed rows.
+- `src/web/public/overmind-helpers.js` - added `completedWorkflowsMostRecent()` to filter completed/paused workflows, sort by `ended_at` descending with `updated_at` fallback, and enforce 5/10/15 limits.
+- `src/web/public/style.css` - added compact styling for the Completed tab dropdown.
+- `tests/overmind-stream.test.ts` - added regression coverage for most-recent-first ordering, fallback sorting, status filtering, and limit truncation.
+
+### What Changed
+
+- Completed tab now defaults to showing the last 10 completed runs.
+- Dropdown options are 5, 10, and 15 and remain in memory when switching tabs.
+- Active, ERROR, History, and OVM tabs do not show the dropdown.
+- Completed tab badge still shows the total completed/paused rows available.
+
+### Verification
+
+- command or method: `npx tsc --noEmit`
+- result: PASS
+- evidence: completed with exit code 0.
+
+- command or method: `npx vitest run tests/overmind-stream.test.ts`
+- result: PASS
+- evidence: 1 file passed, 14 tests passed.
+
+- command or method: `npx vitest run`
+- result: PASS
+- evidence: 41 files passed, 554 tests passed, 1 skipped.
+
+### Standing Rules
+
+- Completed-tab visibility controls limit only the visible list; the tab badge remains the total available completed-run count.
+
+### Caveats
+
+- Screenshot evidence is captured after dev deploy with the live Completed tab set to 5.

@@ -70,12 +70,33 @@ export function isActiveStatus(status) {
   return ['active', 'working', 'waiting_human', 'awaiting_decision', 'stuck'].includes(status);
 }
 
+export function completedWorkflowsMostRecent(workflows, limit = 10) {
+  const rows = Array.isArray(workflows) ? workflows : [];
+  const safeLimit = [5, 10, 15].includes(Number(limit)) ? Number(limit) : 10;
+  return rows
+    .filter(workflow => workflow?.status === 'completed' || workflow?.status === 'paused')
+    .sort((a, b) => {
+      const bTime = workflowCompletedSortMs(b);
+      const aTime = workflowCompletedSortMs(a);
+      if (bTime !== aTime) return bTime - aTime;
+      return Number(b?.id ?? 0) - Number(a?.id ?? 0);
+    })
+    .slice(0, safeLimit);
+}
+
 export function summarizeWorkflows(workflows) {
   const rows = Array.isArray(workflows) ? workflows : [];
   return {
     total: rows.length,
     active: rows.filter(workflow => isActiveStatus(workflow?.status) && workflow?.orphaned !== true).length
   };
+}
+
+function workflowCompletedSortMs(workflow) {
+  const ended = parseTimestampMs(workflow?.ended_at);
+  if (!Number.isNaN(ended)) return ended;
+  const updated = parseTimestampMs(workflow?.updated_at);
+  return Number.isNaN(updated) ? 0 : updated;
 }
 
 export function groupOvermindHistoryByWorkflow(history) {
