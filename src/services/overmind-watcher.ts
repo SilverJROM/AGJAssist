@@ -438,7 +438,11 @@ export class OvermindWatcher {
           tmuxService: this.tmuxService,
           brain: this.brain,
           nudgeState: this.nudgeState,
-          notify: this.notify
+          notify: this.notify,
+          appSettings: this.appSettings,
+          cooldowns: this.cooldowns,
+          subagentInFlight: this.subagentInFlight.has(wid),
+          paneChanged
         }
       );
       return;

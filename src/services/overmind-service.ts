@@ -80,6 +80,7 @@ interface OvermindWorkflowRow {
   last_parent_update_at: string | null;
   evidence_idle_threshold_override_minutes: number | null;
   orphaned: number;
+  completion_nudge_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -618,7 +619,8 @@ export class OvermindService {
       child_statuses: fields.child_statuses ?? existing.child_statuses,
       info_request: fields.info_request !== undefined ? fields.info_request : existing.info_request,
       info_check: fields.info_check !== undefined ? fields.info_check : existing.info_check,
-      orphaned: fields.orphaned !== undefined ? fields.orphaned : existing.orphaned
+      orphaned: fields.orphaned !== undefined ? fields.orphaned : existing.orphaned,
+      completion_nudge_count: fields.completion_nudge_count ?? existing.completion_nudge_count
     };
 
     this.db
@@ -646,6 +648,7 @@ export class OvermindService {
             info_request = ?,
             info_check = ?,
             orphaned = ?,
+            completion_nudge_count = ?,
             updated_at = datetime('now')
         WHERE id = ?`
       )
@@ -672,6 +675,7 @@ export class OvermindService {
         next.info_request,
         next.info_check,
         next.orphaned ? 1 : 0,
+        next.completion_nudge_count,
         id
       );
 
@@ -802,7 +806,7 @@ export class OvermindService {
 
     const tx = this.db.raw.transaction(() => {
       this.db
-        .prepare("UPDATE overmind_workflows SET current_task = ?, tasks = ?, ended_at = ?, task_log = ?, updated_at = datetime('now') WHERE id = ?")
+        .prepare("UPDATE overmind_workflows SET current_task = ?, tasks = ?, ended_at = ?, task_log = ?, completion_check = NULL, completion_nudge_count = 0, updated_at = datetime('now') WHERE id = ?")
         .run(currentTask, JSON.stringify(tasks), endedAt, JSON.stringify(taskLog), id);
 
       if (shouldLog) {
@@ -887,6 +891,7 @@ export class OvermindService {
       ...row,
       monitoring_paused: row.monitoring_paused === 1,
       orphaned: row.orphaned === 1,
+      completion_nudge_count: row.completion_nudge_count ?? 0,
       child_sessions: this.parseJsonArray<string>(row.child_sessions),
       child_roles: this.parseJsonArray<string>(row.child_roles),
       tasks: this.parseJsonArray<OvermindTask>(row.tasks),

@@ -151,6 +151,10 @@ export interface OvermindWorkflow {
   last_parent_update_at: string | null;
   evidence_idle_threshold_override_minutes: number | null;
   orphaned: boolean;
+  /** Persistent counter for the bounded completion-prompt ladder (R3).
+   *  Incremented each time OVM sends the proven completion nudge; reset only
+   *  when setTasks resyncs the task list (completion_check goes NULL). */
+  completion_nudge_count: number;
   spark_health?: SparkHealth;
   created_at: string;
   updated_at: string;
@@ -179,4 +183,5 @@ export interface UpdateOvermindWorkflowInput {
   info_request?: string | null;
   info_check?: string | null;
   orphaned?: boolean;
+  completion_nudge_count?: number;
 }

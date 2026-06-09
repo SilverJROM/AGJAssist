@@ -71,7 +71,7 @@ function attachedRun(input: {
 describe("OvermindService", () => {
   it("creates the schema v28 tables, display name, active attribution, history, notification, elapsed, completion-check, per-session status, child roles, info-request, parent-update, and monitoring-pause columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(29);
+    expect(version.version).toBe(30);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -116,6 +116,7 @@ describe("OvermindService", () => {
     expect(colNames).toContain("last_parent_update_at");
     expect(colNames).toContain("evidence_idle_threshold_override_minutes");
     expect(colNames).toContain("orphaned");
+    expect(colNames).toContain("completion_nudge_count");
     expect(cols.find((col) => col.name === "label")).toMatchObject({ notnull: 0 });
     expect(cols.find((col) => col.name === "coordinator_session")).toMatchObject({ notnull: 0 });
 
@@ -777,7 +778,7 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(29);
+    expect(version.version).toBe(30);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("display_name");
@@ -797,6 +798,7 @@ describe("OvermindService", () => {
     expect(cols.map((col) => col.name)).toContain("last_parent_update_at");
     expect(cols.map((col) => col.name)).toContain("evidence_idle_threshold_override_minutes");
     expect(cols.map((col) => col.name)).toContain("orphaned");
+    expect(cols.map((col) => col.name)).toContain("completion_nudge_count");
     expect(cols.find((col) => col.name === "label")).toMatchObject({ notnull: 0 });
     expect(cols.find((col) => col.name === "coordinator_session")).toMatchObject({ notnull: 0 });
     expect(service.getBySession("legacy-parent")?.child_roles).toEqual([]);
@@ -835,6 +837,7 @@ describe("OvermindService", () => {
     expect(cols.filter((col) => col.name === "last_parent_update_at")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "evidence_idle_threshold_override_minutes")).toHaveLength(1);
     expect(cols.filter((col) => col.name === "orphaned")).toHaveLength(1);
+    expect(cols.filter((col) => col.name === "completion_nudge_count")).toHaveLength(1);
     expect(historyCols.filter((col) => col.name === "coordinator_session")).toHaveLength(1);
   });
 

@@ -365,10 +365,12 @@ describe("Overmind completion-edge verification (all tasks done, no /complete)",
     expect(after?.last_notified_transition).toBeNull();
     expect(brain.completionCalls).toHaveLength(1);
     expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
-    expect(tmux.sendAndSubmit).toHaveBeenCalledWith(
-      "coord-1",
-      "overmind: Overmind: list shows all done — POST /complete if finished, else update it."
-    );
+    // R3: proven completion prompt — not the brain's consultText, but the template.
+    const sentMsg = (tmux.sendAndSubmit.mock.calls[0] as [string, string])[1];
+    expect((tmux.sendAndSubmit.mock.calls[0] as [string, string])[0]).toBe("coord-1");
+    expect(sentMsg).toContain('"projcore lkvc"');
+    expect(sentMsg).toContain("overmind.sh complete --run-dir");
+    expect(sentMsg).toContain("2/2 tasks DONE but is");
     expect(notify).not.toHaveBeenCalled();
 
     // Same all-done signature stays parked without a second Sonnet call, nudge, or OVM completion.

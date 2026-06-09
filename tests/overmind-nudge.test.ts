@@ -18,6 +18,7 @@ import { TmuxService } from "../src/tmux/tmux-service.js";
 import type { AppSettingsService, OvermindCooldowns } from "../src/services/app-settings-service.js";
 import { NudgeStateService } from "../src/services/nudge-state-service.js";
 import { registerAttachedWorkflowFixture } from "./overmind-fixtures.js";
+import { buildCompletionPrompt } from "../src/services/overmind/completion-detector.js";
 
 const isAgentPaneMock = vi.hoisted(() => vi.fn());
 
@@ -211,7 +212,7 @@ describe("Overmind watcher nudge ladder", () => {
       { id: "b2", label: "B2", state: "done" }
     ]);
 
-    // Pane keeps churning (idle recap chatter) — would normally pin status to "working".
+    // Pane keeps churning (idle recap chatter) — same hash each tick (no real activity).
     const tmux = makeTmuxMock({
       "coord-done": "✻ Cooked for 2m · recap: queue empty",
       "child-done": "child idle"
@@ -220,25 +221,33 @@ describe("Overmind watcher nudge ladder", () => {
 
     await watcher.tick();
     let updated = service.get(workflow.id);
-    expect(updated?.status).toBe("active");
+    // R3: status is "stuck" after sending the proven completion prompt.
+    expect(updated?.status).toBe("stuck");
     expect(updated?.completion_check).toBe("2/2");
+    // R3: completion_nudge_count incremented to 1 after first nudge.
+    expect(updated?.completion_nudge_count).toBe(1);
     expect(updated?.orphaned).toBe(false);
     expect(updated?.last_notified_transition).toBeNull();
     expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
     expect(tmux.sendAndSubmit.mock.calls[0][0]).toBe("coord-done");
-    expect(tmux.sendAndSubmit.mock.calls[0][1]).toContain("POST /api/overmind/complete");
+    // R3: proven completion prompt must name the run label + the exact overmind.sh command.
+    expect(tmux.sendAndSubmit.mock.calls[0][1]).toContain('"lkvc"');
+    expect(tmux.sendAndSubmit.mock.calls[0][1]).toContain("overmind.sh complete --run-dir");
+    expect(tmux.sendAndSubmit.mock.calls[0][1]).toContain("2/2 tasks DONE but is");
     expect(notify).not.toHaveBeenCalled();
 
+    // R1: second tick within cooldown — no additional nudge sent (cooldown gate).
     await watcher.tick();
     updated = service.get(workflow.id);
-    expect(updated?.status).toBe("active");
+    // OVM never auto-completes — status stays stuck, not "completed".
+    expect(updated?.status).toBe("stuck");
     expect(updated?.ended_at).not.toBeNull();
     expect(updated?.last_notified_transition).toBeNull();
     expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it("keeps already-nudged all-done workflows parked without per-tick nudge spam", async () => {
+  it("keeps all-done workflows parked without per-tick nudge spam once the ladder is exhausted", async () => {
     const notify = vi.fn(async () => {});
     const workflow = registerAttachedWorkflowFixture(service, {
       label: "parked-done",
@@ -250,12 +259,12 @@ describe("Overmind watcher nudge ladder", () => {
       { id: "b1", label: "B1", state: "done" },
       { id: "b2", label: "B2", state: "done" }
     ]);
+    // Simulate ladder exhausted: completion_nudge_count = MAX_COMPLETION_NUDGES (4).
     service.update(workflow.id, {
       status: "stuck",
       completion_check: "2/2",
       stuck_since: "2000-01-01T00:00:00.000Z",
-      nudge_count: 2,
-      tier: 2
+      completion_nudge_count: 4
     });
 
     const tmux = makeTmuxMock({
@@ -263,13 +272,14 @@ describe("Overmind watcher nudge ladder", () => {
       "child-parked-done": "child idle"
     });
     const watcher = new OvermindWatcher(service, tmux, notify);
+    // Simulate cooldown already elapsed so we fall through to the ladder check.
+    // (completion_nudge_count=4 = MAX → no nudge sent regardless of cooldown)
 
     await watcher.tick();
     const updated = service.get(workflow.id);
+    // R5: run stays visible (not auto-completed), not orphaned.
     expect(updated?.status).toBe("stuck");
-    expect(updated?.stuck_since).toBeNull();
-    expect(updated?.nudge_count).toBe(0);
-    expect(updated?.tier).toBe(0);
+    expect(updated?.completion_nudge_count).toBe(4);
     expect(updated?.orphaned).toBe(false);
     expect(updated?.last_notified_transition).toBeNull();
     expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
@@ -1320,6 +1330,224 @@ describe("Idle-nudge cooldown persists across watcher restarts (NudgeStateServic
     expect(snapshot.workflows[String(completed.id)]).toBeUndefined();
     expect(snapshot.workflows[String(failed.id)]).toBeUndefined();
     expect(snapshot.workflows[String(paused.id)]).toBeUndefined();
+  });
+});
+
+// ─── R1-R8 Completion-prompt ladder (proven prompt, no latch) ────────────────
+
+describe("Completion-prompt ladder (R1-R8 fix)", () => {
+  const RUN_DIR = "/tmp/overmind-nudge";
+
+  it("R1/R3: all-done + brain 'working' but NO observed activity → falls through to send the proven completion prompt (no latch)", async () => {
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "lkvc-r1",
+      coordinator_session: "coord-r1",
+      child_sessions: ["child-r1"],
+      run_dir: RUN_DIR
+    });
+    service.setTasks(workflow.id, null, [
+      { id: "b1", label: "B1", state: "done" },
+      { id: "b2", label: "B2", state: "done" }
+    ]);
+    // No pane activity: last_pane_hash matches current pane.
+    const STATIC_PANE = "idle coordinator pane";
+    service.update(workflow.id, { last_pane_hash: hashPane(STATIC_PANE) });
+
+    const brain = {
+      verifyCompletion: vi.fn(async () => ({
+        action: "working" as const,
+        reason: "pane looks active",
+        consultText: ""
+      }))
+    } as unknown as OvermindBrain;
+
+    const tmux = makeTmuxMock({ "coord-r1": STATIC_PANE, "child-r1": "child idle" });
+    const watcher = new OvermindWatcher(service, tmux, undefined, brain);
+
+    // Tick 1: no activity observed + brain "working" → accepted (consec count 1 < 2).
+    await watcher.tick();
+    let updated = service.get(workflow.id);
+    expect(updated?.status).toBe("working");
+    expect(updated?.completion_nudge_count).toBe(-1); // negative = consec "working" accepts
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+
+    // Tick 2: same scenario → accepted (consec count 2 <= 2). Still no nudge.
+    await watcher.tick();
+    updated = service.get(workflow.id);
+    expect(updated?.status).toBe("working");
+    expect(updated?.completion_nudge_count).toBe(-2);
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+
+    // Tick 3: cap (2) exceeded → brain "working" NOT accepted → completion prompt sent.
+    await watcher.tick();
+    updated = service.get(workflow.id);
+    expect(updated?.status).toBe("stuck");
+    expect(updated?.completion_nudge_count).toBe(1); // positive = nudge sent
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    // R3: proven prompt must contain run label + exact overmind.sh command.
+    const sentMsg = tmux.sendAndSubmit.mock.calls[0][1] as string;
+    expect(sentMsg).toContain('"lkvc-r1"');
+    expect(sentMsg).toContain(`overmind.sh complete --run-dir ${RUN_DIR}`);
+    expect(sentMsg).toContain("2/2 tasks DONE but is");
+  });
+
+  it("R3: sends proven completion prompt up to N times (bounded; no per-tick spam, re-sends after cooldown)", async () => {
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "lkvc-r3",
+      coordinator_session: "coord-r3",
+      child_sessions: ["child-r3"],
+      run_dir: RUN_DIR
+    });
+    service.setTasks(workflow.id, null, [
+      { id: "b1", label: "B1", state: "done" },
+      { id: "b2", label: "B2", state: "done" }
+    ]);
+
+    const tmux = makeTmuxMock({ "coord-r3": "idle pane", "child-r3": "child idle" });
+    // 1-min cooldown so we can manually advance it.
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(1));
+
+    // Tick 1: first nudge.
+    await watcher.tick();
+    expect(service.get(workflow.id)?.completion_nudge_count).toBe(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+
+    // Tick 2: within cooldown → no nudge.
+    await watcher.tick();
+    expect(service.get(workflow.id)?.completion_nudge_count).toBe(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1); // no additional send
+
+    // Advance cooldown past expiry → nudge 2.
+    (watcher as any).cooldowns.recordFired(workflow.id, "completion_prompt", Date.now() - 2 * 60 * 1000);
+    await watcher.tick();
+    expect(service.get(workflow.id)?.completion_nudge_count).toBe(2);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(2);
+
+    // Advance cooldown → nudge 3.
+    (watcher as any).cooldowns.recordFired(workflow.id, "completion_prompt", Date.now() - 2 * 60 * 1000);
+    await watcher.tick();
+    expect(service.get(workflow.id)?.completion_nudge_count).toBe(3);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(3);
+
+    // Advance cooldown → nudge 4 (MAX).
+    (watcher as any).cooldowns.recordFired(workflow.id, "completion_prompt", Date.now() - 2 * 60 * 1000);
+    await watcher.tick();
+    expect(service.get(workflow.id)?.completion_nudge_count).toBe(4);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(4);
+
+    // Advance cooldown again → ladder exhausted (count=4=MAX) → no more nudges.
+    (watcher as any).cooldowns.recordFired(workflow.id, "completion_prompt", Date.now() - 2 * 60 * 1000);
+    await watcher.tick();
+    expect(service.get(workflow.id)?.completion_nudge_count).toBe(4);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(4); // no additional send
+  });
+
+  it("R4: OVM never sets status to 'completed' itself — only the parent POST /complete does", async () => {
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "lkvc-r4",
+      coordinator_session: "coord-r4",
+      child_sessions: ["child-r4"],
+      run_dir: RUN_DIR
+    });
+    service.setTasks(workflow.id, null, [
+      { id: "b1", label: "B1", state: "done" }
+    ]);
+
+    const tmux = makeTmuxMock({ "coord-r4": "idle pane", "child-r4": "child idle" });
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(1));
+
+    // Run many ticks — including advancing cooldown to send multiple nudges.
+    for (let i = 0; i < 8; i++) {
+      (watcher as any).cooldowns.recordFired(workflow.id, "completion_prompt", Date.now() - 2 * 60 * 1000);
+      await watcher.tick();
+    }
+
+    const updated = service.get(workflow.id);
+    // R4: OVM must NEVER auto-complete.
+    expect(updated?.status).not.toBe("completed");
+    // R5: run stays visible (status is stuck after ladder exhaustion).
+    expect(updated?.status).toBe("stuck");
+  });
+
+  it("R5: dead parent (orphaned) → orphaned=true, no nudge, no auto-complete", async () => {
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "dead-r5",
+      coordinator_session: "coord-r5",
+      child_sessions: ["child-r5"],
+      run_dir: RUN_DIR
+    });
+    service.setTasks(workflow.id, null, [
+      { id: "b1", label: "B1", state: "done" }
+    ]);
+
+    const tmux = makeTmuxMock(
+      { "coord-r5": "", "child-r5": "" },
+      { "coord-r5": false, "child-r5": false }
+    );
+    const watcher = new OvermindWatcher(service, tmux);
+
+    await watcher.tick();
+    const updated = service.get(workflow.id);
+    expect(updated?.orphaned).toBe(true);
+    expect(updated?.status).not.toBe("completed");
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+  });
+
+  it("R6: all-done + pane changed (observed activity) → NOT prompted as done", async () => {
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "active-r6",
+      coordinator_session: "coord-r6",
+      child_sessions: ["child-r6"],
+      run_dir: RUN_DIR
+    });
+    service.setTasks(workflow.id, null, [
+      { id: "b1", label: "B1", state: "done" }
+    ]);
+    // Set a prior pane hash different from the current pane → pane has changed.
+    service.update(workflow.id, { last_pane_hash: hashPane("old pane content") });
+
+    const tmux = makeTmuxMock({ "coord-r6": "NEW pane content showing activity", "child-r6": "child idle" });
+    const watcher = new OvermindWatcher(service, tmux);
+
+    await watcher.tick();
+    const updated = service.get(workflow.id);
+    // R6: active run must NOT receive a completion prompt.
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    expect(updated?.status).toBe("working");
+  });
+
+  it("R7: setTasks resets completion_check to NULL and completion_nudge_count to 0", () => {
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "set-tasks-r7",
+      coordinator_session: "coord-r7",
+      child_sessions: [],
+      run_dir: RUN_DIR
+    });
+    // Simulate a prior completion check.
+    service.update(workflow.id, {
+      completion_check: "2/2",
+      completion_nudge_count: 3
+    });
+
+    // setTasks must reset both fields.
+    service.setTasks(workflow.id, null, [
+      { id: "b1", label: "B1", state: "done" },
+      { id: "b2", label: "B2", state: "done" }
+    ]);
+
+    const updated = service.get(workflow.id);
+    expect(updated?.completion_check).toBeNull();
+    expect(updated?.completion_nudge_count).toBe(0);
+  });
+
+  it("R3 prompt text: contains the exact proven template fields", () => {
+    const prompt = buildCompletionPrompt("my-run-label", 3, 3, "/path/to/run/dir");
+    expect(prompt).toContain("overmind:");
+    expect(prompt).toContain('"my-run-label"');
+    expect(prompt).toContain("3/3 tasks DONE but is");
+    expect(prompt).toContain("bash ~/.claude/agents/lib/overmind.sh complete --run-dir /path/to/run/dir");
+    expect(prompt).toContain("finishing the work isn't enough");
+    expect(prompt).toContain("update your task list instead");
   });
 });
 

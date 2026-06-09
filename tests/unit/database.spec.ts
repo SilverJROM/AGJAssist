@@ -69,7 +69,7 @@ describe("DatabaseService", () => {
       .prepare("SELECT version FROM schema_version")
       .get() as { version: number };
 
-    expect(version.version).toBe(29);
+    expect(version.version).toBe(30);
     db.close();
   });
 
@@ -167,12 +167,13 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(29);
+    expect(version.version).toBe(30);
     const upgradedCols = upgraded.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     const upgradedColNames = upgradedCols.map((c) => c.name);
     expect(upgradedColNames).toContain("last_parent_update_at");
     expect(upgradedColNames).toContain("evidence_idle_threshold_override_minutes");
     expect(upgradedColNames).toContain("orphaned");
+    expect(upgradedColNames).toContain("completion_nudge_count");
     upgraded.close();
   });
 
@@ -263,7 +264,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(29);
+    expect(version.version).toBe(30);
 
     const count = upgraded.prepare("SELECT COUNT(*) AS count FROM overmind_workflows").get() as { count: number };
     expect(count.count).toBe(2);

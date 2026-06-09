@@ -574,6 +574,18 @@ export class DatabaseService {
         }
       }
 
+      // Migration: v29 → v30: persistent counter for the bounded completion-prompt
+      // ladder (R3). Separate from nudge_count (which is the generic stuck/idle
+      // ladder) so the two paths don't interfere and the counter survives across
+      // ticks without being reset by unrelated code.
+      if (current && current.version < 30) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("completion_nudge_count")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN completion_nudge_count INTEGER NOT NULL DEFAULT 0");
+        }
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);
