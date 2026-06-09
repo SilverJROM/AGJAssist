@@ -23,6 +23,11 @@ type ParentSend = (target: string, message: string) => Promise<unknown>;
 
 const fallbackParentOrphanedAlerts = new Set<string>();
 
+/** H7: require N consecutive bare-bash/no-session reads before orphaning.
+ *  A single ambiguous classification → treat as "unknown" → still nudge. */
+const CONSECUTIVE_DEAD_BEFORE_ORPHAN = 2;
+const consecutiveDeadCount = new Map<number, number>();
+
 export async function sendGuardedParentNudge(
   workflow: OvermindWorkflow,
   message: string,
@@ -40,6 +45,28 @@ export async function sendGuardedParentNudge(
   }
 
   if (paneKind === "bare-bash" || paneKind === "no-session") {
+    // H7: require CONSECUTIVE_DEAD_BEFORE_ORPHAN consecutive dead reads before
+    // treating the parent as unreachable. A single bare-bash read of an idle
+    // agent shell is ambiguous — keep nudging.
+    const prev = consecutiveDeadCount.get(workflow.id) ?? 0;
+    const next = prev + 1;
+    consecutiveDeadCount.set(workflow.id, next);
+
+    if (next < CONSECUTIVE_DEAD_BEFORE_ORPHAN) {
+      // Single ambiguous read — downgrade to "unknown" and still attempt send.
+      // (The send may fail if the session is truly dead, but we tried.)
+      console.info(`[overmind] parent session "${parentSession}" read as ${paneKind} (count=${next}/${CONSECUTIVE_DEAD_BEFORE_ORPHAN}) — treating as unknown, attempting nudge.`);
+      try {
+        await send(parentSession, message);
+        return { sent: true, parentSession, paneKind: "unknown" };
+      } catch {
+        // Session truly unreachable — fall through to orphan on next consecutive check.
+        return { sent: false, parentSession, paneKind: "unknown" };
+      }
+    }
+
+    // Threshold reached → orphan.
+    consecutiveDeadCount.delete(workflow.id);
     await markParentOrphaned(workflow, parentSession, paneKind, deps);
     return {
       sent: false,
@@ -49,8 +76,20 @@ export async function sendGuardedParentNudge(
     };
   }
 
+  // Alive session — reset consecutive dead counter.
+  consecutiveDeadCount.delete(workflow.id);
   await send(parentSession, message);
   return { sent: true, parentSession, paneKind };
+}
+
+/** Clears the consecutive dead counter for a workflow (e.g. on cleanup). */
+export function forgetConsecutiveDeadCount(workflowId: number): void {
+  consecutiveDeadCount.delete(workflowId);
+}
+
+/** Clears ALL consecutive dead counters (e.g. for test isolation). */
+export function resetAllConsecutiveDeadCounts(): void {
+  consecutiveDeadCount.clear();
 }
 
 function resolveParentSession(

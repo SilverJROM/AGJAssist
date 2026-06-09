@@ -586,6 +586,24 @@ export class DatabaseService {
         }
       }
 
+      // Migration: v30 → v31: monotonic completion-prompt redesign (iter2 red-team plugs).
+      // Adds working_accepts (separate consecutive-working counter) and
+      // completion_nudge_last_at (persisted cooldown anchor so restarts don't spam).
+      // Cleans up the old sign-convention hack where completion_nudge_count < 0 was
+      // used as a working-accepts counter — reset any negative values to 0 on upgrade.
+      if (current && current.version < 31) {
+        const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
+        const colNames = new Set(cols.map((c) => c.name));
+        if (!colNames.has("working_accepts")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN working_accepts INTEGER NOT NULL DEFAULT 0");
+        }
+        if (!colNames.has("completion_nudge_last_at")) {
+          this.db.exec("ALTER TABLE overmind_workflows ADD COLUMN completion_nudge_last_at TEXT");
+        }
+        // Heal any negative completion_nudge_count values from the old sign hack.
+        this.db.exec("UPDATE overmind_workflows SET completion_nudge_count = 0 WHERE completion_nudge_count < 0");
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);

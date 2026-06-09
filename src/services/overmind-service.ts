@@ -81,6 +81,8 @@ interface OvermindWorkflowRow {
   evidence_idle_threshold_override_minutes: number | null;
   orphaned: number;
   completion_nudge_count: number;
+  working_accepts: number;
+  completion_nudge_last_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -319,6 +321,9 @@ export class OvermindService {
                  tier = 0,
                  last_notified_transition = NULL,
                  completion_check = NULL,
+                 completion_nudge_count = 0,
+                 working_accepts = 0,
+                 completion_nudge_last_at = NULL,
                  orphaned = 0,
                  run_started_at = COALESCE(run_started_at, ?),
                  updated_at = ?
@@ -620,7 +625,11 @@ export class OvermindService {
       info_request: fields.info_request !== undefined ? fields.info_request : existing.info_request,
       info_check: fields.info_check !== undefined ? fields.info_check : existing.info_check,
       orphaned: fields.orphaned !== undefined ? fields.orphaned : existing.orphaned,
-      completion_nudge_count: fields.completion_nudge_count ?? existing.completion_nudge_count
+      completion_nudge_count: fields.completion_nudge_count ?? existing.completion_nudge_count,
+      working_accepts: fields.working_accepts ?? existing.working_accepts,
+      completion_nudge_last_at: fields.completion_nudge_last_at !== undefined
+        ? fields.completion_nudge_last_at
+        : existing.completion_nudge_last_at
     };
 
     this.db
@@ -649,6 +658,8 @@ export class OvermindService {
             info_check = ?,
             orphaned = ?,
             completion_nudge_count = ?,
+            working_accepts = ?,
+            completion_nudge_last_at = ?,
             updated_at = datetime('now')
         WHERE id = ?`
       )
@@ -676,6 +687,8 @@ export class OvermindService {
         next.info_check,
         next.orphaned ? 1 : 0,
         next.completion_nudge_count,
+        next.working_accepts,
+        next.completion_nudge_last_at,
         id
       );
 
@@ -804,10 +817,20 @@ export class OvermindService {
       : existing.task_log;
     const endedAt = this.computeEndedAt(tasks, existing.status, existing.ended_at, now);
 
+    // H6: reset the completion ladder only when the task SIGNATURE actually
+    // changes (done/total delta). An identical re-sync must not reset counters.
+    const signatureChanged = doneCount !== existingDoneCount || tasks.length !== existing.tasks.length;
+
     const tx = this.db.raw.transaction(() => {
-      this.db
-        .prepare("UPDATE overmind_workflows SET current_task = ?, tasks = ?, ended_at = ?, task_log = ?, completion_check = NULL, completion_nudge_count = 0, updated_at = datetime('now') WHERE id = ?")
-        .run(currentTask, JSON.stringify(tasks), endedAt, JSON.stringify(taskLog), id);
+      if (signatureChanged) {
+        this.db
+          .prepare("UPDATE overmind_workflows SET current_task = ?, tasks = ?, ended_at = ?, task_log = ?, completion_check = NULL, completion_nudge_count = 0, working_accepts = 0, completion_nudge_last_at = NULL, updated_at = datetime('now') WHERE id = ?")
+          .run(currentTask, JSON.stringify(tasks), endedAt, JSON.stringify(taskLog), id);
+      } else {
+        this.db
+          .prepare("UPDATE overmind_workflows SET current_task = ?, tasks = ?, ended_at = ?, task_log = ?, updated_at = datetime('now') WHERE id = ?")
+          .run(currentTask, JSON.stringify(tasks), endedAt, JSON.stringify(taskLog), id);
+      }
 
       if (shouldLog) {
         this.db
@@ -892,6 +915,8 @@ export class OvermindService {
       monitoring_paused: row.monitoring_paused === 1,
       orphaned: row.orphaned === 1,
       completion_nudge_count: row.completion_nudge_count ?? 0,
+      working_accepts: row.working_accepts ?? 0,
+      completion_nudge_last_at: row.completion_nudge_last_at ?? null,
       child_sessions: this.parseJsonArray<string>(row.child_sessions),
       child_roles: this.parseJsonArray<string>(row.child_roles),
       tasks: this.parseJsonArray<OvermindTask>(row.tasks),

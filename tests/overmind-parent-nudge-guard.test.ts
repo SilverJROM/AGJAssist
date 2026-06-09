@@ -5,7 +5,10 @@ import path from "node:path";
 import { DatabaseService } from "../src/db/database.js";
 import { NudgeStateService } from "../src/services/nudge-state-service.js";
 import { OvermindService } from "../src/services/overmind-service.js";
-import { sendGuardedParentNudge } from "../src/services/overmind/parent-nudge-guard.js";
+import {
+  sendGuardedParentNudge,
+  resetAllConsecutiveDeadCounts
+} from "../src/services/overmind/parent-nudge-guard.js";
 import { registerAttachedWorkflowFixture } from "./overmind-fixtures.js";
 
 const isAgentPaneMock = vi.hoisted(() => vi.fn());
@@ -24,10 +27,12 @@ beforeEach(() => {
   service = new OvermindService(db);
   isAgentPaneMock.mockReset();
   isAgentPaneMock.mockResolvedValue("codex");
+  resetAllConsecutiveDeadCounts();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  resetAllConsecutiveDeadCounts();
   db.close();
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
@@ -83,51 +88,75 @@ describe("sendGuardedParentNudge", () => {
     expect(send).toHaveBeenCalledWith("legacy-parent", "overmind: legacy check");
   });
 
-  it("suppresses bare-bash parent nudges, marks parent_status, logs, and sends TG once", async () => {
+  it("H7: single bare-bash read → treated as unknown, send attempted; second consecutive bare-bash → orphaned, no send, TG once", async () => {
     const workflow = createAttachedWorkflow("bare-parent");
     const nudgeState = new NudgeStateService();
     const notify = vi.fn(async () => {});
     const send = vi.fn(async () => true);
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     isAgentPaneMock.mockResolvedValue("bare-bash");
 
+    // First call: count=1 < 2 → downgraded to "unknown", send IS attempted.
     const first = await sendGuardedParentNudge(
       workflow,
       "overmind: first",
       { overmindService: service, nudgeState, notify },
       send
     );
+    expect(first.sent).toBe(true);
+    expect(first.paneKind).toBe("unknown");
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
+    expect(info.mock.calls.some((c: unknown[]) =>
+      String(c[0]).includes('count=1/2')
+    )).toBe(true);
+
+    // Second call: count=2 = threshold → orphaned, no send, TG notify fires.
     const second = await sendGuardedParentNudge(
       workflow,
       "overmind: second",
       { overmindService: service, nudgeState, notify },
       send
     );
-
-    expect(first.sent).toBe(false);
     expect(second.sent).toBe(false);
-    expect(send).not.toHaveBeenCalled();
+    expect(second.paneKind).toBe("bare-bash");
+    expect(send).toHaveBeenCalledTimes(1); // no additional send on orphan
     expect(service.get(workflow.id)?.parent_status).toBe("bare-bash");
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify.mock.calls[0][0]).toContain("🚨 URGENT");
-    expect(warn.mock.calls[0][0]).toContain('[overmind] parent session "bare-parent" is bare-bash — suppressing nudge for run');
+    expect(warn.mock.calls.some((c: unknown[]) =>
+      String(c[0]).includes('[overmind] parent session "bare-parent" is bare-bash — suppressing nudge for run')
+    )).toBe(true);
   });
 
-  it("suppresses missing parent sessions and marks parent_status no-session", async () => {
+  it("H7: single no-session read → treated as unknown, send attempted; after threshold → orphaned", async () => {
     const workflow = createAttachedWorkflow("missing-parent");
     const send = vi.fn(async () => true);
     isAgentPaneMock.mockResolvedValue("no-session");
 
-    const result = await sendGuardedParentNudge(
+    // First call: count=1 < 2 → downgraded to "unknown", send attempted.
+    const first = await sendGuardedParentNudge(
       workflow,
-      "overmind: missing",
+      "overmind: missing first",
       { overmindService: service, nudgeState: new NudgeStateService(), notify: vi.fn(async () => {}) },
       send
     );
+    expect(first.sent).toBe(true);
+    expect(first.paneKind).toBe("unknown");
+    expect(send).toHaveBeenCalledTimes(1);
 
-    expect(result.sent).toBe(false);
-    expect(send).not.toHaveBeenCalled();
+    // Second call: count=2 = threshold → orphaned.
+    const second = await sendGuardedParentNudge(
+      workflow,
+      "overmind: missing second",
+      { overmindService: service, nudgeState: new NudgeStateService(), notify: vi.fn(async () => {}) },
+      send
+    );
+    expect(second.sent).toBe(false);
+    expect(second.paneKind).toBe("no-session");
     expect(service.get(workflow.id)?.parent_status).toBe("no-session");
+    expect(send).toHaveBeenCalledTimes(1); // only the first call sent
   });
 
   it("sends to the coordinator when parent resolution fails instead of throwing", async () => {

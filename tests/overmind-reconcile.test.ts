@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { OvermindService, OvermindWorkflow } from "../src/services/overmind-service.js";
 import { OvermindWatcher, RECONCILE_MS } from "../src/services/overmind-watcher.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
+import { resetAllConsecutiveDeadCounts } from "../src/services/overmind/parent-nudge-guard.js";
 
 const isAgentPaneMock = vi.hoisted(() => vi.fn());
 
@@ -46,6 +47,9 @@ function workflow(overrides: Partial<OvermindWorkflow> = {}): OvermindWorkflow {
     last_parent_update_at: null,
     evidence_idle_threshold_override_minutes: null,
     orphaned: false,
+    completion_nudge_count: 0,
+    working_accepts: 0,
+    completion_nudge_last_at: null,
     created_at: "2026-05-22T00:00:00.000Z",
     updated_at: "2026-05-22T00:00:00.000Z",
     ...overrides
@@ -86,6 +90,11 @@ describe("OvermindWatcher.reconcile()", () => {
   beforeEach(() => {
     isAgentPaneMock.mockReset();
     isAgentPaneMock.mockResolvedValue("codex");
+    resetAllConsecutiveDeadCounts();
+  });
+
+  afterEach(() => {
+    resetAllConsecutiveDeadCounts();
   });
 
   it("sends a demand when parent alive and an unresolved gap exists (info_request set)", async () => {
@@ -157,16 +166,20 @@ describe("OvermindWatcher.reconcile()", () => {
     expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
   });
 
-  it("does NOT send a demand when parent session is dead (sessionExists → false)", async () => {
+  it("H7: first dead-parent read (no-session) → one tolerated attempt; second consecutive → no send (orphaned)", async () => {
     const wf = workflow({ info_request: "run_dir" });
     const service = makeServiceStub([wf]);
     const tmux = makeTmuxMock({ sessionAlive: false });
     const watcher = new OvermindWatcher(service, tmux);
     isAgentPaneMock.mockResolvedValue("no-session");
 
+    // First reconcile: count=1 < 2 → H7 downgrade to "unknown", one tolerated send attempt.
     await watcher.reconcile([wf]);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
 
-    expect(tmux.sendAndSubmit).not.toHaveBeenCalled();
+    // Second reconcile: count=2 = threshold → orphaned, no send.
+    await watcher.reconcile([wf]);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1); // no additional send
   });
 
   it("task-list reminder is ONLY sent as part of the registration-gap demand, never as a standalone call", async () => {
@@ -236,7 +249,7 @@ describe("OvermindWatcher.reconcile()", () => {
     expect(reconcileCalls.length).toBe(0);
   });
 
-  it("handles multiple workflows: demands only from those with a gap + alive parent", async () => {
+  it("handles multiple workflows: demands only from those with a gap + alive parent (H7: dead parent gets one tolerated attempt)", async () => {
     const wfWithGap = workflow({ id: 1, coordinator_session: "coord-a", info_request: "tasklist" });
     const wfNoGap = workflow({ id: 2, coordinator_session: "coord-b", info_request: null });
     const wfPaused = workflow({ id: 3, coordinator_session: "coord-c", info_request: "run_dir", monitoring_paused: true });
@@ -259,13 +272,19 @@ describe("OvermindWatcher.reconcile()", () => {
 
     await watcher.reconcile(rows);
 
-    // Only coord-a should have received a demand
+    // coord-a: gap + alive parent → demand sent.
+    // coord-d: first consecutive no-session read (H7 threshold=2) → one tolerated attempt.
+    // coord-b: no gap → no send.
+    // coord-c: paused → no send.
     const calls = (tmux.sendAndSubmit as ReturnType<typeof vi.fn>).mock.calls as [string, string][];
-    expect(calls.length).toBe(1);
-    expect(calls[0][0]).toBe("coord-a");
-    expect(calls[0][1]).toContain("tasklist");
-    expect(calls[0][1]).toContain("/api/overmind/children");
-    expect(calls[0][1]).toContain("/api/overmind/tasks");
+    const coordACalls = calls.filter(([target]) => target === "coord-a");
+    const coordDCalls = calls.filter(([target]) => target === "coord-d");
+    expect(coordACalls.length).toBe(1);
+    expect(coordACalls[0][1]).toContain("tasklist");
+    expect(coordACalls[0][1]).toContain("/api/overmind/children");
+    expect(coordACalls[0][1]).toContain("/api/overmind/tasks");
+    // coord-d gets one tolerated send attempt (H7 first consecutive read).
+    expect(coordDCalls.length).toBe(1);
   });
 
   // --- Dedupe tests ---

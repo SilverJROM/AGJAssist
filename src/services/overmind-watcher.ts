@@ -241,7 +241,38 @@ export class OvermindWatcher {
     );
     workflow = evidence.workflow;
     const derivedTaskState = evidence.derivedTaskState;
+    const wid = workflow.id;
     if (workflow.monitoring_paused) {
+      // H2: a paused run that is all-done must NOT be silently hidden in Active.
+      // Run the completion-prompt path even when monitoring is paused — completing
+      // a finished run is not an "interrupt", it's cleanup. Non-done runs still
+      // skip all nudges while paused.
+      if (allTasksComplete(workflow.tasks) && !orphaned) {
+        await handleAllTasksDone(
+          workflow,
+          coordinatorPane,
+          result.coordinatorHash,
+          activeAttribution,
+          effectiveParentStatus,
+          childStatuses,
+          orphaned,
+          resolvedRunDir,
+          {
+            overmindService: this.overmindService,
+            tmuxService: this.tmuxService,
+            brain: this.brain,
+            nudgeState: this.nudgeState,
+            notify: this.notify,
+            appSettings: this.appSettings,
+            subagentInFlight: this.subagentInFlight.has(wid),
+            paneChanged,
+            subagentInFlightSince: this.subagentInFlight.get(wid)?.since,
+            subagentInFlightSource: this.subagentInFlight.get(wid)?.source,
+            clearSubagentInFlight: () => this.subagentInFlight.delete(wid)
+          }
+        );
+        return;
+      }
       cleanupWorkflowState(workflow.id, {
         cooldowns: this.cooldowns,
         nudgeState: this.nudgeState,
@@ -266,7 +297,6 @@ export class OvermindWatcher {
       return;
     }
     const nowMs = Date.now();
-    const wid = workflow.id;
     const idleDecision = decideRunIdle({
       coordinatorPane,
       childPanes,
@@ -440,9 +470,11 @@ export class OvermindWatcher {
           nudgeState: this.nudgeState,
           notify: this.notify,
           appSettings: this.appSettings,
-          cooldowns: this.cooldowns,
           subagentInFlight: this.subagentInFlight.has(wid),
-          paneChanged
+          paneChanged,
+          subagentInFlightSince: this.subagentInFlight.get(wid)?.since,
+          subagentInFlightSource: this.subagentInFlight.get(wid)?.source,
+          clearSubagentInFlight: () => this.subagentInFlight.delete(wid)
         }
       );
       return;

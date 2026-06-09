@@ -151,10 +151,16 @@ export interface OvermindWorkflow {
   last_parent_update_at: string | null;
   evidence_idle_threshold_override_minutes: number | null;
   orphaned: boolean;
-  /** Persistent counter for the bounded completion-prompt ladder (R3).
-   *  Incremented each time OVM sends the proven completion nudge; reset only
-   *  when setTasks resyncs the task list (completion_check goes NULL). */
+  /** MONOTONIC counter of completion prompts sent; only ever increases (until
+   *  MAX) for a given signature. Never negated or repurposed. Reset to 0 only
+   *  when the task signature actually changes (setTasks). */
   completion_nudge_count: number;
+  /** Consecutive brain-"working" accepts on an idle all-done run. Reset to 0
+   *  the moment a nudge is sent OR observed (pane-hash) activity occurs. */
+  working_accepts: number;
+  /** ISO timestamp of the last completion nudge sent. Persisted in the DB so
+   *  a pm2/process restart cannot reset the cooldown and spam. */
+  completion_nudge_last_at: string | null;
   spark_health?: SparkHealth;
   created_at: string;
   updated_at: string;
@@ -184,4 +190,6 @@ export interface UpdateOvermindWorkflowInput {
   info_check?: string | null;
   orphaned?: boolean;
   completion_nudge_count?: number;
+  working_accepts?: number;
+  completion_nudge_last_at?: string | null;
 }

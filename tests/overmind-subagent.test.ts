@@ -60,6 +60,9 @@ function wf(overrides: Partial<OvermindWorkflow> = {}): OvermindWorkflow {
     last_parent_update_at: null,
     evidence_idle_threshold_override_minutes: null,
     orphaned: false,
+    completion_nudge_count: 0,
+    working_accepts: 0,
+    completion_nudge_last_at: null,
     created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides

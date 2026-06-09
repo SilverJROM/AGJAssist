@@ -15,7 +15,6 @@ import type { OvermindNotify } from "../overmind-watcher.js";
 import type { TmuxService } from "../../tmux/tmux-service.js";
 import type { ActiveSessionAttribution } from "./active-session-attribution.js";
 import type { AppSettingsService } from "../app-settings-service.js";
-import type { WatcherCooldowns } from "./cooldowns.js";
 import { collectPriorDecisions } from "./decision-match.js";
 import { sendGuardedParentNudge } from "./parent-nudge-guard.js";
 
@@ -23,17 +22,26 @@ const BRAIN_COORDINATOR_TAIL_LINES = 40;
 const BRAIN_RUN_FILE_TAIL_LINES = 80;
 
 /** Max consecutive "working" brain verdicts accepted for an all-done run
- *  without observed pane/artifact activity before falling through to the
- *  completion-prompt ladder. */
+ *  without OBSERVED (pane-hash) activity before falling through to the
+ *  completion-prompt ladder.
+ *  MONOTONIC INVARIANT: once completion_nudge_count > 0, re-entering the
+ *  working-accept branch is BLOCKED unless a real pane-hash change is seen. */
 const MAX_CONSECUTIVE_WORKING_ACCEPTS = 2;
 
-/** Max completion prompts sent before the ladder stops (run stays visible,
- *  no auto-complete — JROM rule). */
+/** Max completion prompts sent before the slow-backoff phase. */
 const MAX_COMPLETION_NUDGES = 4;
 
-/** Cooldown key reused from the unified idle path so completion prompts don't
- *  fire immediately after a stuck nudge on the same workflow. */
+/** After MAX_COMPLETION_NUDGES exhaustion, backoff interval before re-nudging (hourly). */
+const EXHAUSTION_BACKOFF_MS = 60 * 60_000;
+
+/** Key used for the persisted cooldown in completion_nudge_last_at.
+ *  (Also used as legacy key name for in-memory cooldowns map — we now read
+ *  completion_nudge_last_at from the DB as the authoritative cooldown.) */
 const COMPLETION_NUDGE_COOLDOWN_KEY = "completion_prompt";
+
+/** A stale tui-subagent flag is force-expired after this many ms with no
+ *  pane-hash change. Prevents H8: stale tui flag from suppressing the ladder. */
+const STALE_SUBAGENT_FORCE_EXPIRE_MS = 5 * 60_000;
 
 export interface CompletionDetectorDeps {
   overmindService: OvermindService;
@@ -43,12 +51,16 @@ export interface CompletionDetectorDeps {
   notify?: OvermindNotify;
   /** Required for the bounded completion-prompt ladder cooldown. */
   appSettings?: AppSettingsService;
-  /** Required for the cooldown gate on completion prompts. */
-  cooldowns?: WatcherCooldowns;
   /** Whether a subagent is currently in flight for this workflow (from watcher). */
   subagentInFlight?: boolean;
   /** Whether the coordinator pane hash changed since the last tick. */
   paneChanged?: boolean;
+  /** Timestamp (ms) when the subagent entry was first set. Used for H8 force-expiry. */
+  subagentInFlightSince?: number;
+  /** Whether the subagent entry came from a tui-source detection (vs ack). */
+  subagentInFlightSource?: "tui" | "ack";
+  /** Called to clear stale subagent flag externally (H8). */
+  clearSubagentInFlight?: () => void;
 }
 
 /**
@@ -86,6 +98,7 @@ export async function handleAllTasksDone(
   const totalCount = workflow.tasks.length;
   const signature = `${doneCount}/${totalCount}`;
   const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
 
   // ── Orphaned: dead parent → ERROR tab (R5, existing behavior kept) ──────────
   if (isOrphaned) {
@@ -93,8 +106,7 @@ export async function handleAllTasksDone(
       status: workflow.status === "working" ? "stuck" : workflow.status,
       pending_decision: null,
       last_pane_hash: coordinatorHash,
-      // R7: keep stuck_since consistent — set it now if not already set
-      stuck_since: workflow.stuck_since ?? new Date().toISOString(),
+      stuck_since: workflow.stuck_since ?? nowIso,
       completion_check: signature,
       active_session: attribution.active_session,
       active_role: attribution.active_role,
@@ -105,44 +117,51 @@ export async function handleAllTasksDone(
     return;
   }
 
-  // ── R1: Cooldown gate (replaces the permanent early-return latch) ────────────
-  // If completion_check already equals the current signature, we know a prior tick
-  // assessed this run. Re-enter the prompt ladder on a cooldown, rather than
-  // returning without action.
-  const cooldownMs = (deps.appSettings?.get().stuck_nudge_cooldown_minutes ?? 20) * 60_000;
-  const alreadyChecked = workflow.completion_check === signature;
-  if (alreadyChecked && deps.cooldowns) {
-    const lastFired = deps.cooldowns.getLastFired(workflow.id, COMPLETION_NUDGE_COOLDOWN_KEY);
-    const withinCooldown = nowMs - lastFired < cooldownMs;
-    if (withinCooldown) {
-      // Still within cooldown window — just refresh display fields without nudging.
-      deps.overmindService.update(workflow.id, {
-        pending_decision: null,
-        last_pane_hash: coordinatorHash,
-        active_session: attribution.active_session,
-        active_role: attribution.active_role,
-        parent_status: parentStatus,
-        child_statuses: childStatuses,
-        orphaned: false
-      });
-      return;
-    }
-    // Cooldown elapsed → fall through to re-assess and potentially re-nudge.
+  // ── H8: Force-expire a stale tui-source subagentInFlight flag ────────────────
+  // If the subagent entry is tui-sourced and there has been no pane-hash change
+  // within STALE_SUBAGENT_FORCE_EXPIRE_MS, do NOT treat it as activity. Clear it
+  // so the completion ladder proceeds. A stale tui flag must never suppress the
+  // all-done path forever.
+  if (
+    deps.subagentInFlight === true &&
+    deps.subagentInFlightSource === "tui" &&
+    !deps.paneChanged &&
+    deps.subagentInFlightSince !== undefined &&
+    nowMs - deps.subagentInFlightSince >= STALE_SUBAGENT_FORCE_EXPIRE_MS
+  ) {
+    deps.clearSubagentInFlight?.();
+    // Fall through — subagentInFlight is now treated as false for this path.
   }
 
-  // ── R2: Gate "working" verdict on observed activity ──────────────────────────
-  // Accept brain "working" only when real activity is observed; cap consecutive
-  // accepts so a genuinely-idle all-done run can't be parked as "working" forever.
+  // Re-read the flag (may have been cleared above).
+  // We shadow the dep so the rest of the function uses the updated value.
+  const effectiveSubagentInFlight =
+    deps.subagentInFlight === true &&
+    !(
+      deps.subagentInFlightSource === "tui" &&
+      !deps.paneChanged &&
+      deps.subagentInFlightSince !== undefined &&
+      nowMs - deps.subagentInFlightSince >= STALE_SUBAGENT_FORCE_EXPIRE_MS
+    );
+
+  // ── Observed activity check ──────────────────────────────────────────────────
+  // REAL activity = coordinator pane hash actually changed (since last tick) OR
+  // a live (non-stale-tui) subagent is in flight.
+  // H8: a tui-source subagentInFlight WITHOUT a recent pane-hash change is NOT
+  // treated as observed activity — it is considered stale.
   const hasObservedActivity =
-    deps.paneChanged === true ||
-    deps.subagentInFlight === true;
+    (deps.paneChanged === true) ||
+    (effectiveSubagentInFlight === true);
+
+  // ── MONOTONIC INVARIANT ──────────────────────────────────────────────────────
+  // Once completion_nudge_count > 0 for this signature, the run CANNOT re-enter
+  // working-accept without real observed activity. This prevents oscillation.
+  const isSignatureNew = workflow.completion_check !== signature;
+  const alreadyNudged = !isSignatureNew && workflow.completion_nudge_count > 0;
 
   if (hasObservedActivity) {
-    // Real activity observed → accept "working" without asking the brain.
-    // Reset nudge_count/tier so the generic stuck ladder starts fresh if
-    // activity stops later. Record cooldown so the next tick doesn't
-    // immediately escalate to a completion prompt.
-    deps.cooldowns?.recordFired(workflow.id, COMPLETION_NUDGE_COOLDOWN_KEY, nowMs);
+    // Real activity observed → accept "working". Reset working_accepts (not nudge count).
+    // MONOTONIC: nudge count not reset here — only resets on real signature change.
     deps.overmindService.update(workflow.id, {
       status: "working",
       pending_decision: null,
@@ -151,7 +170,8 @@ export async function handleAllTasksDone(
       nudge_count: 0,
       tier: 0,
       completion_check: signature,
-      completion_nudge_count: 0,
+      working_accepts: 0,
+      // nudge count intentionally NOT reset here (signature unchanged, just activity observed)
       active_session: attribution.active_session,
       active_role: attribution.active_role,
       parent_status: parentStatus,
@@ -161,89 +181,146 @@ export async function handleAllTasksDone(
     return;
   }
 
-  // No observed activity → check the brain, but cap consecutive "working" accepts.
-  const verdict = await assessCompletion(workflow, coordinatorPane, resolvedRunDir, deps);
+  // ── H8 / MONOTONIC: if already nudged, skip the working-accept path ──────────
+  // A run that already received a completion prompt is NOT credibly "working"
+  // again without real activity. Go straight to the cooldown/ladder check.
+  if (!alreadyNudged) {
+    // No observed activity → check the brain, but cap consecutive "working" accepts.
+    const verdict = await assessCompletion(workflow, coordinatorPane, resolvedRunDir, deps);
 
-  if (verdict.action === "working") {
-    // Count how many consecutive times we have accepted "working" without activity.
-    // completion_nudge_count is repurposed here as a consecutive-working counter
-    // when completion_check is NOT yet set for this signature. Once we enter the
-    // nudge ladder we reset it and use it as the nudge counter instead. To avoid
-    // ambiguity, we use a separate in-DB mechanism: we track the consecutive-working
-    // count by checking how many times we set completion_check=signature without
-    // resetting. Rather than adding another column, we use the following heuristic:
-    // - If completion_nudge_count > 0 AND completion_check === signature, it means
-    //   we already sent nudges, so "working" is no longer credible → fall through.
-    // - If completion_check !== signature (first time seeing this signature), allow
-    //   up to MAX_CONSECUTIVE_WORKING_ACCEPTS acceptances tracked by a special
-    //   negative value range of completion_nudge_count (we use a dedicated bool below).
-    //
-    // Simpler: we track the consecutive "working" accepts using a field in the
-    // cooldowns map (in-memory, lost on restart — acceptable since restart resets
-    // the brain too).
-    const consecutiveKey = `working_accepts_${signature}`;
-    const accepts = (deps.cooldowns?.getLastFired(workflow.id, consecutiveKey) ?? 0);
-    // We abuse getLastFired as a counter by storing it as "Date.now() - N" trick.
-    // Better: use a separate in-memory counter. Since cooldowns only stores timestamps
-    // we need a different approach.
-    //
-    // We'll use completion_nudge_count with a sign convention:
-    // - completion_nudge_count < 0: number of consecutive "working" accepts (negated)
-    // - completion_nudge_count >= 0: number of completion nudges sent
-    // When completion_check !== signature, reset both.
-    const isFirstSignature = workflow.completion_check !== signature;
-    const currentAccepts = isFirstSignature ? 0 : (workflow.completion_nudge_count < 0 ? -workflow.completion_nudge_count : 0);
+    if (verdict.action === "working") {
+      // Count consecutive "working" accepts for this signature using working_accepts.
+      const currentAccepts = isSignatureNew ? 0 : workflow.working_accepts;
 
-    if (currentAccepts < MAX_CONSECUTIVE_WORKING_ACCEPTS) {
-      // Accept this "working" verdict. The consecutive cap itself throttles
-      // escalation; we do NOT record the cooldown here so consecutive accepts
-      // can accumulate until the cap is hit.
+      if (currentAccepts < MAX_CONSECUTIVE_WORKING_ACCEPTS) {
+        // Accept this "working" verdict.
+        deps.overmindService.update(workflow.id, {
+          status: "working",
+          pending_decision: null,
+          last_pane_hash: coordinatorHash,
+          stuck_since: null,
+          nudge_count: 0,
+          tier: 0,
+          completion_check: signature,
+          working_accepts: currentAccepts + 1,
+          // completion_nudge_count NOT touched (stays 0 or unchanged)
+          active_session: attribution.active_session,
+          active_role: attribution.active_role,
+          parent_status: parentStatus,
+          child_statuses: childStatuses,
+          orphaned: false
+        });
+        return;
+      }
+      // Cap exceeded → fall through to completion prompt ladder.
+    }
+    // verdict !== "working" → fall through to completion prompt ladder.
+  }
+
+  // ── Persisted cooldown gate (H3) ─────────────────────────────────────────────
+  // Use completion_nudge_last_at from DB as the authoritative cooldown anchor.
+  // This survives pm2/process restarts (unlike in-memory WatcherCooldowns).
+  const cooldownMs = (deps.appSettings?.get().stuck_nudge_cooldown_minutes ?? 20) * 60_000;
+  const lastNudgeMs = parseIsoToMs(workflow.completion_nudge_last_at);
+  const currentNudgeCount = isSignatureNew ? 0 : Math.max(0, workflow.completion_nudge_count);
+
+  const withinCooldown = nowMs - lastNudgeMs < cooldownMs;
+
+  // Determine if we're in the exhaustion phase (slow-backoff after MAX nudges).
+  const isExhausted = currentNudgeCount >= MAX_COMPLETION_NUDGES;
+  const backoffMs = isExhausted ? EXHAUSTION_BACKOFF_MS : cooldownMs;
+  const withinBackoff = nowMs - lastNudgeMs < backoffMs;
+
+  if (withinBackoff) {
+    // Within cooldown or backoff — just refresh display fields without nudging.
+    deps.overmindService.update(workflow.id, {
+      status: isExhausted ? "stuck" : (workflow.status === "working" ? "stuck" : workflow.status),
+      pending_decision: null,
+      last_pane_hash: coordinatorHash,
+      stuck_since: workflow.stuck_since ?? nowIso,
+      completion_check: signature,
+      active_session: attribution.active_session,
+      active_role: attribution.active_role,
+      parent_status: parentStatus,
+      child_statuses: childStatuses,
+      orphaned: false
+    });
+    return;
+  }
+
+  // ── H5: Exhaustion → slow-backoff re-nudge + one-shot JROM escalation ───────
+  // After MAX_COMPLETION_NUDGES, we continue at hourly backoff and fire ONE
+  // deduped escalation notification. NEVER silent-stale-forever.
+  if (isExhausted) {
+    // Slow-backoff re-nudge (hourly). Send the completion prompt again.
+    const completionPrompt = buildCompletionPrompt(
+      workflow.label,
+      doneCount,
+      totalCount,
+      resolvedRunDir
+    );
+
+    const guarded = await sendGuardedParentNudge(
+      workflow,
+      completionPrompt,
+      {
+        overmindService: deps.overmindService,
+        nudgeState: deps.nudgeState,
+        notify: deps.notify
+      },
+      (target, text) => deps.tmuxService.sendAndSubmit(target, text)
+    );
+
+    if (guarded.sent) {
+      // Fire ONE-shot JROM escalation notification (deduped via stuck_since check).
+      // We escalate on the FIRST hourly re-nudge after exhaustion.
+      if (currentNudgeCount === MAX_COMPLETION_NUDGES) {
+        try {
+          await deps.notify?.(
+            `overmind: ⚠️ Run "${workflow.label}" (id=${workflow.id}) has not been completed after ${MAX_COMPLETION_NUDGES} prompts. ` +
+            `Switching to hourly slow-backoff reminders. Parent may need manual intervention. ` +
+            `Run: bash ~/.claude/agents/lib/overmind.sh complete --run-dir ${resolvedRunDir}`
+          );
+        } catch {
+          // notification failure is non-fatal
+        }
+      }
       deps.overmindService.update(workflow.id, {
-        status: "working",
+        status: "stuck",
         pending_decision: null,
         last_pane_hash: coordinatorHash,
-        stuck_since: null,
-        nudge_count: 0,
-        tier: 0,
+        stuck_since: workflow.stuck_since ?? nowIso,
         completion_check: signature,
-        completion_nudge_count: -(currentAccepts + 1),
+        completion_nudge_count: currentNudgeCount + 1,
+        working_accepts: 0,
+        completion_nudge_last_at: nowIso,
         active_session: attribution.active_session,
         active_role: attribution.active_role,
         parent_status: parentStatus,
         child_statuses: childStatuses,
         orphaned: false
       });
-      return;
+    } else {
+      // F2: send failed → record cooldown + escalate to orphaned (bare-bash parent).
+      deps.overmindService.update(workflow.id, {
+        status: "stuck",
+        pending_decision: null,
+        last_pane_hash: coordinatorHash,
+        stuck_since: workflow.stuck_since ?? nowIso,
+        completion_check: signature,
+        completion_nudge_last_at: nowIso,
+        active_session: attribution.active_session,
+        active_role: attribution.active_role,
+        parent_status: guarded.parent_status ?? parentStatus,
+        child_statuses: childStatuses,
+        orphaned: guarded.paneKind === "bare-bash" || guarded.paneKind === "no-session"
+      });
     }
-    // Cap exceeded with no activity → fall through to completion prompt ladder.
-  }
-
-  // ── R3: Bounded completion-prompt ladder ────────────────────────────────────
-  // Determine current nudge count (positive values = completion nudges sent).
-  const isFirstSignature = workflow.completion_check !== signature;
-  const currentNudgeCount = isFirstSignature
-    ? 0
-    : Math.max(0, workflow.completion_nudge_count);
-
-  if (currentNudgeCount >= MAX_COMPLETION_NUDGES) {
-    // Ladder exhausted — run stays visible, no auto-complete. Keep updating fields.
-    deps.overmindService.update(workflow.id, {
-      status: "stuck",
-      pending_decision: null,
-      last_pane_hash: coordinatorHash,
-      stuck_since: workflow.stuck_since ?? new Date().toISOString(),
-      completion_check: signature,
-      completion_nudge_count: currentNudgeCount,
-      active_session: attribution.active_session,
-      active_role: attribution.active_role,
-      parent_status: parentStatus,
-      child_statuses: childStatuses,
-      orphaned: false
-    });
     return;
   }
 
-  // Build the proven completion prompt (R3 template from proven-completion-prompt.md).
+  // ── R3: Bounded completion-prompt ladder ────────────────────────────────────
+  // Build and send the proven completion prompt.
   const completionPrompt = buildCompletionPrompt(
     workflow.label,
     doneCount,
@@ -263,15 +340,16 @@ export async function handleAllTasksDone(
   );
 
   if (guarded.sent) {
-    // Record cooldown and increment counter.
-    deps.cooldowns?.recordFired(workflow.id, COMPLETION_NUDGE_COOLDOWN_KEY, nowMs);
+    // MONOTONIC: only increment, never decrement. Record persisted cooldown.
     deps.overmindService.update(workflow.id, {
       status: "stuck",
       pending_decision: null,
       last_pane_hash: coordinatorHash,
-      stuck_since: workflow.stuck_since ?? new Date().toISOString(),
+      stuck_since: workflow.stuck_since ?? nowIso,
       completion_check: signature,
       completion_nudge_count: currentNudgeCount + 1,
+      working_accepts: 0,
+      completion_nudge_last_at: nowIso,
       active_session: attribution.active_session,
       active_role: attribution.active_role,
       parent_status: parentStatus,
@@ -279,20 +357,21 @@ export async function handleAllTasksDone(
       orphaned: false
     });
   } else {
-    // Parent not reachable (bare-bash / no-session) — sendGuardedParentNudge already
-    // called markParentOrphaned internally.
+    // F2: bare-bash / no-session → record cooldown timestamp so we don't retry
+    // every tick. Escalate to orphaned immediately (bare-bash parent is dead
+    // for completion purposes).
     deps.overmindService.update(workflow.id, {
       status: "stuck",
       pending_decision: null,
       last_pane_hash: coordinatorHash,
-      stuck_since: workflow.stuck_since ?? new Date().toISOString(),
+      stuck_since: workflow.stuck_since ?? nowIso,
       completion_check: signature,
-      completion_nudge_count: currentNudgeCount,
+      completion_nudge_last_at: nowIso,
       active_session: attribution.active_session,
       active_role: attribution.active_role,
       parent_status: guarded.parent_status ?? parentStatus,
       child_statuses: childStatuses,
-      orphaned: false
+      orphaned: guarded.paneKind === "bare-bash" || guarded.paneKind === "no-session"
     });
   }
 }
@@ -329,6 +408,12 @@ async function assessCompletion(
       reason: "Completion brain failed; deterministic consult to projcore."
     };
   }
+}
+
+function parseIsoToMs(iso: string | null | undefined): number {
+  if (!iso) return 0;
+  const parsed = Date.parse(iso);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function summarizeTasks(tasks: { id: string; label: string; state: string }[]): string {

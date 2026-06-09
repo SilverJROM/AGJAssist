@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 30;
+export const SCHEMA_VERSION = 31;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -352,6 +352,8 @@ CREATE TABLE IF NOT EXISTS overmind_workflows (
   evidence_idle_threshold_override_minutes INTEGER,
   orphaned INTEGER NOT NULL DEFAULT 0,
   completion_nudge_count INTEGER NOT NULL DEFAULT 0,
+  working_accepts INTEGER NOT NULL DEFAULT 0,
+  completion_nudge_last_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

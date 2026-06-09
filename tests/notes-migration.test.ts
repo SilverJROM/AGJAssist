@@ -81,7 +81,7 @@ describe("v22 → v23 upgrade regression", () => {
     try {
       // ── Step 3: schema_version bumped to latest ───────────────────────────
       const ver = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-      expect(ver.version).toBe(30);
+      expect(ver.version).toBe(31);
 
       // ── Step 4: new columns present on notes ──────────────────────────────
       const cols = db.raw.pragma("table_info(notes)") as { name: string }[];
