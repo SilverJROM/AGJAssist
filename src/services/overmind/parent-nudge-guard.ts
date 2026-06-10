@@ -78,8 +78,8 @@ export async function sendGuardedParentNudge(
 
   // Alive session — reset consecutive dead counter.
   consecutiveDeadCount.delete(workflow.id);
-  await send(parentSession, message);
-  return { sent: true, parentSession, paneKind };
+  const sent = Boolean(await send(parentSession, message));
+  return { sent, parentSession, paneKind };
 }
 
 /** Clears the consecutive dead counter for a workflow (e.g. on cleanup). */

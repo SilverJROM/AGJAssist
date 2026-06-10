@@ -187,4 +187,30 @@ describe("sendGuardedParentNudge", () => {
     expect(send).toHaveBeenCalledWith("legacy-parent", "overmind: resolver fallback");
     expect(warn.mock.calls[0][0]).toContain("parent session resolution failed");
   });
+
+  it("NEW-1: alive parent (claude) where send returns false → sent:false, paneKind preserved, not orphaned", async () => {
+    // sendAndSubmit returns false on send-failure — the guard must propagate
+    // this boolean, not hardcode sent:true.
+    const workflow = createAttachedWorkflow("claude-parent");
+    isAgentPaneMock.mockResolvedValue("claude");
+    // send returns false (tmux send failed / unconfirmed submit)
+    const send = vi.fn(async () => false);
+
+    const result = await sendGuardedParentNudge(
+      workflow,
+      "overmind: completion prompt",
+      { overmindService: service },
+      send
+    );
+
+    // Must reflect the real send outcome, not a hardcoded true.
+    expect(result.sent).toBe(false);
+    expect(result.parentSession).toBe("claude-parent");
+    // Live pane kind must be preserved (not orphaned kinds bare-bash/no-session).
+    expect(result.paneKind).toBe("claude");
+    // parent_status not set (not orphaned).
+    expect(result.parent_status).toBeUndefined();
+    // send was actually called (alive path still attempts the send).
+    expect(send).toHaveBeenCalledWith("claude-parent", "overmind: completion prompt");
+  });
 });

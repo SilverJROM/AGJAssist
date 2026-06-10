@@ -1855,6 +1855,45 @@ describe("iter2 red-team plugs (H1-H8)", () => {
     expect(updated.status).not.toBe("completed"); // R4
   });
 
+  it("NEW-1: alive parent where sendAndSubmit returns false → completion_nudge_count NOT incremented, completion_nudge_last_at recorded, orphaned stays false", async () => {
+    // Regression: before fix, the guard discarded the boolean from sendAndSubmit
+    // and hardcoded sent:true — phantom sends marched the monotonic counter to
+    // exhaustion on a live but temporarily unreachable parent.
+    const workflow = registerAttachedWorkflowFixture(service, {
+      label: "phantom-send",
+      coordinator_session: "coord-phantom",
+      child_sessions: ["child-phantom"],
+      run_dir: RUN_DIR
+    });
+    service.setTasks(workflow.id, null, [
+      { id: "b1", label: "B1", state: "done" },
+      { id: "b2", label: "B2", state: "done" }
+    ]);
+
+    // isAgentPane returns a live kind (claude) — guard does NOT orphan the pane.
+    isAgentPaneMock.mockResolvedValue("claude");
+
+    // sendAndSubmit returns false — the real tmux send failed / submit unconfirmed.
+    const tmux = makeTmuxMock({
+      "coord-phantom": "idle pane",
+      "child-phantom": "child idle"
+    });
+    tmux.sendAndSubmit.mockResolvedValue(false);
+
+    const watcher = new OvermindWatcher(service, tmux, undefined, undefined, undefined, makeSettingsStub(1));
+    await watcher.tick();
+
+    const updated = service.get(workflow.id)!;
+    // Phantom send: completion_nudge_count must NOT be incremented (was 0, stays 0).
+    expect(updated.completion_nudge_count).toBe(0);
+    // Cooldown recorded so the ladder retries after cooldown, not per-tick.
+    expect(updated.completion_nudge_last_at).not.toBeNull();
+    // Live parent must NOT be orphaned.
+    expect(updated.orphaned).toBe(false);
+    // Send was actually attempted (alive pane path does call send).
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+  });
+
   it("R4/R7: OVM never setStatus('completed'); dead-parent → orphaned; active run never prompted", async () => {
     // Part 1: active run with pending tasks → never prompted for completion.
     const activeWorkflow = registerAttachedWorkflowFixture(service, {
