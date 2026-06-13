@@ -6,10 +6,13 @@ import { DatabaseService } from "../../src/db/database.js";
 import { AgentAssignmentService } from "../../src/services/agent-assignment-service.js";
 
 const TEST_DB = path.join("data", "test-agent-assignments.sqlite");
+const TEST_IMPORT_DB = path.join("data", "test-agent-assignments-import.sqlite");
 
 function cleanup(): void {
-  for (const f of [TEST_DB, `${TEST_DB}-wal`, `${TEST_DB}-shm`]) {
-    if (fs.existsSync(f)) fs.unlinkSync(f);
+  for (const dbPath of [TEST_DB, TEST_IMPORT_DB]) {
+    for (const f of [dbPath, `${dbPath}-wal`, `${dbPath}-shm`]) {
+      if (fs.existsSync(f)) fs.unlinkSync(f);
+    }
   }
 }
 
@@ -163,6 +166,85 @@ describe("AgentAssignmentService", () => {
   it("returns null when neither binding nor default exists", () => {
     expect(service.resolveProjectRole(1, "redteam_1")).toBeNull();
   });
+
+  it("exports markdown and imports it into a fresh DB with matching resolved outcomes", () => {
+    db.prepare("INSERT INTO projects (id, directory_name, display_name) VALUES (2, 'spark', 'Spark')").run();
+    const codex = service.createAgent({
+      name: "Codex Builder",
+      provider: "codex",
+      model: "gpt-5-codex",
+      default_effort: "medium"
+    });
+    const claude = service.createAgent({
+      name: "Claude Validator",
+      provider: "claude",
+      model: "opus",
+      default_effort: "high"
+    });
+    const grok = service.createAgent({
+      name: "Grok Redteam",
+      provider: "grok",
+      model: "grok-build",
+      default_effort: "low"
+    });
+
+    service.setRoleDefault("implementer", codex.id);
+    service.setRoleDefault("validator", claude.id);
+    service.setProjectBinding(1, "implementer", claude.id);
+    service.setProjectBinding(1, "redteam_1", grok.id);
+    service.setProjectBinding(2, "validator", codex.id);
+
+    const markdown = service.exportMarkdown();
+    expect(markdown).toContain("| Codex Builder | codex | gpt-5-codex | medium |");
+    expect(markdown.indexOf("| Codex Builder |")).toBeLessThan(
+      markdown.indexOf("| Grok Redteam |")
+    );
+    const originalState = snapshotAgentSetup(service, [1, 2], [
+      "implementer",
+      "validator",
+      "redteam_1"
+    ]);
+
+    const importDb = new DatabaseService(TEST_IMPORT_DB);
+    try {
+      importDb
+        .prepare("INSERT INTO projects (id, directory_name, display_name) VALUES (1, 'agj', 'AGJ')")
+        .run();
+      importDb
+        .prepare(
+          "INSERT INTO projects (id, directory_name, display_name) VALUES (2, 'spark', 'Spark')"
+        )
+        .run();
+      const importService = new AgentAssignmentService(importDb);
+
+      expect(importService.importMarkdown(markdown)).toEqual({
+        agents: 3,
+        role_defaults: 2,
+        role_bindings: 3
+      });
+      expect(snapshotAgentSetup(importService, [1, 2], ["implementer", "validator", "redteam_1"])).toEqual(
+        originalState
+      );
+
+      expect(importService.importMarkdown(markdown)).toEqual({
+        agents: 3,
+        role_defaults: 2,
+        role_bindings: 3
+      });
+      expect(importDb.prepare("SELECT COUNT(*) AS count FROM agents").get()).toEqual({ count: 3 });
+      expect(importDb.prepare("SELECT COUNT(*) AS count FROM role_defaults").get()).toEqual({
+        count: 2
+      });
+      expect(importDb.prepare("SELECT COUNT(*) AS count FROM role_bindings").get()).toEqual({
+        count: 3
+      });
+      expect(snapshotAgentSetup(importService, [1, 2], ["implementer", "validator", "redteam_1"])).toEqual(
+        originalState
+      );
+    } finally {
+      importDb.close();
+    }
+  });
 });
 
 describe("AgentAssignmentService on upgraded v31 DB", () => {
@@ -209,3 +291,33 @@ describe("AgentAssignmentService on upgraded v31 DB", () => {
     upgraded.close();
   });
 });
+
+function snapshotAgentSetup(
+  service: AgentAssignmentService,
+  projectIds: number[],
+  roles: string[]
+): Record<string, unknown> {
+  return {
+    agents: service.listAgents().map((agent) => ({
+      name: agent.name,
+      provider: agent.provider,
+      model: agent.model,
+      default_effort: agent.default_effort
+    })),
+    defaults: service.listRoleDefaults().map((roleDefault) => ({
+      role: roleDefault.role,
+      agent: roleDefault.agent.name
+    })),
+    resolved: projectIds.flatMap((projectId) =>
+      roles.map((role) => {
+        const resolved = service.resolveProjectRole(projectId, role);
+        return {
+          project_id: projectId,
+          role,
+          source: resolved?.source ?? null,
+          agent: resolved?.agent.name ?? null
+        };
+      })
+    )
+  };
+}

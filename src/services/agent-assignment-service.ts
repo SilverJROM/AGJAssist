@@ -55,6 +55,12 @@ export interface ResolvedRoleAgent {
   agent: AgentDefinition;
 }
 
+export interface AgentSetupImportResult {
+  agents: number;
+  role_defaults: number;
+  role_bindings: number;
+}
+
 export class AgentAssignmentService {
   constructor(private readonly db: DatabaseService) {}
 
@@ -236,6 +242,113 @@ export class AgentAssignmentService {
 
     return null;
   }
+
+  exportMarkdown(): string {
+    const agents = this.listAgents();
+    const defaults = this.listRoleDefaults();
+    const bindings = this.db
+      .prepare(
+        `SELECT rb.project_id, rb.role, a.name AS agent_name
+         FROM role_bindings rb
+         JOIN agents a ON a.id = rb.agent_id
+         ORDER BY rb.project_id, rb.role`
+      )
+      .all() as { project_id: number; role: AgentRole; agent_name: string }[];
+
+    const lines = [
+      "# Agent Setup Export",
+      "",
+      "version: 1",
+      "",
+      "## Agents",
+      "| name | provider | model | default_effort |",
+      "| --- | --- | --- | --- |",
+      ...agents.map((agent) =>
+        tableRow([agent.name, agent.provider, agent.model, agent.default_effort])
+      ),
+      "",
+      "## Role Defaults",
+      "| role | agent |",
+      "| --- | --- |",
+      ...defaults.map((roleDefault) => tableRow([roleDefault.role, roleDefault.agent.name])),
+      "",
+      "## Project Role Bindings",
+      "| project_id | role | agent |",
+      "| --- | --- | --- |",
+      ...bindings.map((binding) =>
+        tableRow([String(binding.project_id), binding.role, binding.agent_name])
+      ),
+      ""
+    ];
+
+    return lines.join("\n");
+  }
+
+  importMarkdown(markdown: string): AgentSetupImportResult {
+    const setup = parseAgentSetupMarkdown(markdown);
+
+    return this.db.transaction(() => {
+      const agentIds = new Map<string, number>();
+
+      for (const agent of setup.agents) {
+        const persisted = this.db
+          .prepare(
+            `INSERT INTO agents (name, provider, model, default_effort)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(name) DO UPDATE SET
+               provider = excluded.provider,
+               model = excluded.model,
+               default_effort = excluded.default_effort,
+               updated_at = datetime('now')
+             RETURNING id`
+          )
+          .get(agent.name, agent.provider, agent.model, agent.default_effort) as { id: number };
+        agentIds.set(agent.name, persisted.id);
+      }
+
+      for (const roleDefault of setup.roleDefaults) {
+        const agentId = agentIds.get(roleDefault.agent);
+        if (!agentId) {
+          throw new Error(`unknown agent '${roleDefault.agent}' in role default ${roleDefault.role}`);
+        }
+        this.setRoleDefault(roleDefault.role, agentId);
+      }
+
+      for (const binding of setup.roleBindings) {
+        const agentId = agentIds.get(binding.agent);
+        if (!agentId) {
+          throw new Error(
+            `unknown agent '${binding.agent}' in project ${binding.project_id} role ${binding.role}`
+          );
+        }
+        this.setProjectBinding(binding.project_id, binding.role, agentId);
+      }
+
+      return {
+        agents: setup.agents.length,
+        role_defaults: setup.roleDefaults.length,
+        role_bindings: setup.roleBindings.length
+      };
+    });
+  }
+}
+
+interface ParsedAgentSetup {
+  agents: Array<{
+    name: string;
+    provider: AgentProvider;
+    model: string;
+    default_effort: string;
+  }>;
+  roleDefaults: Array<{
+    role: AgentRole;
+    agent: string;
+  }>;
+  roleBindings: Array<{
+    project_id: number;
+    role: AgentRole;
+    agent: string;
+  }>;
 }
 
 function requireText(value: string | undefined, field: string): string {
@@ -262,6 +375,157 @@ function requireRole(value: string): AgentRole {
     return value as AgentRole;
   }
   throw new Error("role is invalid");
+}
+
+function parseAgentSetupMarkdown(markdown: string): ParsedAgentSetup {
+  const sections = splitSections(markdown);
+  const agentRows = parseTable(sections.get("Agents") ?? "", [
+    "name",
+    "provider",
+    "model",
+    "default_effort"
+  ]);
+  const defaultRows = parseTable(sections.get("Role Defaults") ?? "", ["role", "agent"]);
+  const bindingRows = parseTable(sections.get("Project Role Bindings") ?? "", [
+    "project_id",
+    "role",
+    "agent"
+  ]);
+
+  return {
+    agents: agentRows.map((row) => ({
+      name: requireText(row.name, "agent name"),
+      provider: requireProvider(requireText(row.provider, "provider")),
+      model: requireText(row.model, "model"),
+      default_effort: normalizeEffort(row.default_effort)
+    })),
+    roleDefaults: defaultRows.map((row) => ({
+      role: requireRole(requireText(row.role, "role")),
+      agent: requireText(row.agent, "agent")
+    })),
+    roleBindings: bindingRows.map((row) => ({
+      project_id: parseProjectId(row.project_id),
+      role: requireRole(requireText(row.role, "role")),
+      agent: requireText(row.agent, "agent")
+    }))
+  };
+}
+
+function splitSections(markdown: string): Map<string, string> {
+  const sections = new Map<string, string>();
+  let current: string | null = null;
+  let buffer: string[] = [];
+
+  for (const line of markdown.split(/\r?\n/)) {
+    const match = /^##\s+(.+?)\s*$/.exec(line);
+    if (match) {
+      if (current) {
+        sections.set(current, buffer.join("\n"));
+      }
+      current = match[1];
+      buffer = [];
+      continue;
+    }
+
+    if (current) {
+      buffer.push(line);
+    }
+  }
+
+  if (current) {
+    sections.set(current, buffer.join("\n"));
+  }
+
+  return sections;
+}
+
+function parseTable(section: string, expectedHeaders: string[]): Array<Record<string, string>> {
+  const rows = section
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("|") && line.endsWith("|"));
+
+  if (rows.length === 0) {
+    return [];
+  }
+  if (rows.length === 1) {
+    throw new Error(`markdown table '${expectedHeaders.join(", ")}' is missing a separator row`);
+  }
+
+  const headers = splitTableRow(rows[0]);
+  if (headers.join("\0") !== expectedHeaders.join("\0")) {
+    throw new Error(`markdown table headers must be: ${expectedHeaders.join(", ")}`);
+  }
+
+  if (!isSeparatorRow(splitTableRow(rows[1]))) {
+    throw new Error(`markdown table '${expectedHeaders.join(", ")}' has an invalid separator row`);
+  }
+
+  return rows.slice(2).map((row) => {
+    const cells = splitTableRow(row);
+    if (cells.length !== expectedHeaders.length) {
+      throw new Error(`markdown table row must have ${expectedHeaders.length} cells`);
+    }
+
+    return Object.fromEntries(expectedHeaders.map((header, index) => [header, cells[index]]));
+  });
+}
+
+function splitTableRow(row: string): string[] {
+  const trimmed = row.trim();
+  const content = trimmed.slice(1, -1);
+  const cells: string[] = [];
+  let cell = "";
+  let escaped = false;
+
+  for (const char of content) {
+    if (escaped) {
+      cell += char === "n" ? "\n" : char;
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === "|") {
+      cells.push(cell.trim());
+      cell = "";
+      continue;
+    }
+    cell += char;
+  }
+
+  if (escaped) {
+    cell += "\\";
+  }
+
+  cells.push(cell.trim());
+  return cells;
+}
+
+function isSeparatorRow(cells: string[]): boolean {
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function parseProjectId(value: string | undefined): number {
+  const text = requireText(value, "project_id");
+  if (!/^\d+$/.test(text)) {
+    throw new Error("project_id must be a positive integer");
+  }
+  const projectId = Number(text);
+  if (!Number.isSafeInteger(projectId) || projectId <= 0) {
+    throw new Error("project_id must be a positive integer");
+  }
+  return projectId;
+}
+
+function tableRow(cells: string[]): string {
+  return `| ${cells.map(escapeTableCell).join(" | ")} |`;
+}
+
+function escapeTableCell(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n/g, "\\n");
 }
 
 function rowToAgent(row: Record<string, unknown>): AgentDefinition {
