@@ -6040,10 +6040,198 @@ function TgDashboard({ onEditBottomNav }) {
 }
 
 function AgentOS() {
+  const [agents, setAgents] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [bindings, setBindings] = useState([]);
+  const [defaults, setDefaults] = useState([]);
+  const [form, setForm] = useState({ name: '', provider: 'claude', model: '', default_effort: 'medium' });
+  const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const ROLES = ['projcore', 'coord', 'implementer', 'validator', 'deliberation_1', 'deliberation_2', 'deliberation_3', 'redteam_1', 'redteam_2', 'redteam_3'];
+  const PROVIDERS = ['claude', 'codex', 'grok'];
+  const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+  async function loadAgents() {
+    try {
+      const d = await api('/api/agents');
+      setAgents(d.agents || []);
+    } catch (e) { setError(e.message || 'Failed to load agents'); }
+  }
+  async function loadProjects() {
+    try {
+      const d = await api('/api/projects');
+      setProjects(d.projects || []);
+    } catch (e) { /* non-fatal */ }
+  }
+  async function loadDefaults() {
+    try {
+      const d = await api('/api/role-defaults');
+      setDefaults(d.defaults || []);
+    } catch (e) { /* non-fatal */ }
+  }
+  async function loadBindings(pid) {
+    if (!pid) { setBindings([]); return; }
+    try {
+      const d = await api(`/api/projects/${pid}/role-bindings`);
+      setBindings(d.bindings || []);
+    } catch (e) { setBindings([]); }
+  }
+
+  useEffect(() => {
+    Promise.all([loadAgents(), loadProjects(), loadDefaults()]).then(() => setLoading(false)).catch(() => setLoading(false));
+  }, []);
+
+  // auto-select first project for convenience (once loaded)
+  useEffect(() => {
+    if (!selectedProjectId && projects.length > 0) {
+      setSelectedProjectId(projects[0].id);
+    }
+  }, [projects, selectedProjectId]);
+
+  useEffect(() => {
+    if (selectedProjectId) loadBindings(selectedProjectId);
+  }, [selectedProjectId]);
+
+  function resetForm() {
+    setForm({ name: '', provider: 'claude', model: '', default_effort: 'medium' });
+    setEditingId(null);
+  }
+
+  async function saveAgent() {
+    setError(''); setMsg('');
+    const body = { ...form };
+    try {
+      if (editingId) {
+        await api(`/api/agents/${editingId}`, { method: 'PATCH', body: JSON.stringify(body) });
+        setMsg('Agent updated');
+      } else {
+        await api('/api/agents', { method: 'POST', body: JSON.stringify(body) });
+        setMsg('Agent created (persists)');
+      }
+      resetForm();
+      await loadAgents();
+    } catch (e) { setError(e.message || 'Save failed'); }
+  }
+
+  function startEdit(a) {
+    setForm({ name: a.name, provider: a.provider, model: a.model, default_effort: a.default_effort });
+    setEditingId(a.id);
+    setError(''); setMsg('');
+  }
+
+  async function deleteAgent(id) {
+    if (!confirm('Delete this agent?')) return;
+    setError(''); setMsg('');
+    try {
+      await api(`/api/agents/${id}`, { method: 'DELETE' });
+      if (editingId === id) resetForm();
+      await loadAgents();
+    } catch (e) { setError(e.message || 'Delete failed'); }
+  }
+
+  async function applyMapping(role, agentIdValue) {
+    if (!selectedProjectId) return;
+    setError(''); setMsg('');
+    try {
+      const url = `/api/projects/${selectedProjectId}/role-bindings/${role}`;
+      if (!agentIdValue || agentIdValue === '') {
+        await api(url, { method: 'DELETE' });
+        setMsg(`${role} cleared (now uses global default)`);
+      } else {
+        await api(url, { method: 'PUT', body: JSON.stringify({ agent_id: Number(agentIdValue) }) });
+        setMsg(`${role} mapped (persisted)`);
+      }
+      await loadBindings(selectedProjectId);
+    } catch (e) { setError(e.message || 'Mapping failed'); }
+  }
+
+  if (loading) return html`<div class="loading">Loading Agent OS...</div>`;
+
+  const defaultsMap = {};
+  defaults.forEach(d => { if (d && d.role) defaultsMap[d.role] = d.agent; });
+  const bindingsMap = {};
+  bindings.forEach(b => { if (b && b.role) bindingsMap[b.role] = b.agent; });
+
   return html`
     <div>
       <h2>Agent OS</h2>
-      <p>Per-project agent role mapping + chat — coming in B2/B4.</p>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Reusable agents (create/edit/delete) + per-project role mappings. All persist via A1 API. Unmapped roles show global default.</p>
+      ${error ? html`<p style="color:var(--danger);font-size:12px;margin:4px 0">${error}</p>` : ''}
+      ${msg ? html`<p style="color:var(--success);font-size:12px;margin:4px 0">${msg}</p>` : ''}
+
+      <div class="action-bar" style="margin-top:8px">
+        <h3 style="margin:0">Agents</h3>
+        <button class="btn btn-sm" onclick=${() => loadAgents()}>Refresh</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
+        <input style="flex:1;min-width:140px" placeholder="Name (e.g. grok-projcore)" value=${form.name} onInput=${e => setForm({...form, name: e.target.value})} />
+        <select value=${form.provider} onChange=${e => setForm({...form, provider: e.target.value})}>
+          ${PROVIDERS.map(p => html`<option value=${p}>${p}</option>`)}
+        </select>
+        <input style="flex:1;min-width:120px" placeholder="Model (e.g. grok-3)" value=${form.model} onInput=${e => setForm({...form, model: e.target.value})} />
+        <select value=${form.default_effort} onChange=${e => setForm({...form, default_effort: e.target.value})}>
+          ${EFFORTS.map(e => html`<option value=${e}>${e}</option>`)}
+        </select>
+        <button class="btn btn-sm btn-primary" onclick=${saveAgent}>${editingId ? 'Update Agent' : 'Create Agent'}</button>
+        ${editingId ? html`<button class="btn btn-sm" onclick=${resetForm}>Cancel</button>` : ''}
+      </div>
+      <div class="item-list">
+        ${agents.length === 0 ? html`<div style="font-size:12px;color:var(--text-secondary);padding:4px">No agents yet. Create one above — it will persist.</div>` : ''}
+        ${agents.map(a => html`
+          <div class="item-card" style="padding:6px 10px;display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <div style="flex:1;font-size:13px">
+              <strong>${a.name}</strong>
+              <span style="color:var(--text-secondary);font-size:11px;margin-left:6px">${a.provider} / ${a.model} · effort=${a.default_effort}</span>
+            </div>
+            <button class="btn btn-sm" onclick=${() => startEdit(a)}>Edit</button>
+            <button class="btn btn-sm btn-danger" onclick=${() => deleteAgent(a.id)}>Del</button>
+          </div>
+        `)}
+      </div>
+
+      <div style="margin-top:16px">
+        <div class="action-bar">
+          <h3 style="margin:0">Per-project Role Mappings (10 roles)</h3>
+          <button class="btn btn-sm" onclick=${() => selectedProjectId && loadBindings(selectedProjectId)}>Re-fetch</button>
+        </div>
+        <div style="margin:6px 0">
+          <span style="font-size:12px">Project: </span>
+          <select value=${selectedProjectId || ''} onChange=${e => setSelectedProjectId(e.target.value ? Number(e.target.value) : null)}>
+            <option value="">— select project —</option>
+            ${projects.map(p => html`<option value=${p.id}>${p.display_name || p.directory_name || ('#' + p.id)}</option>`)}
+          </select>
+          <span style="font-size:11px;color:var(--text-secondary);margin-left:8px">Select agent (or blank) for a role — saves immediately. Blank = global default.</span>
+        </div>
+        ${!selectedProjectId ? html`<div style="font-size:12px;color:var(--text-secondary)">Select a project to map roles. Unmapped = shows the global default from role_defaults.</div>` : html`
+          <div style="border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px">
+            ${ROLES.map(role => {
+              const bound = bindingsMap[role];
+              const defAgent = defaultsMap[role];
+              const val = bound ? String(bound.id) : '';
+              const label = bound ? bound.name : (defAgent ? defAgent.name : '—');
+              const usingDefault = !bound;
+              return html`
+                <div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border)">
+                  <div style="width:120px;font-family:monospace">${role}</div>
+                  <select style="min-width:180px;font-size:11px" value=${val} onChange=${e => applyMapping(role, e.target.value)}>
+                    <option value="">— global default —</option>
+                    ${agents.map(ag => html`<option value=${ag.id}>${ag.name}</option>`)}
+                  </select>
+                  <span style="font-size:11px;${usingDefault ? 'color:var(--text-secondary)' : 'color:var(--success)'}">
+                    ${usingDefault ? `using global default: ${label}` : `bound → ${label}`}
+                    ${usingDefault ? html`<span class="badge badge-draft" style="font-size:9px;margin-left:4px">default</span>` : html`<span class="badge badge-active" style="font-size:9px;margin-left:4px">project</span>`}
+                  </span>
+                </div>
+              `;
+            })}
+          </div>
+          <div style="font-size:10px;color:var(--text-secondary);margin-top:4px">Persistence: change persists on server; re-fetch or re-select project reads back exactly what was set. Fallback indicator appears for unmapped.</div>
+        `}
+      </div>
     </div>
   `;
 }
