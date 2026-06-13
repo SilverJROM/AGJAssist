@@ -25,6 +25,8 @@ import { NudgeStateService } from "./services/nudge-state-service.js";
 import { OvermindStreamManager } from "./api/websocket/overmind-stream-manager.js";
 import { OvmSessionService } from "./services/ovm-session.js";
 import { AgentAssignmentService } from "./services/agent-assignment-service.js";
+import { AgentEventsService } from "./services/agent-events-service.js";
+import { AgentWakeScheduler } from "./services/agent-wake-scheduler.js";
 import {
   formatError,
   installTelegramProcessGuards,
@@ -73,6 +75,8 @@ async function main(): Promise<void> {
   const personalTaskService = new PersonalTaskService(db, auditService);
   const reminderService = new ReminderService(db, auditService);
   const agentAssignmentService = new AgentAssignmentService(db);
+  const agentEventsService = new AgentEventsService(db);
+  const agentWakeScheduler = new AgentWakeScheduler(db, tmuxService, agentEventsService);
   const overmindService = new OvermindService(db);
   const appSettingsService = new AppSettingsService();
   await appSettingsService.load();
@@ -103,7 +107,8 @@ async function main(): Promise<void> {
     overmindBrain,
     (workflows) => overmindStreamManager.broadcast(workflows),
     appSettingsService,
-    nudgeStateService
+    nudgeStateService,
+    agentWakeScheduler
   );
 
   // Tmux streaming

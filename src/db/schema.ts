@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 33;
+export const SCHEMA_VERSION = 34;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -415,6 +415,22 @@ CREATE INDEX IF NOT EXISTS idx_agent_events_batch_type ON agent_events(run_id, b
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_events_terminal_dedupe
   ON agent_events(run_id, batch_id, state, correlation_id)
   WHERE type = 'status' AND state IN ('DONE', 'BLOCKED');
+
+CREATE TABLE IF NOT EXISTS agent_wake_schedule (
+  id INTEGER PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  batch_id TEXT NOT NULL,
+  target_session TEXT,
+  kind TEXT NOT NULL CHECK(kind IN ('poke-pane', 'wake-coordinator')),
+  due_at TEXT NOT NULL,
+  fired_at TEXT,
+  outcome TEXT,
+  body TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_agent_wake_schedule_due
+  ON agent_wake_schedule(due_at, fired_at);
+CREATE INDEX IF NOT EXISTS idx_agent_wake_schedule_run
+  ON agent_wake_schedule(run_id, batch_id);
 `;
 
 export const DEFAULT_SAFETY_PATTERNS = [

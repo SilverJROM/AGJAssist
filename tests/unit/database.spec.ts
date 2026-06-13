@@ -69,7 +69,7 @@ describe("DatabaseService", () => {
       .prepare("SELECT version FROM schema_version")
       .get() as { version: number };
 
-    expect(version.version).toBe(33);
+    expect(version.version).toBe(34);
     db.close();
   });
 
@@ -167,7 +167,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(33);
+    expect(version.version).toBe(34);
     const upgradedCols = upgraded.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     const upgradedColNames = upgradedCols.map((c) => c.name);
     expect(upgradedColNames).toContain("last_parent_update_at");
@@ -202,7 +202,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(33);
+    expect(version.version).toBe(34);
 
     const tableNames = (
       upgraded.raw
@@ -212,6 +212,7 @@ describe("DatabaseService", () => {
     expect(tableNames).toContain("agents");
     expect(tableNames).toContain("role_bindings");
     expect(tableNames).toContain("role_defaults");
+    expect(tableNames).toContain("agent_wake_schedule");
 
     const project = upgraded
       .prepare("SELECT id, directory_name, display_name, status, active FROM projects WHERE id = 7")
@@ -320,7 +321,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(33);
+    expect(version.version).toBe(34);
 
     const count = upgraded.prepare("SELECT COUNT(*) AS count FROM overmind_workflows").get() as { count: number };
     expect(count.count).toBe(2);

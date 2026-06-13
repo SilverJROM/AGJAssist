@@ -16,6 +16,7 @@ import {
 } from "./overmind-brain.js";
 import { AppSettingsService } from "./app-settings-service.js";
 import { NudgeStateService } from "./nudge-state-service.js";
+import { AgentWakeScheduler } from "./agent-wake-scheduler.js";
 export const POLL_MS = 30_000;
 export const RECONCILE_MS = 1_800_000;
 import {
@@ -88,7 +89,8 @@ export class OvermindWatcher {
     private readonly brain?: OvermindBrain,
     private readonly onUpdate?: OvermindUpdate,
     private readonly appSettings?: AppSettingsService,
-    private readonly nudgeState?: NudgeStateService
+    private readonly nudgeState?: NudgeStateService,
+    private readonly wakeScheduler?: AgentWakeScheduler
   ) {
     this.evidenceReader = new EvidenceReader({
       overmindService: this.overmindService,
@@ -115,6 +117,7 @@ export class OvermindWatcher {
       }
     }
     await Promise.all(activeWorkflows.map((workflow) => this.tickWorkflow(workflow)));
+    await this.wakeScheduler?.tick();
     if (Date.now() - this.lastReconcileAt >= RECONCILE_MS) {
       const freshActiveWorkflows = this.overmindService.list().filter(
         (workflow) => !TERMINAL_STATUSES.includes(workflow.status)

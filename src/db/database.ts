@@ -659,6 +659,27 @@ export class DatabaseService {
         `);
       }
 
+      // Migration: v33 → v34: app-owned wake schedule for provider-agnostic callbacks.
+      if (current && current.version < 34) {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS agent_wake_schedule (
+            id INTEGER PRIMARY KEY,
+            run_id TEXT NOT NULL,
+            batch_id TEXT NOT NULL,
+            target_session TEXT,
+            kind TEXT NOT NULL CHECK(kind IN ('poke-pane', 'wake-coordinator')),
+            due_at TEXT NOT NULL,
+            fired_at TEXT,
+            outcome TEXT,
+            body TEXT NOT NULL DEFAULT '{}'
+          );
+          CREATE INDEX IF NOT EXISTS idx_agent_wake_schedule_due
+            ON agent_wake_schedule(due_at, fired_at);
+          CREATE INDEX IF NOT EXISTS idx_agent_wake_schedule_run
+            ON agent_wake_schedule(run_id, batch_id);
+        `);
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);
