@@ -6050,6 +6050,8 @@ function AgentOS() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
+  const [launchMode, setLaunchMode] = useState('projcore');
+  const [launchResult, setLaunchResult] = useState('');
 
   const ROLES = ['projcore', 'coord', 'implementer', 'validator', 'deliberation_1', 'deliberation_2', 'deliberation_3', 'redteam_1', 'redteam_2', 'redteam_3'];
   const PROVIDERS = ['claude', 'codex', 'grok'];
@@ -6265,6 +6267,30 @@ function AgentOS() {
           </div>
           <div style="font-size:10px;color:var(--text-secondary);margin-top:4px">Persistence: change persists on server; re-fetch or re-select project reads back exactly what was set. Fallback indicator appears for unmapped.</div>
         `}
+      </div>
+
+      <!-- B3 minimal launch hook (per brief): mode selector (R7) + Launch button (behind owner auth). Live who-is-working = B5, chat = B4 (out of scope). -->
+      <div style="margin-top:16px">
+        <div class="action-bar">
+          <h3 style="margin:0">Launch (B3)</h3>
+        </div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Select mode (picks CORE prompt + coordinator role binding). One tmux session per project (R9). Owner auth enforced.</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <select value=${launchMode} onChange=${e => setLaunchMode(e.target.value)} style="min-width:120px;font-size:11px">
+            <option value="projcore">projcore</option>
+            <option value="coord">coord</option>
+          </select>
+          <button class="btn btn-sm btn-primary" onclick=${async () => {
+            if (!selectedProjectId) { setError('Select a project first'); return; }
+            setError(''); setMsg(''); setLaunchResult('');
+            try {
+              const r = await api(`/api/projects/${selectedProjectId}/launch`, { method: 'POST', body: JSON.stringify({ mode: launchMode }) });
+              setLaunchResult(`Launched ${r.mode} → ${r.sessionTarget} (${r.provider}/${r.model})`);
+              setMsg('Launch dispatched (session reuse if existed)');
+            } catch (e) { setError(e.message || 'Launch failed (owner?)'); }
+          }}>Launch</button>
+        </div>
+        ${launchResult ? html`<div style="font-size:11px;margin-top:4px;color:var(--success)">${launchResult}</div>` : ''}
       </div>
     </div>
   `;
