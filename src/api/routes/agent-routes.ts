@@ -3,14 +3,17 @@ import { createAuthMiddleware, requireOwner } from "../../auth/auth-middleware.j
 import { AuthService } from "../../auth/auth-service.js";
 import { AgentAssignmentService } from "../../services/agent-assignment-service.js";
 import { CoordinatorLaunchService } from "../../services/coordinator-launch-service.js";
+import { TmuxService } from "../../tmux/tmux-service.js";
 
 export function registerAgentRoutes(
   app: FastifyInstance,
   authService: AuthService,
   agentAssignmentService: AgentAssignmentService,
-  coordinatorLaunchService?: CoordinatorLaunchService
+  coordinatorLaunchService?: CoordinatorLaunchService,
+  tmuxService?: TmuxService
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
+  const tmux = tmuxService;
 
   app.get(
     "/api/agents",
@@ -205,6 +208,30 @@ export function registerAgentRoutes(
         const mode = (request.body?.mode || "") as "projcore" | "coord";
         const result = await coordinatorLaunchService.launch(projectId, mode);
         return result;
+      } catch (err) {
+        return sendAgentError(reply, err);
+      }
+    }
+  );
+
+  // B4: talk/send to the project's coordinator session (R8 chat-half). Owner auth + requireOwner.
+  // Reuses B3 session convention (agj-os-${projectId}) + tmux-service send-keys (no reimpl of substrate).
+  // Optimistic echo is in frontend; this just delivers the keystrokes.
+  app.post<{
+    Params: { projectId: string };
+    Body: { text: string; target?: string };
+  }>(
+    "/api/projects/:projectId/agent-message",
+    { preHandler: [authMiddleware, requireOwner] },
+    async (request, reply) => {
+      try {
+        if (!tmux) return reply.code(500).send({ error: "tmux service not available" });
+        const projectId = Number(request.params.projectId);
+        const text = (request.body?.text || "").trim();
+        if (!text) return reply.code(400).send({ error: "text required" });
+        const target = request.body?.target || `agj-os-${projectId}:0.0`;
+        await (tmux as any).send(target, text, true);
+        return { ok: true, runId: `agj-os-${projectId}`, target };
       } catch (err) {
         return sendAgentError(reply, err);
       }
