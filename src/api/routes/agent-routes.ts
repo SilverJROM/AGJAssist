@@ -5,6 +5,7 @@ import { AgentAssignmentService, AGENT_ROLES, type AgentRole } from "../../servi
 import { CoordinatorLaunchService } from "../../services/coordinator-launch-service.js";
 import { TmuxService } from "../../tmux/tmux-service.js";
 import { ProjectService } from "../../services/project-service.js";
+import { SafetyService } from "../../services/safety-service.js";
 
 function isLoopbackAddress(ip: string | undefined | null): boolean {
   if (!ip) return false;
@@ -32,11 +33,13 @@ export function registerAgentRoutes(
   agentAssignmentService: AgentAssignmentService,
   coordinatorLaunchService?: CoordinatorLaunchService,
   tmuxService?: TmuxService,
-  projectService?: ProjectService
+  projectService?: ProjectService,
+  safetyService?: SafetyService
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
   const tmux = tmuxService;
   const projects = projectService;
+  const safety = safetyService;
 
   app.get(
     "/api/agents",
@@ -261,22 +264,38 @@ export function registerAgentRoutes(
     }
   );
 
-  // B4: talk/send to the project's coordinator session (R8 chat-half). Owner auth + requireOwner.
-  // Reuses B3 session convention (agj-os-${projectId}) + tmux-service send-keys (no reimpl of substrate).
-  // Optimistic echo is in frontend; this just delivers the keystrokes.
+  // B4 + B6: talk/send to the project's coordinator session. Now under spawn-path guards:
+  // (b) loopback via same requireLocalLaunch; (c) server-derived target only (no attacker-controlled);
+  // (c) text routed through same safetyService.checkCommand that sendCommand uses (sendAndSubmit bypasses).
+  // Owner auth + requireOwner still apply.
   app.post<{
     Params: { projectId: string };
     Body: { text: string; target?: string };
   }>(
     "/api/projects/:projectId/agent-message",
-    { preHandler: [authMiddleware, requireOwner] },
+    { preHandler: [authMiddleware, requireOwner, requireLocalLaunch] },
     async (request, reply) => {
       try {
         if (!tmux) return reply.code(500).send({ error: "tmux service not available" });
         const projectId = Number(request.params.projectId);
         const text = (request.body?.text || "").trim();
         if (!text) return reply.code(400).send({ error: "text required" });
-        const target = request.body?.target || `agj-os-${projectId}:0.0`;
+
+        // (c) ALWAYS derive the project's own session target server-side; NEVER trust request body target
+        const target = `agj-os-${projectId}:0.0`;
+        const suppliedTarget = request.body?.target;
+        if (suppliedTarget && suppliedTarget !== target) {
+          return reply.code(400).send({ error: "target must be the project's own session" });
+        }
+
+        // (c) apply the exact safety pattern check used by sendCommand (before sendAndSubmit)
+        if (safety) {
+          const check = safety.checkCommand(text);
+          if (check.blocked) {
+            return reply.code(400).send({ error: `Command blocked by safety pattern: ${check.pattern?.pattern || "matched"}` });
+          }
+        }
+
         await tmux.sendAndSubmit(target, text);
         return { ok: true, runId: `agj-os-${projectId}`, target };
       } catch (err) {

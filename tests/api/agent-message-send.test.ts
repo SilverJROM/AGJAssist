@@ -6,6 +6,8 @@ import { AgentAssignmentService } from '../../src/services/agent-assignment-serv
 import { CoordinatorLaunchService } from '../../src/services/coordinator-launch-service.js';
 import { TmuxService } from '../../src/tmux/tmux-service.js';
 import { registerAgentRoutes } from '../../src/api/routes/agent-routes.js';
+import { SafetyService } from '../../src/services/safety-service.js';
+import { ProjectService } from '../../src/services/project-service.js';
 
 // B4 send test (Fastify inject, owner auth, REAL TmuxService method mock). Asserts sendAndSubmit (not fake send) so it fails on wrong method (GAP-2).
 describe('B4 /api/projects/:id/agent-message', () => {
@@ -24,9 +26,17 @@ describe('B4 /api/projects/:id/agent-message', () => {
     // Dummies for the register (not used by the new route)
     const assignment = {} as any as AgentAssignmentService;
     const launch = undefined as any as CoordinatorLaunchService;
+    const projectDummy = {} as any as ProjectService;
+    // Safety mock: blocks on obvious dangerous for the new B6 tests; safe otherwise
+    const safety = {
+      checkCommand: vi.fn((cmd: string) => ({
+        blocked: /rm -rf|danger|evil|sudo rm/i.test(cmd),
+        pattern: /rm -rf|danger|evil/i.test(cmd) ? ({ pattern: 'dangerous' } as any) : null
+      }))
+    } as any as SafetyService;
 
-    // Register with tmux (the B4 addition). Mock matches real TmuxService.sendAndSubmit shape so test fails if route calls wrong/nonexistent method.
-    registerAgentRoutes(app, authService, assignment, launch, tmux as any as TmuxService);
+    // Register ... + project + safety (B6 spawn guards now apply to agent-message too)
+    registerAgentRoutes(app, authService, assignment, launch, tmux as any as TmuxService, projectDummy, safety);
 
     await app.ready();
   });
@@ -37,7 +47,8 @@ describe('B4 /api/projects/:id/agent-message', () => {
       method: 'POST',
       url: '/api/projects/42/agent-message',
       headers: { authorization: 'Bearer owner-token' },
-      payload: { text: 'hello from B4 test', target: 'agj-os-42:0.0' }
+      payload: { text: 'hello from B4 test', target: 'agj-os-42:0.0' },
+      remoteAddress: '127.0.0.1'
     });
 
     expect(res.statusCode).toBe(200);
@@ -62,8 +73,65 @@ describe('B4 /api/projects/:id/agent-message', () => {
       method: 'POST',
       url: '/api/projects/42/agent-message',
       headers: { authorization: 'Bearer owner-token' },
-      payload: { text: '   ' }
+      payload: { text: '   ' },
+      remoteAddress: '127.0.0.1'
     });
     expect(resBad.statusCode).toBe(400);
+  });
+
+  // B6 red-team iter1 additions: non-loopback 403; foreign target rejected; dangerous blocked by safety; legit still works
+  it('non-loopback agent-message rejected with 403 (b)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/projects/42/agent-message',
+      headers: { authorization: 'Bearer owner-token' },
+      payload: { text: 'safe message' },
+      remoteAddress: '10.0.0.5'
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toContain('localhost');
+  });
+
+  it('foreign target is rejected (not trusted/used) (c)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/projects/42/agent-message',
+      headers: { authorization: 'Bearer owner-token' },
+      payload: { text: 'hi', target: 'other-session:0.0' },
+      remoteAddress: '127.0.0.1'
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain('target must be the project');
+    // ensure sendAndSubmit was NOT called with foreign
+    expect(tmux.sendAndSubmit).not.toHaveBeenCalledWith(expect.stringContaining('other-session'), expect.any(String));
+  });
+
+  it('dangerous payload is blocked by safetyService pattern check (c)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/projects/42/agent-message',
+      headers: { authorization: 'Bearer owner-token' },
+      payload: { text: 'rm -rf /' },
+      remoteAddress: '127.0.0.1'
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain('blocked by safety pattern');
+  });
+
+  it('legit owner + loopback + safe text + own target still works (R14)', async () => {
+    // reset call count for this it
+    tmux.sendAndSubmit.mockClear();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/projects/42/agent-message',
+      headers: { authorization: 'Bearer owner-token' },
+      payload: { text: 'legit safe chat to agent', target: 'agj-os-42:0.0' },
+      remoteAddress: '127.0.0.1'
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.ok).toBe(true);
+    expect(body.runId).toBe('agj-os-42');
+    expect(tmux.sendAndSubmit).toHaveBeenCalledWith(expect.stringContaining('agj-os-42'), 'legit safe chat to agent');
   });
 });
