@@ -23,6 +23,7 @@ import { SonnetOvermindBrain } from "./services/overmind-brain.js";
 import { AppSettingsService } from "./services/app-settings-service.js";
 import { NudgeStateService } from "./services/nudge-state-service.js";
 import { OvermindStreamManager } from "./api/websocket/overmind-stream-manager.js";
+import { AgentEventsStreamManager } from "./api/websocket/agent-events-stream-manager.js";
 import { OvmSessionService } from "./services/ovm-session.js";
 import { AgentAssignmentService } from "./services/agent-assignment-service.js";
 import { AgentEventsService } from "./services/agent-events-service.js";
@@ -76,6 +77,8 @@ async function main(): Promise<void> {
   const reminderService = new ReminderService(db, auditService);
   const agentAssignmentService = new AgentAssignmentService(db);
   const agentEventsService = new AgentEventsService(db);
+  const agentEventsStreamManager = new AgentEventsStreamManager(authService, agentEventsService);
+  agentEventsService.onEvent((event) => agentEventsStreamManager.broadcast(event));
   const agentWakeScheduler = new AgentWakeScheduler(db, tmuxService, agentEventsService);
   const overmindService = new OvermindService(db);
   const appSettingsService = new AppSettingsService();
@@ -141,6 +144,7 @@ async function main(): Promise<void> {
     overmindService,
     overmindNotify,
     overmindStreamManager,
+    agentEventsStreamManager,
     ovmSessionService,
     appSettingsService,
     nudgeStateService

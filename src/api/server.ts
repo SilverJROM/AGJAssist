@@ -39,6 +39,8 @@ import { OvermindService } from "../services/overmind-service.js";
 import { registerOvermindRoutes } from "./routes/overmind-routes.js";
 import type { OvermindNotify } from "../services/overmind-watcher.js";
 import { OvermindStreamManager } from "./websocket/overmind-stream-manager.js";
+import { AgentEventsStreamManager } from "./websocket/agent-events-stream-manager.js";
+import { registerAgentEventsRoutes } from "./routes/agent-events-routes.js";
 import type { OvmSessionManager } from "../services/ovm-session.js";
 import { AppSettingsService } from "../services/app-settings-service.js";
 import { registerAppSettingsRoutes } from "./routes/app-settings-routes.js";
@@ -66,6 +68,7 @@ export interface ApiServices {
   overmindService: OvermindService;
   overmindNotify?: OvermindNotify;
   overmindStreamManager?: OvermindStreamManager;
+  agentEventsStreamManager?: AgentEventsStreamManager;
   ovmSessionService?: OvmSessionManager;
   appSettingsService?: AppSettingsService;
   nudgeStateService?: NudgeStateService;
@@ -141,6 +144,10 @@ export async function createApiServer(
     services.tmuxService,
     services.nudgeStateService
   );
+
+  if (services.agentEventsStreamManager) {
+    registerAgentEventsRoutes(app, services.agentEventsStreamManager);
+  }
 
   if (services.appSettingsService) {
     registerAppSettingsRoutes(app, services.authService, services.appSettingsService);

@@ -30,12 +30,21 @@ export interface AgentEventRow {
   ts: string;
 }
 
+export type AgentEventListener = (event: AgentEventRow) => void;
+
 interface RawAgentEventRow extends Omit<AgentEventRow, "body"> {
   body: string;
 }
 
 export class AgentEventsService {
+  private readonly listeners = new Set<AgentEventListener>();
+
   constructor(private readonly db: DatabaseService) {}
+
+  onEvent(listener: AgentEventListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
 
   recordEvent(input: AgentEventInput): AgentEventRow {
     if (input.type === "status" && (input.state === "DONE" || input.state === "BLOCKED")) {
@@ -62,7 +71,7 @@ export class AgentEventsService {
         input.ts ?? new Date().toISOString()
       );
 
-    return this.getEventById(Number(result.lastInsertRowid));
+    return this.emitEvent(this.getEventById(Number(result.lastInsertRowid)));
   }
 
   listEvents(runId: string): AgentEventRow[] {
@@ -111,7 +120,7 @@ export class AgentEventsService {
           JSON.stringify(body),
           input.ts ?? new Date().toISOString()
         );
-      return this.getEventById(Number(result.lastInsertRowid));
+      return this.emitEvent(this.getEventById(Number(result.lastInsertRowid)));
     }
 
     const mergedBody = mergeProvenance(existing.body, input.body, input.source);
@@ -119,7 +128,7 @@ export class AgentEventsService {
     this.db
       .prepare("UPDATE agent_events SET body = ?, session = ? WHERE id = ?")
       .run(JSON.stringify(mergedBody), mergedSession, existing.id);
-    return this.getEventById(existing.id);
+    return this.emitEvent(this.getEventById(existing.id));
   }
 
   private getEventById(id: number): AgentEventRow {
@@ -128,6 +137,13 @@ export class AgentEventsService {
       .get(id) as RawAgentEventRow | undefined;
     if (!row) throw new Error(`agent_events row ${id} not found after insert`);
     return parseRow(row);
+  }
+
+  private emitEvent(event: AgentEventRow): AgentEventRow {
+    for (const listener of this.listeners) {
+      listener(event);
+    }
+    return event;
   }
 }
 
