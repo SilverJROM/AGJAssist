@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -396,6 +396,25 @@ CREATE TABLE IF NOT EXISTS overmind_task_history (
   total INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_overmind_task_history_coordinator_session ON overmind_task_history(coordinator_session);
+
+CREATE TABLE IF NOT EXISTS agent_events (
+  id INTEGER PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  batch_id TEXT NOT NULL,
+  session TEXT,
+  type TEXT NOT NULL CHECK(type IN ('message', 'status', 'tool', 'gate')),
+  state TEXT,
+  source TEXT NOT NULL CHECK(source IN ('callback', 'git', 'pane', 'post')),
+  correlation_id TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '{}',
+  ts TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_events_run_ts ON agent_events(run_id, ts);
+CREATE INDEX IF NOT EXISTS idx_agent_events_batch_type ON agent_events(run_id, batch_id, type);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_events_terminal_dedupe
+  ON agent_events(run_id, batch_id, state, correlation_id)
+  WHERE type = 'status' AND state IN ('DONE', 'BLOCKED');
 `;
 
 export const DEFAULT_SAFETY_PATTERNS = [

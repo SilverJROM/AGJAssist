@@ -635,6 +635,30 @@ export class DatabaseService {
         `);
       }
 
+      // Migration: v32 → v33: unified structured agent event stream.
+      if (current && current.version < 33) {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS agent_events (
+            id INTEGER PRIMARY KEY,
+            run_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            batch_id TEXT NOT NULL,
+            session TEXT,
+            type TEXT NOT NULL CHECK(type IN ('message', 'status', 'tool', 'gate')),
+            state TEXT,
+            source TEXT NOT NULL CHECK(source IN ('callback', 'git', 'pane', 'post')),
+            correlation_id TEXT NOT NULL,
+            body TEXT NOT NULL DEFAULT '{}',
+            ts TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+          CREATE INDEX IF NOT EXISTS idx_agent_events_run_ts ON agent_events(run_id, ts);
+          CREATE INDEX IF NOT EXISTS idx_agent_events_batch_type ON agent_events(run_id, batch_id, type);
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_events_terminal_dedupe
+            ON agent_events(run_id, batch_id, state, correlation_id)
+            WHERE type = 'status' AND state IN ('DONE', 'BLOCKED');
+        `);
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);
