@@ -1,19 +1,42 @@
-import { FastifyInstance, FastifyReply } from "fastify";
+import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { createAuthMiddleware, requireOwner } from "../../auth/auth-middleware.js";
 import { AuthService } from "../../auth/auth-service.js";
-import { AgentAssignmentService } from "../../services/agent-assignment-service.js";
+import { AgentAssignmentService, AGENT_ROLES, type AgentRole } from "../../services/agent-assignment-service.js";
 import { CoordinatorLaunchService } from "../../services/coordinator-launch-service.js";
 import { TmuxService } from "../../tmux/tmux-service.js";
+import { ProjectService } from "../../services/project-service.js";
+
+function isLoopbackAddress(ip: string | undefined | null): boolean {
+  if (!ip) return false;
+  const v = String(ip).trim();
+  if (v === "127.0.0.1" || v === "::1" || v === "::ffff:127.0.0.1") return true;
+  if (v.startsWith("127.")) return true;
+  return false;
+}
+
+function requireLocalLaunch(request: FastifyRequest, reply: FastifyReply, done: () => void): void {
+  // Security: direct socket addr primary (resists xff spoof); fallback for proxies. Scoped ONLY to spawn/launch path.
+  // App remains bound to config.api.host (0.0.0.0) so remote/tunnel UI access to dashboard/other APIs is unaffected.
+  const direct = (request.raw as any)?.socket?.remoteAddress || (request.raw as any)?.connection?.remoteAddress;
+  const ip = direct || request.ip || String((request.headers["x-forwarded-for"] as string) || "").split(",")[0].trim();
+  if (!isLoopbackAddress(ip)) {
+    reply.code(403).send({ error: "Launch/spawn endpoints only reachable from localhost" });
+    return;
+  }
+  done();
+}
 
 export function registerAgentRoutes(
   app: FastifyInstance,
   authService: AuthService,
   agentAssignmentService: AgentAssignmentService,
   coordinatorLaunchService?: CoordinatorLaunchService,
-  tmuxService?: TmuxService
+  tmuxService?: TmuxService,
+  projectService?: ProjectService
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
   const tmux = tmuxService;
+  const projects = projectService;
 
   app.get(
     "/api/agents",
@@ -192,20 +215,44 @@ export function registerAgentRoutes(
     }
   );
 
-  // B3 launcher (R9/R5/R7): behind EXISTING owner auth (affirmation #1). Mode selects CORE + binding (affirmation #2).
+  // B6 spawn-path guardrails (R24/R15 atop B3): (a) TG allowlist in core; (b) loopback preHandler scoped ONLY here (app host untouched); (c) enum role from AGENT_ROLES + existing project + launch_cmd from A2 resolver only (no free-form).
   app.post<{
     Params: { projectId: string };
     Body: { mode: string };
   }>(
     "/api/projects/:projectId/launch",
-    { preHandler: [authMiddleware, requireOwner] },
+    { preHandler: [authMiddleware, requireOwner, requireLocalLaunch] },
     async (request, reply) => {
       try {
         if (!coordinatorLaunchService) {
           return reply.code(500).send({ error: "Launcher not configured" });
         }
         const projectId = Number(request.params.projectId);
-        const mode = (request.body?.mode || "") as "projcore" | "coord";
+
+        // (b) already enforced by requireLocalLaunch preHandler (non-loopback -> 403)
+
+        const body = (request.body || {}) as Record<string, unknown>;
+        const mode = String(body.mode || "");
+
+        // (c) reject any free-form/shell/provider/cmd payload from request (or TG bridge); only enumerated role
+        const forbidden = ["cmd", "command", "shell", "launch_cmd", "provider", "model", "prompt", "effort"];
+        if (forbidden.some((k) => Object.prototype.hasOwnProperty.call(body, k) && body[k] != null)) {
+          return reply.code(400).send({ error: "free-form payload not allowed; only enumerated role (mode) accepted for spawn" });
+        }
+
+        // (c) role must be in the 10 AGJ roles (A1 registry)
+        if (!(AGENT_ROLES as readonly string[]).includes(mode)) {
+          return reply.code(400).send({ error: "role is invalid" });
+        }
+
+        // (c) project must exist in tracked projects
+        if (projects) {
+          const proj = projects.getById(projectId);
+          if (!proj) {
+            return reply.code(404).send({ error: "Project not found" });
+          }
+        }
+
         const result = await coordinatorLaunchService.launch(projectId, mode);
         return result;
       } catch (err) {

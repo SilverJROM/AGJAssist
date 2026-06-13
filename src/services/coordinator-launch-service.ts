@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { AgentAssignmentService } from "./agent-assignment-service.js";
+import { AgentAssignmentService, AGENT_ROLES, type AgentRole } from "./agent-assignment-service.js";
 import {
   dispatchToProvider,
   ProviderDispatchRequest,
@@ -11,7 +11,7 @@ import {
 
 export interface CoordinatorLaunchResult {
   success: true;
-  mode: "projcore" | "coord";
+  mode: string;
   sessionTarget: string;
   provider: string;
   model: string;
@@ -28,9 +28,12 @@ export class CoordinatorLaunchService {
     ) => Promise<ProviderDispatchResult> = dispatchToProvider
   ) {}
 
-  async launch(projectId: number, mode: "projcore" | "coord"): Promise<CoordinatorLaunchResult> {
-    if (mode !== "projcore" && mode !== "coord") {
-      throw new Error("mode must be projcore or coord");
+  async launch(projectId: number, mode: string): Promise<CoordinatorLaunchResult> {
+    // Validation against full AGENT_ROLES (the 10) is primarily at the launch endpoint for (c).
+    // resolveProjectRole + requireRole will still enforce; only launchable roles (projcore/coord) have core prompts.
+    const role = (mode || "") as AgentRole;
+    if (!AGENT_ROLES.includes(role)) {
+      throw new Error("role is invalid");
     }
 
     const resolved = this.agentAssignmentService.resolveProjectRole(projectId, mode);

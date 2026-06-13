@@ -40,6 +40,7 @@ export interface AppConfig {
   telegram: {
     botToken: string;
     authorizedUserId: number;
+    authorizedChatIds: number[];
     testMode: boolean;
   };
   runtime: {
@@ -76,12 +77,25 @@ export function loadConfig(): AppConfig {
     throw new Error("AUTHORIZED_USER_ID must be numeric");
   }
 
+  let authorizedChatIds: number[] = [authorizedUserId];
+  const chatIdsEnv = optional("AUTHORIZED_CHAT_IDS", "").trim();
+  if (chatIdsEnv) {
+    authorizedChatIds = chatIdsEnv
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isInteger(n) && n > 0);
+    if (authorizedChatIds.length === 0) {
+      authorizedChatIds = [authorizedUserId];
+    }
+  }
+
   const workspaceRoot = optional("WORKSPACE_ROOT", "/home/agjrom");
 
   return {
     telegram: {
       botToken: required("BOT_TOKEN"),
       authorizedUserId,
+      authorizedChatIds,
       testMode: parseBool(optional("TEST_MODE", "false"))
     },
     runtime: {

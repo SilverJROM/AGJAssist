@@ -12,6 +12,8 @@ import { CoordinatorLaunchService } from "../../src/services/coordinator-launch-
 import { ProviderDispatchService } from "../../src/services/provider-dispatch-service.js";
 import { ProviderResolverService } from "../../src/services/provider-resolver-service.js";
 import { TmuxService } from "../../src/tmux/tmux-service.js";
+import { ProjectService } from "../../src/services/project-service.js";
+import { AssistantCore } from "../../src/bot/assistant-core.js";
 
 const TEST_DB = path.join("data", "test-coordinator-launch.sqlite");
 const BOT_TOKEN = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11";
@@ -85,6 +87,13 @@ describe("Coordinator launch (B3) - HTTP-level Fastify inject + outcome asserts"
     agentAssignmentService.setProjectBinding(123, "projcore", agent.id);
     agentAssignmentService.setProjectBinding(123, "coord", agent.id);
 
+    // 456: existing project but no binding for projcore (used for unbound-role 400 case in B6 tests)
+    try {
+      db.prepare(
+        `INSERT INTO projects (id, directory_name, display_name, active) VALUES (456, 'unbound-proj', 'Unbound Project', 1)`
+      ).run();
+    } catch {}
+
     // Also a claude agent + default for variety in tests
     const claudeAgent = agentAssignmentService.createAgent({
       name: "test-claude-impl",
@@ -102,10 +111,10 @@ describe("Coordinator launch (B3) - HTTP-level Fastify inject + outcome asserts"
     cleanup();
   });
 
-  async function createTestServerWithLaunch(launcher: CoordinatorLaunchService) {
+  async function createTestServerWithLaunch(launcher: CoordinatorLaunchService, projectService?: ProjectService) {
     const fastify = Fastify({ logger: false });
     // Register auth + agent routes (the launch endpoint must use the real requireOwner)
-    registerAgentRoutes(fastify, authService, agentAssignmentService, launcher);
+    registerAgentRoutes(fastify, authService, agentAssignmentService, launcher, undefined as any, projectService);
     return fastify;
   }
 
@@ -132,13 +141,14 @@ describe("Coordinator launch (B3) - HTTP-level Fastify inject + outcome asserts"
     );
 
     ownerToken = makeOwnerToken();
-    app = await createTestServerWithLaunch(launcher);
+    app = await createTestServerWithLaunch(launcher, new ProjectService(db, "/tmp"));
 
     const res = await app.inject({
       method: "POST",
       url: "/api/projects/123/launch",
       headers: { authorization: `Bearer ${ownerToken}` },
-      payload: { mode: "projcore" }
+      payload: { mode: "projcore" },
+      remoteAddress: "127.0.0.1"
     });
 
     expect(res.statusCode).toBe(200);
@@ -176,14 +186,15 @@ describe("Coordinator launch (B3) - HTTP-level Fastify inject + outcome asserts"
     );
 
     ownerToken = makeOwnerToken();
-    app = await createTestServerWithLaunch(launcher);
+    app = await createTestServerWithLaunch(launcher, new ProjectService(db, "/tmp"));
 
     // coord mode
     const res2 = await app.inject({
       method: "POST",
       url: "/api/projects/123/launch",
       headers: { authorization: `Bearer ${ownerToken}` },
-      payload: { mode: "coord" }
+      payload: { mode: "coord" },
+      remoteAddress: "127.0.0.1"
     });
     expect(res2.statusCode).toBe(200);
     const body2 = JSON.parse(res2.body);
@@ -210,13 +221,14 @@ describe("Coordinator launch (B3) - HTTP-level Fastify inject + outcome asserts"
     );
 
     ownerToken = makeOwnerToken();
-    app = await createTestServerWithLaunch(launcher);
+    app = await createTestServerWithLaunch(launcher, new ProjectService(db, "/tmp"));
 
     const r1 = await app.inject({
       method: "POST",
       url: "/api/projects/123/launch",
       headers: { authorization: `Bearer ${ownerToken}` },
-      payload: { mode: "projcore" }
+      payload: { mode: "projcore" },
+      remoteAddress: "127.0.0.1"
     });
     expect(r1.statusCode).toBe(200);
 
@@ -224,7 +236,8 @@ describe("Coordinator launch (B3) - HTTP-level Fastify inject + outcome asserts"
       method: "POST",
       url: "/api/projects/123/launch",
       headers: { authorization: `Bearer ${ownerToken}` },
-      payload: { mode: "projcore" }
+      payload: { mode: "projcore" },
+      remoteAddress: "127.0.0.1"
     });
     expect(r2.statusCode).toBe(200);
 
@@ -245,7 +258,7 @@ describe("Coordinator launch (B3) - HTTP-level Fastify inject + outcome asserts"
     );
 
     ownerToken = makeOwnerToken();
-    app = await createTestServerWithLaunch(launcher);
+    app = await createTestServerWithLaunch(launcher, new ProjectService(db, "/tmp"));
 
     // No auth → 401
     const noAuth = await app.inject({
@@ -256,23 +269,102 @@ describe("Coordinator launch (B3) - HTTP-level Fastify inject + outcome asserts"
     expect(noAuth.statusCode).toBe(401);
 
     // Viewer token would 403 (create a viewer user + token would be more setup; requireOwner path is exercised by the owner case above and the register using the real middleware)
-    // Bad mode
+    // Bad mode (not in AGENT_ROLES)
     const badMode = await app.inject({
       method: "POST",
       url: "/api/projects/123/launch",
       headers: { authorization: `Bearer ${ownerToken}` },
-      payload: { mode: "invalid" }
+      payload: { mode: "invalid" },
+      remoteAddress: "127.0.0.1"
     });
     expect(badMode.statusCode).toBe(400);
 
-    // Unbound project/mode returns 4xx from resolve (no binding/default for a fresh pid)
+    // Unbound role on *existing* project (456 has no projcore binding) -> 400 from resolve (B3 path preserved)
     const unbound = await app.inject({
       method: "POST",
-      url: "/api/projects/999/launch",
+      url: "/api/projects/456/launch",
       headers: { authorization: `Bearer ${ownerToken}` },
-      payload: { mode: "projcore" }
+      payload: { mode: "projcore" },
+      remoteAddress: "127.0.0.1"
     });
     expect(unbound.statusCode).toBe(400);
     expect(unbound.body).toContain("no agent bound or default");
+
+    // Non-existing project -> 404 from (c) guard (project must be existing)
+    const noProject = await app.inject({
+      method: "POST",
+      url: "/api/projects/999/launch",
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { mode: "projcore" },
+      remoteAddress: "127.0.0.1"
+    });
+    expect(noProject.statusCode).toBe(404);
+    expect(noProject.body).toContain("Project not found");
+
+    // Free-form payload (cmd/shell/provider) rejected at entry (c) even with owner+local
+    const freeform = await app.inject({
+      method: "POST",
+      url: "/api/projects/123/launch",
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { mode: "projcore", cmd: "rm -rf /", provider: "evil" },
+      remoteAddress: "127.0.0.1"
+    });
+    expect(freeform.statusCode).toBe(400);
+    expect(freeform.body).toContain("free-form payload not allowed");
+  });
+
+  it("chat_id allowlist (a) + loopback (b) rejections; legit owner+127+valid still launches (R14) + cmd from A2 resolver only (c)", async () => {
+    // Bot-level (TG path used for spawn-triggering commands like ovm_*/overmind that relate to agent runtimes)
+    const fakeTmux = {} as any;
+    const fakeConfig = {
+      telegram: { authorizedUserId: 123456, authorizedChatIds: [123456], testMode: false },
+      runtime: { defaultTimeoutMinutes: 60, workspaceRoot: "/tmp", allowedCommandPrefixes: [], maxToolIterations: 1 },
+      api: { port: 3101, host: "0.0.0.0", jwtSecret: "t", sessionExpiryHours: 1 },
+      db: { path: ":memory:" },
+      projects: { root: "/tmp" },
+      tmux: { historyRetentionDays: 1, outputBufferLines: 10, streamIntervalMs: 100 },
+      overmind: { token: "t" }
+    } as any;
+    const core = new AssistantCore(fakeConfig, fakeTmux);
+    expect(core.isAuthorized(123456)).toBe(true);
+    expect(core.isAuthorized(999999)).toBe(false); // non-listed chat_id denied
+    expect(core.isAuthorized(undefined)).toBe(false);
+
+    // Non-loopback even with valid owner token -> 403 (b)
+    const tmux = makeTmuxMock(false);
+    const dispatchService = new ProviderDispatchService(new ProviderResolverService(), tmux);
+    const launcher = new CoordinatorLaunchService(agentAssignmentService, (r) =>
+      dispatchService.dispatchToProvider(r)
+    );
+    ownerToken = makeOwnerToken();
+    app = await createTestServerWithLaunch(launcher, new ProjectService(db, "/tmp"));
+
+    const badIp = await app.inject({
+      method: "POST",
+      url: "/api/projects/123/launch",
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { mode: "projcore" },
+      remoteAddress: "10.0.0.99"
+    });
+    expect(badIp.statusCode).toBe(403);
+    expect(badIp.body).toContain("localhost");
+
+    // Legit owner + loopback + valid enumerated role on existing project STILL works (R14 no regression)
+    const good = await app.inject({
+      method: "POST",
+      url: "/api/projects/123/launch",
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { mode: "projcore" },
+      remoteAddress: "127.0.0.1"
+    });
+    expect(good.statusCode).toBe(200);
+    const body = JSON.parse(good.body);
+    expect(body.success).toBe(true);
+    expect(body.mode).toBe("projcore");
+    expect(body.provider).toBe("grok");
+
+    // (c) assert launch_cmd was built ONLY from the A2 resolver (not free-form from request)
+    const sentCmd = tmux.sendCommand.mock.calls.length > 0 ? tmux.sendCommand.mock.calls[tmux.sendCommand.mock.calls.length - 1][1] : "";
+    expect(sentCmd).toMatch(/grok --always-approve --agent|codex|claude/); // template from providers registry
   });
 });

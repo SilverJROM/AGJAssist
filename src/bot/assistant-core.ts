@@ -93,7 +93,9 @@ export class AssistantCore {
   }
 
   isAuthorized(userId?: number): boolean {
-    return Boolean(userId) && userId === this.config.telegram.authorizedUserId;
+    if (!userId) return false;
+    const ids = this.config.telegram.authorizedChatIds || [this.config.telegram.authorizedUserId];
+    return ids.includes(userId);
   }
 
   isOvmChatMode(userId: number): boolean {

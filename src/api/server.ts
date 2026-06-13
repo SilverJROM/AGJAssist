@@ -134,7 +134,7 @@ export async function createApiServer(
   registerTemplateRoutes(app, services.authService, services.stepTemplateService);
   registerPersonalTaskRoutes(app, services.authService, services.personalTaskService);
   registerReminderRoutes(app, services.authService, services.reminderService);
-  registerAgentRoutes(app, services.authService, services.agentAssignmentService, services.coordinatorLaunchService, services.tmuxService);
+  registerAgentRoutes(app, services.authService, services.agentAssignmentService, services.coordinatorLaunchService, services.tmuxService, services.projectService);
   registerOvermindRoutes(
     app,
     config,
