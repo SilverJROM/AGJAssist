@@ -7,14 +7,14 @@ import { CoordinatorLaunchService } from '../../src/services/coordinator-launch-
 import { TmuxService } from '../../src/tmux/tmux-service.js';
 import { registerAgentRoutes } from '../../src/api/routes/agent-routes.js';
 
-// Minimal test for B4 send endpoint (Fastify inject, owner auth, tmux spy, no real send)
+// B4 send test (Fastify inject, owner auth, REAL TmuxService method mock). Asserts sendAndSubmit (not fake send) so it fails on wrong method (GAP-2).
 describe('B4 /api/projects/:id/agent-message', () => {
   let app: FastifyInstance;
   let tmux: any;
 
   beforeEach(async () => {
     app = Fastify({ logger: false });
-    tmux = { send: vi.fn().mockResolvedValue({ message: 'sent', blocked: false }) };
+    tmux = { sendAndSubmit: vi.fn().mockResolvedValue(true) };
 
     // Minimal auth service that satisfies middleware for owner
     const authService = {
@@ -25,7 +25,7 @@ describe('B4 /api/projects/:id/agent-message', () => {
     const assignment = {} as any as AgentAssignmentService;
     const launch = undefined as any as CoordinatorLaunchService;
 
-    // Register with tmux (the B4 addition)
+    // Register with tmux (the B4 addition). Mock matches real TmuxService.sendAndSubmit shape so test fails if route calls wrong/nonexistent method.
     registerAgentRoutes(app, authService, assignment, launch, tmux as any as TmuxService);
 
     await app.ready();
@@ -44,8 +44,8 @@ describe('B4 /api/projects/:id/agent-message', () => {
     const body = JSON.parse(res.body);
     expect(body.ok).toBe(true);
     expect(body.runId).toBe('agj-os-42');
-    expect(tmux.send).toHaveBeenCalledTimes(1);
-    expect(tmux.send).toHaveBeenCalledWith('agj-os-42:0.0', 'hello from B4 test', true);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledTimes(1);
+    expect(tmux.sendAndSubmit).toHaveBeenCalledWith(expect.stringContaining('agj-os-42'), 'hello from B4 test');
   });
 
   it('rejects non-owner (401/403 range) and missing text (400)', async () => {

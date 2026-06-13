@@ -230,7 +230,7 @@ export function registerAgentRoutes(
         const text = (request.body?.text || "").trim();
         if (!text) return reply.code(400).send({ error: "text required" });
         const target = request.body?.target || `agj-os-${projectId}:0.0`;
-        await (tmux as any).send(target, text, true);
+        await tmux.sendAndSubmit(target, text);
         return { ok: true, runId: `agj-os-${projectId}`, target };
       } catch (err) {
         return sendAgentError(reply, err);
