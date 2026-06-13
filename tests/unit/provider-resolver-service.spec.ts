@@ -18,7 +18,7 @@ describe("ProviderResolverService", () => {
     ).toEqual({
       provider: "grok",
       model: "grok-build",
-      launch_cmd: "grok --always-approve --agent builder",
+      launch_cmd: "grok --always-approve --agent builder --effort xhigh",
       bypass_flag: "--always-approve",
       effort_flag: "--effort xhigh",
       callback_mechanism: "status-file",

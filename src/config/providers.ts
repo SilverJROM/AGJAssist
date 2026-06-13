@@ -59,7 +59,7 @@ export const PROVIDERS = {
     launch: {
       defaultMode: "tui",
       templates: {
-        tui: "grok --always-approve --agent <agent>",
+        tui: "grok --always-approve --agent <agent> --effort <effort>",
         headless: "grok -p <prompt> -m <model>"
       }
     },

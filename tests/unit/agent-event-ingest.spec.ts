@@ -125,6 +125,84 @@ describe("AgentEventIngest", () => {
     });
   });
 
+  it("normalizes a grok status file into a callback-sourced status event", async () => {
+    const statusFilePath = path.join(tmpDir, "grok-status.json");
+    fs.writeFileSync(
+      statusFilePath,
+      JSON.stringify({
+        status: "done",
+        commit: "4444444444444444444444444444444444444444",
+        dev_url: "http://localhost:3101",
+        notes: "grok finished"
+      })
+    );
+    const { ingest, events } = makeIngest();
+
+    await ingest.tick({
+      ...runConfig(),
+      statusFilePath
+    });
+
+    const rows = events.listEvents("run-a3");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      role: "implementer",
+      batch_id: "A3a",
+      type: "status",
+      state: "DONE",
+      source: "callback",
+      correlation_id: "terminal:run-a3:A3a:DONE"
+    });
+    expect(rows[0].body).toMatchObject({
+      sources: ["callback"],
+      file: statusFilePath,
+      commit: "4444444444444444444444444444444444444444",
+      dev_url: "http://localhost:3101",
+      notes: "grok finished"
+    });
+  });
+
+  it("reconciles grok status-file DONE and git DONE by terminal correlation id", async () => {
+    const statusFilePath = path.join(tmpDir, "grok-status.json");
+    fs.writeFileSync(
+      statusFilePath,
+      JSON.stringify({
+        status: "DONE",
+        commit: "5555555555555555555555555555555555555555",
+        dev_url: null,
+        notes: "status-file landed"
+      })
+    );
+    const { ingest, events } = makeIngest();
+
+    await ingest.tick({
+      ...runConfig(),
+      statusFilePath
+    });
+    gitHead = {
+      branch: "feat/agj-upgrade-A3a-agent-events",
+      head: "5555555555555555555555555555555555555555"
+    };
+    await ingest.tick({
+      ...runConfig(),
+      statusFilePath
+    });
+
+    const rows = events.listEvents("run-a3");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      type: "status",
+      state: "DONE",
+      correlation_id: "terminal:run-a3:A3a:DONE"
+    });
+    expect(rows[0].body.sources).toEqual(["callback", "git"]);
+    expect(rows[0].body).toMatchObject({
+      commit: "5555555555555555555555555555555555555555",
+      head: "5555555555555555555555555555555555555555",
+      notes: "status-file landed"
+    });
+  });
+
   it("round-trips a structured chat message event", () => {
     const { ingest, events } = makeIngest();
 

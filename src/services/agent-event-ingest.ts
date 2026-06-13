@@ -11,6 +11,7 @@ export interface AgentEventIngestRun {
   batchId: string;
   session?: string | null;
   callbacksPath?: string;
+  statusFilePath?: string;
   expectedBranch?: string;
 }
 
@@ -55,6 +56,8 @@ export class AgentEventIngest {
   async tick(run: AgentEventIngestRun): Promise<AgentEventRow[]> {
     const emitted: AgentEventRow[] = [];
     emitted.push(...await this.ingestCallbacks(run));
+    const grokStatusEvent = await this.ingestGrokStatusFile(run);
+    if (grokStatusEvent) emitted.push(grokStatusEvent);
     const gitEvent = await this.ingestGitHead(run);
     if (gitEvent) emitted.push(gitEvent);
     const paneEvent = await this.ingestPaneIdle(run);
@@ -115,6 +118,30 @@ export class AgentEventIngest {
       }));
     });
     return rows;
+  }
+
+  private async ingestGrokStatusFile(run: AgentEventIngestRun): Promise<AgentEventRow | null> {
+    if (!run.statusFilePath) return null;
+
+    const parsed = await parseGrokStatusFile(run.statusFilePath);
+    if (!parsed) return null;
+
+    return this.events.recordEvent({
+      run_id: run.runId,
+      role: run.role,
+      batch_id: run.batchId,
+      session: run.session ?? null,
+      type: "status",
+      state: parsed.status,
+      source: "callback",
+      correlation_id: correlationId(run.runId, run.batchId, parsed.status),
+      body: {
+        file: run.statusFilePath,
+        commit: parsed.commit,
+        dev_url: parsed.dev_url,
+        notes: parsed.notes
+      }
+    });
   }
 
   private async ingestGitHead(run: AgentEventIngestRun): Promise<AgentEventRow | null> {
@@ -222,8 +249,51 @@ export function parseCallbackLine(line: string): {
   };
 }
 
+export interface GrokStatusFile {
+  status: string;
+  commit: string | null;
+  dev_url: string | null;
+  notes: string | null;
+}
+
+export async function parseGrokStatusFile(filePath: string): Promise<GrokStatusFile | null> {
+  let raw = "";
+  try {
+    raw = await readFile(filePath, "utf8");
+  } catch {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  const record = parsed as Record<string, unknown>;
+  if (typeof record.status !== "string") return null;
+
+  const status = record.status.trim().toUpperCase();
+  if (!TERMINAL_STATES.has(status) && status !== "WORKING" && status !== "PROPOSED" && status !== "NEEDS-INFO" && status !== "REVISE-PLAN") {
+    return null;
+  }
+
+  return {
+    status,
+    commit: optionalString(record.commit),
+    dev_url: optionalString(record.dev_url),
+    notes: optionalString(record.notes)
+  };
+}
+
 export function correlationId(runId: string, batchId: string, state: string): string {
   return `terminal:${runId}:${batchId}:${state}`;
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
 }
 
 export async function readGitHeadBestEffort(runDir: string): Promise<GitHeadSnapshot | null> {
