@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DatabaseService } from "../src/db/database.js";
+import { SCHEMA_VERSION } from "../src/db/schema.js";
 import { NoteService } from "../src/services/note-service.js";
 import { AuditService } from "../src/services/audit-service.js";
 import fs from "node:fs";
@@ -33,7 +34,7 @@ afterEach(() => {
 describe("migration v23", () => {
   it("creates latest schema version", () => {
     const row = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(row.version).toBe(31);
+    expect(row.version).toBe(SCHEMA_VERSION);
   });
 
   it("creates the note_folders table", () => {
@@ -92,7 +93,7 @@ describe("migration v23", () => {
 describe("migration v26", () => {
   it("creates latest schema version", () => {
     const row = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(row.version).toBe(31);
+    expect(row.version).toBe(SCHEMA_VERSION);
   });
 
   it("notes table has font_size column with default 15", () => {

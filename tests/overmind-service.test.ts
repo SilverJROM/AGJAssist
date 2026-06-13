@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { DatabaseService } from "../src/db/database.js";
+import { SCHEMA_VERSION } from "../src/db/schema.js";
 import { OvermindService } from "../src/services/overmind-service.js";
 import type { OvermindTask, OvermindWorkflow } from "../src/services/overmind/types.js";
 import Database from "better-sqlite3";
@@ -71,7 +72,7 @@ function attachedRun(input: {
 describe("OvermindService", () => {
   it("creates the schema v28 tables, display name, active attribution, history, notification, elapsed, completion-check, per-session status, child roles, info-request, parent-update, and monitoring-pause columns", () => {
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(31);
+    expect(version.version).toBe(SCHEMA_VERSION);
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'overmind_workflows'")
@@ -780,7 +781,7 @@ describe("OvermindService", () => {
     service = new OvermindService(db);
 
     const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(31);
+    expect(version.version).toBe(SCHEMA_VERSION);
 
     let cols = db.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     expect(cols.map((col) => col.name)).toContain("display_name");

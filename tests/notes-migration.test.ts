@@ -11,6 +11,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import Database from "better-sqlite3";
 import { DatabaseService } from "../src/db/database.js";
+import { SCHEMA_VERSION } from "../src/db/schema.js";
 import { NoteService } from "../src/services/note-service.js";
 import { AuditService } from "../src/services/audit-service.js";
 import fs from "node:fs";
@@ -81,7 +82,7 @@ describe("v22 → v23 upgrade regression", () => {
     try {
       // ── Step 3: schema_version bumped to latest ───────────────────────────
       const ver = db.prepare("SELECT version FROM schema_version").get() as { version: number };
-      expect(ver.version).toBe(31);
+      expect(ver.version).toBe(SCHEMA_VERSION);
 
       // ── Step 4: new columns present on notes ──────────────────────────────
       const cols = db.raw.pragma("table_info(notes)") as { name: string }[];
