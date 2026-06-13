@@ -524,6 +524,7 @@ function Header({ user }) {
           <a href="#/tasks" class=${route === '/tasks' ? 'active' : ''}>Tasks</a>
           <a href="#/notes" class=${route === '/notes' ? 'active' : ''}>Notes</a>
           <a href="#/conversations" class=${route === '/conversations' ? 'active' : ''}>Chat</a>
+          <a href="#/agent-os" class=${route === '/agent-os' ? 'active' : ''}>Agent OS</a>
           <a href="#/settings" class=${route === '/settings' ? 'active' : ''}>Settings</a>
         </nav>
       </div>
@@ -6038,6 +6039,15 @@ function TgDashboard({ onEditBottomNav }) {
   `;
 }
 
+function AgentOS() {
+  return html`
+    <div>
+      <h2>Agent OS</h2>
+      <p>Per-project agent role mapping + chat — coming in B2/B4.</p>
+    </div>
+  `;
+}
+
 function TgApp() {
   const route = useRoute();
   const user = JSON.parse(localStorage.getItem('agj_user') || 'null');
@@ -6055,7 +6065,7 @@ function TgApp() {
     const KNOWN_PREFIXES = ['/project/'];
     const KNOWN_EXACT = new Set([
       '/', '/projects', '/terminals', '/overmind', '/overmind-projects', '/tasks',
-      '/notes', '/conversations', '/settings'
+      '/notes', '/conversations', '/settings', '/agent-os'
     ]);
     const isKnown =
       initialHash &&
@@ -6095,6 +6105,8 @@ function TgApp() {
     content = html`<${OvmConsole} />`;
   } else if (route === '/settings') {
     content = html`<${Settings} onEditBottomNav=${() => setEditingBottomNav(true)} />`;
+  } else if (route === '/agent-os') {
+    content = html`<${AgentOS} />`;
   } else if (route.startsWith('/project/')) {
     const id = route.split('/')[2];
     content = html`<${ProjectDetail} id=${id} key=${id} />`;
@@ -6156,6 +6168,8 @@ function App() {
     content = html`<${OvmConsole} />`;
   } else if (route === '/settings') {
     content = html`<${Settings} />`;
+  } else if (route === '/agent-os') {
+    content = html`<${AgentOS} />`;
   } else if (route.startsWith('/project/')) {
     const id = route.split('/')[2];
     content = html`<${ProjectDetail} id=${id} key=${id} />`;
