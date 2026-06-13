@@ -297,6 +297,13 @@ export function buildOvermindWsUrl(token, loc = globalThis.location) {
   return `${protocol}//${loc.host}/ws/overmind?token=${encodeURIComponent(token)}`;
 }
 
+export function buildAgentEventsWsUrl(token, runId, loc = globalThis.location) {
+  if (!token || !runId || !loc?.host) return null;
+  const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+  const enc = encodeURIComponent(runId);
+  return `${protocol}//${loc.host}/ws/agent-events/${enc}?token=${encodeURIComponent(token)}`;
+}
+
 export function buildTmuxWsUrl(target, token, loc = globalThis.location) {
   if (!target || !token || !loc?.host) return null;
   const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';

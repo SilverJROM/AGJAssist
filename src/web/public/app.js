@@ -6053,6 +6053,68 @@ function AgentOS() {
   const [launchMode, setLaunchMode] = useState('projcore');
   const [launchResult, setLaunchResult] = useState('');
 
+  // B4: chat state (pure from agent_events WS per R18; active from B3 launch result; optimistic me + rail placeholder for B4)
+  const [activeRunId, setActiveRunId] = useState(null);
+  const [activeTmuxTarget, setActiveTmuxTarget] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [composerText, setComposerText] = useState('');
+  const [expanded, setExpanded] = useState(() => new Set());
+  const [chatWsStatus, setChatWsStatus] = useState('idle');
+
+  // B4 effects: WS subscribe from A3c agent-events (snapshot + live event push); smoke seed for render proof (pure events, no scrape)
+  useEffect(() => {
+    if (!activeRunId || !authToken) return;
+    if (location.search.includes('b4smoke')) return;
+    const url = (typeof buildAgentEventsWsUrl === 'function')
+      ? buildAgentEventsWsUrl(authToken, activeRunId)
+      : null;
+    if (!url) { setChatWsStatus('no-url'); return; }
+    const ws = new WebSocket(url);
+    let closed = false;
+    ws.onopen = () => setChatWsStatus('connected');
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'snapshot' && msg.run_id === activeRunId) setEvents(msg.events || []);
+        else if (msg.type === 'event' && msg.run_id === activeRunId && msg.event) setEvents(prev => [...prev, msg.event]);
+      } catch {}
+    };
+    ws.onerror = () => setChatWsStatus('error');
+    ws.onclose = () => { if (!closed) setChatWsStatus('closed'); };
+    return () => { closed = true; if (ws.readyState === 1) ws.close(); };
+  }, [activeRunId, authToken]);
+
+  useEffect(() => {
+    if (location.search.includes('b4smoke') && !activeRunId) {
+      setActiveRunId('agj-os-TEST');
+      setActiveTmuxTarget('agj-os-TEST:0.0');
+      setEvents([
+        { id: 101, run_id: 'agj-os-TEST', role: 'projcore', type: 'status', state: 'PROPOSED', source: 'callback', body: { approach: 'split chat + rail' }, ts: '2026-06-13T10:42:00Z' },
+        { id: 102, run_id: 'agj-os-TEST', role: 'me', type: 'message', state: null, source: 'post', body: { text: 'go ahead, keep effort medium' }, ts: '2026-06-13T10:43:00Z' },
+        { id: 103, run_id: 'agj-os-TEST', role: 'grok-build', type: 'message', state: null, source: 'callback', body: { text: 'Added role_bindings table + binding UI; launcher now resolves role→provider from it.' }, ts: '2026-06-13T10:51:00Z' },
+        { id: 104, run_id: 'agj-os-TEST', role: 'codex5.5', type: 'status', state: 'DONE', source: 'callback', body: { gate: 'PASS', q: 'Q0 closure confirmed' }, ts: '2026-06-13T10:54:00Z' }
+      ]);
+    }
+  }, [activeRunId]);
+
+  async function sendToAgent() {
+    const text = (composerText || '').trim();
+    if (!text || !selectedProjectId) return;
+    const run = activeRunId || `agj-os-${selectedProjectId}`;
+    const target = activeTmuxTarget || `${run}:0.0`;
+    // optimistic local echo (R18)
+    const opt = { id: -Date.now(), run_id: run, role: 'me', type: 'message', state: null, source: 'post', body: { text }, ts: new Date().toISOString() };
+    setEvents(prev => [...prev, opt]);
+    const prevText = composerText;
+    setComposerText('');
+    try {
+      await api(`/api/projects/${selectedProjectId}/agent-message`, { method: 'POST', body: JSON.stringify({ text, target }) });
+    } catch (e) {
+      setError('Send failed: ' + (e.message || ''));
+      setComposerText(prevText);
+    }
+  }
+
   const ROLES = ['projcore', 'coord', 'implementer', 'validator', 'deliberation_1', 'deliberation_2', 'deliberation_3', 'redteam_1', 'redteam_2', 'redteam_3'];
   const PROVIDERS = ['claude', 'codex', 'grok'];
   const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
@@ -6269,7 +6331,7 @@ function AgentOS() {
         `}
       </div>
 
-      <!-- B3 minimal launch hook (per brief): mode selector (R7) + Launch button (behind owner auth). Live who-is-working = B5, chat = B4 (out of scope). -->
+      <!-- B3 minimal launch hook (per brief): mode selector (R7) + Launch button (behind owner auth). Live who-is-working = B5, chat = B4. -->
       <div style="margin-top:16px">
         <div class="action-bar">
           <h3 style="margin:0">Launch (B3)</h3>
@@ -6286,12 +6348,91 @@ function AgentOS() {
             try {
               const r = await api(`/api/projects/${selectedProjectId}/launch`, { method: 'POST', body: JSON.stringify({ mode: launchMode }) });
               setLaunchResult(`Launched ${r.mode} → ${r.sessionTarget} (${r.provider}/${r.model})`);
+              // B4: capture run/target from B3 launch for WS + send (reuse sessionTarget)
+              const runId = r.sessionTarget ? String(r.sessionTarget).split(':')[0] : `agj-os-${selectedProjectId}`;
+              setActiveRunId(runId);
+              setActiveTmuxTarget(r.sessionTarget || `${runId}:0.0`);
+              setEvents([]);
               setMsg('Launch dispatched (session reuse if existed)');
             } catch (e) { setError(e.message || 'Launch failed (owner?)'); }
           }}>Launch</button>
         </div>
         ${launchResult ? html`<div style="font-size:11px;margin-top:4px;color:var(--success)">${launchResult}</div>` : ''}
       </div>
+
+      <!-- B4 chat surface: renders PURELY from agent_events (WS snapshot + updates, R18); status→chips; internals collapsed via .exp; optimistic me; composer send.
+           Desktop: split + 230px rail. Mobile ≤480px: real @media collapse to strip + full chat + pinned composer (R19). Matches grok-build/opus mocks. -->
+      ${(activeRunId || location.search.includes('b4smoke')) ? html`
+        <div class="agent-chat" style="margin-top:16px">
+          <div style="border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface);">
+            <div class="appbar" style="height:38px;padding:0 10px;background:linear-gradient(180deg,#1b212b,var(--surface));border-bottom:1px solid var(--border);">
+              <div class="brand"><span>Agent OS</span><span class="sep">·</span><span class="model">${activeRunId || 'chat'}</span></div>
+              <div class="spacer"></div>
+              <span class="live"><span class="dot"></span>live ${chatWsStatus}</span>
+            </div>
+            <div class="body" style="display:flex;min-height:260px;">
+              <section class="chat" style="flex:1;display:flex;flex-direction:column;border-right:1px solid var(--border);">
+                <details class="mobilestrip" open>
+                  <summary>
+                    <div class="strip-avatars" style="display:flex;gap:-5px;">
+                      <div class="avatar av-pc" style="width:20px;height:20px;font-size:9px;">PC</div>
+                      <div class="avatar av-gk" style="width:20px;height:20px;font-size:9px;">GB</div>
+                      <div class="avatar av-cx" style="width:20px;height:20px;font-size:9px;">CX</div>
+                    </div>
+                    <span class="strip-label" style="flex:1;font-size:11px;margin-left:8px;">3 agents · <b>grok working</b></span>
+                    <span class="strip-batch" style="font-family:monospace;font-size:10px;color:var(--text-secondary);">B4</span>
+                  </summary>
+                  <div class="strip-body" style="padding:4px 8px 8px;display:flex;flex-direction:column;gap:8px;font-size:11px;">
+                    <div class="agent"><div class="avatar av-pc">PC</div><div class="info"><div class="nm">projcore <span class="sub">(Opus)</span></div><div class="st coord"><span class="sd"></span>coordinating</div></div></div>
+                    <div class="agent"><div class="avatar av-gk">GB</div><div class="info"><div class="nm">grok-build</div><div class="st work"><span class="sd"></span>working</div></div></div>
+                    <div class="agent"><div class="avatar av-cx">CX</div><div class="info"><div class="nm">codex5.5 <span class="sub">(validator)</span></div><div class="st idle"><span class="sd"></span>idle</div></div></div>
+                  </div>
+                </details>
+                <div class="transcript">
+                  ${(events.length ? events : []).map(ev => {
+                    const isMe = ev.role === 'me' || ev.source === 'post';
+                    const roleClass = (ev.role||'').includes('projcore') ? 'projcore' : (ev.role||'').includes('grok') ? 'grok' : (ev.role||'').includes('codex') ? 'codex' : 'me';
+                    const isStatusLike = ev.type === 'status' || !!ev.state;
+                    if (isStatusLike) {
+                      return html`<div class="mfoot"><span class=${'chip ' + (ev.state === 'DONE' || (ev.state||'').toUpperCase()==='PASS' ? 'success' : 'warning')}>${ev.state || 'STATUS'}</span></div>`;
+                    }
+                    const bodyText = ev.body && ev.body.text ? ev.body.text : (ev.body ? JSON.stringify(ev.body).slice(0,180) : '');
+                    const hasInternals = ev.body && (ev.body.diff || ev.body.tool || ev.body.approach || ev.body.gate);
+                    const isExp = expanded.has(ev.id);
+                    return html`<div class=${'msg ' + (isMe ? 'me' : '')}>
+                      <div class="meta"><span class=${'role ' + roleClass}>${ev.role || 'agent'}</span><span class="time">${(ev.ts || '').slice(11,16)}</span></div>
+                      <div class="bubble">${bodyText}</div>
+                      <div class="mfoot">
+                        ${hasInternals ? html`<span class="exp" onClick=${() => { setExpanded(s => { const n = new Set(s); n.has(ev.id) ? n.delete(ev.id) : n.add(ev.id); return n; }); }}><span class="car">${isExp ? '▾' : '▸'}</span> internals</span>` : ''}
+                        ${ev.state ? html`<span class="chip accent">${ev.state}</span>` : ''}
+                      </div>
+                      ${isExp && ev.body ? html`<div style="font-size:10px;font-family:monospace;opacity:.8;padding:2px 4px;">${JSON.stringify(ev.body)}</div>` : ''}
+                    </div>`;
+                  })}
+                </div>
+                <div class="composer">
+                  <div class="inputrow">
+                    <label class="field"><input value=${composerText} onInput=${e => setComposerText(e.target.value)} placeholder="talk to projcore…" /></label>
+                    <button class="send" onClick=${sendToAgent}>send</button>
+                  </div>
+                </div>
+              </section>
+              <aside class="rail">
+                <div class="rsection">
+                  <div class="rtitle">WHO'S WORKING</div>
+                  <div class="agent"><div class="avatar av-pc">PC</div><div class="info"><div class="nm">projcore <span class="sub">(Opus)</span></div><div class="st coord"><span class="sd"></span>coordinating</div></div></div>
+                  <div class="agent"><div class="avatar av-gk">GB</div><div class="info"><div class="nm">grok-build</div><div class="st work"><span class="sd"></span>working</div></div></div>
+                  <div class="agent"><div class="avatar av-cx">CX</div><div class="info"><div class="nm">codex5.5</div><div class="st idle"><span class="sd"></span>idle</div></div></div>
+                </div>
+                <div class="rsection">
+                  <div class="rtitle">BATCH</div>
+                  <div class="batchcard"><div class="bh"><span class="bn">B4</span><span class="gl">gate: pending</span></div><div class="pbar"><i></i></div></div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      ` : ''}
     </div>
   `;
 }
