@@ -604,6 +604,37 @@ export class DatabaseService {
         this.db.exec("UPDATE overmind_workflows SET completion_nudge_count = 0 WHERE completion_nudge_count < 0");
       }
 
+      // Migration: v31 → v32: reusable Agent definitions and per-project role bindings.
+      if (current && current.version < 32) {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS agents (
+            id INTEGER PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL,
+            provider TEXT NOT NULL CHECK(provider IN ('claude', 'codex', 'grok')),
+            model TEXT NOT NULL,
+            default_effort TEXT NOT NULL DEFAULT 'medium',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+
+          CREATE TABLE IF NOT EXISTS role_bindings (
+            id INTEGER PRIMARY KEY,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            role TEXT NOT NULL CHECK(role IN ('projcore', 'coord', 'implementer', 'validator', 'deliberation_1', 'deliberation_2', 'deliberation_3', 'redteam_1', 'redteam_2', 'redteam_3')),
+            agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE RESTRICT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(project_id, role)
+          );
+
+          CREATE TABLE IF NOT EXISTS role_defaults (
+            role TEXT PRIMARY KEY CHECK(role IN ('projcore', 'coord', 'implementer', 'validator', 'deliberation_1', 'deliberation_2', 'deliberation_3', 'redteam_1', 'redteam_2', 'redteam_3')),
+            agent_id INTEGER NOT NULL REFERENCES agents(id),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+        `);
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);

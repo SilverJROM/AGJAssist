@@ -69,7 +69,7 @@ describe("DatabaseService", () => {
       .prepare("SELECT version FROM schema_version")
       .get() as { version: number };
 
-    expect(version.version).toBe(31);
+    expect(version.version).toBe(32);
     db.close();
   });
 
@@ -121,7 +121,7 @@ describe("DatabaseService", () => {
     db.close();
   });
 
-  it("upgrades a v23 snapshot DB to v29 and adds current overmind workflow columns", () => {
+  it("upgrades a v23 snapshot DB to current and adds current overmind workflow columns", () => {
     cleanup();
     const raw = new Database(TEST_DB);
     raw.exec(`
@@ -167,7 +167,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(31);
+    expect(version.version).toBe(32);
     const upgradedCols = upgraded.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     const upgradedColNames = upgradedCols.map((c) => c.name);
     expect(upgradedColNames).toContain("last_parent_update_at");
@@ -176,6 +176,60 @@ describe("DatabaseService", () => {
     expect(upgradedColNames).toContain("completion_nudge_count");
     expect(upgradedColNames).toContain("working_accepts");
     expect(upgradedColNames).toContain("completion_nudge_last_at");
+    upgraded.close();
+  });
+
+  it("upgrades a v31 DB to v32 with agent tables and leaves existing project rows intact", () => {
+    cleanup();
+    const raw = new Database(TEST_DB);
+    raw.exec(`
+      PRAGMA foreign_keys = ON;
+      CREATE TABLE schema_version (version INTEGER NOT NULL);
+      INSERT INTO schema_version (version) VALUES (31);
+      CREATE TABLE projects (
+        id INTEGER PRIMARY KEY,
+        directory_name TEXT UNIQUE NOT NULL,
+        display_name TEXT,
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'archived')),
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO projects (id, directory_name, display_name)
+      VALUES (7, 'existing-project', 'Existing Project');
+    `);
+    raw.close();
+
+    const upgraded = new DatabaseService(TEST_DB);
+    const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
+    expect(version.version).toBe(32);
+
+    const tableNames = (
+      upgraded.raw
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        .all() as { name: string }[]
+    ).map((row) => row.name);
+    expect(tableNames).toContain("agents");
+    expect(tableNames).toContain("role_bindings");
+    expect(tableNames).toContain("role_defaults");
+
+    const project = upgraded
+      .prepare("SELECT id, directory_name, display_name, status, active FROM projects WHERE id = 7")
+      .get() as {
+      id: number;
+      directory_name: string;
+      display_name: string;
+      status: string;
+      active: number;
+    };
+    expect(project).toEqual({
+      id: 7,
+      directory_name: "existing-project",
+      display_name: "Existing Project",
+      status: "active",
+      active: 1
+    });
+
     upgraded.close();
   });
 
@@ -266,7 +320,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(31);
+    expect(version.version).toBe(32);
 
     const count = upgraded.prepare("SELECT COUNT(*) AS count FROM overmind_workflows").get() as { count: number };
     expect(count.count).toBe(2);

@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 31;
+export const SCHEMA_VERSION = 32;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -83,6 +83,32 @@ CREATE TABLE IF NOT EXISTS agent_delegations (
 );
 CREATE INDEX IF NOT EXISTS idx_delegations_agent ON agent_delegations(agent_name);
 CREATE INDEX IF NOT EXISTS idx_delegations_session ON agent_delegations(tmux_session_id);
+
+CREATE TABLE IF NOT EXISTS agents (
+  id INTEGER PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  provider TEXT NOT NULL CHECK(provider IN ('claude', 'codex', 'grok')),
+  model TEXT NOT NULL,
+  default_effort TEXT NOT NULL DEFAULT 'medium',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS role_bindings (
+  id INTEGER PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK(role IN ('projcore', 'coord', 'implementer', 'validator', 'deliberation_1', 'deliberation_2', 'deliberation_3', 'redteam_1', 'redteam_2', 'redteam_3')),
+  agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE RESTRICT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(project_id, role)
+);
+
+CREATE TABLE IF NOT EXISTS role_defaults (
+  role TEXT PRIMARY KEY CHECK(role IN ('projcore', 'coord', 'implementer', 'validator', 'deliberation_1', 'deliberation_2', 'deliberation_3', 'redteam_1', 'redteam_2', 'redteam_3')),
+  agent_id INTEGER NOT NULL REFERENCES agents(id),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 CREATE TABLE IF NOT EXISTS note_folders (
   id INTEGER PRIMARY KEY,

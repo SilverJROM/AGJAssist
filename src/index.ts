@@ -24,6 +24,7 @@ import { AppSettingsService } from "./services/app-settings-service.js";
 import { NudgeStateService } from "./services/nudge-state-service.js";
 import { OvermindStreamManager } from "./api/websocket/overmind-stream-manager.js";
 import { OvmSessionService } from "./services/ovm-session.js";
+import { AgentAssignmentService } from "./services/agent-assignment-service.js";
 import {
   formatError,
   installTelegramProcessGuards,
@@ -71,6 +72,7 @@ async function main(): Promise<void> {
   const stepTemplateService = new StepTemplateService(db, auditService);
   const personalTaskService = new PersonalTaskService(db, auditService);
   const reminderService = new ReminderService(db, auditService);
+  const agentAssignmentService = new AgentAssignmentService(db);
   const overmindService = new OvermindService(db);
   const appSettingsService = new AppSettingsService();
   await appSettingsService.load();
@@ -130,6 +132,7 @@ async function main(): Promise<void> {
     stepTemplateService,
     personalTaskService,
     reminderService,
+    agentAssignmentService,
     overmindService,
     overmindNotify,
     overmindStreamManager,
