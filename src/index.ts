@@ -27,6 +27,7 @@ import { AgentEventsStreamManager } from "./api/websocket/agent-events-stream-ma
 import { OvmSessionService } from "./services/ovm-session.js";
 import { AgentAssignmentService } from "./services/agent-assignment-service.js";
 import { AgentEventsService } from "./services/agent-events-service.js";
+import { CoordinatorLaunchService } from "./services/coordinator-launch-service.js";
 import { AgentWakeScheduler } from "./services/agent-wake-scheduler.js";
 import {
   formatError,
@@ -76,6 +77,7 @@ async function main(): Promise<void> {
   const personalTaskService = new PersonalTaskService(db, auditService);
   const reminderService = new ReminderService(db, auditService);
   const agentAssignmentService = new AgentAssignmentService(db);
+  const coordinatorLaunchService = new CoordinatorLaunchService(agentAssignmentService);
   const agentEventsService = new AgentEventsService(db);
   const agentEventsStreamManager = new AgentEventsStreamManager(authService, agentEventsService);
   agentEventsService.onEvent((event) => agentEventsStreamManager.broadcast(event));
@@ -141,6 +143,7 @@ async function main(): Promise<void> {
     personalTaskService,
     reminderService,
     agentAssignmentService,
+    coordinatorLaunchService,
     overmindService,
     overmindNotify,
     overmindStreamManager,

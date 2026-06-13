@@ -2,11 +2,13 @@ import { FastifyInstance, FastifyReply } from "fastify";
 import { createAuthMiddleware, requireOwner } from "../../auth/auth-middleware.js";
 import { AuthService } from "../../auth/auth-service.js";
 import { AgentAssignmentService } from "../../services/agent-assignment-service.js";
+import { CoordinatorLaunchService } from "../../services/coordinator-launch-service.js";
 
 export function registerAgentRoutes(
   app: FastifyInstance,
   authService: AuthService,
-  agentAssignmentService: AgentAssignmentService
+  agentAssignmentService: AgentAssignmentService,
+  coordinatorLaunchService?: CoordinatorLaunchService
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
 
@@ -181,6 +183,28 @@ export function registerAgentRoutes(
             request.params.role
           )
         };
+      } catch (err) {
+        return sendAgentError(reply, err);
+      }
+    }
+  );
+
+  // B3 launcher (R9/R5/R7): behind EXISTING owner auth (affirmation #1). Mode selects CORE + binding (affirmation #2).
+  app.post<{
+    Params: { projectId: string };
+    Body: { mode: string };
+  }>(
+    "/api/projects/:projectId/launch",
+    { preHandler: [authMiddleware, requireOwner] },
+    async (request, reply) => {
+      try {
+        if (!coordinatorLaunchService) {
+          return reply.code(500).send({ error: "Launcher not configured" });
+        }
+        const projectId = Number(request.params.projectId);
+        const mode = (request.body?.mode || "") as "projcore" | "coord";
+        const result = await coordinatorLaunchService.launch(projectId, mode);
+        return result;
       } catch (err) {
         return sendAgentError(reply, err);
       }

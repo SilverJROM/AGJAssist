@@ -35,6 +35,7 @@ import { ReminderService } from "../services/reminder-service.js";
 import { registerReminderRoutes } from "./routes/reminder-routes.js";
 import { registerAgentRoutes } from "./routes/agent-routes.js";
 import { AgentAssignmentService } from "../services/agent-assignment-service.js";
+import { CoordinatorLaunchService } from "../services/coordinator-launch-service.js";
 import { OvermindService } from "../services/overmind-service.js";
 import { registerOvermindRoutes } from "./routes/overmind-routes.js";
 import type { OvermindNotify } from "../services/overmind-watcher.js";
@@ -65,6 +66,7 @@ export interface ApiServices {
   personalTaskService: PersonalTaskService;
   reminderService: ReminderService;
   agentAssignmentService: AgentAssignmentService;
+  coordinatorLaunchService?: CoordinatorLaunchService;
   overmindService: OvermindService;
   overmindNotify?: OvermindNotify;
   overmindStreamManager?: OvermindStreamManager;
@@ -132,7 +134,7 @@ export async function createApiServer(
   registerTemplateRoutes(app, services.authService, services.stepTemplateService);
   registerPersonalTaskRoutes(app, services.authService, services.personalTaskService);
   registerReminderRoutes(app, services.authService, services.reminderService);
-  registerAgentRoutes(app, services.authService, services.agentAssignmentService);
+  registerAgentRoutes(app, services.authService, services.agentAssignmentService, services.coordinatorLaunchService);
   registerOvermindRoutes(
     app,
     config,
