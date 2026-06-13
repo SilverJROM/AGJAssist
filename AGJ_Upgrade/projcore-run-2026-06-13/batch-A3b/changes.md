@@ -24,7 +24,7 @@ Feature: adds the app-owned wake scheduler half of R21 with additive wake storag
 
 ## Commits
 
-- `4286c2c` [batch-A3b] agent_wake_schedule + app scheduler | scenarios: A3b
+- `314e52e` [batch-A3b] agent_wake_schedule + app scheduler | scenarios: A3b
 
 ## Standing Rules (if discovered)
 
