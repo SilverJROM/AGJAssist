@@ -4,5 +4,8 @@ export default defineConfig({
   timeout: 30000,
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   use: { baseURL: 'http://localhost:3210' },
-  webServer: { command: 'node e2e/static-server.mjs', url: 'http://localhost:3210/index.html', reuseExistingServer: !process.env.CI, timeout: 30000 },
+  // reuseExistingServer:false so the proof always boots OUR shipped-app static server (e2e/static-server.mjs)
+  // and is never hijacked by a foreign dev server (e.g. `npx serve`, which 301-redirects /index.html and drops the
+  // ?b4smoke=1 query the render proof depends on). A clean checkout must serve the real shipped src/web/public.
+  webServer: { command: 'node e2e/static-server.mjs', url: 'http://localhost:3210/index.html', reuseExistingServer: false, timeout: 30000 },
 });
