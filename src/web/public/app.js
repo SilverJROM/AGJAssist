@@ -6149,6 +6149,16 @@ function AgentOS() {
     } catch (e) { setError(e.message || 'Mapping failed'); }
   }
 
+  async function setGlobalDefault(role, agentIdValue) {
+    if (!agentIdValue || agentIdValue === '') return;
+    setError(''); setMsg('');
+    try {
+      await api(`/api/role-defaults/${role}`, { method: 'PUT', body: JSON.stringify({ agent_id: Number(agentIdValue) }) });
+      setMsg(`Global default for ${role} set`);
+      await loadDefaults();
+    } catch (e) { setError(e.message || 'Set default failed (owner?)'); }
+  }
+
   if (loading) return html`<div class="loading">Loading Agent OS...</div>`;
 
   const defaultsMap = {};
@@ -6191,6 +6201,30 @@ function AgentOS() {
             <button class="btn btn-sm btn-danger" onclick=${() => deleteAgent(a.id)}>Del</button>
           </div>
         `)}
+      </div>
+
+      <!-- GAP-1: global-default SETTER (near role-defaults display/usage ~621x); wires PUT /api/role-defaults/:role so unmapped fallbacks can be set + shown -->
+      <div style="margin-top:16px">
+        <div class="action-bar">
+          <h3 style="margin:0">Global Role Defaults</h3>
+        </div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Set the global default agent per role (PUT /api/role-defaults/:role). Unmapped roles (in mappings below) fall back to these.</div>
+        <div style="border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px">
+          ${ROLES.map(role => {
+            const defAgent = defaultsMap[role];
+            const val = defAgent ? String(defAgent.id) : '';
+            return html`
+              <div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border)">
+                <div style="width:120px;font-family:monospace">${role}</div>
+                <select style="min-width:180px;font-size:11px" value=${val} onChange=${e => setGlobalDefault(role, e.target.value)}>
+                  <option value="">— none —</option>
+                  ${agents.map(ag => html`<option value=${ag.id}>${ag.name}</option>`)}
+                </select>
+                <span style="font-size:11px;color:var(--text-secondary)">${defAgent ? defAgent.name : '—'}</span>
+              </div>
+            `;
+          })}
+        </div>
       </div>
 
       <div style="margin-top:16px">
