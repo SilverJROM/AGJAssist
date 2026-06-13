@@ -35,7 +35,7 @@ export class CoordinatorLaunchService {
 
     const resolved = this.agentAssignmentService.resolveProjectRole(projectId, mode);
     if (!resolved) {
-      throw new Error(`No agent bound or default for role ${mode} on project ${projectId}`);
+      throw new Error(`invalid role binding: no agent bound or default for role ${mode} on project ${projectId}`);
     }
 
     const agent = resolved.agent;

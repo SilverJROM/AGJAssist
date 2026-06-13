@@ -273,6 +273,6 @@ describe("Coordinator launch (B3) - HTTP-level Fastify inject + outcome asserts"
       payload: { mode: "projcore" }
     });
     expect(unbound.statusCode).toBe(400);
-    expect(unbound.body).toContain("No agent bound or default");
+    expect(unbound.body).toContain("no agent bound or default");
   });
 });
