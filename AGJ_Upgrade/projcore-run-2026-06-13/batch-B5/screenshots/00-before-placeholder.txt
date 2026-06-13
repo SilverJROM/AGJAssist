@@ -1,0 +1,65 @@
+=== app.js rail WHO IS WORKING placeholder (B4) ===
+6420:              <aside class="rail">
+6421-                <div class="rsection">
+6422:                  <div class="rtitle">WHO'S WORKING</div>
+6423-                  <div class="agent"><div class="avatar av-pc">PC</div><div class="info"><div class="nm">projcore <span class="sub">(Opus)</span></div><div class="st coord"><span class="sd"></span>coordinating</div></div></div>
+6424-                  <div class="agent"><div class="avatar av-gk">GB</div><div class="info"><div class="nm">grok-build</div><div class="st work"><span class="sd"></span>working</div></div></div>
+6425-                  <div class="agent"><div class="avatar av-cx">CX</div><div class="info"><div class="nm">codex5.5</div><div class="st idle"><span class="sd"></span>idle</div></div></div>
+6426-                </div>
+6427-                <div class="rsection">
+6428-                  <div class="rtitle">BATCH</div>
+6429-                  <div class="batchcard"><div class="bh"><span class="bn">B4</span><span class="gl">gate: pending</span></div><div class="pbar"><i></i></div></div>
+6430-                </div>
+6431-              </aside>
+6432-            </div>
+6433-          </div>
+6434-        </div>
+6435-      ` : ''}
+6436-    </div>
+6437-  `;
+6438-}
+6439-
+6440-function TgApp() {
+6441-  const route = useRoute();
+6442-  const user = JSON.parse(localStorage.getItem('agj_user') || 'null');
+6443-  const [bottomNavTabIds, setBottomNavTabIds] = useState(() => readBottomNavTabIds());
+6444-  const [editingBottomNav, setEditingBottomNav] = useState(false);
+6445-
+6446-  // JROM 2026-05-24: on a fresh page load, redirect away from any empty or
+6447-  // unknown hash to the user's preferred landing page (default: Home '/').
+6448-  // Deep linking still works — a known route in the hash is honored. This
+6449-  // fixes the "Page not found" the user saw on initial open when an old
+6450-  // stale hash (e.g. a removed page) survived in the URL.
+6451-  useEffect(() => {
+6452-    if (!authToken || !user) return;
+=== mobilestrip placeholder ===
+6375:                <details class="mobilestrip" open>
+6376-                  <summary>
+6377-                    <div class="strip-avatars" style="display:flex;gap:-5px;">
+6378-                      <div class="avatar av-pc" style="width:20px;height:20px;font-size:9px;">PC</div>
+6379-                      <div class="avatar av-gk" style="width:20px;height:20px;font-size:9px;">GB</div>
+6380-                      <div class="avatar av-cx" style="width:20px;height:20px;font-size:9px;">CX</div>
+6381-                    </div>
+6382-                    <span class="strip-label" style="flex:1;font-size:11px;margin-left:8px;">3 agents · <b>grok working</b></span>
+6383-                    <span class="strip-batch" style="font-family:monospace;font-size:10px;color:var(--text-secondary);">B4</span>
+6384-                  </summary>
+6385:                  <div class="strip-body" style="padding:4px 8px 8px;display:flex;flex-direction:column;gap:8px;font-size:11px;">
+6386-                    <div class="agent"><div class="avatar av-pc">PC</div><div class="info"><div class="nm">projcore <span class="sub">(Opus)</span></div><div class="st coord"><span class="sd"></span>coordinating</div></div></div>
+6387-                    <div class="agent"><div class="avatar av-gk">GB</div><div class="info"><div class="nm">grok-build</div><div class="st work"><span class="sd"></span>working</div></div></div>
+6388-                    <div class="agent"><div class="avatar av-cx">CX</div><div class="info"><div class="nm">codex5.5 <span class="sub">(validator)</span></div><div class="st idle"><span class="sd"></span>idle</div></div></div>
+6389-                  </div>
+6390-                </details>
+6391-                <div class="transcript">
+6392-                  ${(events.length ? events : []).map(ev => {
+6393-                    const isMe = ev.role === 'me' || ev.source === 'post';
+6394-                    const roleClass = (ev.role||'').includes('projcore') ? 'projcore' : (ev.role||'').includes('grok') ? 'grok' : (ev.role||'').includes('codex') ? 'codex' : 'me';
+6395-                    const isStatusLike = ev.type === 'status' || !!ev.state;
+6396-                    if (isStatusLike) {
+6397-                      return html`<div class="mfoot"><span class=${'chip ' + (ev.state === 'DONE' || (ev.state||'').toUpperCase()==='PASS' ? 'success' : 'warning')}>${ev.state || 'STATUS'}</span></div>`;
+6398-                    }
+6399-                    const bodyText = ev.body && ev.body.text ? ev.body.text : (ev.body ? JSON.stringify(ev.body).slice(0,180) : '');
+6400-                    const hasInternals = ev.body && (ev.body.diff || ev.body.tool || ev.body.approach || ev.body.gate);
+6401-                    const isExp = expanded.has(ev.id);
+6402-                    return html`<div class=${'msg ' + (isMe ? 'me' : '')}>
+6403-                      <div class="meta"><span class=${'role ' + roleClass}>${ev.role || 'agent'}</span><span class="time">${(ev.ts || '').slice(11,16)}</span></div>
+6404-                      <div class="bubble">${bodyText}</div>

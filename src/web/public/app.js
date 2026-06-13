@@ -6094,6 +6094,13 @@ function AgentOS() {
         { id: 103, run_id: 'agj-os-TEST', role: 'grok-build', type: 'message', state: null, source: 'callback', body: { text: 'Added role_bindings table + binding UI; launcher now resolves role→provider from it.' }, ts: '2026-06-13T10:51:00Z' },
         { id: 104, run_id: 'agj-os-TEST', role: 'codex5.5', type: 'status', state: 'DONE', source: 'callback', body: { gate: 'PASS', q: 'Q0 closure confirmed' }, ts: '2026-06-13T10:54:00Z' }
       ]);
+      // B5 test support only (b4smoke): seed real binding-shaped agent data so derivation shows provider/model "from the binding"; attach injector that drives setEvents (same path as real WS 'event')
+      setBindings([
+        {role: 'projcore', agent: {id: 1, name: 'grok-projcore', provider: 'grok', model: '4'}},
+        {role: 'grok-build', agent: {id: 2, name: 'claude-opus', provider: 'claude', model: 'opus'}},
+        {role: 'codex5.5', agent: {id: 3, name: 'codex5.5', provider: 'codex', model: '5.5'}}
+      ]);
+      window.__injectAgentEvent = (ev) => setEvents(prev => [...prev, { id: -Date.now(), run_id: 'agj-os-TEST', role: ev.role || 'agent', type: ev.type || 'status', state: ev.state, source: 'callback', body: ev.body || {}, ts: ev.ts || new Date().toISOString() }]);
     }
   }, [activeRunId]);
 
@@ -6229,6 +6236,27 @@ function AgentOS() {
   defaults.forEach(d => { if (d && d.role) defaultsMap[d.role] = d.agent; });
   const bindingsMap = {};
   bindings.forEach(b => { if (b && b.role) bindingsMap[b.role] = b.agent; });
+
+  // B5: REAL derivation (latest state per role from agent_events + bindingsMap/defaultsMap for agent provider/model per A1; session from activeRunId/B3; state from event). Replaces B4 placeholders only. Live: existing setEvents re-renders this. No A1/A2/A3/A4 changes.
+  const roleToAv = (r) => (r||'').includes('projcore') ? 'PC' : (r||'').includes('grok') ? 'GB' : (r||'').includes('codex') ? 'CX' : String(r||'').slice(0,2).toUpperCase();
+  const stateClass = (s) => { const u = (s||'').toUpperCase(); if (u.includes('DONE') || u === 'PASS') return 'success'; if (u.includes('WORK') || u.includes('PROPOS')) return 'work'; if (u.includes('IDLE')) return 'idle'; return 'coord'; };
+  const getWhosWorking = () => {
+    const run = activeRunId || (location.search.includes('b4smoke') ? 'agj-os-TEST' : null);
+    if (!run) return [];
+    const latest = {};
+    (events || []).forEach(ev => {
+      if (!ev || !ev.role || ev.role === 'me') return;
+      if (ev.run_id && ev.run_id !== run) return;
+      if (!latest[ev.role] || (ev.ts || '') > (latest[ev.role].ts || '')) latest[ev.role] = ev;
+    });
+    return Object.keys(latest).map(role => {
+      const ev = latest[role];
+      const ag = bindingsMap[role] || defaultsMap[role] || { name: 'unbound', provider: '?', model: '?' };
+      const sess = run;
+      const st = ev.state || (ev.type === 'message' ? 'output' : 'active');
+      return { role, agent: ag, session: sess, state: st };
+    }).sort((a,b) => a.role.localeCompare(b.role));
+  };
 
   return html`
     <div>
@@ -6379,13 +6407,11 @@ function AgentOS() {
                       <div class="avatar av-gk" style="width:20px;height:20px;font-size:9px;">GB</div>
                       <div class="avatar av-cx" style="width:20px;height:20px;font-size:9px;">CX</div>
                     </div>
-                    <span class="strip-label" style="flex:1;font-size:11px;margin-left:8px;">3 agents · <b>grok working</b></span>
+                    <span class="strip-label" style="flex:1;font-size:11px;margin-left:8px;">${getWhosWorking().length} agents · live</span>
                     <span class="strip-batch" style="font-family:monospace;font-size:10px;color:var(--text-secondary);">B4</span>
                   </summary>
                   <div class="strip-body" style="padding:4px 8px 8px;display:flex;flex-direction:column;gap:8px;font-size:11px;">
-                    <div class="agent"><div class="avatar av-pc">PC</div><div class="info"><div class="nm">projcore <span class="sub">(Opus)</span></div><div class="st coord"><span class="sd"></span>coordinating</div></div></div>
-                    <div class="agent"><div class="avatar av-gk">GB</div><div class="info"><div class="nm">grok-build</div><div class="st work"><span class="sd"></span>working</div></div></div>
-                    <div class="agent"><div class="avatar av-cx">CX</div><div class="info"><div class="nm">codex5.5 <span class="sub">(validator)</span></div><div class="st idle"><span class="sd"></span>idle</div></div></div>
+                    ${getWhosWorking().map(w => html`<div class="agent" data-role=${w.role}><div class="avatar av-pc">${roleToAv(w.role)}</div><div class="info"><div class="nm">${w.role} · ${w.agent.name} <span class="sub">(${w.agent.provider}/${w.agent.model})</span></div><div class=${'st ' + stateClass(w.state)}><span class="sd"></span>${w.state} <span class="sess" style="font-family:monospace;font-size:9px;opacity:0.7">${w.session}</span></div></div></div>`)}
                   </div>
                 </details>
                 <div class="transcript">
@@ -6420,9 +6446,7 @@ function AgentOS() {
               <aside class="rail">
                 <div class="rsection">
                   <div class="rtitle">WHO'S WORKING</div>
-                  <div class="agent"><div class="avatar av-pc">PC</div><div class="info"><div class="nm">projcore <span class="sub">(Opus)</span></div><div class="st coord"><span class="sd"></span>coordinating</div></div></div>
-                  <div class="agent"><div class="avatar av-gk">GB</div><div class="info"><div class="nm">grok-build</div><div class="st work"><span class="sd"></span>working</div></div></div>
-                  <div class="agent"><div class="avatar av-cx">CX</div><div class="info"><div class="nm">codex5.5</div><div class="st idle"><span class="sd"></span>idle</div></div></div>
+                  ${getWhosWorking().map(w => html`<div class="agent" data-role=${w.role}><div class="avatar av-pc">${roleToAv(w.role)}</div><div class="info"><div class="nm">${w.role} · ${w.agent.name} <span class="sub">(${w.agent.provider}/${w.agent.model})</span></div><div class=${'st ' + stateClass(w.state)}><span class="sd"></span>${w.state} <span class="sess" style="font-family:monospace;font-size:9px;opacity:0.7">${w.session}</span></div></div></div>`)}
                 </div>
                 <div class="rsection">
                   <div class="rtitle">BATCH</div>
