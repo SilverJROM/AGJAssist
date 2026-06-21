@@ -19,6 +19,7 @@ import type { OvmSessionManager } from "../../services/ovm-session.js";
 import type { TmuxService } from "../../tmux/tmux-service.js";
 import type { NudgeStateService } from "../../services/nudge-state-service.js";
 import { isAgentPane, type AgentPaneKind } from "../../services/overmind/agent-pane.js";
+import { resolveParentSession } from "../../services/overmind/parent-session-resolver.js";
 import { augmentWorkflowSparkHealth } from "../../services/overmind/spark-health.js";
 import type { OvermindParentStatus } from "../../services/overmind/types.js";
 import {
@@ -918,8 +919,15 @@ export function registerOvermindRoutes(
         tasks: submittedTasks
       });
       let parentStatus: OvermindParentStatus = "unknown";
+      let liveParent = match.project.parent_session;
       try {
-        parentStatus = normalizeRegisterParentStatus(await isAgentPane(match.project.parent_session));
+        const resolution = await resolveParentSession(match.project.parent_session);
+        liveParent = resolution.session ?? match.project.parent_session;
+      } catch {
+        liveParent = match.project.parent_session;
+      }
+      try {
+        parentStatus = normalizeRegisterParentStatus(await isAgentPane(liveParent));
       } catch {
         parentStatus = "unknown";
       }
@@ -943,6 +951,7 @@ export function registerOvermindRoutes(
         project_slug: match.project.slug,
         parent_session: match.project.parent_session,
         parent_status: parentStatus,
+        ...(liveParent !== match.project.parent_session ? { resolved_session: liveParent } : {}),
         ...(parentWarning ? { parent_warning: parentWarning } : {})
       });
     }

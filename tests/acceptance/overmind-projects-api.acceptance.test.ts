@@ -12,6 +12,7 @@ import { AppConfig } from "../../src/config/config.js";
 import { registerOvermindRoutes } from "../../src/api/routes/overmind-routes.js";
 import { OvermindService } from "../../src/services/overmind-service.js";
 import * as agentPane from "../../src/services/overmind/agent-pane.js";
+import * as parentResolver from "../../src/services/overmind/parent-session-resolver.js";
 
 const BOT_TOKEN = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11";
 const JWT_SECRET = "acceptance-secret";
@@ -108,6 +109,13 @@ beforeEach(async () => {
   authService = new AuthService(db, BOT_TOKEN, JWT_SECRET, 24);
   overmindService = new OvermindService(db);
   vi.spyOn(agentPane, "isAgentPane").mockResolvedValue("codex");
+  vi.spyOn(parentResolver, "resolveParentSession").mockImplementation(async (stored: string) => ({
+    session: stored,
+    base: stored ? stored.replace(/-\d+$/, "") : "",
+    candidates: stored ? [stored] : [],
+    method: "exact",
+    ambiguous: false,
+  }) as any);
 
   app = Fastify({ logger: false });
   registerOvermindRoutes(app, testConfig(dbPath), authService, overmindService);
@@ -471,5 +479,71 @@ describe("T12.6-T12.8 Overmind projects dashboard/delete/warn acceptance", () =>
       run_dir: fs.realpathSync(runDir),
       parent_status: "bare-bash"
     });
+  });
+
+  it("T12.9 resolves bare base parent_session to live session status (R5) — no false no-session warning", async () => {
+    const stored = "agj";
+    const live = "agj-4";
+    vi.mocked(parentResolver.resolveParentSession).mockResolvedValue({
+      session: live,
+      base: "agj",
+      candidates: [live],
+      method: "group",
+      ambiguous: false,
+    } as any);
+    vi.mocked(agentPane.isAgentPane).mockResolvedValue("codex");
+
+    const appPath = projectPath("r5-base-resolve");
+    const runDir = path.join(appPath, "spark-daemon-runkit", "r5-run");
+    fs.mkdirSync(runDir, { recursive: true });
+    const project = overmindService.createProject({
+      slug: "r5-base-resolve",
+      app_path: appPath,
+      parent_session: stored,
+      notes: null
+    });
+
+    const attached = await registerRun({ run_dir: runDir });
+
+    expect(attached.statusCode).toBe(201);
+    const body = attached.json();
+    expect(body.parent_session).toBe(stored);
+    expect(body.resolved_session).toBe(live);
+    expect(body.parent_status).toBe("ok");
+    expect(body.parent_warning).toBeUndefined();
+    expect(body.workflow).toMatchObject({ parent_status: "ok" });
+    expect(vi.mocked(agentPane.isAgentPane)).toHaveBeenCalledWith(live);
+  });
+
+  it("T12.10 full live parent_session name still reports own status (backward compat, unchanged)", async () => {
+    const live = "agj-99";
+    vi.mocked(parentResolver.resolveParentSession).mockResolvedValue({
+      session: live,
+      base: "agj",
+      candidates: [live],
+      method: "exact",
+      ambiguous: false,
+    } as any);
+    vi.mocked(agentPane.isAgentPane).mockResolvedValue("claude");
+
+    const appPath = projectPath("r5-full-live");
+    const runDir = path.join(appPath, "spark-daemon-runkit", "r5-full");
+    fs.mkdirSync(runDir, { recursive: true });
+    const project = overmindService.createProject({
+      slug: "r5-full-live",
+      app_path: appPath,
+      parent_session: live,
+      notes: null
+    });
+
+    const attached = await registerRun({ run_dir: runDir });
+
+    expect(attached.statusCode).toBe(201);
+    const body = attached.json();
+    expect(body.parent_session).toBe(live);
+    expect(body.resolved_session).toBeUndefined();
+    expect(body.parent_status).toBe("ok");
+    expect(body.parent_warning).toBeUndefined();
+    expect(body.workflow.parent_status).toBe("ok");
   });
 });
