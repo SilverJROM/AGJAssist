@@ -1608,6 +1608,23 @@ function OvermindProjects() {
     return () => document.removeEventListener('click', close);
   }, [openProjectMenuSlug]);
 
+  // b5hint smoke support (for UI-PROOF only): seed one project so the list renders and edit path can be exercised via REAL clicks (summary + menu + Edit); mirrors b4smoke pattern
+  useEffect(() => {
+    if (location.search.includes('b5hint')) {
+      setLoading(false);
+      setError('');
+      setProjects([{
+        slug: 'demo',
+        app_path: '/home/agjrom/TGBOTS/AGJAssist',
+        parent_session: 'agj',
+        notes: '',
+        active_runs_count: 0,
+        latest_parent_status: null,
+        updated_at: null
+      }]);
+    }
+  }, []);
+
   function openCreate() {
     setForm(emptyForm);
     setCreateError('');
@@ -1862,8 +1879,9 @@ function OvermindProjects() {
               <input
                 value=${form.parent_session}
                 onInput=${e => updateForm('parent_session', e.target.value)}
-                placeholder="AGJ-51"
+                placeholder="agj"
               />
+              <small class="form-hint" style="display:block;margin-top:4px;font-size:11px;color:var(--text-secondary)">Base name (e.g. agj) — auto-resolves to the live session even when the suffix changes (agj-51 → agj-4). Full names also work.</small>
             </div>
             <div class="form-group">
               <label>Notes</label>
@@ -1903,6 +1921,7 @@ function OvermindProjects() {
                 onInput=${e => updateEditForm('parent_session', e.target.value)}
                 autofocus
               />
+              <small class="form-hint" style="display:block;margin-top:4px;font-size:11px;color:var(--text-secondary)">Base name (e.g. agj) — auto-resolves to the live session even when the suffix changes (agj-51 → agj-4). Full names also work.</small>
             </div>
             <div class="form-group">
               <label>Notes</label>
