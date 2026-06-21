@@ -61,6 +61,7 @@ export interface CompletionDetectorDeps {
   subagentInFlightSource?: "tui" | "ack";
   /** Called to clear stale subagent flag externally (H8). */
   clearSubagentInFlight?: () => void;
+  liveResolver?: (stored: string) => Promise<string>;
 }
 
 /**
@@ -266,7 +267,8 @@ export async function handleAllTasksDone(
       {
         overmindService: deps.overmindService,
         nudgeState: deps.nudgeState,
-        notify: deps.notify
+        notify: deps.notify,
+        liveResolver: deps.liveResolver
       },
       (target, text) => deps.tmuxService.sendAndSubmit(target, text)
     );
@@ -334,7 +336,8 @@ export async function handleAllTasksDone(
     {
       overmindService: deps.overmindService,
       nudgeState: deps.nudgeState,
-      notify: deps.notify
+      notify: deps.notify,
+      liveResolver: deps.liveResolver
     },
     (target, text) => deps.tmuxService.sendAndSubmit(target, text)
   );

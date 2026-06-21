@@ -21,6 +21,7 @@ export interface ArtifactFailsafeDeps {
   TERMINAL_STATUSES: OvermindWorkflowStatus[];
   subagentInFlight?: boolean;
   activeWorkInProgress?: boolean;
+  liveResolver?: (stored: string) => Promise<string>;
 }
 
 export interface ArtifactFailsafeResult {

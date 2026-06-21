@@ -56,6 +56,7 @@ export interface NudgeLadderDeps {
   nudgeState?: NudgeStateService;
   cooldowns: WatcherCooldowns;
   notify?: OvermindNotify;
+  liveResolver?: (stored: string) => Promise<string>;
 }
 
 export async function applyNudgeLadder(

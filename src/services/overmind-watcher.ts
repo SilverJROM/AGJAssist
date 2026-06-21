@@ -70,6 +70,7 @@ import {
 } from "./overmind/nudge-ladder.js";
 import { handleAllTasksDone } from "./overmind/completion-detector.js";
 import { sendGuardedParentNudge } from "./overmind/parent-nudge-guard.js";
+import { makeLiveParentResolver } from "./overmind/resolve-live-parent.js";
 export class OvermindWatcher {
   private interval: NodeJS.Timeout | null = null;
   private readonly childPaneHashes = new Map<number, Map<string, string>>();
@@ -82,6 +83,9 @@ export class OvermindWatcher {
     { source: "tui" | "ack"; since: number; name?: string; expectedEndAt?: number }
   >();
   private readonly apparentIdleSince = new Map<number, number>();
+  private readonly liveParentResolver = makeLiveParentResolver({
+    capturePane: (t) => this.tmuxService.capturePane(t, 30)
+  });
   constructor(
     private readonly overmindService: OvermindService,
     private readonly tmuxService: TmuxService,
@@ -165,7 +169,8 @@ export class OvermindWatcher {
           {
             overmindService: this.overmindService,
             nudgeState: this.nudgeState,
-            notify: this.notify
+            notify: this.notify,
+            liveResolver: this.liveParentResolver
           },
           (target, text) => this.tmuxService.sendAndSubmit(target, text)
         );
@@ -394,7 +399,8 @@ export class OvermindWatcher {
               {
                 overmindService: this.overmindService,
                 nudgeState: this.nudgeState,
-                notify: this.notify
+                notify: this.notify,
+                liveResolver: this.liveParentResolver
               },
               (target, text) => this.tmuxService.sendAndSubmit(target, text)
             );
@@ -421,7 +427,8 @@ export class OvermindWatcher {
         notify: this.notify,
         TERMINAL_STATUSES,
         subagentInFlight: this.subagentInFlight.has(wid),
-        activeWorkInProgress: busyPaneActive
+        activeWorkInProgress: busyPaneActive,
+        liveResolver: this.liveParentResolver
       });
     if (artifactFailsafe.parent_status) {
       effectiveParentStatus = artifactFailsafe.parent_status;
@@ -477,7 +484,8 @@ export class OvermindWatcher {
           paneChanged,
           subagentInFlightSince: this.subagentInFlight.get(wid)?.since,
           subagentInFlightSource: this.subagentInFlight.get(wid)?.source,
-          clearSubagentInFlight: () => this.subagentInFlight.delete(wid)
+          clearSubagentInFlight: () => this.subagentInFlight.delete(wid),
+          liveResolver: this.liveParentResolver
         }
       );
       return;
@@ -500,7 +508,8 @@ export class OvermindWatcher {
           appSettings: this.appSettings,
           nudgeState: this.nudgeState,
           cooldowns: this.cooldowns,
-          notify: this.notify
+          notify: this.notify,
+          liveResolver: this.liveParentResolver
         })
         : await applyNudgeLadder(workflow, effectiveResult.status, coordinatorPane, {
           overmindService: this.overmindService,
@@ -509,7 +518,8 @@ export class OvermindWatcher {
           appSettings: this.appSettings,
           nudgeState: this.nudgeState,
           cooldowns: this.cooldowns,
-          notify: this.notify
+          notify: this.notify,
+          liveResolver: this.liveParentResolver
         });
     this.overmindService.update(workflow.id, {
       status: nudgeFields.status ?? effectiveResult.status,
@@ -591,7 +601,8 @@ export class OvermindWatcher {
         {
           overmindService: this.overmindService,
           nudgeState: this.nudgeState,
-          notify: this.notify
+          notify: this.notify,
+          liveResolver: this.liveParentResolver
         },
         (target, text) => this.tmuxService.sendAndSubmit(target, text)
       );

@@ -10,6 +10,7 @@ export interface GuardedParentNudgeDeps {
   overmindService: OvermindService;
   nudgeState?: NudgeStateService;
   notify?: OvermindNotify;
+  liveResolver?: (stored: string) => Promise<string>;
 }
 
 export interface GuardedParentNudgeResult {
@@ -34,7 +35,16 @@ export async function sendGuardedParentNudge(
   deps: GuardedParentNudgeDeps,
   send: ParentSend
 ): Promise<GuardedParentNudgeResult> {
-  const { parentSession, resolverFailed } = resolveParentSession(workflow, deps);
+  const initial = resolveParentSession(workflow, deps);
+  let parentSession = initial.parentSession;
+  const resolverFailed = initial.resolverFailed;
+  if (deps.liveResolver && !resolverFailed) {
+    try {
+      parentSession = await deps.liveResolver(parentSession);
+    } catch {
+      /* keep stored */
+    }
+  }
   let paneKind: AgentPaneKind = "unknown";
   if (!resolverFailed) {
     try {
