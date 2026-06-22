@@ -185,6 +185,11 @@ export class OvermindWatcher {
   private async tickWorkflow(workflow: OvermindWorkflow): Promise<void> {
     const now = new Date().toISOString();
     const resolvedRunDir = await this.resolveRunDir(workflow);
+    // Resolve the stored coordinator (which may be a BASE name like "helm") to the
+    // live session BEFORE the existence/pane checks. Without this the orphan check
+    // ran on the raw base ("helm" → has-session always false → permanent orphan even
+    // after the coordinator returns). Same resolver used by the nudge path. (2026-06-22)
+    const liveCoordinator = await this.liveParentResolver(workflow.coordinator_session);
     const [
       coordinatorPane,
       childSnapshots,
@@ -194,11 +199,11 @@ export class OvermindWatcher {
       trackedArtifactActivityMs,
       gitHeadActivityMs
     ] = await Promise.all([
-      this.capturePaneSafe(workflow.coordinator_session),
+      this.capturePaneSafe(liveCoordinator),
       Promise.all(workflow.child_sessions.map((target) => this.captureChildSession(target))),
       runDirMtimeAdvanced(resolvedRunDir, workflow.last_activity_at),
       pathExists(resolvedRunDir),
-      this.sessionExistsSafe(workflow.coordinator_session),
+      this.sessionExistsSafe(liveCoordinator),
       getLastTrackedArtifactActivityMs(resolvedRunDir),
       gitHeadActivityMsBestEffort(resolvedRunDir)
     ]);
@@ -235,7 +240,7 @@ export class OvermindWatcher {
       now
     });
     const activeAttribution = determineActiveSessionAttribution({
-      coordinatorSession: workflow.coordinator_session,
+      coordinatorSession: liveCoordinator,
       coordinatorPane,
       childSessions: workflow.child_sessions,
       childPanes
