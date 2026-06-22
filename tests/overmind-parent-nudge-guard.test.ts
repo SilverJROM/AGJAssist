@@ -88,7 +88,7 @@ describe("sendGuardedParentNudge", () => {
     expect(send).toHaveBeenCalledWith("legacy-parent", "overmind: legacy check");
   });
 
-  it("H7: single bare-bash read → treated as unknown, send attempted; second consecutive bare-bash → orphaned, no send, TG once", async () => {
+  it("H7: bare-bash reads below threshold → unknown + send; 3rd consecutive bare-bash → orphaned, no send, TG once", async () => {
     const workflow = createAttachedWorkflow("bare-parent");
     const nudgeState = new NudgeStateService();
     const notify = vi.fn(async () => {});
@@ -97,7 +97,7 @@ describe("sendGuardedParentNudge", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     isAgentPaneMock.mockResolvedValue("bare-bash");
 
-    // First call: count=1 < 2 → downgraded to "unknown", send IS attempted.
+    // Calls 1 & 2: count < 3 → downgraded to "unknown", send IS attempted.
     const first = await sendGuardedParentNudge(
       workflow,
       "overmind: first",
@@ -106,22 +106,34 @@ describe("sendGuardedParentNudge", () => {
     );
     expect(first.sent).toBe(true);
     expect(first.paneKind).toBe("unknown");
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(notify).not.toHaveBeenCalled();
     expect(info.mock.calls.some((c: unknown[]) =>
-      String(c[0]).includes('count=1/2')
+      String(c[0]).includes('count=1/3')
     )).toBe(true);
 
-    // Second call: count=2 = threshold → orphaned, no send, TG notify fires.
     const second = await sendGuardedParentNudge(
       workflow,
       "overmind: second",
       { overmindService: service, nudgeState, notify },
       send
     );
-    expect(second.sent).toBe(false);
-    expect(second.paneKind).toBe("bare-bash");
-    expect(send).toHaveBeenCalledTimes(1); // no additional send on orphan
+    expect(second.sent).toBe(true);
+    expect(second.paneKind).toBe("unknown");
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(notify).not.toHaveBeenCalled();
+    expect(info.mock.calls.some((c: unknown[]) =>
+      String(c[0]).includes('count=2/3')
+    )).toBe(true);
+
+    // Third call: count=3 = threshold → orphaned, no send, TG notify fires.
+    const third = await sendGuardedParentNudge(
+      workflow,
+      "overmind: third",
+      { overmindService: service, nudgeState, notify },
+      send
+    );
+    expect(third.sent).toBe(false);
+    expect(third.paneKind).toBe("bare-bash");
+    expect(send).toHaveBeenCalledTimes(2); // no additional send on orphan
     expect(service.get(workflow.id)?.parent_status).toBe("bare-bash");
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify.mock.calls[0][0]).toContain("🚨 URGENT");
@@ -135,7 +147,7 @@ describe("sendGuardedParentNudge", () => {
     const send = vi.fn(async () => true);
     isAgentPaneMock.mockResolvedValue("no-session");
 
-    // First call: count=1 < 2 → downgraded to "unknown", send attempted.
+    // Calls 1 & 2: count < 3 → downgraded to "unknown", send attempted.
     const first = await sendGuardedParentNudge(
       workflow,
       "overmind: missing first",
@@ -144,19 +156,28 @@ describe("sendGuardedParentNudge", () => {
     );
     expect(first.sent).toBe(true);
     expect(first.paneKind).toBe("unknown");
-    expect(send).toHaveBeenCalledTimes(1);
 
-    // Second call: count=2 = threshold → orphaned.
     const second = await sendGuardedParentNudge(
       workflow,
       "overmind: missing second",
       { overmindService: service, nudgeState: new NudgeStateService(), notify: vi.fn(async () => {}) },
       send
     );
-    expect(second.sent).toBe(false);
-    expect(second.paneKind).toBe("no-session");
+    expect(second.sent).toBe(true);
+    expect(second.paneKind).toBe("unknown");
+    expect(send).toHaveBeenCalledTimes(2);
+
+    // Third call: count=3 = threshold → orphaned.
+    const third = await sendGuardedParentNudge(
+      workflow,
+      "overmind: missing third",
+      { overmindService: service, nudgeState: new NudgeStateService(), notify: vi.fn(async () => {}) },
+      send
+    );
+    expect(third.sent).toBe(false);
+    expect(third.paneKind).toBe("no-session");
     expect(service.get(workflow.id)?.parent_status).toBe("no-session");
-    expect(send).toHaveBeenCalledTimes(1); // only the first call sent
+    expect(send).toHaveBeenCalledTimes(2); // calls 1 & 2 sent, 3rd orphaned
   });
 
   it("sends to the coordinator when parent resolution fails instead of throwing", async () => {

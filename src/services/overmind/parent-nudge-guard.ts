@@ -26,7 +26,7 @@ const fallbackParentOrphanedAlerts = new Set<string>();
 
 /** H7: require N consecutive bare-bash/no-session reads before orphaning.
  *  A single ambiguous classification → treat as "unknown" → still nudge. */
-const CONSECUTIVE_DEAD_BEFORE_ORPHAN = 2;
+const CONSECUTIVE_DEAD_BEFORE_ORPHAN = 3;
 const consecutiveDeadCount = new Map<number, number>();
 
 export async function sendGuardedParentNudge(
