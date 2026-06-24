@@ -46,6 +46,8 @@ import type { OvmSessionManager } from "../services/ovm-session.js";
 import { AppSettingsService } from "../services/app-settings-service.js";
 import { registerAppSettingsRoutes } from "./routes/app-settings-routes.js";
 import type { NudgeStateService } from "../services/nudge-state-service.js";
+import type { TelegramAssistant } from "../bot/telegram-bot.js";
+import { registerTgLoginRoutes } from "./routes/tg-login-routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -74,6 +76,7 @@ export interface ApiServices {
   ovmSessionService?: OvmSessionManager;
   appSettingsService?: AppSettingsService;
   nudgeStateService?: NudgeStateService;
+  telegramAssistant?: TelegramAssistant | null;
 }
 
 export async function createApiServer(
@@ -112,6 +115,7 @@ export async function createApiServer(
   }));
 
   // Register route groups
+  registerTgLoginRoutes(app, config, services.telegramAssistant);
   registerAuthRoutes(app, services.authService);
   registerProjectRoutes(app, services.authService, services.projectService, services.auditService);
   registerSafetyRoutes(app, services.authService, services.safetyService);

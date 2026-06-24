@@ -1,8 +1,17 @@
 import TelegramBot from "node-telegram-bot-api";
 import { AssistantCore } from "./assistant-core.js";
+import { helmLoginChallengeStore } from "./helm-login-store.js";
+import { decideHelmLoginVerdict, type HelmLoginVerdict } from "./helm-login-verdict.js";
 
 type SendMessageOptions = Parameters<TelegramBot["sendMessage"]>[2];
 type AnswerCallbackOptions = Partial<TelegramBot.AnswerCallbackQueryOptions>;
+
+export interface HelmChallengeMessageInput {
+  chatId: number;
+  prompt: string;
+  challengeId: string;
+  buttons: number[];
+}
 
 function splitMessage(text: string, maxLen = 3900): string[] {
   if (text.length <= maxLen) return [text];
@@ -31,6 +40,24 @@ export class TelegramAssistant {
 
   async sendMessage(chatId: number | string, text: string): Promise<void> {
     await this.bot.sendMessage(chatId, text);
+  }
+
+  async sendHelmChallenge(input: HelmChallengeMessageInput): Promise<void> {
+    try {
+      await this.bot.sendMessage(input.chatId, input.prompt, {
+        reply_markup: {
+          inline_keyboard: [
+            input.buttons.map((n) => ({
+              text: String(n),
+              callback_data: `helmpwl:${input.challengeId}:${n}`
+            }))
+          ]
+        }
+      });
+    } catch (error) {
+      console.error("Telegram Helm challenge send failed:", error);
+      throw error;
+    }
   }
 
   private async configureCommands(): Promise<void> {
@@ -68,6 +95,11 @@ export class TelegramAssistant {
 
     this.bot.on("callback_query", async (query) => {
       try {
+        if (query.data?.startsWith("helmpwl:")) {
+          await this.handleHelmPasswordlessCallback(query);
+          return;
+        }
+
         if (!query.data?.startsWith("weblogin:")) return;
         if (!this.core.isAuthorized(query.from.id)) {
           await this.answerCallbackQuerySafe(query.id, { text: "Unauthorized" });
@@ -131,6 +163,71 @@ export class TelegramAssistant {
         await this.sendMessageSafe(chatId, `Error: ${msg}`);
       }
     });
+  }
+
+  private async handleHelmPasswordlessCallback(query: TelegramBot.CallbackQuery): Promise<void> {
+    if (!this.core.isAuthorized(query.from.id)) {
+      await this.answerCallbackQuerySafe(query.id, { text: "Unauthorized" });
+      return;
+    }
+
+    const parts = query.data?.split(":") ?? [];
+    if (parts.length !== 3 || parts[0] !== "helmpwl" || !parts[1]) {
+      await this.answerCallbackQuerySafe(query.id, { text: "Invalid" });
+      return;
+    }
+
+    const challengeId = parts[1];
+    const selected = Number(parts[2]);
+    if (!Number.isInteger(selected)) {
+      await this.answerCallbackQuerySafe(query.id, { text: "Invalid" });
+      return;
+    }
+
+    const consumed = helmLoginChallengeStore.consume(challengeId);
+    if (!consumed.ok) {
+      await this.answerCallbackQuerySafe(query.id, { text: "Expired" });
+      return;
+    }
+
+    const result = decideHelmLoginVerdict(consumed.challenge, selected);
+    await this.editHelmCallbackMessage(query, result);
+    await this.answerCallbackQuerySafe(query.id, {
+      text: result === "pass" ? "Signed in to Helm" : "Sign-in denied"
+    });
+    await this.postHelmVerdict(consumed.challenge.callbackUrl, challengeId, result);
+  }
+
+  private async editHelmCallbackMessage(
+    query: TelegramBot.CallbackQuery,
+    result: HelmLoginVerdict
+  ): Promise<void> {
+    if (!query.message) return;
+
+    try {
+      await this.bot.editMessageText(result === "pass" ? "✅ Signed in to Helm" : "❌ Sign-in denied", {
+        chat_id: query.message.chat.id,
+        message_id: query.message.message_id
+      });
+    } catch (error) {
+      console.error("Telegram editMessageText failed:", error);
+    }
+  }
+
+  private async postHelmVerdict(
+    callbackUrl: string,
+    challengeId: string,
+    result: HelmLoginVerdict
+  ): Promise<void> {
+    try {
+      await fetch(callbackUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeId, result })
+      });
+    } catch (error) {
+      console.error("Helm Telegram verdict webhook failed:", error);
+    }
   }
 
   private async startPollingSafely(): Promise<void> {

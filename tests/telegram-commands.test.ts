@@ -6,6 +6,7 @@ const telegramMock = vi.hoisted(() => ({
   on: vi.fn(),
   startPolling: vi.fn(async () => undefined),
   sendMessage: vi.fn(async () => undefined),
+  editMessageText: vi.fn(async () => undefined),
   answerCallbackQuery: vi.fn(async () => undefined)
 }));
 
@@ -41,5 +42,30 @@ describe("Telegram command menu", () => {
     );
     expect(commands).not.toContain("om_tasks");
     expect(commands).not.toContain("om_drop");
+  });
+
+  it("keeps the existing weblogin callback path intact", async () => {
+    const handlers = new Map<string, (payload: any) => Promise<void>>();
+    telegramMock.on.mockImplementation((event: string, handler: (payload: any) => Promise<void>) => {
+      handlers.set(event, handler);
+      return telegramMock;
+    });
+    const core = {
+      isAuthorized: vi.fn(() => true),
+      handleCommand: vi.fn(async () => "login-code-response")
+    } as unknown as AssistantCore;
+    const assistant = new TelegramAssistant("test-token", core);
+
+    await assistant.start();
+    await handlers.get("callback_query")?.({
+      id: "callback-1",
+      data: "weblogin:2",
+      from: { id: 1000000001 }
+    });
+
+    expect(core.isAuthorized).toHaveBeenCalledWith(1000000001);
+    expect(core.handleCommand).toHaveBeenCalledWith("/weblogin 2");
+    expect(telegramMock.answerCallbackQuery).toHaveBeenCalledWith("callback-1", undefined);
+    expect(telegramMock.sendMessage).toHaveBeenCalledWith(1000000001, "login-code-response", undefined);
   });
 });

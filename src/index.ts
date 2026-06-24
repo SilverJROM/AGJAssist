@@ -150,7 +150,8 @@ async function main(): Promise<void> {
     agentEventsStreamManager,
     ovmSessionService,
     appSettingsService,
-    nudgeStateService
+    nudgeStateService,
+    telegramAssistant
   });
 
   await apiServer.listen({ port: config.api.port, host: config.api.host });
