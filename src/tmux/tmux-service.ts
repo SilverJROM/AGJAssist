@@ -5,6 +5,18 @@ import { SafetyService, SafetyCheckResult } from "../services/safety-service.js"
 
 const execFileAsync = promisify(execFile);
 
+// Coordinator-message submit tuning. A modern TUI composer (Claude Code / codex)
+// ingests a bracketed paste ASYNCHRONOUSLY: the text is not in the composer the
+// instant `send-keys -l` returns. So we must (1) wait for the paste to actually
+// render before pressing Enter — an Enter into a still-empty composer is swallowed
+// and the text then drops in un-submitted — and (2) never conclude "submitted" off
+// an empty composer we never saw hold the text (that false-positive is what made
+// nudges pile up un-sent). See sendAndSubmit.
+const COMPOSER_POLL_MS = 120;
+const COMPOSER_RENDER_MAX_POLLS = 16; // ~2s ceiling waiting for the paste to land
+const SUBMIT_VERIFY_DELAY_MS = 400;
+const SUBMIT_MAX_PRESSES = 4;
+
 export interface TmuxPane {
   target: string;
   session: string;
@@ -125,41 +137,51 @@ export class TmuxService {
     };
   }
 
-  // Send text literally then verify submission, re-pressing Enter up to 3 times total if
-  // the TUI treats a long paste as "Pasted Content" and does not auto-submit on the first
-  // C-m. Returns true when submitted (composer no longer holds the text), false after 3
-  // attempts (still stuck). Best-effort: never throws.
+  // Reliably paste a message into a coordinator/agent TUI composer and submit it.
+  //
+  // The bug this fixes: the previous version sent the literal text and an Enter
+  // back-to-back. But a TUI ingests a bracketed paste asynchronously, so that first
+  // Enter routinely fired into a still-empty composer and was swallowed; the text
+  // then landed un-submitted. Worse, a verify that ran in that window saw an empty
+  // composer and FALSELY reported "submitted", so the retry loop gave up and the
+  // message just piled up in the parent's command line, never sent.
+  //
+  // The fix is two-phase:
+  //   1. Paste the literal text, then POLL until it has actually rendered in the
+  //      composer (or shows a "[Pasted Content]" blob) before touching Enter.
+  //   2. Only then press Enter, verifying the composer cleared after each press and
+  //      re-pressing up to SUBMIT_MAX_PRESSES (a long paste can collapse into a blob
+  //      that needs an extra Enter to expand+submit).
+  // Returns true once the composer no longer holds the text. Best-effort: never throws.
   async sendAndSubmit(target: string, text: string): Promise<boolean> {
     try {
       this.ensureValidTarget(target);
       const trimmed = text.trim();
       if (!trimmed) return false;
 
-      // Initial send: literal text + first Enter (two separate execFile calls).
-      await execFileAsync("tmux", ["send-keys", "-l", "-t", target, "--", trimmed]);
-      await execFileAsync("tmux", ["send-keys", "-t", target, "C-m"]);
-
-      // Distinctive chunk used to detect the message still sitting in the composer.
+      // Distinctive chunk used to detect the message in / gone from the composer.
       const chunk = trimmed.replace(/\s+/g, "").slice(0, 40);
 
-      const MAX_PRESSES = 3;
-      let pressCount = 1;
-
-      while (pressCount < MAX_PRESSES) {
-        await setTimeoutPromise(500);
+      // Phase 1: paste the literal text, then wait for it to actually render.
+      await execFileAsync("tmux", ["send-keys", "-l", "-t", target, "--", trimmed]);
+      for (let poll = 0; poll < COMPOSER_RENDER_MAX_POLLS; poll++) {
+        await setTimeoutPromise(COMPOSER_POLL_MS);
         const pane = await this.capturePane(target);
-        if (this.isTextSubmitted(pane, chunk)) {
-          return true;
-        }
-        // Still un-submitted — press Enter again.
-        await execFileAsync("tmux", ["send-keys", "-t", target, "C-m"]);
-        pressCount += 1;
+        // Composer is "holding" our text when it is NOT in a submitted/empty state.
+        if (!this.isTextSubmitted(pane, chunk)) break;
+        // Else the paste hasn't landed yet (or capture noise) — keep polling. Do NOT
+        // press Enter into an empty composer.
       }
 
-      // Final check after the last press.
-      await setTimeoutPromise(500);
-      const pane = await this.capturePane(target);
-      return this.isTextSubmitted(pane, chunk);
+      // Phase 2: submit, then verify the composer cleared; re-press if it didn't.
+      for (let press = 0; press < SUBMIT_MAX_PRESSES; press++) {
+        await execFileAsync("tmux", ["send-keys", "-t", target, "C-m"]);
+        await setTimeoutPromise(SUBMIT_VERIFY_DELAY_MS);
+        const pane = await this.capturePane(target);
+        if (this.isTextSubmitted(pane, chunk)) return true;
+      }
+
+      return this.isTextSubmitted(await this.capturePane(target), chunk);
     } catch {
       return false;
     }

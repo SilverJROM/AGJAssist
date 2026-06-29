@@ -79,50 +79,69 @@ describe("TmuxService sendAndSubmit", () => {
     execFileMock.mockResolvedValue({ stdout: "", stderr: "" });
   });
 
-  it("returns true immediately when the composer is clear after the first Enter", async () => {
-    const service = new TmuxService();
-    // capturePane returns a clean pane (no ❯/› with the message text in it).
-    vi.spyOn(service, "capturePane").mockResolvedValue("some clean output\r\n");
+  const cmCallsFor = (target: string) =>
+    execFileMock.mock.calls.filter(
+      (args: string[]) => JSON.stringify(args) === JSON.stringify(["tmux", ["send-keys", "-t", target, "C-m"]])
+    );
 
-    const result = await service.sendAndSubmit("agj-7:0.0", "Hello coordinator");
-
-    expect(result).toBe(true);
-    // Should have sent text + one C-m initially.
-    expect(execFileMock).toHaveBeenCalledWith("tmux", ["send-keys", "-l", "-t", "agj-7:0.0", "--", "Hello coordinator"]);
-    expect(execFileMock).toHaveBeenCalledWith("tmux", ["send-keys", "-t", "agj-7:0.0", "C-m"]);
-  });
-
-  it("re-presses Enter when the first capture shows the text stuck in the composer, then returns true", async () => {
+  it("pastes the text, waits for it to render, then submits and returns true", async () => {
     const service = new TmuxService();
     const capturePane = vi.spyOn(service, "capturePane");
-    // First capture: text is still in the composer line.
+    // Render poll: composer is holding our text.
     capturePane.mockResolvedValueOnce("❯ Hello coordinator\r\n");
-    // Second capture: composer is clear.
-    capturePane.mockResolvedValueOnce("some clean output\r\n");
+    // Verify after Enter: composer cleared.
+    capturePane.mockResolvedValue("some clean output\r\n");
 
     const result = await service.sendAndSubmit("agj-7:0.0", "Hello coordinator");
 
     expect(result).toBe(true);
-    // C-m should have been sent twice: initial + one re-press.
-    const cmCalls = execFileMock.mock.calls.filter(
-      (args: string[]) => JSON.stringify(args) === JSON.stringify(["tmux", ["send-keys", "-t", "agj-7:0.0", "C-m"]])
-    );
-    expect(cmCalls.length).toBe(2);
+    expect(execFileMock).toHaveBeenCalledWith("tmux", ["send-keys", "-l", "-t", "agj-7:0.0", "--", "Hello coordinator"]);
+    // Exactly one Enter: pressed once, after the paste rendered, and it cleared.
+    expect(cmCallsFor("agj-7:0.0").length).toBe(1);
   });
 
-  it("returns false after 3 Enter attempts when the composer never clears (no infinite loop)", async () => {
+  it("does NOT press Enter until the async paste has rendered (regression: no false-positive submit)", async () => {
     const service = new TmuxService();
-    // Every capturePane call returns the text still in the composer.
+    const capturePane = vi.spyOn(service, "capturePane");
+    // First two polls: paste hasn't landed yet — composer shows only the empty prompt.
+    capturePane.mockResolvedValueOnce("❯ \r\n");
+    capturePane.mockResolvedValueOnce("❯ \r\n");
+    // Third poll: the text has finally rendered.
+    capturePane.mockResolvedValueOnce("❯ Hello coordinator\r\n");
+    // Verify after Enter: cleared.
+    capturePane.mockResolvedValue("clean\r\n");
+
+    const result = await service.sendAndSubmit("agj-7:0.0", "Hello coordinator");
+
+    expect(result).toBe(true);
+    // The old bug pressed Enter immediately into the empty composer (swallowed) and
+    // then declared success off the empty pane. Now we poll the empty composer
+    // (>= 3 captures) and press Enter exactly ONCE, only after the text rendered.
+    expect(capturePane.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(cmCallsFor("agj-7:0.0").length).toBe(1);
+  });
+
+  it("re-presses Enter when the composer doesn't clear after the first Enter", async () => {
+    const service = new TmuxService();
+    const capturePane = vi.spyOn(service, "capturePane");
+    capturePane.mockResolvedValueOnce("❯ Hello coordinator\r\n"); // render poll: held
+    capturePane.mockResolvedValueOnce("❯ Hello coordinator\r\n"); // verify 1: still held → re-press
+    capturePane.mockResolvedValue("some clean output\r\n"); // verify 2: cleared
+
+    const result = await service.sendAndSubmit("agj-7:0.0", "Hello coordinator");
+
+    expect(result).toBe(true);
+    expect(cmCallsFor("agj-7:0.0").length).toBe(2);
+  });
+
+  it("returns false after SUBMIT_MAX_PRESSES (4) when the composer never clears (no infinite loop)", async () => {
+    const service = new TmuxService();
     vi.spyOn(service, "capturePane").mockResolvedValue("❯ Hello coordinator stuck\r\n");
 
     const result = await service.sendAndSubmit("agj-7:0.0", "Hello coordinator stuck");
 
     expect(result).toBe(false);
-    // Exactly 3 C-m presses total (never more).
-    const cmCalls = execFileMock.mock.calls.filter(
-      (args: string[]) => JSON.stringify(args) === JSON.stringify(["tmux", ["send-keys", "-t", "agj-7:0.0", "C-m"]])
-    );
-    expect(cmCalls.length).toBe(3);
+    expect(cmCallsFor("agj-7:0.0").length).toBe(4);
   });
 
   it("returns false (no throw) when execFile rejects (e.g. invalid session)", async () => {
@@ -134,16 +153,17 @@ describe("TmuxService sendAndSubmit", () => {
     expect(result).toBe(false);
   });
 
-  it("detects paste indicator [Pasted Content and re-presses Enter", async () => {
+  it("treats a [Pasted Content] blob as rendered, then submits", async () => {
     const service = new TmuxService();
     const capturePane = vi.spyOn(service, "capturePane");
-    // First capture: pane shows paste indicator.
+    // Render poll: pane shows the paste blob indicator (counts as "holding text").
     capturePane.mockResolvedValueOnce("[Pasted Content (3 lines)] Press tab to queue message\r\n");
-    // Second capture: clean.
-    capturePane.mockResolvedValueOnce("submitted output\r\n");
+    // Verify after Enter: clean.
+    capturePane.mockResolvedValue("submitted output\r\n");
 
     const result = await service.sendAndSubmit("agj-7:0.0", "some long text");
 
     expect(result).toBe(true);
+    expect(cmCallsFor("agj-7:0.0").length).toBe(1);
   });
 });
