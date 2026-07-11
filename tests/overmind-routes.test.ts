@@ -500,6 +500,7 @@ describe("Overmind routes", () => {
       "register",
       "tasks",
       "children",
+      "parent-session",
       "complete",
       "pause",
       "resume"
@@ -523,6 +524,7 @@ describe("Overmind routes", () => {
       "register",
       "tasks",
       "children",
+      "parent-session",
       "complete",
       "pause",
       "resume"
@@ -1585,6 +1587,92 @@ describe("Overmind routes", () => {
     });
 
     expect(overmindService.getParentSessionForWorkflow(workflow.id)).toBe("AGJ-51");
+  });
+
+  describe("POST /api/overmind/parent-session", () => {
+    it("upserts the dynamic coordinator name onto the project resolved by app_path and bumps updated_at", async () => {
+      const appPath = tempProjectPath();
+      overmindService.createProject({
+        slug: "helm",
+        app_path: appPath,
+        parent_session: "x-02_projcore_grok45_helm",
+        notes: null
+      });
+      const before = overmindService.getProjectBySlug("helm")!;
+
+      const res = await lifecyclePost("/api/overmind/parent-session", {
+        token: OVERMIND_TOKEN,
+        parent_session: "x-06_projcore_grok45_helm",
+        app_path: appPath,
+        reported_by: "[north] north-main"
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({
+        ok: true,
+        matched_by: "app_path",
+        project: { slug: "helm", parent_session: "x-06_projcore_grok45_helm" }
+      });
+      const after = overmindService.getProjectBySlug("helm")!;
+      expect(after.parent_session).toBe("x-06_projcore_grok45_helm");
+      expect(new Date(after.updated_at).getTime()).toBeGreaterThanOrEqual(new Date(before.updated_at).getTime());
+      expect(streamBroadcast).toHaveBeenCalled();
+    });
+
+    it("falls back to the trailing project slug when app_path is omitted", async () => {
+      overmindService.createProject({
+        slug: "helm",
+        app_path: tempProjectPath(),
+        parent_session: "x-02_projcore_grok45_helm",
+        notes: null
+      });
+
+      const res = await lifecyclePost("/api/overmind/parent-session", {
+        token: OVERMIND_TOKEN,
+        parent_session: "x-07_projcore_opus_helm"
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().matched_by).toBe("session_slug");
+      expect(overmindService.getProjectBySlug("helm")!.parent_session).toBe("x-07_projcore_opus_helm");
+    });
+
+    it("rejects a parent_session that does not match the projcore convention (fail-closed 400)", async () => {
+      overmindService.createProject({
+        slug: "helm",
+        app_path: tempProjectPath(),
+        parent_session: "x-02_projcore_grok45_helm",
+        notes: null
+      });
+
+      const res = await lifecyclePost("/api/overmind/parent-session", {
+        token: OVERMIND_TOKEN,
+        parent_session: "x-06_lead_grok45_helm"
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().code).toBe("invalid-parent-session-format");
+      expect(overmindService.getProjectBySlug("helm")!.parent_session).toBe("x-02_projcore_grok45_helm");
+    });
+
+    it("404s without creating a project when nothing resolves", async () => {
+      const res = await lifecyclePost("/api/overmind/parent-session", {
+        token: OVERMIND_TOKEN,
+        parent_session: "x-06_projcore_grok45_ghost",
+        app_path: "/tmp/does-not-map-to-any-project"
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.json().code).toBe("no-project-for-parent-session");
+      expect(overmindService.getProjectBySlug("ghost")).toBeNull();
+    });
+
+    it("requires the overmind token", async () => {
+      const res = await lifecyclePost("/api/overmind/parent-session", {
+        parent_session: "x-06_projcore_grok45_helm"
+      });
+      expect(res.statusCode).toBe(401);
+    });
   });
 
   it("rejects lifecycle requests with missing or invalid token and non-loopback source", async () => {

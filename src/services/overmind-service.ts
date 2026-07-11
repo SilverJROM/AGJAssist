@@ -233,6 +233,44 @@ export class OvermindService {
     return row ? this.mapProjectRow(row) : null;
   }
 
+  /**
+   * Report the live projcore coordinator (parent) session for a project and
+   * persist it onto the project row so the Projects panel's PARENT_SESSION +
+   * UPDATED_AT reflect the current coordinator instead of a stale hardcoded name.
+   *
+   * Resolution chain (never silently creates a project):
+   *   1. by canonical app_path when provided (unique primary key);
+   *   2. fall back to matching the trailing `_<project>` slug of the session name.
+   * Returns matched_by=null with project=null when nothing resolves (caller 404s).
+   */
+  async reportParentSession(input: {
+    parent_session: string;
+    app_path?: string | null;
+  }): Promise<{ project: OvermindProject | null; matched_by: "app_path" | "session_slug" | null }> {
+    const projects = this.listProjects();
+
+    if (input.app_path && input.app_path.trim()) {
+      const target = await this.canonicalizeRunDir(input.app_path.trim());
+      for (const project of projects) {
+        if ((await this.canonicalizeRunDir(project.app_path)) === target) {
+          const updated = this.updateProjectBySlug(project.slug, { parent_session: input.parent_session });
+          return { project: updated, matched_by: "app_path" };
+        }
+      }
+    }
+
+    // Fallback: the trailing `_<project>` segment of x-<NN>_projcore_<model>_<project>.
+    const parts = input.parent_session.split("_");
+    const trailingSlug = parts[parts.length - 1];
+    const bySlug = trailingSlug ? projects.find((project) => project.slug === trailingSlug) : undefined;
+    if (bySlug) {
+      const updated = this.updateProjectBySlug(bySlug.slug, { parent_session: input.parent_session });
+      return { project: updated, matched_by: "session_slug" };
+    }
+
+    return { project: null, matched_by: null };
+  }
+
   deleteProjectBySlug(slug: string): boolean {
     const project = this.getProjectBySlug(slug);
     if (!project) return false;

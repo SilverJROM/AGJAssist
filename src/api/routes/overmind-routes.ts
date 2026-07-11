@@ -51,6 +51,13 @@ interface ProjectParams {
   slug: string;
 }
 
+interface ReportParentSessionBody extends TokenBody {
+  parent_session?: string;
+  app_path?: string | null;
+  reported_by?: string;
+  run_id?: string | number | null;
+}
+
 interface SendBody {
   message?: string;
 }
@@ -140,6 +147,10 @@ interface DiscoveryEndpoint {
 }
 
 const SESSION_NAME_RE = /^[A-Za-z0-9._-]{1,80}$/;
+// Fail-closed guard: a reported parent session must be a live projcore
+// coordinator name in the x-<NN>_projcore_<model>_<project> convention (north
+// spawns these dynamically per run). Anything else is rejected, never stored.
+const PARENT_SESSION_CONVENTION_RE = /^x-[0-9]{2}_projcore_/;
 const PROJECT_MUTATION_FORBIDDEN = {
   error: "projects are JROM-managed; ask JROM to create via dashboard"
 };
@@ -543,6 +554,41 @@ function discoveryEndpoints(): DiscoveryEndpoint[] {
       }
     },
     {
+      name: "parent-session",
+      method: "POST",
+      path: "/api/overmind/parent-session",
+      auth: "loopback + overmind token in body.token or x-overmind-token",
+      required: ["parent_session", "token"],
+      forbidden: [],
+      input_schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["parent_session", "token"],
+        properties: {
+          parent_session: {
+            type: "string",
+            pattern: PARENT_SESSION_CONVENTION_RE.source,
+            description: "Live projcore coordinator session, x-<NN>_projcore_<model>_<project>."
+          },
+          app_path: {
+            type: "string",
+            minLength: 1,
+            description: "Project app_path (recommended primary key). Omit to resolve by the session's trailing project slug."
+          },
+          reported_by: { type: "string", description: "Caller identity, e.g. '[north] <session>'." },
+          run_id: { type: ["string", "integer", "null"], description: "Optional run correlation id." },
+          token: { type: "string", minLength: 1 }
+        }
+      },
+      notes: "Reports the dynamic coordinator name at projcore-spawn (and on respawn/seat-swap) so the panel PARENT_SESSION + UPDATED_AT stay live. Idempotent upsert; resolves by app_path then trailing project slug; unresolvable → 404, never creates a project.",
+      example: {
+        parent_session: "x-06_projcore_grok45_helm",
+        app_path: "/home/agjrom/TGBOTS/Helm",
+        reported_by: "[north] north-main",
+        token: "<overmind token>"
+      }
+    },
+    {
       name: "complete",
       method: "POST",
       path: "/api/overmind/complete",
@@ -773,6 +819,95 @@ export function registerOvermindRoutes(
       }
 
       return { project: withProjectReadMetadata(project) };
+    }
+  );
+
+  // north reports the DYNAMIC projcore coordinator name at spawn time (and again
+  // on respawn/seat-swap) so the panel's PARENT_SESSION + UPDATED_AT track the
+  // live coordinator instead of a stale hardcoded value. Idempotent upsert onto
+  // the resolved project; never creates a project (unresolvable → 404).
+  app.post<{ Body: ReportParentSessionBody }>(
+    "/api/overmind/parent-session",
+    async (request, reply) => {
+      if (!requireLoopbackAndToken(request, reply, config.overmind.token)) return;
+
+      const parentSession = typeof request.body?.parent_session === "string"
+        ? request.body.parent_session.trim()
+        : "";
+      const appPath = typeof request.body?.app_path === "string"
+        ? request.body.app_path.trim()
+        : "";
+      const reportedBy = typeof request.body?.reported_by === "string"
+        ? request.body.reported_by.trim()
+        : "";
+
+      if (!parentSession) {
+        return sendAgentClientError(
+          reply,
+          400,
+          "missing-parent-session",
+          "'parent_session' is required.",
+          "Send parent_session as the live coordinator name in the x-<NN>_projcore_<model>_<project> convention.",
+          {},
+          "'parent_session' is required"
+        );
+      }
+      if (!PARENT_SESSION_CONVENTION_RE.test(parentSession)) {
+        return sendAgentClientError(
+          reply,
+          400,
+          "invalid-parent-session-format",
+          `parent_session '${parentSession}' does not match the projcore coordinator convention.`,
+          "Value must start with x-<NN>_projcore_ (e.g. x-06_projcore_grok45_helm).",
+          { pattern: PARENT_SESSION_CONVENTION_RE.source },
+          `parent_session '${parentSession}' does not match the projcore coordinator convention`
+        );
+      }
+      if (!SESSION_NAME_RE.test(parentSession)) {
+        return sendInvalidSessionName(reply, "parent_session", parentSession);
+      }
+      if (appPath && !path.isAbsolute(appPath)) {
+        return sendAgentClientError(
+          reply,
+          400,
+          "invalid-app-path",
+          `'app_path' must be an absolute path. Got: '${appPath}'.`,
+          "Send the project's canonical absolute app_path, or omit it to resolve by the session's trailing project slug.",
+          {},
+          `'app_path' must be an absolute path. Got: '${appPath}'`
+        );
+      }
+
+      const result = await overmindService.reportParentSession({
+        parent_session: parentSession,
+        app_path: appPath || null
+      });
+
+      if (!result.project) {
+        const validProjects = liveDiscoveryProjects(overmindService);
+        return reply.code(404).send({
+          ok: false,
+          error: "no-project-for-parent-session",
+          code: "no-project-for-parent-session",
+          message: appPath
+            ? `No registered overmind project matches app_path '${appPath}' or the trailing project slug of '${parentSession}'.`
+            : `No registered overmind project matches the trailing project slug of '${parentSession}'.`,
+          hint: "Provide the project's app_path, or ensure the session's trailing _<project> slug matches a registered project slug. This endpoint never creates projects.",
+          validProjects
+        });
+      }
+
+      console.info(
+        `[overmind] parent-session reported: project='${result.project.slug}' parent_session='${parentSession}' matched_by=${result.matched_by} reported_by='${reportedBy || "unknown"}'`
+      );
+
+      streamManager?.broadcast();
+
+      return reply.code(200).send({
+        ok: true,
+        matched_by: result.matched_by,
+        project: withProjectReadMetadata(result.project)
+      });
     }
   );
 
