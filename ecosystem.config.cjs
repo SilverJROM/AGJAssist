@@ -8,7 +8,7 @@ module.exports = {
       env: {
         NODE_ENV: "production"
       },
-      max_memory_restart: "256M",
+      max_memory_restart: "2048M",
       restart_delay: 3000,
       max_restarts: 10
     }
