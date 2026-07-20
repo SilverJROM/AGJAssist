@@ -6,6 +6,12 @@ import { decideHelmLoginVerdict, type HelmLoginVerdict } from "./helm-login-verd
 type SendMessageOptions = Parameters<TelegramBot["sendMessage"]>[2];
 type AnswerCallbackOptions = Partial<TelegramBot.AnswerCallbackQueryOptions>;
 
+export interface TelegramAssistantOptions {
+  updateMode: "webhook" | "polling";
+  webhookUrl?: string | null;
+  webhookSecretToken?: string;
+}
+
 export interface HelmChallengeMessageInput {
   chatId: number;
   prompt: string;
@@ -28,14 +34,27 @@ export class TelegramAssistant {
   private pollingRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly pollingRetryMs = 30_000;
 
-  constructor(botToken: string, private readonly core: AssistantCore) {
+  constructor(
+    botToken: string,
+    private readonly core: AssistantCore,
+    private readonly options: TelegramAssistantOptions = { updateMode: "polling" }
+  ) {
     this.bot = new TelegramBot(botToken, { polling: false });
   }
 
   async start(): Promise<void> {
     await this.configureCommands();
     this.registerHandlers();
+    if (this.options.updateMode === "webhook") {
+      await this.startWebhook();
+      return;
+    }
+
     await this.startPollingSafely();
+  }
+
+  processUpdate(update: TelegramBot.Update): void {
+    this.bot.processUpdate(update);
   }
 
   async sendMessage(chatId: number | string, text: string): Promise<void> {
@@ -232,12 +251,28 @@ export class TelegramAssistant {
 
   private async startPollingSafely(): Promise<void> {
     try {
+      await this.bot.deleteWebHook();
       await this.bot.startPolling();
     } catch (error) {
       console.error("Telegram startPolling failed; API/dashboard/Overmind remain online:", error);
       this.schedulePollingRetry();
       throw error;
     }
+  }
+
+  private async startWebhook(): Promise<void> {
+    if (!this.options.webhookUrl) {
+      throw new Error("Telegram webhook mode requires TELEGRAM_WEBHOOK_URL or WEB_APP_URL");
+    }
+
+    const options: TelegramBot.SetWebHookOptions = {
+      allowed_updates: ["message", "callback_query"]
+    };
+    if (this.options.webhookSecretToken) {
+      options.secret_token = this.options.webhookSecretToken;
+    }
+
+    await this.bot.setWebHook(this.options.webhookUrl, options);
   }
 
   private schedulePollingRetry(): void {

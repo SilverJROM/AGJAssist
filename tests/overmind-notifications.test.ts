@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildBlockedNotification,
   buildDoneNotification,
+  buildGuardianEscalationNotification,
   buildNeedsInputNotification
 } from "../src/services/overmind-notifications.js";
 
@@ -70,5 +71,34 @@ describe("overmind notification formatting", () => {
     expect(message).toContain("Question:");
     expect(message).toContain("Why you:");
     expect(message).toContain("If unanswered:");
+  });
+
+  it("builds verdict-led guardian escalation messages for BLOCKED", () => {
+    const message = buildGuardianEscalationNotification({
+      runId: "app-fixes-v2",
+      severity: "BLOCKED",
+      title: "coordinator session died",
+      lines: ["session: rs-grok", "agent: grok45", "batch: B24c"],
+      action: "restart rs-grok and reseed projcore from context-handoff.md"
+    });
+
+    expect(message).toContain("🛑 BLOCKED · AGJAssist · guardian");
+    expect(message).toContain("⛔ coordinator session died");
+    expect(message).toContain("Run: app-fixes-v2");
+    expect(message).toContain("session: rs-grok");
+    expect(message).toContain("Need from you: restart rs-grok and reseed projcore from context-handoff.md");
+  });
+
+  it("builds verdict-led guardian escalation messages for URGENT", () => {
+    const message = buildGuardianEscalationNotification({
+      runId: "app-fixes-v2",
+      severity: "URGENT",
+      title: "ambiguous scope decision",
+      lines: ["batch: B25"],
+      action: "confirm whether to include the migration"
+    });
+
+    expect(message).toContain("🚨 URGENT · AGJAssist · guardian");
+    expect(message).toContain("❓ ambiguous scope decision");
   });
 });

@@ -10,7 +10,7 @@ AGJAssist is a Telegram bot + web dashboard for development project management, 
 
 - **Backend**: TypeScript, Fastify, better-sqlite3
 - **Frontend**: Preact + htm (no JSX, no build step), hash-based routing
-- **Bot**: Telegram Bot API (polling mode)
+- **Bot**: Telegram Bot API (webhook mode when `WEB_APP_URL`/`TELEGRAM_WEBHOOK_URL` is configured; polling fallback for local-only setups)
 - **Port**: 3101
 - **Deploy**: `npx tsc` -> copy static files -> `pm2 restart agjassist`
 
@@ -51,6 +51,7 @@ AGJAssist is a Telegram bot + web dashboard for development project management, 
 
 ## API Routes
 
+- `/api/telegram/webhook` - Telegram Bot API webhook receiver protected by `X-Telegram-Bot-Api-Secret-Token`
 - `/api/auth/*` - Authentication (Telegram, code-based, 2FA)
 - `/api/projects/*` - Project CRUD and file management
 - `/api/tmux/*` - Terminal session management

@@ -64,6 +64,28 @@ export function buildNeedsInputNotification(input: UnresolvedNotificationInput):
   ].join("\n");
 }
 
+export interface GuardianEscalationInput {
+  runId: string;
+  severity: "BLOCKED" | "URGENT";
+  title: string;
+  lines: string[];
+  action: string;
+}
+
+export function buildGuardianEscalationNotification(input: GuardianEscalationInput): string {
+  const emoji = input.severity === "BLOCKED" ? "🛑" : "🚨";
+  const verdictGlyph = input.severity === "BLOCKED" ? "⛔" : "❓";
+  return [
+    `${emoji} ${input.severity} · ${OVERMIND_PROJECT} · guardian`,
+    "",
+    `${verdictGlyph} ${compactLine(input.title)}`,
+    `Run: ${input.runId}`,
+    ...input.lines.map((line) => compactLine(line)),
+    "",
+    `Need from you: ${compactLine(input.action)}`
+  ].join("\n");
+}
+
 export function buildParentOrphanedNotification(input: ParentOrphanedNotificationInput): string {
   const name = workflowDisplayName(input.workflow);
   return [

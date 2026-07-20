@@ -1,4 +1,5 @@
 import path from "node:path";
+import crypto from "node:crypto";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -25,6 +26,13 @@ function optionalNumber(name: string, fallback: number): number {
   return parsed;
 }
 
+function optionalEnum<T extends string>(name: string, allowed: readonly T[], fallback: T): T {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  if (allowed.includes(raw as T)) return raw as T;
+  throw new Error(`Invalid env var: ${name}`);
+}
+
 function parseBool(value: string): boolean {
   return value.trim().toLowerCase() === "true";
 }
@@ -42,6 +50,10 @@ export interface AppConfig {
     authorizedUserId: number;
     authorizedChatIds: number[];
     testMode: boolean;
+    updateMode: "webhook" | "polling";
+    webhookUrl: string | null;
+    webhookPath: string;
+    webhookSecretToken: string;
   };
   runtime: {
     workspaceRoot: string;
@@ -72,6 +84,7 @@ export interface AppConfig {
 }
 
 export function loadConfig(): AppConfig {
+  const botToken = required("BOT_TOKEN");
   const authorizedUserId = Number(required("AUTHORIZED_USER_ID"));
   if (Number.isNaN(authorizedUserId)) {
     throw new Error("AUTHORIZED_USER_ID must be numeric");
@@ -90,13 +103,27 @@ export function loadConfig(): AppConfig {
   }
 
   const workspaceRoot = optional("WORKSPACE_ROOT", "/home/agjrom");
+  const webAppUrl = optional("WEB_APP_URL", "").replace(/\/+$/, "");
+  const webhookPath = optional("TELEGRAM_WEBHOOK_PATH", "/api/telegram/webhook");
+  const explicitWebhookUrl = optional("TELEGRAM_WEBHOOK_URL", "");
+  const webhookUrl = explicitWebhookUrl || (webAppUrl ? `${webAppUrl}${webhookPath}` : "");
+  const defaultUpdateMode = webhookUrl ? "webhook" : "polling";
+  const updateMode = optionalEnum("TELEGRAM_UPDATE_MODE", ["webhook", "polling"] as const, defaultUpdateMode);
+  const defaultWebhookSecret = crypto
+    .createHash("sha256")
+    .update(`agjassist:${botToken}`)
+    .digest("hex");
 
   return {
     telegram: {
-      botToken: required("BOT_TOKEN"),
+      botToken,
       authorizedUserId,
       authorizedChatIds,
-      testMode: parseBool(optional("TEST_MODE", "false"))
+      testMode: parseBool(optional("TEST_MODE", "false")),
+      updateMode,
+      webhookUrl: webhookUrl || null,
+      webhookPath,
+      webhookSecretToken: optional("TELEGRAM_WEBHOOK_SECRET", defaultWebhookSecret)
     },
     runtime: {
       workspaceRoot: path.resolve(workspaceRoot),

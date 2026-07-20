@@ -4,7 +4,10 @@ const telegramMock = vi.hoisted(() => ({
   setMyCommands: vi.fn(async () => undefined),
   setChatMenuButton: vi.fn(async () => undefined),
   on: vi.fn(),
+  deleteWebHook: vi.fn(async () => true),
+  setWebHook: vi.fn(async () => true),
   startPolling: vi.fn(async () => undefined),
+  processUpdate: vi.fn(),
   sendMessage: vi.fn(async () => undefined),
   editMessageText: vi.fn(async () => undefined),
   answerCallbackQuery: vi.fn(async () => undefined)

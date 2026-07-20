@@ -70,16 +70,17 @@ export function installTelegramProcessGuards(logger: Logger = console): void {
 
 export async function startTelegramNonFatal(
   telegramAssistant: TelegramStarter | null,
-  logger: Logger = console
+  logger: Logger = console,
+  updateMode: "webhook" | "polling" = "polling"
 ): Promise<boolean> {
   if (!telegramAssistant) {
-    logger.log("AGJAssist booted in TEST_MODE=true (Telegram polling not started)");
+    logger.log("AGJAssist booted in TEST_MODE=true (Telegram bot not started)");
     return false;
   }
 
   try {
     await telegramAssistant.start();
-    logger.log("AGJAssist Telegram bot started");
+    logger.log(`AGJAssist Telegram bot started (${updateMode})`);
     return true;
   } catch (error) {
     logger.error(

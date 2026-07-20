@@ -344,6 +344,12 @@ function formatSparkTime(value) {
 function renderSparkHealthTile(workflow) {
   if (!isActiveStatus(workflow.status)) return null;
   const health = normalizeSparkHealth(workflow);
+  // Spark watchdog tile renders ONLY when the daemon is live (it stamps a real
+  // last_classification each tick). When spark is disabled/dead the backend returns
+  // a null classification (active-run fallback), so hide the tile entirely — no
+  // ghost "Spark watchdog: HEALTHY" indicator while spark is off. Re-enabling the
+  // daemon restores live classifications and the tile returns automatically.
+  if (health.lastClassification == null) return null;
   const colorClass = sparkHealthColorClass(health.state);
   const ambiguousLabel = health.minutesSinceAmbiguous == null ? '—' : `${health.minutesSinceAmbiguous}m`;
   return html`

@@ -98,7 +98,11 @@ async function main(): Promise<void> {
   core.setOvmSessionService(ovmSessionService);
   const telegramAssistant = config.telegram.testMode
     ? null
-    : new TelegramAssistant(config.telegram.botToken, core);
+    : new TelegramAssistant(config.telegram.botToken, core, {
+      updateMode: config.telegram.updateMode,
+      webhookUrl: config.telegram.webhookUrl,
+      webhookSecretToken: config.telegram.webhookSecretToken
+    });
   const overmindNotify = async (text: string): Promise<void> => {
     if (!telegramAssistant) return;
     await telegramAssistant.sendMessage(config.telegram.authorizedUserId, text);
@@ -261,7 +265,7 @@ async function main(): Promise<void> {
     }
   }, 60_000);
 
-  await startTelegramNonFatal(telegramAssistant);
+  await startTelegramNonFatal(telegramAssistant, console, config.telegram.updateMode);
 }
 
 main().catch((error) => {
