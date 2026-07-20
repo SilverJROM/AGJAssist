@@ -5,3 +5,20 @@ tmp/
 *.db
 *.sqlite
 .env
+
+# OVM runtime state + logs — never track (OVM writes these; WK_0712 removes the writers).
+# Unscoped names match at any depth (covers root + nested run dirs).
+.overmind-state.json
+/progress.md
+/plan/overmind/audit/cron.log
+/plan/overmind/audit/audit-state.json
+/plan/overmind/audit/panes/
+
+# build backups + test output
+dist.bak-*/
+test-results/
+
+# local machine config + reboot marker (not shared repo content)
+.claude/settings.local.json
+.claude/*.lock
+.reboot-ready-*
