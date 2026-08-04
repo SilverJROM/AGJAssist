@@ -6,13 +6,14 @@ import { helmLoginChallengeStore } from "../src/bot/helm-login-store.js";
 import type { TelegramAssistant } from "../src/bot/telegram-bot.js";
 
 const OWNER_CHAT_ID = 1000000001;
+const SECOND_PERMITTED_CHAT_ID = 6180223491;
 
 function testConfig(): AppConfig {
   return {
     telegram: {
       botToken: "test-token",
       authorizedUserId: OWNER_CHAT_ID,
-      authorizedChatIds: [OWNER_CHAT_ID],
+      authorizedChatIds: [OWNER_CHAT_ID, SECOND_PERMITTED_CHAT_ID],
       testMode: true
     },
     runtime: {
@@ -89,7 +90,7 @@ describe("Telegram login challenge route", () => {
     expect(telegramAssistant.sendHelmChallenge).not.toHaveBeenCalled();
   });
 
-  it("rejects non-owner chat IDs without sending Telegram", async () => {
+  it("rejects chat IDs outside the permitted-target allowlist without sending Telegram", async () => {
     const response = await app.inject({
       method: "POST",
       url: "/api/tg/login-challenge",
@@ -100,6 +101,21 @@ describe("Telegram login challenge route", () => {
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ ok: false, error: "invalid_chat_id" });
     expect(telegramAssistant.sendHelmChallenge).not.toHaveBeenCalled();
+  });
+
+  it("accepts a challenge for any chat ID present in the permitted-target allowlist, not only the primary owner", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/tg/login-challenge",
+      remoteAddress: "127.0.0.1",
+      payload: validPayload({ challengeId: "challenge-second-user", chatId: SECOND_PERMITTED_CHAT_ID })
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+    expect(telegramAssistant.sendHelmChallenge).toHaveBeenCalledWith(
+      expect.objectContaining({ chatId: SECOND_PERMITTED_CHAT_ID })
+    );
   });
 
   it("rejects malformed button and display-number payloads", async () => {

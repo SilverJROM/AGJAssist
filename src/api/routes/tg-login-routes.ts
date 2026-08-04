@@ -36,6 +36,10 @@ function isTwoDigitInteger(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 10 && Number(value) <= 99;
 }
 
+function isPermittedChatId(value: unknown, permitted: readonly number[]): value is number {
+  return typeof value === "number" && permitted.includes(value);
+}
+
 function isLoopbackHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -70,7 +74,8 @@ export function registerTgLoginRoutes(
         return;
       }
 
-      if (body.chatId !== config.telegram.authorizedUserId) {
+      const permittedChatIds = config.telegram.authorizedChatIds || [config.telegram.authorizedUserId];
+      if (!isPermittedChatId(body.chatId, permittedChatIds)) {
         validationError(reply, "invalid_chat_id");
         return;
       }
