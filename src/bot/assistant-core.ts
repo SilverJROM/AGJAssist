@@ -7,6 +7,7 @@ import { NoteService } from "../services/note-service.js";
 import { AuthService } from "../auth/auth-service.js";
 import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "../services/overmind-service.js";
 import type { OvmSessionManager } from "../services/ovm-session.js";
+import { lokalaiLinkCodeStore } from "./lokalai-link-code-store.js";
 
 const WEBSITES_ROOT = "/home/agjrom/websites";
 const OVERMIND_ACTIVE_STATUSES: OvermindWorkflowStatus[] = [
@@ -121,6 +122,7 @@ export class AssistantCore {
           "/note <text> - create a quick note in Notes folder",
           "/notes - list recent notes from Notes folder",
           "/weblogin - generate a login code for the web app",
+          "/lokalai_link - generate a one-time code to link this Telegram account to lokalAI",
           "/app - open the web app",
           "/timeout [minutes] - show or set command timeout (default 60)",
           "/overmind - show active Overmind workflows",
@@ -267,6 +269,12 @@ export class AssistantCore {
         const hours = validHours.includes(hoursArg) ? hoursArg : 4;
         const code = this.authService.generateLoginCode(this.config.telegram.authorizedUserId, hours);
         return `Login code: ${code}\nValid for: ${hours}h session\nExpires in 5 minutes.\n\nUsage: /weblogin [2|4|8|16]`;
+      }
+
+      case "/lokalai_link": {
+        if (!userId) return "Unable to determine your Telegram id.";
+        const code = lokalaiLinkCodeStore.issue(userId);
+        return `lokalAI link code: ${code}\nEnter this in lokalAI while signed in, within 5 minutes, to link this Telegram account.\nThis code is single-use.`;
       }
 
       case "/app":

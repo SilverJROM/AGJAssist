@@ -48,6 +48,7 @@ import { registerAppSettingsRoutes } from "./routes/app-settings-routes.js";
 import type { NudgeStateService } from "../services/nudge-state-service.js";
 import type { TelegramAssistant } from "../bot/telegram-bot.js";
 import { registerTgLoginRoutes } from "./routes/tg-login-routes.js";
+import { registerLokalaiLinkRoutes } from "./routes/lokalai-link-routes.js";
 import { registerTelegramWebhookRoutes } from "./routes/telegram-webhook-routes.js";
 import { registerGuardianRoutes } from "./routes/guardian-routes.js";
 
@@ -118,6 +119,7 @@ export async function createApiServer(
 
   // Register route groups
   registerTgLoginRoutes(app, config, services.telegramAssistant);
+  registerLokalaiLinkRoutes(app);
   registerTelegramWebhookRoutes(app, config, services.telegramAssistant);
   registerAuthRoutes(app, services.authService);
   registerProjectRoutes(app, services.authService, services.projectService, services.auditService);
