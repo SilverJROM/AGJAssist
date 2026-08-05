@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { AppConfig } from "../../config/config.js";
 import { lokalaiLinkCodeStore } from "../../bot/lokalai-link-code-store.js";
 
 interface ConsumeLinkCodeBody {
@@ -23,7 +24,7 @@ function requireLoopback(request: FastifyRequest, reply: FastifyReply, done: () 
   done();
 }
 
-export function registerLokalaiLinkRoutes(app: FastifyInstance): void {
+export function registerLokalaiLinkRoutes(app: FastifyInstance, config: AppConfig): void {
   app.post(
     "/api/lokalai/link-codes/consume",
     { preHandler: requireLoopback },
@@ -39,6 +40,17 @@ export function registerLokalaiLinkRoutes(app: FastifyInstance): void {
       if (!result.ok) {
         const status = result.reason === "expired" ? 410 : 404;
         reply.code(status).send({ ok: false, error: result.reason === "expired" ? "code_expired" : "code_not_found" });
+        return;
+      }
+
+      // Re-check the permitted-target allowlist at consume time, not just at issue
+      // time: a code outlives a single request, so a target removed from the
+      // allowlist between issue and consume must not still resolve. Opaque
+      // code_not_found (identical to an unknown code) so the response cannot be
+      // used to learn that a valid code exists for a non-permitted target.
+      const permittedChatIds = config.telegram.authorizedChatIds || [config.telegram.authorizedUserId];
+      if (!permittedChatIds.includes(result.telegramUserId)) {
+        reply.code(404).send({ ok: false, error: "code_not_found" });
         return;
       }
 

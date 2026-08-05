@@ -2,8 +2,51 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Fastify, { type FastifyInstance } from "fastify";
 import { LOKALAI_LINK_CODE_TTL_MS, lokalaiLinkCodeStore } from "../src/bot/lokalai-link-code-store.js";
 import { registerLokalaiLinkRoutes } from "../src/api/routes/lokalai-link-routes.js";
+import type { AppConfig } from "../src/config/config.js";
 
 const TELEGRAM_USER_ID = 1000000001;
+const REVOKED_TELEGRAM_USER_ID = 60000001;
+
+function testConfig(authorizedChatIds: number[] = [TELEGRAM_USER_ID]): AppConfig {
+  return {
+    telegram: {
+      botToken: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+      authorizedUserId: authorizedChatIds[0] ?? TELEGRAM_USER_ID,
+      authorizedChatIds,
+      testMode: true,
+      updateMode: "polling",
+      webhookUrl: null,
+      webhookPath: "/api/telegram/webhook",
+      webhookSecretToken: "test-secret"
+    },
+    runtime: {
+      workspaceRoot: "/tmp",
+      allowedCommandPrefixes: [],
+      maxToolIterations: 1,
+      defaultTimeoutMinutes: 1
+    },
+    api: {
+      port: 0,
+      host: "127.0.0.1",
+      jwtSecret: "test-secret",
+      sessionExpiryHours: 24
+    },
+    db: {
+      path: "data/test-lokalai-link.sqlite"
+    },
+    projects: {
+      root: "/tmp"
+    },
+    tmux: {
+      historyRetentionDays: 7,
+      outputBufferLines: 5000,
+      streamIntervalMs: 100
+    },
+    overmind: {
+      token: "ovm-test-token"
+    }
+  };
+}
 
 describe("lokalai link code store", () => {
   beforeEach(() => {
@@ -53,7 +96,7 @@ describe("POST /api/lokalai/link-codes/consume", () => {
   beforeEach(async () => {
     lokalaiLinkCodeStore.clear();
     app = Fastify({ logger: false });
-    registerLokalaiLinkRoutes(app);
+    registerLokalaiLinkRoutes(app, testConfig());
     await app.ready();
   });
 
@@ -147,5 +190,25 @@ describe("POST /api/lokalai/link-codes/consume", () => {
     });
     expect(replay.statusCode).toBe(404);
     expect(replay.json()).toEqual({ ok: false, error: "code_not_found" });
+  });
+
+  it("opaquely rejects a valid code whose bound id has left the permitted-target allowlist", async () => {
+    // Re-check at consume time, not just at issue time: a target removed from
+    // the allowlist between issue and consume must not still resolve, and the
+    // response must be indistinguishable from an unknown code (no leak that a
+    // valid code existed for a non-permitted target).
+    const code = lokalaiLinkCodeStore.issue(REVOKED_TELEGRAM_USER_ID);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/lokalai/link-codes/consume",
+      remoteAddress: "127.0.0.1",
+      payload: { code }
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ ok: false, error: "code_not_found" });
+    // Still atomically retired even though the request was refused.
+    expect(lokalaiLinkCodeStore.consume(code)).toEqual({ ok: false, reason: "missing" });
   });
 });

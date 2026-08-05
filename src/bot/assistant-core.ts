@@ -273,6 +273,10 @@ export class AssistantCore {
 
       case "/lokalai_link": {
         if (!userId) return "Unable to determine your Telegram id.";
+        // Re-check the permitted-target allowlist here too, rather than trusting
+        // the caller's upstream isAuthorized() gate alone — this is the only
+        // place that actually mints a code for a Telegram id.
+        if (!this.isAuthorized(userId)) return "Unauthorized access.";
         const code = lokalaiLinkCodeStore.issue(userId);
         return `lokalAI link code: ${code}\nEnter this in lokalAI while signed in, within 5 minutes, to link this Telegram account.\nThis code is single-use.`;
       }

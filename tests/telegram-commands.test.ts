@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 const telegramMock = vi.hoisted(() => ({
   setMyCommands: vi.fn(async () => undefined),
@@ -19,6 +19,8 @@ vi.mock("node-telegram-bot-api", () => ({
 
 import { TelegramAssistant } from "../src/bot/telegram-bot.js";
 import { AssistantCore } from "../src/bot/assistant-core.js";
+import type { AppConfig } from "../src/config/config.js";
+import { lokalaiLinkCodeStore } from "../src/bot/lokalai-link-code-store.js";
 
 describe("Telegram command menu", () => {
   beforeEach(() => {
@@ -120,5 +122,71 @@ describe("Telegram command menu", () => {
 
     expect(core.handleCommand).not.toHaveBeenCalled();
     expect(telegramMock.sendMessage).toHaveBeenCalledWith(99999, "Unauthorized access.", undefined);
+  });
+});
+
+describe("AssistantCore /lokalai_link re-checks the permitted-target allowlist", () => {
+  const AUTHORIZED_ID = 1000000001;
+  const REVOKED_ID = 60000001;
+
+  function testConfig(authorizedChatIds: number[]): AppConfig {
+    return {
+      telegram: {
+        botToken: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+        authorizedUserId: authorizedChatIds[0] ?? AUTHORIZED_ID,
+        authorizedChatIds,
+        testMode: true,
+        updateMode: "polling",
+        webhookUrl: null,
+        webhookPath: "/api/telegram/webhook",
+        webhookSecretToken: "test-secret"
+      },
+      runtime: {
+        workspaceRoot: "/tmp",
+        allowedCommandPrefixes: [],
+        maxToolIterations: 1,
+        defaultTimeoutMinutes: 1
+      },
+      api: {
+        port: 0,
+        host: "127.0.0.1",
+        jwtSecret: "test-secret",
+        sessionExpiryHours: 24
+      },
+      db: {
+        path: "data/test-lokalai-link-core.sqlite"
+      },
+      projects: {
+        root: "/tmp"
+      },
+      tmux: {
+        historyRetentionDays: 7,
+        outputBufferLines: 5000,
+        streamIntervalMs: 100
+      },
+      overmind: {
+        token: "ovm-test-token"
+      }
+    };
+  }
+
+  afterEach(() => {
+    lokalaiLinkCodeStore.clear();
+  });
+
+  it("issues a code for a Telegram id on the permitted-target allowlist", async () => {
+    const core = new AssistantCore(testConfig([AUTHORIZED_ID]), {} as any);
+
+    const response = await core.handleCommand("/lokalai_link", AUTHORIZED_ID);
+
+    expect(response).toMatch(/^lokalAI link code: /);
+  });
+
+  it("refuses to mint a code once the contacting id is no longer on the permitted-target allowlist, even if handleCommand is reached directly", async () => {
+    const core = new AssistantCore(testConfig([AUTHORIZED_ID]), {} as any);
+
+    const response = await core.handleCommand("/lokalai_link", REVOKED_ID);
+
+    expect(response).toBe("Unauthorized access.");
   });
 });

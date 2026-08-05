@@ -119,7 +119,7 @@ export async function createApiServer(
 
   // Register route groups
   registerTgLoginRoutes(app, config, services.telegramAssistant);
-  registerLokalaiLinkRoutes(app);
+  registerLokalaiLinkRoutes(app, config);
   registerTelegramWebhookRoutes(app, config, services.telegramAssistant);
   registerAuthRoutes(app, services.authService);
   registerProjectRoutes(app, services.authService, services.projectService, services.auditService);
