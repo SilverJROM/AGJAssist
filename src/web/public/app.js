@@ -65,6 +65,7 @@ function applyTerminalConvFontSize(size) {
 function writeTerminalConvFontSize(size) {
   const next = applyTerminalConvFontSize(size);
   try { localStorage.setItem(TERMINAL_CONV_FONT_STORAGE_KEY, String(next)); } catch {}
+  try { window.dispatchEvent(new CustomEvent('agj-terminal-conv-font', { detail: next })); } catch {}
   return next;
 }
 
@@ -2063,6 +2064,8 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [terminalStatus, setTerminalStatus] = useState('disconnected');
   const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
   const [friendlyRefreshTick, setFriendlyRefreshTick] = useState(0);
+  const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
+  const [showRawChrome, setShowRawChrome] = useState(false);
   const menuRef = useRef(null);
   const webAppContext = window.Telegram?.WebApp;
   const isTgMiniAppContext = isTgMiniApp || Boolean(
@@ -2131,6 +2134,24 @@ function TerminalTab({ projectId, projectName } = {}) {
     return () => document.body.classList.remove('tg-terminal-focus');
   }, [fullScreen]);
 
+  useEffect(() => {
+    const sync = () => setConvFontSize(applyTerminalConvFontSize(readTerminalConvFontSize()));
+    const onStorage = (event) => {
+      if (event.key && event.key !== TERMINAL_CONV_FONT_STORAGE_KEY) return;
+      sync();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('agj-terminal-conv-font', sync);
+    window.addEventListener('hashchange', sync);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('agj-terminal-conv-font', sync);
+      window.removeEventListener('hashchange', sync);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, []);
+
   const exitFullScreen = useCallback(() => {
     setFullScreen(false);
     const targetRoute = previousRoute && previousRoute !== '/terminals' ? previousRoute : null;
@@ -2183,6 +2204,10 @@ function TerminalTab({ projectId, projectName } = {}) {
     try { localStorage.setItem(TERMINAL_FONT_STORAGE_KEY, String(clamped)); } catch {}
   }
 
+  function updateConvFontSize(nextSize) {
+    setConvFontSize(writeTerminalConvFontSize(nextSize));
+  }
+
   function normalizeLineLimit(value) {
     const parsed = Number(value);
     return [25, 50, 100, 150, 200].includes(parsed) ? parsed : 25;
@@ -2197,36 +2222,123 @@ function TerminalTab({ projectId, projectName } = {}) {
     }
   }
 
+  const updatedLabel = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : '';
+  const targetSubtitle = [
+    activeTarget || '',
+    activePane?.command || '',
+    updatedLabel ? `updated ${updatedLabel}` : ''
+  ].filter(Boolean).join(' · ');
+
   const shell = html`
-    <div class=${'terminal-shell' + (fullScreen ? ' terminal-shell-fullscreen' : '')}>
+    <div class=${'terminal-shell' + (fullScreen ? ' terminal-shell-fullscreen' : '') + (friendlyMode ? ' terminal-shell-friendly' : '')}>
       <div class="terminal-shell-header" data-term-topbar>
         <div class="terminal-topbar-main">
-        ${isTgMiniAppContext && fullScreen && html`
-            <button class="btn btn-sm" onclick=${exitFullScreen}>Back</button>
+          ${isTgMiniAppContext && fullScreen && html`
+            <button class="terminal-topbar-icon-btn" onclick=${exitFullScreen} aria-label="Back">←</button>
           `}
-          <button class="btn btn-sm terminal-menu-trigger" data-term-menu data-testid="terminal-menu" onclick=${() => setMenuOpen((current) => !current)}>☰</button>
-          <strong>${friendlyMode ? 'Terminal Chat' : 'Raw Terminal'}</strong>
-          ${activePane && html`<span class="badge badge-draft">${activePane.session_name}</span>`}
-          ${activeTarget && html`<span class="badge badge-active">${activeTarget}</span>`}
-          ${hasTarget ? html`<span class=${menuStatusClass}>${terminalStatus}</span>` : ''}
-          ${lastUpdatedAt ? html`<span class="terminal-topbar-pill" data-testid="terminal-last-updated" data-terminal-last-updated>Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}</span>` : ''}
+          <button class="terminal-topbar-icon-btn terminal-menu-trigger" data-term-menu data-testid="terminal-menu"
+                  aria-label="menu" aria-expanded=${menuOpen}
+                  onclick=${() => setMenuOpen((current) => !current)}>☰</button>
+          <div class="terminal-topbar-target">
+            <div class="terminal-topbar-name">
+              <span class=${'terminal-topbar-dot' + (hasTarget && (terminalStatus === 'connected' || terminalStatus === 'running') ? ' on' : '')}></span>
+              ${activePane?.session_name || (friendlyMode ? 'Terminal Chat' : 'Raw Terminal')}
+            </div>
+            <div class="terminal-topbar-sub" data-testid="terminal-last-updated" data-terminal-last-updated>
+              ${hasTarget ? (targetSubtitle || activeTarget) : 'Select a pane'}
+            </div>
+          </div>
+          <div class="terminal-fontpill" title="Text size">
+            <button type="button" class="am" data-testid="terminal-font-decrease"
+                    onclick=${() => updateConvFontSize(convFontSize - 1)}
+                    disabled=${convFontSize <= TERMINAL_CONV_FONT_MIN}>A−</button>
+            <button type="button" class="ap" data-testid="terminal-font-increase"
+                    onclick=${() => updateConvFontSize(convFontSize + 1)}
+                    disabled=${convFontSize >= TERMINAL_CONV_FONT_MAX}>A+</button>
+          </div>
         </div>
       </div>
-      ${menuOpen ? html`
-        <div class="terminal-menu-overlay" onclick=${() => setMenuOpen(false)}></div>
-        <div class="terminal-menu-sheet" data-term-menu-sheet data-testid="terminal-menu-sheet" role="menu" ref=${menuRef} onclick=${(event) => event.stopPropagation()}>
+      ${menuOpen ? html`<div class="terminal-menu-overlay" onclick=${() => setMenuOpen(false)}></div>` : ''}
+      <div class=${'terminal-menu-sheet' + (menuOpen ? ' open' : '')} data-term-menu-sheet data-testid="terminal-menu-sheet" role="menu" ref=${menuRef} inert=${!menuOpen} onclick=${(event) => event.stopPropagation()}>
+        <div class="terminal-sheet-inner">
+          <div class="terminal-sheet-sect">Text size</div>
+          <div class="terminal-sheet-row">
+            <div class="terminal-sheet-lbl">Conversation size<small>Also in Settings ▸ Appearance (syncs everywhere)</small></div>
+            <div class="terminal-sheet-stepper">
+              <button type="button" onclick=${() => updateConvFontSize(convFontSize - 1)} disabled=${convFontSize <= TERMINAL_CONV_FONT_MIN}>A−</button>
+              <span class="val">${convFontSize}px</span>
+              <button type="button" onclick=${() => updateConvFontSize(convFontSize + 1)} disabled=${convFontSize >= TERMINAL_CONV_FONT_MAX}>A＋</button>
+            </div>
+          </div>
+          <div class="terminal-sheet-row">
+            <input type="range" min=${TERMINAL_CONV_FONT_MIN} max=${TERMINAL_CONV_FONT_MAX} step="1" value=${String(convFontSize)}
+                   onInput=${e => updateConvFontSize(Number(e.target.value))} />
+          </div>
+          <div class="terminal-sheet-row" style="margin-bottom:16px">
+            <div class="terminal-sheet-lbl">Reset to default</div>
+            <button type="button" class="terminal-sheet-chip" onclick=${() => updateConvFontSize(TERMINAL_CONV_FONT_DEFAULT)}>Reset · ${TERMINAL_CONV_FONT_DEFAULT}px</button>
+          </div>
+
+          ${hasTarget && html`
+            <div class="terminal-sheet-sect">Raw terminal size</div>
+            <div class="terminal-sheet-row" style="margin-bottom:16px">
+              <div class="terminal-font-controls" aria-label="Terminal font size controls">
+                <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(terminalFontSize - 1)} disabled=${terminalFontSize <= TERMINAL_MIN_FONT_SIZE} title="Decrease terminal font size">A-</button>
+                <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(TERMINAL_DEFAULT_FONT_SIZE)} disabled=${terminalFontSize === TERMINAL_DEFAULT_FONT_SIZE} title="Reset terminal font size">Reset</button>
+                <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(terminalFontSize + 1)} disabled=${terminalFontSize >= TERMINAL_MAX_FONT_SIZE} title="Increase terminal font size">A+</button>
+              </div>
+            </div>
+          `}
+
+          <div class="terminal-sheet-sect">Output</div>
+          <div class="terminal-sheet-row">
+            <div class="terminal-sheet-lbl">Show raw terminal output<small>Reveals stripped CLI chrome</small></div>
+            <button type="button" class=${'terminal-switch' + (showRawChrome ? ' on' : '')}
+                    data-testid="terminal-show-raw" data-show-raw role="switch" aria-checked=${showRawChrome}
+                    disabled=${!hasTarget || !friendlyMode}
+                    onclick=${() => setShowRawChrome((current) => !current)}></button>
+          </div>
+
+          <div class="terminal-sheet-sect">Session</div>
           <div class="terminal-menu-section">
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <strong>${friendlyMode ? 'Terminal Chat' : 'Raw Terminal'}</strong>
               ${activeTarget ? html`<span class="terminal-chat-detail-pill">${activeTarget}</span>` : ''}
               ${hasTarget ? html`<span class=${menuStatusClass}>${terminalStatus}</span>` : ''}
             </div>
-            ${lastUpdatedAt ? html`<span class="terminal-chat-detail-pill" data-testid="terminal-last-updated" data-terminal-last-updated>Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}</span>` : ''}
           </div>
-          <div class="terminal-menu-row">
+          <div class="terminal-sheet-picker">
+            ${sessionsError
+              ? html`<div style="color:var(--danger,#f85149);font-size:12px;flex:1">${sessionsError} <button class="btn btn-sm" onclick=${loadSessions}>Retry</button></div>`
+              : html`<select value=${activeTarget || ''} onChange=${e => setActiveTarget(e.target.value || null)}>
+                  <option value="">${allPanes.length === 0 ? 'Loading panes...' : 'Select a pane...'}</option>
+                  ${allPanes.map(p => html`
+                    <option value=${p.target}>${p.session_name} · ${p.target} · ${p.command}</option>
+                  `)}
+                </select>`
+            }
+          </div>
+          <div class="terminal-sheet-chips" style="margin-bottom:12px">
+            <button type="button" class="terminal-sheet-chip" onclick=${() => {
+              setShowNewSession(true);
+              setNewSessionName('');
+              setMenuOpen(false);
+            }}>+ New</button>
+            <button type="button" class="terminal-sheet-chip" onclick=${() => {
+              if (friendlyMode) {
+                setFriendlyRefreshTick((tick) => tick + 1);
+              }
+            }}>Refresh</button>
+            <button type="button" class="terminal-sheet-chip danger" onclick=${() => {
+              setMenuOpen(false);
+              setActiveTarget(null);
+            }}>Disconnect</button>
+          </div>
+          <div class="terminal-sheet-row">
+            <div class="terminal-sheet-lbl">Lines captured</div>
             <label class="terminal-chat-line-picker">
               <span>Lines</span>
-              <select data-testid="terminal-lines" defaultValue=${String(lineLimit)} onchange=${e => handleLineLimitChange(e.target.value)}>
+              <select data-testid="terminal-lines" value=${String(lineLimit)} onchange=${e => handleLineLimitChange(e.target.value)}>
                 <option value="25">25</option>
                 <option value="50">50</option>
                 <option value="100">100</option>
@@ -2234,45 +2346,10 @@ function TerminalTab({ projectId, projectName } = {}) {
                 <option value="200">200</option>
               </select>
             </label>
-            <button class="btn btn-sm" onclick=${() => {
-              if (friendlyMode) {
-                setFriendlyRefreshTick((tick) => tick + 1);
-              }
-            }}>Refresh</button>
-            <button class="btn btn-sm btn-danger" onclick=${() => {
-              setMenuOpen(false);
-              setActiveTarget(null);
-            }}>Disconnect</button>
           </div>
-          ${hasTarget && html`
-            <div class="terminal-menu-row">
-              <button class=${'btn btn-sm' + (friendlyMode ? ' btn-primary' : '')}
-                      onclick=${() => {
-                        setMenuOpen(false);
-                        setFriendlyMode(true);
-                      }}>Friendly</button>
-              <button class=${'btn btn-sm' + (!friendlyMode ? ' btn-primary' : '')}
-                      onclick=${() => {
-                        setMenuOpen(false);
-                        setFriendlyMode(false);
-                      }}>Raw</button>
-            </div>
-          `}
-          <div class="terminal-menu-row terminal-menu-row-wrap">
-            ${hasTarget && html`
-              <div class="terminal-font-controls" aria-label="Terminal font size controls">
-                <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(terminalFontSize - 1)} disabled=${terminalFontSize <= TERMINAL_MIN_FONT_SIZE} title="Decrease terminal font size">A-</button>
-                <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(TERMINAL_DEFAULT_FONT_SIZE)} disabled=${terminalFontSize === TERMINAL_DEFAULT_FONT_SIZE} title="Reset terminal font size">Reset</button>
-                <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(terminalFontSize + 1)} disabled=${terminalFontSize >= TERMINAL_MAX_FONT_SIZE} title="Increase terminal font size">A+</button>
-              </div>
-            `}
-            <button class="btn btn-sm" onclick=${() => {
-              setShowNewSession(true);
-              setNewSessionName('');
-              setMenuOpen(false);
-            }}>+ New</button>
+          <div class="terminal-sheet-chips">
             ${isTgMiniAppContext && html`
-              <button class="btn btn-sm" onclick=${() => {
+              <button type="button" class="terminal-sheet-chip" onclick=${() => {
                 setMenuOpen(false);
                 if (fullScreen) {
                   exitFullScreen();
@@ -2281,11 +2358,23 @@ function TerminalTab({ projectId, projectName } = {}) {
                 }
               }}>${fullScreen ? 'Close Full' : 'Full Screen'}</button>
             `}
+            ${hasTarget && html`
+              <button type="button" class=${'terminal-sheet-chip' + (friendlyMode ? ' sel' : '')}
+                      onclick=${() => {
+                        setMenuOpen(false);
+                        setFriendlyMode(true);
+                      }}>Friendly</button>
+              <button type="button" class=${'terminal-sheet-chip' + (!friendlyMode ? ' sel' : '')}
+                      onclick=${() => {
+                        setMenuOpen(false);
+                        setFriendlyMode(false);
+                      }}>Raw</button>
+            `}
           </div>
         </div>
-      ` : ''}
+      </div>
 
-      ${isTgMiniAppContext && html`
+      ${isTgMiniAppContext && !hasTarget && html`
         <div class="terminal-mobile-picker">
           ${sessionsError
             ? html`<div style="color:var(--danger,#f85149);font-size:12px;flex:1">${sessionsError} <button class="btn btn-sm" onclick=${loadSessions}>Retry</button></div>`
@@ -2333,6 +2422,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                     key=${`${activeTarget}:${lineLimit}`}
                     lineLimit=${lineLimit}
                     refreshTick=${friendlyRefreshTick}
+                    showRawChrome=${showRawChrome}
                     onStatusChange=${setTerminalStatus}
                     onLastUpdated=${setLastUpdatedAt}
                     onToggleFullScreen=${isTgMiniAppContext ? () => {
@@ -2380,7 +2470,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   `;
 }
 
-function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refreshTick, onStatusChange, onLastUpdated, onToggleFullScreen, onDisconnect }) {
+function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, showRawChrome = false, onStatusChange, onLastUpdated }) {
   const [status, setStatus] = useState('loading');
   const [statusLine, setStatusLine] = useState('');
   const [entries, setEntries] = useState([]);
@@ -2389,7 +2479,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refr
   const [snapshot, setSnapshot] = useState('');
   const [lastCommand, setLastCommand] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
-  const [showRawChrome, setShowRawChrome] = useState(false);
+  const [sendMode, setSendMode] = useState('command');
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
   const transcriptRef = useRef(null);
   const snapshotRef = useRef('');
@@ -2425,10 +2515,6 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refr
     return next;
   }
 
-  function updateConvFontSize(nextSize) {
-    setConvFontSize(writeTerminalConvFontSize(nextSize));
-  }
-
   useEffect(() => {
     syncConvFontFromStorage();
     const onStorage = (event) => {
@@ -2437,10 +2523,12 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refr
     };
     const onSameTab = () => syncConvFontFromStorage();
     window.addEventListener('storage', onStorage);
+    window.addEventListener('agj-terminal-conv-font', onSameTab);
     window.addEventListener('hashchange', onSameTab);
     document.addEventListener('visibilitychange', onSameTab);
     return () => {
       window.removeEventListener('storage', onStorage);
+      window.removeEventListener('agj-terminal-conv-font', onSameTab);
       window.removeEventListener('hashchange', onSameTab);
       document.removeEventListener('visibilitychange', onSameTab);
     };
@@ -2667,63 +2755,23 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refr
   }
 
   const rawChrome = showRawChrome ? extractStrippedChromeLines(snapshot) : '';
+  const statusBusy = /drizzl|working|thinking|running/i.test(statusLine || '');
+
+  function handleComposerInput(event) {
+    setInput(event.target.value);
+    const field = event.target;
+    field.style.height = 'auto';
+    field.style.height = Math.min(field.scrollHeight, 120) + 'px';
+  }
 
   return html`
     <div class="terminal-chat-view">
-      <div class="terminal-chat-composer">
-        <div class="terminal-chat-raw-toolbar">
-          <button class="btn btn-sm" data-testid="terminal-show-raw" data-show-raw
-                  onclick=${() => setShowRawChrome((current) => !current)}
-                  title=${showRawChrome ? 'Hide stripped terminal chrome lines' : 'Show stripped terminal chrome lines'}>
-            ${showRawChrome ? 'Hide raw' : 'Show raw'}
-          </button>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn btn-sm terminal-input-font-control" data-testid="terminal-font-decrease"
-                  onclick=${() => updateConvFontSize(convFontSize - 1)}
-                  disabled=${convFontSize <= TERMINAL_CONV_FONT_MIN}>A-</button>
-          <button class="btn btn-sm terminal-input-font-control" data-testid="terminal-font-increase"
-                  onclick=${() => updateConvFontSize(convFontSize + 1)}
-                  disabled=${convFontSize >= TERMINAL_CONV_FONT_MAX}>A+</button>
-          ${onToggleFullScreen && html`
-            <button class="btn btn-sm" onclick=${onToggleFullScreen}>
-              ${fullScreen ? 'Collapse' : 'Full Screen'}
-            </button>
-          `}
-        </div>
-        <div class="terminal-chat-composer-row">
-          <textarea class="terminal-chat-input-field"
-                    data-testid="terminal-composer-input"
-                    value=${input}
-                    rows="2"
-                    placeholder="Type a terminal command..."
-                    onInput=${e => setInput(e.target.value)}
-                    onKeyDown=${e => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendCommand();
-                      }
-                    }}></textarea>
-          <button class="terminal-chat-enter-btn" data-testid="terminal-send-enter" onclick=${sendManualEnter} disabled=${sending} title="Send Enter key">
-            ↵
-          </button>
-          <button class="terminal-chat-send-btn" data-testid="terminal-send-command" onclick=${sendCommand} disabled=${sending || !input.trim()}>
-            ${sending ? html`<div class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>` : html`<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`}
-          </button>
-        </div>
-      </div>
-
       <div class="terminal-chat-transcript" data-testid="terminal-conversation" ref=${transcriptRef}>
+        <div class="terminal-chat-daydiv">Today</div>
         ${rawChrome ? html`
           <div class="terminal-chat-raw" data-testid="terminal-raw-chrome" data-raw-chrome>
             <pre>${rawChrome}</pre>
           </div>` : ''}
-        <div class="terminal-chat-details">
-          <span class="terminal-chat-detail-pill">${sessionName || 'Terminal chat'}</span>
-          <span class="terminal-chat-detail-pill">${target}</span>
-          ${lastUpdatedAt ? html`<span class="terminal-chat-detail-pill">Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}</span>` : ''}
-        </div>
-        <div class="terminal-chat-status" data-testid="terminal-status">${statusLine}</div>
         ${entries.map((entry) => {
           if (entry.role === 'agent' || entry.role === 'user') {
             const isUser = entry.role === 'user';
@@ -2732,9 +2780,13 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refr
                    class=${'ovm-chat-row ' + (isUser ? 'ovm-chat-row-user' : 'ovm-chat-row-ovm') + ' terminal-chat-entry ' + (isUser ? 'terminal-chat-entry-user' : 'terminal-chat-entry-agent')}
                    data-testid=${isUser ? 'terminal-turn-user' : 'terminal-turn-agent'}
                    data-turn-id=${entry.id}>
+                <div class=${'terminal-chat-who' + (isUser ? ' user' : '')}>
+                  ${isUser
+                    ? html`<span data-testid="terminal-turn-time">${entry.timestamp}</span><span class="terminal-chat-badge">YOU</span>`
+                    : html`<span class="terminal-chat-badge">AGENT</span><span>${sessionName || 'Agent'} · <span data-testid="terminal-turn-time">${entry.timestamp}</span></span>`}
+                </div>
                 <div class=${'ovm-chat-bubble terminal-chat-bubble ' + (isUser ? 'ovm-chat-bubble-user' : 'ovm-chat-bubble-ovm')}>
                   <div class="ovm-chat-text terminal-chat-content">${entry.content}</div>
-                  <div class="ovm-chat-ts" data-testid="terminal-turn-time">${entry.timestamp}</div>
                 </div>
               </div>
             `;
@@ -2745,6 +2797,10 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refr
             </div>
           `;
         })}
+        <div class=${'terminal-chat-status' + (statusBusy ? ' busy' : '') + (!statusLine ? ' empty' : '')} data-testid="terminal-status">
+          ${statusBusy ? html`<span class="terminal-chat-pulse"></span>` : ''}
+          ${statusLine}
+        </div>
         ${sending && html`
           <div class="terminal-chat-inline-status">
             <div class="typing-dots">
@@ -2754,6 +2810,34 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refr
             </div>
           </div>
         `}
+      </div>
+
+      <div class="terminal-chat-composer">
+        <div class="terminal-chat-modebar">
+          <button type="button" class=${sendMode === 'command' ? 'sel' : ''}
+                  onclick=${() => setSendMode('command')}>Send as command</button>
+          <button type="button" class=${'terminal-chat-enter-btn' + (sendMode === 'raw' ? ' sel' : '')}
+                  data-testid="terminal-send-enter"
+                  onclick=${() => { setSendMode('raw'); sendManualEnter(); }}
+                  disabled=${sending}>Send raw keys</button>
+        </div>
+        <div class="terminal-chat-composer-row">
+          <textarea class="terminal-chat-input-field"
+                    data-testid="terminal-composer-input"
+                    value=${input}
+                    rows="1"
+                    placeholder="Message the agent..."
+                    onInput=${handleComposerInput}
+                    onKeyDown=${e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendCommand();
+                      }
+                    }}></textarea>
+          <button class="terminal-chat-send-btn" data-testid="terminal-send-command" onclick=${sendCommand} disabled=${sending || !input.trim()}>
+            ${sending ? html`<div class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>` : '➤'}
+          </button>
+        </div>
       </div>
     </div>
   `;
