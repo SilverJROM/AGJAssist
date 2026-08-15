@@ -158,7 +158,7 @@ body {
   border: 1px solid var(--border); border-radius: var(--radius);
   overflow: hidden; position: relative;
 }
-.terminal-panel .xterm { height: 100%; }
+.terminal-panel .xterm { height: 100%; min-height: 120px; }
 .terminal-font-controls {
   display: flex;
   align-items: center;
@@ -168,6 +168,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
 }
 .terminal-shell-header {
   display: flex;
@@ -175,6 +176,57 @@ body {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  overflow: hidden;
+}
+.terminal-topbar-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
+}
+.terminal-topbar-main > .badge,
+.terminal-topbar-main .terminal-topbar-pill {
+  max-width: 180px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.terminal-menu-trigger {
+  margin-right: 6px;
+}
+.terminal-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+}
+.terminal-menu-sheet {
+  position: fixed;
+  top: 52px;
+  right: 8px;
+  width: min(320px, calc(100vw - 16px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  z-index: 241;
+  box-shadow: 0 14px 44px rgba(0,0,0,0.4);
+}
+.terminal-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.terminal-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.terminal-menu-row-wrap { align-items: flex-start; }
 }
 .terminal-mobile-picker {
   display: none;

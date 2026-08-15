@@ -71,7 +71,14 @@ function writeTerminalConvFontSize(size) {
 applyTerminalConvFontSize(readTerminalConvFontSize());
 
 // Telegram Mini App detection
-const isTgMiniApp = !!(window.Telegram?.WebApp?.initData);
+const seededTgContext = (() => {
+  try {
+    return sessionStorage.getItem('agj_has_tg_init_data') === '1';
+  } catch {
+    return false;
+  }
+})();
+const isTgMiniApp = !!(window.Telegram?.WebApp?.initData) || seededTgContext;
 if (isTgMiniApp) {
   document.body.classList.add('tg-miniapp');
   // Runs on every load (incl. already-authenticated users where Login never mounts).
@@ -2033,6 +2040,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [newSessionName, setNewSessionName] = useState('');
   const [friendlyMode, setFriendlyMode] = useState(isTgMiniApp);
   const [fullScreen, setFullScreen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [terminalFontSize, setTerminalFontSize] = useState(() => {
     try {
       const stored = Number(localStorage.getItem(TERMINAL_FONT_STORAGE_KEY));
@@ -2045,8 +2053,23 @@ function TerminalTab({ projectId, projectName } = {}) {
   });
 
   const previousRoute = (() => {
-    try { return sessionStorage.getItem('agj_prev_route') || '/'; } catch { return '/'; }
+    try {
+      const candidate = sessionStorage.getItem('agj_prev_route');
+      if (candidate === '/terminals' || candidate === '/' || !candidate) return null;
+      return candidate;
+    } catch { return null; }
   })();
+  const [lineLimit, setLineLimit] = useState(25);
+  const [terminalStatus, setTerminalStatus] = useState('disconnected');
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
+  const [friendlyRefreshTick, setFriendlyRefreshTick] = useState(0);
+  const menuRef = useRef(null);
+  const webAppContext = window.Telegram?.WebApp;
+  const isTgMiniAppContext = isTgMiniApp || Boolean(
+    webAppContext?.initData
+    || webAppContext?.initDataUnsafe?.user
+    || (webAppContext?.BackButton && typeof webAppContext?.initDataUnsafe === 'undefined')
+  );
 
   function loadSessions() {
     setSessionsError(null);
@@ -2058,7 +2081,52 @@ function TerminalTab({ projectId, projectName } = {}) {
   useEffect(() => { loadSessions(); }, []);
 
   useEffect(() => {
-    if (!isTgMiniApp) return;
+    if (!activeTarget) return;
+    const lineLimitKey = `agj_terminal_chat_${activeTarget.replace(/[^a-zA-Z0-9_.-]/g, '_')}_line_limit`;
+    try {
+      const saved = Number(sessionStorage.getItem(lineLimitKey) || '25');
+      setLineLimit([25, 50, 100, 150, 200].includes(saved) ? saved : 25);
+    } catch {
+      setLineLimit(25);
+    }
+    setFriendlyMode(true);
+  }, [activeTarget]);
+
+  useEffect(() => {
+    if (!activeTarget) return;
+    const lineLimitKey = `agj_terminal_chat_${activeTarget.replace(/[^a-zA-Z0-9_.-]/g, '_')}_line_limit`;
+    try {
+      sessionStorage.setItem(lineLimitKey, String(lineLimit));
+    } catch {}
+  }, [activeTarget, lineLimit]);
+
+  useEffect(() => {
+    if (!activeTarget) {
+      setTerminalStatus('disconnected');
+      setLastUpdatedAt(0);
+      return;
+    }
+    if (!terminalStatus || terminalStatus === 'disconnected') {
+      setTerminalStatus('connected');
+    }
+  }, [activeTarget]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onOutsideClick = (event) => {
+      const node = menuRef.current;
+      if (node && !node.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener('pointerdown', onOutsideClick);
+    return () => {
+      window.removeEventListener('pointerdown', onOutsideClick);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!isTgMiniAppContext) return;
     document.body.classList.toggle('tg-terminal-focus', fullScreen);
     return () => document.body.classList.remove('tg-terminal-focus');
   }, [fullScreen]);
@@ -2070,7 +2138,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   }, [previousRoute]);
 
   useEffect(() => {
-    if (!isTgMiniApp) return undefined;
+    if (!isTgMiniAppContext) return undefined;
     const backButton = window.Telegram?.WebApp?.BackButton;
     if (!backButton) return undefined;
     if (!fullScreen) {
@@ -2107,6 +2175,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   const allPanes = sessions.flatMap(s => s.panes.map(p => ({ ...p, session_name: s.session_name })));
   const activePane = allPanes.find(p => p.target === activeTarget) || null;
   const hasTarget = !!activeTarget;
+  const menuStatusClass = `badge badge-${terminalStatus === 'connected' ? 'active' : terminalStatus === 'loading' || terminalStatus === 'connecting' || terminalStatus === 'running' ? 'pending' : 'failed'}`;
 
   function updateTerminalFontSize(nextSize) {
     const clamped = Math.min(TERMINAL_MAX_FONT_SIZE, Math.max(TERMINAL_MIN_FONT_SIZE, nextSize));
@@ -2114,45 +2183,108 @@ function TerminalTab({ projectId, projectName } = {}) {
     try { localStorage.setItem(TERMINAL_FONT_STORAGE_KEY, String(clamped)); } catch {}
   }
 
+  function normalizeLineLimit(value) {
+    const parsed = Number(value);
+    return [25, 50, 100, 150, 200].includes(parsed) ? parsed : 25;
+  }
+
+  function handleLineLimitChange(nextValue) {
+    const selected = normalizeLineLimit(nextValue);
+    setLineLimit(selected);
+    if (friendlyMode) {
+      setFriendlyRefreshTick((tick) => tick + 1);
+    }
+  }
+
   const shell = html`
     <div class=${'terminal-shell' + (fullScreen ? ' terminal-shell-fullscreen' : '')}>
-      <div class="terminal-shell-header">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          ${isTgMiniApp && fullScreen && html`
+      <div class="terminal-shell-header" data-term-topbar>
+        <div class="terminal-topbar-main">
+        ${isTgMiniAppContext && fullScreen && html`
             <button class="btn btn-sm" onclick=${exitFullScreen}>Back</button>
           `}
+          <button class="btn btn-sm terminal-menu-trigger" data-term-menu data-testid="terminal-menu" onclick=${() => setMenuOpen((current) => !current)}>☰</button>
           <strong>${friendlyMode ? 'Terminal Chat' : 'Raw Terminal'}</strong>
           ${activePane && html`<span class="badge badge-draft">${activePane.session_name}</span>`}
           ${activeTarget && html`<span class="badge badge-active">${activeTarget}</span>`}
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <button class=${'btn btn-sm' + (friendlyMode ? ' btn-primary' : '')}
-                  onclick=${() => setFriendlyMode(true)}>Friendly</button>
-          <button class=${'btn btn-sm' + (!friendlyMode ? ' btn-primary' : '')}
-                  onclick=${() => setFriendlyMode(false)}>Raw</button>
-          ${hasTarget && html`
-            <div class="terminal-font-controls" aria-label="Terminal font size controls">
-              <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(terminalFontSize - 1)} disabled=${terminalFontSize <= TERMINAL_MIN_FONT_SIZE} title="Decrease terminal font size">A-</button>
-              <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(TERMINAL_DEFAULT_FONT_SIZE)} disabled=${terminalFontSize === TERMINAL_DEFAULT_FONT_SIZE} title="Reset terminal font size">Reset</button>
-              <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(terminalFontSize + 1)} disabled=${terminalFontSize >= TERMINAL_MAX_FONT_SIZE} title="Increase terminal font size">A+</button>
-            </div>
-          `}
-          ${isTgMiniApp && html`
-            <button class="btn btn-sm" onclick=${() => {
-              if (fullScreen) {
-                exitFullScreen();
-              } else {
-                setFullScreen(true);
-              }
-            }}>${fullScreen ? 'Close Full' : 'Full Screen'}</button>
-          `}
-          ${activeTarget && html`
-            <button class="btn btn-sm btn-danger" onclick=${() => setActiveTarget(null)}>Disconnect</button>
-          `}
+          ${hasTarget ? html`<span class=${menuStatusClass}>${terminalStatus}</span>` : ''}
+          ${lastUpdatedAt ? html`<span class="terminal-topbar-pill" data-testid="terminal-last-updated" data-terminal-last-updated>Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}</span>` : ''}
         </div>
       </div>
+      ${menuOpen ? html`
+        <div class="terminal-menu-overlay" onclick=${() => setMenuOpen(false)}></div>
+        <div class="terminal-menu-sheet" data-term-menu-sheet data-testid="terminal-menu-sheet" role="menu" ref=${menuRef} onclick=${(event) => event.stopPropagation()}>
+          <div class="terminal-menu-section">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <strong>${friendlyMode ? 'Terminal Chat' : 'Raw Terminal'}</strong>
+              ${activeTarget ? html`<span class="terminal-chat-detail-pill">${activeTarget}</span>` : ''}
+              ${hasTarget ? html`<span class=${menuStatusClass}>${terminalStatus}</span>` : ''}
+            </div>
+            ${lastUpdatedAt ? html`<span class="terminal-chat-detail-pill" data-testid="terminal-last-updated" data-terminal-last-updated>Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}</span>` : ''}
+          </div>
+          <div class="terminal-menu-row">
+            <label class="terminal-chat-line-picker">
+              <span>Lines</span>
+              <select data-testid="terminal-lines" value=${String(lineLimit)} onChange=${e => handleLineLimitChange(e.target.value)} onchange=${e => handleLineLimitChange(e.target.value)}>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="150">150</option>
+                <option value="200">200</option>
+              </select>
+            </label>
+            <button class="btn btn-sm" onclick=${() => {
+              if (friendlyMode) {
+                setFriendlyRefreshTick((tick) => tick + 1);
+              }
+            }}>Refresh</button>
+            <button class="btn btn-sm btn-danger" onclick=${() => {
+              setMenuOpen(false);
+              setActiveTarget(null);
+            }}>Disconnect</button>
+          </div>
+          ${hasTarget && html`
+            <div class="terminal-menu-row">
+              <button class=${'btn btn-sm' + (friendlyMode ? ' btn-primary' : '')}
+                      onclick=${() => {
+                        setMenuOpen(false);
+                        setFriendlyMode(true);
+                      }}>Friendly</button>
+              <button class=${'btn btn-sm' + (!friendlyMode ? ' btn-primary' : '')}
+                      onclick=${() => {
+                        setMenuOpen(false);
+                        setFriendlyMode(false);
+                      }}>Raw</button>
+            </div>
+          `}
+          <div class="terminal-menu-row terminal-menu-row-wrap">
+            ${hasTarget && html`
+              <div class="terminal-font-controls" aria-label="Terminal font size controls">
+                <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(terminalFontSize - 1)} disabled=${terminalFontSize <= TERMINAL_MIN_FONT_SIZE} title="Decrease terminal font size">A-</button>
+                <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(TERMINAL_DEFAULT_FONT_SIZE)} disabled=${terminalFontSize === TERMINAL_DEFAULT_FONT_SIZE} title="Reset terminal font size">Reset</button>
+                <button class="btn btn-sm" onclick=${() => updateTerminalFontSize(terminalFontSize + 1)} disabled=${terminalFontSize >= TERMINAL_MAX_FONT_SIZE} title="Increase terminal font size">A+</button>
+              </div>
+            `}
+            <button class="btn btn-sm" onclick=${() => {
+              setShowNewSession(true);
+              setNewSessionName('');
+              setMenuOpen(false);
+            }}>+ New</button>
+            ${isTgMiniAppContext && html`
+              <button class="btn btn-sm" onclick=${() => {
+                setMenuOpen(false);
+                if (fullScreen) {
+                  exitFullScreen();
+                } else {
+                  setFullScreen(true);
+                }
+              }}>${fullScreen ? 'Close Full' : 'Full Screen'}</button>
+            `}
+          </div>
+        </div>
+      ` : ''}
 
-      ${isTgMiniApp && html`
+      ${isTgMiniAppContext && html`
         <div class="terminal-mobile-picker">
           ${sessionsError
             ? html`<div style="color:var(--danger,#f85149);font-size:12px;flex:1">${sessionsError} <button class="btn btn-sm" onclick=${loadSessions}>Retry</button></div>`
@@ -2163,15 +2295,11 @@ function TerminalTab({ projectId, projectName } = {}) {
                 `)}
               </select>`
           }
-          <button class="btn btn-sm btn-primary" onclick=${() => {
-            setNewSessionName('');
-            setShowNewSession(true);
-          }}>New</button>
         </div>
       `}
 
       <div class="terminal-container">
-        ${!isTgMiniApp && html`
+        ${!isTgMiniAppContext && html`
           <div class="session-tree">
             <div style="display:flex;gap:4px;margin-bottom:8px">
               <button class="btn btn-sm btn-primary" style="flex:1" onclick=${() => {
@@ -2201,7 +2329,12 @@ function TerminalTab({ projectId, projectName } = {}) {
                     target=${activeTarget}
                     sessionName=${activePane?.session_name || ''}
                     fullScreen=${fullScreen}
-                    onToggleFullScreen=${isTgMiniApp ? () => {
+                    key=${`${activeTarget}:${lineLimit}`}
+                    lineLimit=${lineLimit}
+                    refreshTick=${friendlyRefreshTick}
+                    onStatusChange=${setTerminalStatus}
+                    onLastUpdated=${setLastUpdatedAt}
+                    onToggleFullScreen=${isTgMiniAppContext ? () => {
                       if (fullScreen) {
                         exitFullScreen();
                       } else {
@@ -2210,7 +2343,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                     } : null}
                     onDisconnect=${() => setActiveTarget(null)}
                   />`
-                : html`<${TerminalView} target=${activeTarget} key=${activeTarget} fontSize=${terminalFontSize} onDisconnect=${() => setActiveTarget(null)} />`)
+                : html`<${TerminalView} target=${activeTarget} key=${activeTarget} fontSize=${terminalFontSize} onDisconnect=${() => setActiveTarget(null)} onStatusChange=${setTerminalStatus} onLastUpdated=${setLastUpdatedAt} />`)
             : html`<div class="terminal-empty-state">
                 <strong>No terminal selected</strong>
                 <div>Select a pane to connect and start using terminal chat.</div>
@@ -2240,20 +2373,19 @@ function TerminalTab({ projectId, projectName } = {}) {
         </div>
       </div>
     `}
-    ${fullScreen && isTgMiniApp
+    ${fullScreen && isTgMiniAppContext
       ? html`<div class="terminal-fullscreen-overlay">${shell}</div>`
       : shell}
   `;
 }
 
-function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScreen, onDisconnect }) {
+function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refreshTick, onStatusChange, onLastUpdated, onToggleFullScreen, onDisconnect }) {
   const [status, setStatus] = useState('loading');
   const [statusLine, setStatusLine] = useState('');
   const [entries, setEntries] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [snapshot, setSnapshot] = useState('');
-  const [lineLimit, setLineLimit] = useState(() => 25);
   const [lastCommand, setLastCommand] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
@@ -2262,7 +2394,6 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
   const sendingRef = useRef(false);
   const openAgentAfterYouRef = useRef(false);
   const storageKey = 'agj_terminal_chat_' + target.replace(/[^a-zA-Z0-9_.-]/g, '_');
-  const lineLimitKey = storageKey + '_line_limit';
 
   function lastRoleIndex(list, role) {
     for (let i = list.length - 1; i >= 0; i -= 1) {
@@ -2323,19 +2454,9 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
   }
 
   useEffect(() => {
-    try {
-      const savedLineLimit = Number(sessionStorage.getItem(lineLimitKey) || '25');
-      if ([25, 50, 100, 150, 200].includes(savedLineLimit)) {
-        setLineLimit(savedLineLimit);
-      }
-    } catch {}
-  }, [lineLimitKey]);
-
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(lineLimitKey, String(lineLimit));
-    } catch {}
-  }, [lineLimit, lineLimitKey]);
+    if (onStatusChange) onStatusChange(status);
+    if (onLastUpdated) onLastUpdated(lastUpdatedAt);
+  }, [status, lastUpdatedAt, onStatusChange, onLastUpdated]);
 
   useEffect(() => {
     snapshotRef.current = snapshot;
@@ -2360,7 +2481,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
         savedState = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
       } catch {}
       try {
-        const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=200`);
+        const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=${getCaptureLines()}`);
         if (!active) return;
         const output = capTerminalOutput(normalizeTerminalOutput(data.output), 200);
         const nextEntries = applyAgentPatch(conversationSeed(savedState), output);
@@ -2370,6 +2491,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
         setStatusLine(extractStatus(output));
         setLastCommand(savedState?.lastCommand || '');
         setLastUpdatedAt(Date.now());
+        if (onLastUpdated) onLastUpdated(Date.now());
         setStatus('connected');
       } catch (e) {
         if (!active) return;
@@ -2400,7 +2522,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
     return () => {
       active = false;
     };
-  }, [target, sessionName, storageKey, lineLimit]);
+  }, [target, sessionName, storageKey, lineLimit, refreshTick]);
 
   useEffect(() => {
     let active = true;
@@ -2544,49 +2666,14 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
 
   return html`
     <div class="terminal-chat-view">
-      <div class="terminal-chat-header">
-        <div>
-          <strong>${sessionName || 'Terminal chat'}</strong>
-          <div style="font-size:11px;color:var(--text-secondary)">${target}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-sm" data-testid="terminal-font-decrease"
+      <div class="terminal-chat-composer">
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-sm terminal-input-font-control" data-testid="terminal-font-decrease"
                   onclick=${() => updateConvFontSize(convFontSize - 1)}
                   disabled=${convFontSize <= TERMINAL_CONV_FONT_MIN}>A-</button>
-          <button class="btn btn-sm" data-testid="terminal-font-increase"
+          <button class="btn btn-sm terminal-input-font-control" data-testid="terminal-font-increase"
                   onclick=${() => updateConvFontSize(convFontSize + 1)}
                   disabled=${convFontSize >= TERMINAL_CONV_FONT_MAX}>A+</button>
-          <span class="badge badge-${status === 'connected' ? 'active' : status === 'running' ? 'pending' : status === 'loading' ? 'pending' : 'failed'}">${status}</span>
-          <button class="btn btn-sm" onclick=${async () => {
-            try {
-              const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=${getCaptureLines()}`);
-              const latest = capTerminalOutput(normalizeTerminalOutput(data.output), 200);
-              snapshotRef.current = latest;
-              setSnapshot(latest);
-              setLastUpdatedAt(Date.now());
-              setEntries(prev => applyConversationSnapshot(prev, latest));
-              setStatusLine(extractStatus(latest));
-              setStatus('connected');
-            } catch (e) {
-              setStatus('error');
-            }
-          }}>Refresh</button>
-          <button class="btn btn-sm btn-danger" onclick=${onDisconnect}>Disconnect</button>
-        </div>
-      </div>
-
-      <div class="terminal-chat-composer">
-        <div class="terminal-chat-composer-top">
-          <label class="terminal-chat-line-picker">
-            <span>Lines</span>
-            <select value=${String(lineLimit)} onChange=${e => setLineLimit(Number(e.target.value))}>
-              <option value="25">25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-              <option value="150">150</option>
-              <option value="200">200</option>
-            </select>
-          </label>
           ${onToggleFullScreen && html`
             <button class="btn btn-sm" onclick=${onToggleFullScreen}>
               ${fullScreen ? 'Collapse' : 'Full Screen'}
@@ -2658,10 +2745,16 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
 }
 
 // Terminal View (xterm.js)
-function TerminalView({ target, fontSize, onDisconnect }) {
+function TerminalView({ target, fontSize, onDisconnect, onStatusChange, onLastUpdated }) {
   const [status, setStatus] = useState('connecting');
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
   const termRef = useRef(null);
   const fitAddonRef = useRef(null);
+
+  useEffect(() => {
+    if (onStatusChange) onStatusChange(status);
+    if (onLastUpdated) onLastUpdated(lastUpdatedAt);
+  }, [status, lastUpdatedAt, onStatusChange, onLastUpdated]);
 
   useEffect(() => {
     const term = termRef.current;
@@ -2721,13 +2814,21 @@ function TerminalView({ target, fontSize, onDisconnect }) {
       const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
       ws = new WebSocket(`${wsProtocol}//${location.host}/ws/tmux/${encodeURIComponent(target)}?token=${authToken}`);
 
-      ws.onopen = () => setStatus('connected');
-      ws.onclose = () => { setStatus('disconnected'); term.write('\r\n\x1b[31m[Disconnected]\x1b[0m\r\n'); };
+      ws.onopen = () => {
+        setLastUpdatedAt(Date.now());
+        setStatus('connected');
+      };
+      ws.onclose = () => {
+        setLastUpdatedAt(Date.now());
+        setStatus('disconnected');
+        term.write('\r\n\x1b[31m[Disconnected]\x1b[0m\r\n');
+      };
       ws.onerror = () => setStatus('error');
 
       ws.onmessage = (e) => {
         try {
           const msg = JSON.parse(e.data);
+          setLastUpdatedAt(Date.now());
           if (msg.type === 'snapshot') {
             term.reset();
             term.write(msg.data);
@@ -2766,12 +2867,6 @@ function TerminalView({ target, fontSize, onDisconnect }) {
   const containerId = 'terminal-' + target.replace(/[:.]/g, '-');
   return html`
     <div style="height:100%;position:relative">
-      <div style="position:absolute;top:4px;right:8px;z-index:10;font-size:11px;display:flex;align-items:center;gap:6px">
-        <span class="badge badge-${status === 'connected' ? 'active' : status === 'connecting' ? 'pending' : 'failed'}">${status}</span>
-        ${status === 'connected' && onDisconnect && html`
-          <button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:10px" onclick=${onDisconnect}>Disconnect</button>
-        `}
-      </div>
       <div id=${containerId} style="height:100%"></div>
     </div>
   `;
