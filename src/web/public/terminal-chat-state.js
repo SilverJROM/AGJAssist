@@ -32,6 +32,22 @@ function _isChromeLine(line) {
     || _tmuxConfRe.test(line);
 }
 
+function _isC1C3ChromeLine(line) {
+  const trimmed = (line || "").trim();
+  if (!trimmed) return false;
+  return _statusChromeRe.test(trimmed) || _modelFooterRe.test(trimmed) || _tipChromeRe.test(trimmed);
+}
+
+export function extractC1C3ChromeLines(text) {
+  const clean = normalizeTerminalOutput(text);
+  if (!clean) return "";
+  return clean
+    .split("\n")
+    .filter((line) => _isC1C3ChromeLine(line))
+    .join("\n")
+    .trim();
+}
+
 /**
  * Strip ANSI escape sequences and filter Claude-Code TUI chrome lines.
  * Returns the cleaned text with blank lines collapsed.

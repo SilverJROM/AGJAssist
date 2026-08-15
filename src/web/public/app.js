@@ -1,7 +1,7 @@
 import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { normalizeTerminalOutput, diffTerminalOutput, capTerminalOutput, extractStatus, appendYou, applyAgentPatch } from './terminal-chat-state.js';
+import { normalizeTerminalOutput, diffTerminalOutput, capTerminalOutput, extractStatus, appendYou, extractC1C3ChromeLines, applyAgentPatch } from './terminal-chat-state.js';
 import {
   AVAILABLE_BOTTOM_NAV_TABS,
   DEFAULT_BOTTOM_NAV_TAB_IDS,
@@ -2389,6 +2389,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refr
   const [snapshot, setSnapshot] = useState('');
   const [lastCommand, setLastCommand] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
+  const [showRawChrome, setShowRawChrome] = useState(false);
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
   const transcriptRef = useRef(null);
   const snapshotRef = useRef('');
@@ -2665,9 +2666,18 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refr
     setSending(false);
   }
 
+  const rawChrome = showRawChrome ? extractC1C3ChromeLines(snapshot) : '';
+
   return html`
     <div class="terminal-chat-view">
       <div class="terminal-chat-composer">
+        <div class="terminal-chat-raw-toolbar">
+          <button class="btn btn-sm" data-testid="terminal-show-raw" data-show-raw
+                  onclick=${() => setShowRawChrome((current) => !current)}
+                  title=${showRawChrome ? 'Hide stripped terminal chrome lines' : 'Show stripped terminal chrome lines'}>
+            ${showRawChrome ? 'Hide raw' : 'Show raw'}
+          </button>
+        </div>
         <div style="display:flex;gap:6px;align-items:center">
           <button class="btn btn-sm terminal-input-font-control" data-testid="terminal-font-decrease"
                   onclick=${() => updateConvFontSize(convFontSize - 1)}
@@ -2704,6 +2714,10 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refr
       </div>
 
       <div class="terminal-chat-transcript" data-testid="terminal-conversation" ref=${transcriptRef}>
+        ${rawChrome ? html`
+          <div class="terminal-chat-raw" data-testid="terminal-raw-chrome" data-raw-chrome>
+            <pre>${rawChrome}</pre>
+          </div>` : ''}
         <div class="terminal-chat-details">
           <span class="terminal-chat-detail-pill">${sessionName || 'Terminal chat'}</span>
           <span class="terminal-chat-detail-pill">${target}</span>
