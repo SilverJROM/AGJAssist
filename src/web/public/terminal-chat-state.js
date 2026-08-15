@@ -48,6 +48,16 @@ export function extractC1C3ChromeLines(text) {
     .trim();
 }
 
+export function extractStrippedChromeLines(text) {
+  const clean = normalizeTerminalOutput(text);
+  if (!clean) return "";
+  return clean
+    .split("\n")
+    .filter((line) => _isChromeLine(line))
+    .join("\n")
+    .trim();
+}
+
 /**
  * Strip ANSI escape sequences and filter Claude-Code TUI chrome lines.
  * Returns the cleaned text with blank lines collapsed.

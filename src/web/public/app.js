@@ -1,7 +1,7 @@
 import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { normalizeTerminalOutput, diffTerminalOutput, capTerminalOutput, extractStatus, appendYou, extractC1C3ChromeLines, applyAgentPatch } from './terminal-chat-state.js';
+import { normalizeTerminalOutput, diffTerminalOutput, capTerminalOutput, extractStatus, appendYou, extractStrippedChromeLines, applyAgentPatch } from './terminal-chat-state.js';
 import {
   AVAILABLE_BOTTOM_NAV_TABS,
   DEFAULT_BOTTOM_NAV_TAB_IDS,
@@ -2666,7 +2666,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, lineLimit, refr
     setSending(false);
   }
 
-  const rawChrome = showRawChrome ? extractC1C3ChromeLines(snapshot) : '';
+  const rawChrome = showRawChrome ? extractStrippedChromeLines(snapshot) : '';
 
   return html`
     <div class="terminal-chat-view">

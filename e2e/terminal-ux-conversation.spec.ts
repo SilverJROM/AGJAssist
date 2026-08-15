@@ -612,4 +612,5 @@ test('A7 R8 show-raw reveals stripped chrome', async ({ page }) => {
   const raw = page.locator('[data-testid="terminal-raw-chrome"], [data-raw-chrome], .terminal-chat-raw');
   await expect(raw).toBeVisible();
   await expect(raw).toContainText('⏵⏵');
+  await expect(raw).toContainText('┌──────────────────────────────┐');
 });
