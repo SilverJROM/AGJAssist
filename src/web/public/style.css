@@ -9,6 +9,9 @@
   --warning: #d29922;
   --danger: #f85149;
   --terminal-bg: #0a0e14;
+  --terminal-conv-font: 17px;
+  --surface-2: #1c232c;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --radius: 8px;
 }
 
@@ -204,6 +207,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
@@ -380,6 +384,13 @@ body {
 .terminal-chat-view .ovm-chat-row-user { justify-content: flex-end; }
 .terminal-chat-view .ovm-chat-row-ovm { justify-content: flex-start; }
 .terminal-chat-view .ovm-chat-row-system { justify-content: center; }
+.terminal-chat-view .ovm-chat-bubble,
+.terminal-chat-view .terminal-chat-bubble,
+.terminal-chat-view .terminal-chat-content {
+  font-size: var(--terminal-conv-font);
+  line-height: 1.55;
+  font-family: var(--sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+}
 .terminal-chat-view .ovm-chat-bubble {
   max-width: 78%;
   padding: 12px 14px 8px;
@@ -412,6 +423,7 @@ body {
 }
 .terminal-chat-view .ovm-chat-text {
   color: inherit;
+  font-family: var(--sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
 }
 .terminal-chat-view .ovm-chat-bubble-user .terminal-chat-content,
 .terminal-chat-view .ovm-chat-bubble-user .ovm-chat-text {
@@ -471,8 +483,8 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 11.5px;
+  font-family: var(--sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+  font-size: var(--terminal-conv-font);
   line-height: 1.55;
   color: var(--terminal-fg);
   -webkit-text-fill-color: var(--terminal-fg);
@@ -1795,10 +1807,20 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 
 /* Responsive */
 @media (max-width: 767px) {
-  .header { padding: 8px 12px; }
+  .header {
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+  }
   .main { padding: 12px; }
   .project-grid { grid-template-columns: 1fr; }
   .overmind-project-grid { grid-template-columns: 1fr; }
+  .header .nav-links {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
   .terminal-container { flex-direction: column; height: auto; }
   .session-tree { width: 100%; max-height: 200px; }
   .terminal-panel { min-height: 400px; }
@@ -1808,7 +1830,6 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
   .terminal-chat-header { padding: 10px; align-items: flex-start; }
   .terminal-chat-transcript { padding: 10px; gap: 10px; }
   .terminal-chat-card { max-width: 100%; }
-  .terminal-chat-content { font-size: 11px; line-height: 1.55; }
   .terminal-chat-composer { padding: 8px; }
   .terminal-chat-input-field { min-height: 52px; font-size: 12px; }
   .overmind-tabs { display: flex; flex-wrap: wrap; align-self: stretch; }
@@ -3010,7 +3031,7 @@ body.tg-miniapp {
    Matches mockups/projcore-chat-2026-06-13 (grok-build desktop split + opus mobile @media collapse).
    AGJAssist GitHub-dark palette. Real @media (not shrink). R18/R19. Additive, no Terminal/Overmind touch. */
 :root {
-  --surface-2: #1a2233;
+  --surface-2: #1c232c;
   --purple: #bc8cff;
   --teal: #39c5cf;
 }

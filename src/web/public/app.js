@@ -35,6 +35,40 @@ const TERMINAL_FONT_STORAGE_KEY = 'agj_terminal_font_size';
 const TERMINAL_DEFAULT_FONT_SIZE = 13;
 const TERMINAL_MIN_FONT_SIZE = 8;
 const TERMINAL_MAX_FONT_SIZE = 28;
+const TERMINAL_CONV_FONT_STORAGE_KEY = 'agj_terminal_conv_font_size';
+const TERMINAL_CONV_FONT_DEFAULT = 17;
+const TERMINAL_CONV_FONT_MIN = 12;
+const TERMINAL_CONV_FONT_MAX = 26;
+
+function clampTerminalConvFontSize(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return TERMINAL_CONV_FONT_DEFAULT;
+  return Math.min(TERMINAL_CONV_FONT_MAX, Math.max(TERMINAL_CONV_FONT_MIN, Math.round(parsed)));
+}
+
+function readTerminalConvFontSize() {
+  try {
+    const stored = localStorage.getItem(TERMINAL_CONV_FONT_STORAGE_KEY);
+    if (stored == null || stored === '') return TERMINAL_CONV_FONT_DEFAULT;
+    return clampTerminalConvFontSize(stored);
+  } catch {
+    return TERMINAL_CONV_FONT_DEFAULT;
+  }
+}
+
+function applyTerminalConvFontSize(size) {
+  const next = clampTerminalConvFontSize(size);
+  try { document.documentElement.style.setProperty('--terminal-conv-font', `${next}px`); } catch {}
+  return next;
+}
+
+function writeTerminalConvFontSize(size) {
+  const next = applyTerminalConvFontSize(size);
+  try { localStorage.setItem(TERMINAL_CONV_FONT_STORAGE_KEY, String(next)); } catch {}
+  return next;
+}
+
+applyTerminalConvFontSize(readTerminalConvFontSize());
 
 // Telegram Mini App detection
 const isTgMiniApp = !!(window.Telegram?.WebApp?.initData);
@@ -2222,11 +2256,39 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
   const [lineLimit, setLineLimit] = useState(() => 25);
   const [lastCommand, setLastCommand] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
+  const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
   const transcriptRef = useRef(null);
   const snapshotRef = useRef('');
   const sendingRef = useRef(false);
   const storageKey = 'agj_terminal_chat_' + target.replace(/[^a-zA-Z0-9_.-]/g, '_');
   const lineLimitKey = storageKey + '_line_limit';
+
+  function syncConvFontFromStorage() {
+    const next = applyTerminalConvFontSize(readTerminalConvFontSize());
+    setConvFontSize(next);
+    return next;
+  }
+
+  function updateConvFontSize(nextSize) {
+    setConvFontSize(writeTerminalConvFontSize(nextSize));
+  }
+
+  useEffect(() => {
+    syncConvFontFromStorage();
+    const onStorage = (event) => {
+      if (event.key && event.key !== TERMINAL_CONV_FONT_STORAGE_KEY) return;
+      syncConvFontFromStorage();
+    };
+    const onSameTab = () => syncConvFontFromStorage();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('hashchange', onSameTab);
+    document.addEventListener('visibilitychange', onSameTab);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('hashchange', onSameTab);
+      document.removeEventListener('visibilitychange', onSameTab);
+    };
+  }, []);
 
   function getCaptureLines() {
     return lineLimit;
@@ -2459,7 +2521,13 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
           <strong>${sessionName || 'Terminal chat'}</strong>
           <div style="font-size:11px;color:var(--text-secondary)">${target}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" data-testid="terminal-font-decrease"
+                  onclick=${() => updateConvFontSize(convFontSize - 1)}
+                  disabled=${convFontSize <= TERMINAL_CONV_FONT_MIN}>A-</button>
+          <button class="btn btn-sm" data-testid="terminal-font-increase"
+                  onclick=${() => updateConvFontSize(convFontSize + 1)}
+                  disabled=${convFontSize >= TERMINAL_CONV_FONT_MAX}>A+</button>
           <span class="badge badge-${status === 'connected' ? 'active' : status === 'running' ? 'pending' : status === 'loading' ? 'pending' : 'failed'}">${status}</span>
           <button class="btn btn-sm" onclick=${async () => {
             try {
@@ -5814,6 +5882,7 @@ function AgentRegistrySection() {
 
 function Settings({ onEditBottomNav } = {}) {
   const [patterns, setPatterns] = useState([]);
+  const [conversationFontSize, setConversationFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
   const [loading, setLoading] = useState(true);
   const [userInfo, setUserInfo] = useState(null);
 
@@ -5823,6 +5892,10 @@ function Settings({ onEditBottomNav } = {}) {
       api('/api/auth/me').then(d => setUserInfo(d)).catch(() => {})
     ]).then(() => setLoading(false));
   }, []);
+
+  function updateConversationFontSize(nextSize) {
+    setConversationFontSize(writeTerminalConvFontSize(nextSize));
+  }
 
   return html`
     <div>
@@ -5854,6 +5927,18 @@ function Settings({ onEditBottomNav } = {}) {
           ` : ''}
           <h4 style="font-size:13px;margin-bottom:8px">Two-Factor Authentication</h4>
           <${TwoFactorSetup} />
+        </div>
+      </${SettingsSection}>
+      <${SettingsSection} title="Terminal Conversation" defaultOpen=${true}>
+        <div style="margin-bottom:16px">
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">Conversation font size</div>
+          <div data-testid="terminal-conv-font-settings" style="display:flex;align-items:center;gap:8px">
+            <input type="range" min="${TERMINAL_CONV_FONT_MIN}" max="${TERMINAL_CONV_FONT_MAX}" value=${String(conversationFontSize)}
+                   onInput=${e => updateConversationFontSize(Number(e.target.value))}
+                   onChange=${e => updateConversationFontSize(Number(e.target.value))}
+            />
+            <span style="min-width:42px;font-size:12px;color:var(--text-secondary)">${conversationFontSize}px</span>
+          </div>
         </div>
       </${SettingsSection}>
 
