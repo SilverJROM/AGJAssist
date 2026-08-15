@@ -4,22 +4,31 @@ export function normalizeTerminalOutput(text) {
 
 const _spinnerGlyphs = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷";
 const _leadingSpinnerRe = new RegExp(`^\\s*[${_spinnerGlyphs}]`, "u");
-const _statusChromeRe = /bypass permissions|ctrl\+t|to manage|for agents|\/ps to view|\/stop|\bshells?\b|\bmonitors?\b|\/model|shift\+tab|to cycle|focus-events|\/effort/i;
-const _modelFooterRe = /^\s*(gpt-5|sonnet|opus|haiku)\b/i;
-const _cwdFooterRe = /[·•]\s*~\/\S*\s*$/;
-const _turnChromeRe = /esc to interrupt|Working \(|Waiting for|Compacting|Thinking/i;
+// C1 footer/shortcut — listed tokens only (no /ps /stop /model /effort /shells /monitors).
+const _statusChromeRe = /bypass permissions|accept edits|plan mode|shift\+tab|to cycle|ctrl\+t|for agents|↓ to manage|Ctrl\+\.|ctrl\+c:cancel|⏵⏵|▶▶/i;
+// C3 model+cwd: model-name · ~/ at line start — not any mid-dot+tilde.
+const _modelFooterRe = /^\s*[\w.+-]+\s*[·•]\s*~\//;
+const _tipChromeRe = /^\s*Tip:/;
+// C4 KEEP (inverted): former delete class is now preserved as status telemetry.
+const _turnChromeRe = /(\d+[hms]|\d+m \d+s)|tokens|effort|Drizzl\w*|Working|Thinking|Compacting|Waiting for|Worked for/i;
 const _tmuxConfRe = /~\/\.tmux\.conf/;
+const _composerGlyphRe = /^[❯›▌]/u;
+const _composerPlaceholderRe = /^\s*Type a message\b/i;
+const _interruptChromeRe = /^\s*esc to interrupt\s*$/i;
 
 function _isChromeLine(line) {
   const trimmed = line.trim();
   if (trimmed === "") return false;
-  return /^[❯›]/u.test(trimmed)
+  // Order: C1, then C3, then C4 keep, then C2.
+  if (_statusChromeRe.test(line)) return true;
+  if (_modelFooterRe.test(trimmed) || _tipChromeRe.test(trimmed)) return true;
+  if (_turnChromeRe.test(line)) return false;
+  return _composerGlyphRe.test(trimmed)
+    || _composerPlaceholderRe.test(trimmed)
+    || _isBoxDrawingLine(line)
     || /^[─=]{3,}$/.test(trimmed)
+    || _interruptChromeRe.test(trimmed)
     || _leadingSpinnerRe.test(line)
-    || _statusChromeRe.test(line)
-    || _modelFooterRe.test(trimmed)
-    || _cwdFooterRe.test(line)
-    || _turnChromeRe.test(line)
     || _tmuxConfRe.test(line);
 }
 
@@ -29,7 +38,7 @@ function _isChromeLine(line) {
  */
 export function cleanTerminalOutput(text) {
   if (!text) return "";
-  return text
+  const lines = text
     .replace(/\r\n/g, "\n")
     // Strip CSI sequences (ESC [ ... final byte)
     .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
@@ -39,10 +48,23 @@ export function cleanTerminalOutput(text) {
     .replace(/\x1b./g, "")
     // Strip other control chars except newline/tab
     .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "")
-    .split("\n")
-    .filter(line => !_isChromeLine(line))
-    .join("\n")
-    .trim();
+    .split("\n");
+
+  const kept = [];
+  let inRoundBox = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (inRoundBox) {
+      if (/╰/.test(trimmed)) inRoundBox = false;
+      continue;
+    }
+    if (/╭/.test(trimmed)) {
+      inRoundBox = true;
+      continue;
+    }
+    if (!_isChromeLine(line)) kept.push(line);
+  }
+  return kept.join("\n").trim();
 }
 
 function _isBlankLine(line) {
