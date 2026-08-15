@@ -1,5 +1,5 @@
 import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
-import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
 import { normalizeTerminalOutput, diffTerminalOutput, capTerminalOutput, extractStatus, appendYou, extractStrippedChromeLines, applyAgentPatch } from './terminal-chat-state.js';
 import {
@@ -2042,6 +2042,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [friendlyMode, setFriendlyMode] = useState(isTgMiniApp);
   const [fullScreen, setFullScreen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sessionSwitcherOpen, setSessionSwitcherOpen] = useState(false);
   const [terminalFontSize, setTerminalFontSize] = useState(() => {
     try {
       const stored = Number(localStorage.getItem(TERMINAL_FONT_STORAGE_KEY));
@@ -2067,6 +2068,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
   const [showRawChrome, setShowRawChrome] = useState(false);
   const menuRef = useRef(null);
+  const switcherRef = useRef(null);
   const webAppContext = window.Telegram?.WebApp;
   const isTgMiniAppContext = isTgMiniApp || Boolean(
     webAppContext?.initData
@@ -2127,6 +2129,25 @@ function TerminalTab({ projectId, projectName } = {}) {
       window.removeEventListener('pointerdown', onOutsideClick);
     };
   }, [menuOpen]);
+
+  useLayoutEffect(() => {
+    if (!sessionSwitcherOpen) return;
+    const onOutsideClick = (event) => {
+      const node = switcherRef.current;
+      if (node && !node.contains(event.target)) {
+        setSessionSwitcherOpen(false);
+      }
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setSessionSwitcherOpen(false);
+    };
+    window.addEventListener('pointerdown', onOutsideClick);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', onOutsideClick);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [sessionSwitcherOpen]);
 
   useEffect(() => {
     if (!isTgMiniAppContext) return;
@@ -2222,6 +2243,11 @@ function TerminalTab({ projectId, projectName } = {}) {
     }
   }
 
+  // Same switch the hamburger / mobile-picker <select>s use.
+  function switchActiveTarget(nextTarget) {
+    setActiveTarget(nextTarget || null);
+  }
+
   const updatedLabel = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : '';
   const targetSubtitle = [
     activeTarget || '',
@@ -2231,22 +2257,56 @@ function TerminalTab({ projectId, projectName } = {}) {
 
   const shell = html`
     <div class=${'terminal-shell' + (fullScreen ? ' terminal-shell-fullscreen' : '') + (friendlyMode ? ' terminal-shell-friendly' : '')}>
-      <div class="terminal-shell-header" data-term-topbar>
+      <div class=${'terminal-shell-header' + (sessionSwitcherOpen ? ' is-switching' : '')} data-term-topbar>
         <div class="terminal-topbar-main">
           ${isTgMiniAppContext && fullScreen && html`
             <button class="terminal-topbar-icon-btn" onclick=${exitFullScreen} aria-label="Back">←</button>
           `}
           <button class="terminal-topbar-icon-btn terminal-menu-trigger" data-term-menu data-testid="terminal-menu"
                   aria-label="menu" aria-expanded=${menuOpen}
-                  onclick=${() => setMenuOpen((current) => !current)}>☰</button>
-          <div class="terminal-topbar-target">
-            <div class="terminal-topbar-name">
+                  onclick=${() => {
+                    setSessionSwitcherOpen(false);
+                    setMenuOpen((current) => !current);
+                  }}>☰</button>
+          <div class="terminal-topbar-target" ref=${switcherRef}>
+            <button type="button" class="terminal-topbar-name" data-testid="terminal-session-switcher"
+                    aria-haspopup="listbox" aria-expanded=${sessionSwitcherOpen}
+                    onclick=${() => {
+                      setMenuOpen(false);
+                      setSessionSwitcherOpen((current) => !current);
+                    }}>
               <span class=${'terminal-topbar-dot' + (hasTarget && (terminalStatus === 'connected' || terminalStatus === 'running') ? ' on' : '')}></span>
-              ${activePane?.session_name || (friendlyMode ? 'Terminal Chat' : 'Raw Terminal')}
-            </div>
+              <span class="terminal-topbar-name-text">${activePane?.session_name || (friendlyMode ? 'Terminal Chat' : 'Raw Terminal')}</span>
+              <span class=${'terminal-topbar-caret' + (sessionSwitcherOpen ? ' open' : '')} aria-hidden="true">▾</span>
+            </button>
             <div class="terminal-topbar-sub" data-testid="terminal-last-updated" data-terminal-last-updated>
               ${hasTarget ? (targetSubtitle || activeTarget) : 'Select a pane'}
             </div>
+            ${sessionSwitcherOpen && html`
+              <div class="terminal-session-dropdown" data-testid="terminal-session-dropdown" role="listbox">
+                ${sessions.map(s => html`
+                  <div>
+                    <div class="terminal-session-group">${s.session_name}</div>
+                    ${s.panes.map(p => html`
+                      <button type="button"
+                              class=${'terminal-session-option' + (activeTarget === p.target ? ' active' : '')}
+                              data-testid="terminal-session-option"
+                              role="option"
+                              aria-selected=${activeTarget === p.target}
+                              onclick=${() => {
+                                switchActiveTarget(p.target);
+                                setSessionSwitcherOpen(false);
+                              }}>
+                        <span class="terminal-session-option-name">${s.session_name}</span>
+                        <span class="terminal-session-option-target">${p.target}</span>
+                        <span class="terminal-session-option-cmd">${p.command}</span>
+                      </button>
+                    `)}
+                  </div>
+                `)}
+                ${sessions.length === 0 && html`<div class="terminal-session-empty">No active sessions</div>`}
+              </div>
+            `}
           </div>
           <div class="terminal-fontpill" title="Text size">
             <button type="button" class="am" data-testid="terminal-font-decrease"
@@ -2310,7 +2370,7 @@ function TerminalTab({ projectId, projectName } = {}) {
           <div class="terminal-sheet-picker">
             ${sessionsError
               ? html`<div style="color:var(--danger,#f85149);font-size:12px;flex:1">${sessionsError} <button class="btn btn-sm" onclick=${loadSessions}>Retry</button></div>`
-              : html`<select value=${activeTarget || ''} onChange=${e => setActiveTarget(e.target.value || null)}>
+              : html`<select value=${activeTarget || ''} onChange=${e => switchActiveTarget(e.target.value)}>
                   <option value="">${allPanes.length === 0 ? 'Loading panes...' : 'Select a pane...'}</option>
                   ${allPanes.map(p => html`
                     <option value=${p.target}>${p.session_name} · ${p.target} · ${p.command}</option>
@@ -2378,7 +2438,7 @@ function TerminalTab({ projectId, projectName } = {}) {
         <div class="terminal-mobile-picker">
           ${sessionsError
             ? html`<div style="color:var(--danger,#f85149);font-size:12px;flex:1">${sessionsError} <button class="btn btn-sm" onclick=${loadSessions}>Retry</button></div>`
-            : html`<select value=${activeTarget || ''} onChange=${e => setActiveTarget(e.target.value || null)}>
+            : html`<select value=${activeTarget || ''} onChange=${e => switchActiveTarget(e.target.value)}>
                 <option value="">${allPanes.length === 0 ? 'Loading panes...' : 'Select a pane...'}</option>
                 ${allPanes.map(p => html`
                   <option value=${p.target}>${p.session_name} · ${p.target} · ${p.command}</option>
