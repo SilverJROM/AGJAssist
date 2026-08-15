@@ -182,6 +182,156 @@ function makeEntry(id, role, label, content, timestamp) {
   return { id, role, label, content, timestamp };
 }
 
+const _c4VerbRe = /^(?:Working|Drizzl\w*|Thinking|Compacting|Waiting for|Worked for)\b/i;
+const _c4DurationRe = /(?:\d+[hms]|\d+m \d+s)/i;
+
+function _isC4StatusLine(line) {
+  const trimmed = (line || "").trim();
+  if (!trimmed) return false;
+  if (_statusChromeRe.test(line)) return false;
+  if (_modelFooterRe.test(trimmed) || _tipChromeRe.test(trimmed)) return false;
+  if (_c4VerbRe.test(trimmed)) return true;
+  return _c4DurationRe.test(trimmed) && /(?:tokens|effort)/i.test(trimmed);
+}
+
+function _lastIndexByRole(entries, role) {
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    if (entries[i] && entries[i].role === role) return i;
+  }
+  return -1;
+}
+
+function _linesEqual(left, right) {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) return false;
+  }
+  return true;
+}
+
+function _findBlock(hayLines, needleLines) {
+  if (!needleLines.length || hayLines.length < needleLines.length) return -1;
+  const lastStart = hayLines.length - needleLines.length;
+  for (let i = 0; i <= lastStart; i += 1) {
+    if (_linesEqual(hayLines.slice(i, i + needleLines.length), needleLines)) return i;
+  }
+  return -1;
+}
+
+function _removeExactText(haystack, needle) {
+  if (!haystack || !needle) return haystack || "";
+  const hayLines = haystack.split("\n");
+  const needleLines = needle.split("\n");
+  const blockAt = _findBlock(hayLines, needleLines);
+  if (blockAt >= 0) {
+    return hayLines.slice(0, blockAt).concat(hayLines.slice(blockAt + needleLines.length)).join("\n");
+  }
+  for (let n = needleLines.length - 1; n > 0; n -= 1) {
+    const suffix = needleLines.slice(-n);
+    if (_linesEqual(hayLines.slice(0, n), suffix)) {
+      return hayLines.slice(n).join("\n");
+    }
+  }
+  if (needleLines.length === 1) {
+    const target = needleLines[0].trim();
+    return hayLines.filter((line) => line.trim() !== target).join("\n");
+  }
+  return haystack;
+}
+
+function _stripStatusLines(text) {
+  if (!text) return "";
+  return text.split("\n").filter((line) => !_isC4StatusLine(line)).join("\n").trim();
+}
+
+function _mergeAgedTail(previousContent, nextContent) {
+  const prev = previousContent || "";
+  const next = nextContent || "";
+  if (!next) return prev;
+  if (!prev) return next;
+  if (next === prev) return prev;
+  if (next.startsWith(prev)) return next;
+  if (prev.endsWith(next) || prev.includes(next)) return prev;
+
+  const prevLines = prev.split("\n");
+  const nextLines = next.split("\n");
+  const max = Math.min(prevLines.length, nextLines.length);
+  for (let n = max; n > 0; n -= 1) {
+    if (_linesEqual(prevLines.slice(-n), nextLines.slice(0, n))) {
+      return prevLines.concat(nextLines.slice(n)).join("\n");
+    }
+  }
+  return next;
+}
+
+function _agentBodyFromSnapshot(snapshot, entries, excludeLastAgent) {
+  let body = _stripStatusLines(cleanTerminalOutput(snapshot));
+  const removals = [];
+  for (const entry of entries) {
+    if (entry && entry.role === "user" && entry.content) removals.push(entry.content);
+  }
+  const agents = entries.filter((entry) => entry && entry.role === "agent");
+  const priorAgents = excludeLastAgent ? agents.slice(0, -1) : agents;
+  for (const entry of priorAgents) {
+    if (entry.content) removals.push(entry.content);
+  }
+  for (const needle of removals) {
+    body = _removeExactText(body, needle);
+  }
+  return body.trim();
+}
+
+/**
+ * C4 telemetry from the latest snapshot. One status string, never a turn.
+ */
+export function extractStatus(text) {
+  const cleaned = cleanTerminalOutput(text);
+  if (!cleaned) return "";
+  let last = "";
+  for (const line of cleaned.split("\n")) {
+    if (_isC4StatusLine(line)) last = line.trim();
+  }
+  return last;
+}
+
+/**
+ * Append a YOU turn from composer text. Does not rebuild prior entries.
+ */
+export function appendYou(entries, text, { now = Date.now() } = {}) {
+  const content = (text || "").trim();
+  const list = Array.isArray(entries) ? entries : [];
+  if (!content) return list;
+  return list.concat([
+    makeEntry("you-" + now, "user", "You", content, new Date(now).toLocaleTimeString())
+  ]);
+}
+
+/**
+ * Patch the last AGENT in place, or open a new AGENT only after a YOU send.
+ * Aged capture tails do not rebuild prior turns or restamp identities.
+ */
+export function applyAgentPatch(entries, snapshot, { now = Date.now() } = {}) {
+  const list = Array.isArray(entries) ? entries : [];
+  const lastAgentIdx = _lastIndexByRole(list, "agent");
+  const lastUserIdx = _lastIndexByRole(list, "user");
+  const openNew = lastAgentIdx < 0 || lastUserIdx > lastAgentIdx;
+  const body = _agentBodyFromSnapshot(snapshot, list, !openNew);
+
+  if (openNew) {
+    if (!body) return list;
+    return list.concat([
+      makeEntry("agent-" + now, "agent", "Agent", body, new Date(now).toLocaleTimeString())
+    ]);
+  }
+
+  const last = list[lastAgentIdx];
+  const merged = _mergeAgedTail(last.content, body);
+  if (merged === last.content) return list;
+  const next = list.slice();
+  next[lastAgentIdx] = { ...last, content: merged };
+  return next;
+}
+
 export function buildInitialFriendlyState({
   target,
   sessionName,

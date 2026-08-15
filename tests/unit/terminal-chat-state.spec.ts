@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyAgentPatch,
+  appendYou,
   buildInitialFriendlyState,
   capTerminalOutput,
   cleanTerminalOutput,
   diffTerminalOutput,
+  extractStatus,
   formatFriendlyTerminalOutput,
   normalizeTerminalOutput,
   tailTerminalOutput
@@ -197,5 +200,110 @@ describe("terminal chat state", () => {
 
     expect(state.entries).toHaveLength(2);
     expect(state.entries[1].content).toBe("line 3");
+  });
+});
+
+describe("conversation render-model helpers", () => {
+  const COMMAND = "fence hello from the phone";
+  const INITIAL = [
+    "Agent baseline from the live poll.",
+    "⏵⏵ bypass permissions on · ctrl+t",
+    "▌ Type a message",
+    "Working… (5s · esc to interrupt)",
+    "gpt-5.3-codex · ~/TGBOTS/AGJAssist",
+    "┌──────────────────────────────┐",
+    "│ Type a message               │",
+    "└──────────────────────────────┘"
+  ].join("\n");
+  const AFTER_SEND = [
+    INITIAL,
+    COMMAND,
+    "Agent follow-up from the next live poll.",
+    "Drizzling… (7m 38s · 22.9k tokens · xhigh effort)"
+  ].join("\n");
+
+  it("extracts the latest C4 status and ignores C1–C3 plus token prose", () => {
+    expect(extractStatus(INITIAL)).toBe("Working… (5s · esc to interrupt)");
+    expect(extractStatus(AFTER_SEND)).toBe("Drizzling… (7m 38s · 22.9k tokens · xhigh effort)");
+    expect(extractStatus("⏵⏵ bypass permissions on · ctrl+t")).toBe("");
+    expect(extractStatus("gpt-5.3-codex · ~/TGBOTS/AGJAssist · xhigh effort")).toBe("");
+    expect(extractStatus("Count the tokens in the last reply.")).toBe("");
+  });
+
+  it("appends YOU from sent text without restamping prior turns", () => {
+    const seed = applyAgentPatch([], INITIAL, { now: 1_700_000_000_000 });
+    const next = appendYou(seed, `  ${COMMAND}  `, { now: 1_700_000_001_000 });
+    expect(next).toHaveLength(2);
+    expect(next[0]).toBe(seed[0]);
+    expect(next[1]).toMatchObject({
+      id: "you-1700000001000",
+      role: "user",
+      label: "You",
+      content: COMMAND
+    });
+    expect(next[1].timestamp).toBe(new Date(1_700_000_001_000).toLocaleTimeString());
+    expect(appendYou(next, "   ")).toBe(next);
+  });
+
+  it("patches the last AGENT in place and opens a new AGENT only after YOU", () => {
+    const t0 = 1_700_000_000_000;
+    const first = applyAgentPatch([], INITIAL, { now: t0 });
+    expect(first).toHaveLength(1);
+    expect(first[0]).toMatchObject({
+      id: "agent-1700000000000",
+      role: "agent",
+      content: "Agent baseline from the live poll."
+    });
+    expect(first[0].content).not.toContain("Working…");
+    expect(first[0].content).not.toContain("bypass permissions");
+
+    const statusTick = applyAgentPatch(first, INITIAL.replace("5s", "6s"), { now: t0 + 1000 });
+    expect(statusTick).toBe(first);
+    expect(statusTick[0].id).toBe(first[0].id);
+    expect(statusTick[0].timestamp).toBe(first[0].timestamp);
+
+    const withYou = appendYou(first, COMMAND, { now: t0 + 2000 });
+    const stillWaiting = applyAgentPatch(withYou, INITIAL, { now: t0 + 2500 });
+    expect(stillWaiting).toBe(withYou);
+
+    const after = applyAgentPatch(withYou, AFTER_SEND, { now: t0 + 3000 });
+    expect(after).toHaveLength(3);
+    expect(after[0].id).toBe(first[0].id);
+    expect(after[0].timestamp).toBe(first[0].timestamp);
+    expect(after[1].id).toBe("you-1700000002000");
+    expect(after[2]).toMatchObject({
+      id: "agent-1700000003000",
+      role: "agent",
+      content: "Agent follow-up from the next live poll."
+    });
+    expect(after[2].content).not.toContain("Agent baseline");
+    expect(after[2].content).not.toContain(COMMAND);
+    expect(after[2].content).not.toContain("Drizzling");
+
+    const nextPoll = applyAgentPatch(after, AFTER_SEND, { now: t0 + 4000 });
+    expect(nextPoll).toBe(after);
+    expect(nextPoll[2].id).toBe(after[2].id);
+    expect(nextPoll[2].timestamp).toBe(after[2].timestamp);
+  });
+
+  it("keeps prior turn ids when the capture tail ages out", () => {
+    const t0 = 1_700_000_010_000;
+    let entries = applyAgentPatch([], "old-agent-turn-one\nline-a", { now: t0 });
+    entries = appendYou(entries, "hello", { now: t0 + 1000 });
+    entries = applyAgentPatch(
+      entries,
+      "old-agent-turn-one\nline-a\nhello\nline-1\nline-2\nline-3",
+      { now: t0 + 2000 }
+    );
+    const priorIds = entries.map((entry) => entry.id);
+    const priorTimes = entries.map((entry) => entry.timestamp);
+
+    const aged = applyAgentPatch(entries, "hello\nline-1\nline-2\nline-3\nline-4", { now: t0 + 3000 });
+    expect(aged.map((entry) => entry.id)).toEqual(priorIds);
+    expect(aged.map((entry) => entry.timestamp)).toEqual(priorTimes);
+    expect(aged[0].content).toContain("old-agent-turn-one");
+    expect(aged[1].content).toBe("hello");
+    expect(aged[2].content).toBe("line-1\nline-2\nline-3\nline-4");
+    expect(aged).toHaveLength(3);
   });
 });
