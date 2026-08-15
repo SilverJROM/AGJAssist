@@ -1,7 +1,7 @@
 import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { normalizeTerminalOutput, diffTerminalOutput, buildInitialFriendlyState, capTerminalOutput, formatFriendlyTerminalOutput, formatTerminalOutput } from './terminal-chat-state.js';
+import { normalizeTerminalOutput, diffTerminalOutput, capTerminalOutput, extractStatus, appendYou, applyAgentPatch } from './terminal-chat-state.js';
 import {
   AVAILABLE_BOTTOM_NAV_TABS,
   DEFAULT_BOTTOM_NAV_TAB_IDS,
@@ -2214,6 +2214,7 @@ function TerminalTab({ projectId, projectName } = {}) {
 
 function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScreen, onDisconnect }) {
   const [status, setStatus] = useState('loading');
+  const [statusLine, setStatusLine] = useState('');
   const [entries, setEntries] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -2224,8 +2225,6 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
   const transcriptRef = useRef(null);
   const snapshotRef = useRef('');
   const sendingRef = useRef(false);
-  const pendingOutputRef = useRef('');
-  const pendingSinceRef = useRef(0);
   const storageKey = 'agj_terminal_chat_' + target.replace(/[^a-zA-Z0-9_.-]/g, '_');
   const lineLimitKey = storageKey + '_line_limit';
 
@@ -2233,32 +2232,9 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
     return lineLimit;
   }
 
-  function queueBufferedOutput(chunk) {
-    const trimmed = (chunk || '').trim();
-    if (!trimmed) return;
-    pendingOutputRef.current = pendingOutputRef.current
-      ? `${pendingOutputRef.current}\n${trimmed}`
-      : trimmed;
-    if (!pendingSinceRef.current) {
-      pendingSinceRef.current = Date.now();
-    }
-  }
-
-  function flushBufferedOutput(force = false) {
-    const pending = pendingOutputRef.current.trim();
-    if (!pending) return;
-    const wordCount = pending.split(/\s+/).filter(Boolean).length;
-    const ageMs = Date.now() - (pendingSinceRef.current || Date.now());
-    if (!force && wordCount < 10 && ageMs < 2500) return;
-    pendingOutputRef.current = '';
-    pendingSinceRef.current = 0;
-    setEntries(prev => [...prev, {
-      id: 'bg-' + Date.now(),
-      role: 'terminal',
-      label: 'Background output',
-      content: pending,
-      timestamp: new Date().toLocaleTimeString()
-    }]);
+  function conversationSeed(savedState) {
+    const saved = Array.isArray(savedState?.entries) ? savedState.entries : [];
+    return saved.filter((entry) => entry && (entry.role === 'user' || entry.role === 'agent'));
   }
 
   useEffect(() => {
@@ -2292,9 +2268,8 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
       setInput('');
       setEntries([]);
       setSnapshot('');
+      setStatusLine('');
       snapshotRef.current = '';
-      pendingOutputRef.current = '';
-      pendingSinceRef.current = 0;
       let savedState = null;
       try {
         savedState = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
@@ -2303,26 +2278,24 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
         const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=200`);
         if (!active) return;
         const output = capTerminalOutput(normalizeTerminalOutput(data.output), 200);
-        const initialState = buildInitialFriendlyState({
-          target,
-          sessionName,
-          liveOutput: output,
-          savedState,
-          now: Date.now()
-        });
-        setSnapshot(initialState.snapshot);
-        snapshotRef.current = initialState.snapshot;
-        setEntries(initialState.entries);
+        const nextEntries = applyAgentPatch(conversationSeed(savedState), output);
+        setSnapshot(output);
+        snapshotRef.current = output;
+        setEntries(nextEntries);
+        setStatusLine(extractStatus(output));
         setLastCommand(savedState?.lastCommand || '');
         setLastUpdatedAt(Date.now());
         setStatus('connected');
       } catch (e) {
         if (!active) return;
         setStatus('error');
-        if (savedState?.entries?.length) {
-          setSnapshot(capTerminalOutput(savedState.snapshot || '', 200));
-          snapshotRef.current = capTerminalOutput(savedState.snapshot || '', 200);
-          setEntries(savedState.entries);
+        const savedEntries = conversationSeed(savedState);
+        if (savedEntries.length) {
+          const savedSnapshot = capTerminalOutput(savedState.snapshot || '', 200);
+          setSnapshot(savedSnapshot);
+          snapshotRef.current = savedSnapshot;
+          setEntries(savedEntries);
+          setStatusLine(extractStatus(savedSnapshot));
           setLastCommand(savedState.lastCommand || '');
           setLastUpdatedAt(savedState.updatedAt || 0);
         } else {
@@ -2354,15 +2327,12 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
         const latest = capTerminalOutput(normalizeTerminalOutput(data.output), 200);
         const previous = snapshotRef.current;
         if (latest && latest !== previous) {
-          const appended = diffTerminalOutput(previous, latest);
-          if (appended) {
-            queueBufferedOutput(appended);
-          }
           snapshotRef.current = latest;
           setSnapshot(latest);
           setLastUpdatedAt(Date.now());
+          setEntries(prev => applyAgentPatch(prev, latest));
+          setStatusLine(extractStatus(latest));
         }
-        flushBufferedOutput();
       } catch {}
     }, 1000);
 
@@ -2373,15 +2343,16 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
   }, [target]);
 
   useEffect(() => {
+    if (status === 'loading') return;
     try {
       sessionStorage.setItem(storageKey, JSON.stringify({
-        entries: [],
+        entries,
         snapshot: capTerminalOutput(snapshot, 200),
         lastCommand,
         updatedAt: Date.now()
       }));
     } catch {}
-  }, [entries, snapshot, lastCommand, storageKey]);
+  }, [entries, snapshot, lastCommand, storageKey, status]);
 
   async function captureCommandResult(beforeSnapshot) {
     let latest = beforeSnapshot;
@@ -2414,19 +2385,12 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
     const command = input.trim();
     if (!command || sending) return;
 
-    flushBufferedOutput(true);
     const beforeSnapshot = snapshotRef.current;
     setInput('');
     setSending(true);
     setStatus('running');
     setLastCommand(command);
-    setEntries(prev => [...prev, {
-      id: 'cmd-' + Date.now(),
-      role: 'user',
-      label: 'You',
-      content: command,
-      timestamp: new Date().toLocaleTimeString()
-    }]);
+    setEntries(prev => appendYou(prev, command));
 
     try {
       await api(`/api/tmux/panes/${encodeURIComponent(target)}/send`, {
@@ -2438,13 +2402,8 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
       snapshotRef.current = cappedSnapshot;
       setSnapshot(cappedSnapshot);
       setLastUpdatedAt(Date.now());
-      setEntries(prev => [...prev, {
-        id: 'out-' + Date.now(),
-        role: 'terminal',
-        label: 'Terminal',
-        content: result.output || cappedSnapshot || 'Command sent. No new terminal output captured yet.',
-        timestamp: new Date().toLocaleTimeString()
-      }]);
+      setEntries(prev => applyAgentPatch(prev, cappedSnapshot));
+      setStatusLine(extractStatus(cappedSnapshot));
       setStatus('connected');
     } catch (e) {
       setEntries(prev => [...prev, {
@@ -2462,7 +2421,6 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
   async function sendManualEnter() {
     if (sending) return;
 
-    flushBufferedOutput(true);
     const beforeSnapshot = snapshotRef.current;
     setSending(true);
     setStatus('running');
@@ -2477,6 +2435,8 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
       snapshotRef.current = cappedSnapshot;
       setSnapshot(cappedSnapshot);
       setLastUpdatedAt(Date.now());
+      setEntries(prev => applyAgentPatch(prev, cappedSnapshot));
+      setStatusLine(extractStatus(cappedSnapshot));
       setStatus('connected');
     } catch (e) {
       setEntries(prev => [...prev, {
@@ -2503,23 +2463,13 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
           <span class="badge badge-${status === 'connected' ? 'active' : status === 'running' ? 'pending' : status === 'loading' ? 'pending' : 'failed'}">${status}</span>
           <button class="btn btn-sm" onclick=${async () => {
             try {
-              flushBufferedOutput(true);
               const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=${getCaptureLines()}`);
               const latest = capTerminalOutput(normalizeTerminalOutput(data.output), 200);
-              const previous = snapshotRef.current;
-              const appended = diffTerminalOutput(previous, latest);
-              if (appended) {
-                setEntries(prev => [...prev, {
-                  id: 'manual-' + Date.now(),
-                  role: 'terminal',
-                  label: 'Latest output',
-                  content: appended,
-                  timestamp: new Date().toLocaleTimeString()
-                }]);
-              }
               snapshotRef.current = latest;
               setSnapshot(latest);
               setLastUpdatedAt(Date.now());
+              setEntries(prev => applyAgentPatch(prev, latest));
+              setStatusLine(extractStatus(latest));
               setStatus('connected');
             } catch (e) {
               setStatus('error');
@@ -2549,6 +2499,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
         </div>
         <div class="terminal-chat-composer-row">
           <textarea class="terminal-chat-input-field"
+                    data-testid="terminal-composer-input"
                     value=${input}
                     rows="2"
                     placeholder="Type a terminal command..."
@@ -2559,39 +2510,52 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
                         sendCommand();
                       }
                     }}></textarea>
-          <button class="terminal-chat-enter-btn" onclick=${sendManualEnter} disabled=${sending} title="Send Enter key">
+          <button class="terminal-chat-enter-btn" data-testid="terminal-send-enter" onclick=${sendManualEnter} disabled=${sending} title="Send Enter key">
             ↵
           </button>
-          <button class="terminal-chat-send-btn" onclick=${sendCommand} disabled=${sending || !input.trim()}>
+          <button class="terminal-chat-send-btn" data-testid="terminal-send-command" onclick=${sendCommand} disabled=${sending || !input.trim()}>
             ${sending ? html`<div class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>` : html`<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>`}
           </button>
         </div>
       </div>
 
-      <div class="terminal-chat-transcript" ref=${transcriptRef}>
+      <div class="terminal-chat-transcript" data-testid="terminal-conversation" ref=${transcriptRef}>
         <div class="terminal-chat-details">
           <span class="terminal-chat-detail-pill">${sessionName || 'Terminal chat'}</span>
           <span class="terminal-chat-detail-pill">${target}</span>
           ${lastUpdatedAt ? html`<span class="terminal-chat-detail-pill">Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}</span>` : ''}
         </div>
-        <div class="terminal-chat-card terminal-chat-single-output">
-          <div class="terminal-chat-meta">
-            <span>${lastCommand ? `Last command · ${lastCommand}` : `Current output · ${sessionName || target}`}</span>
-            <span>${lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : status}</span>
-          </div>
-          <div class="terminal-chat-content">
-            ${formatFriendlyTerminalOutput(formatTerminalOutput(snapshot), lineLimit) || (sending ? 'Running command...' : status === 'loading' ? 'Loading terminal output...' : status === 'error' ? 'Terminal output unavailable.' : `Connected to ${target}. Waiting for terminal output...`)}
-          </div>
-          ${sending && html`
-            <div class="terminal-chat-inline-status">
-              <div class="typing-dots">
-                <span class="typing-dot"></span>
-                <span class="typing-dot"></span>
-                <span class="typing-dot"></span>
+        <div class="terminal-chat-status" data-testid="terminal-status">${statusLine}</div>
+        ${entries.map((entry) => {
+          if (entry.role === 'agent' || entry.role === 'user') {
+            const isUser = entry.role === 'user';
+            return html`
+              <div key=${entry.id}
+                   class=${'ovm-chat-row ' + (isUser ? 'ovm-chat-row-user' : 'ovm-chat-row-ovm') + ' terminal-chat-entry ' + (isUser ? 'terminal-chat-entry-user' : 'terminal-chat-entry-agent')}
+                   data-testid=${isUser ? 'terminal-turn-user' : 'terminal-turn-agent'}
+                   data-turn-id=${entry.id}>
+                <div class=${'ovm-chat-bubble terminal-chat-bubble ' + (isUser ? 'ovm-chat-bubble-user' : 'ovm-chat-bubble-ovm')}>
+                  <div class="ovm-chat-text terminal-chat-content">${entry.content}</div>
+                  <div class="ovm-chat-ts" data-testid="terminal-turn-time">${entry.timestamp}</div>
+                </div>
               </div>
+            `;
+          }
+          return html`
+            <div key=${entry.id} class="ovm-chat-row ovm-chat-row-system terminal-chat-entry terminal-chat-entry-${entry.role}">
+              <div class="ovm-chat-pill">${entry.content}</div>
             </div>
-          `}
-        </div>
+          `;
+        })}
+        ${sending && html`
+          <div class="terminal-chat-inline-status">
+            <div class="typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+        `}
       </div>
     </div>
   `;

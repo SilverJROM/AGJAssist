@@ -354,9 +354,74 @@ body {
   display: flex;
 }
 .terminal-chat-entry-user { justify-content: flex-end; }
+.terminal-chat-entry-agent { justify-content: flex-start; }
 .terminal-chat-entry-terminal,
 .terminal-chat-entry-system,
 .terminal-chat-entry-error { justify-content: flex-start; }
+.terminal-chat-status {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 7px 13px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+.terminal-chat-view .ovm-chat-row {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+}
+.terminal-chat-view .ovm-chat-row-user { justify-content: flex-end; }
+.terminal-chat-view .ovm-chat-row-ovm { justify-content: flex-start; }
+.terminal-chat-view .ovm-chat-row-system { justify-content: center; }
+.terminal-chat-view .ovm-chat-bubble {
+  max-width: 78%;
+  padding: 12px 14px 8px;
+  border-radius: 14px;
+  word-break: break-word;
+  white-space: pre-wrap;
+  position: relative;
+  box-shadow: none;
+}
+.terminal-chat-view .ovm-chat-bubble-ovm,
+.terminal-chat-view .terminal-chat-bubble.ovm-chat-bubble-ovm {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-bottom-left-radius: 4px;
+}
+.terminal-chat-view .ovm-chat-bubble-ovm::after {
+  border-color: transparent transparent var(--surface) transparent;
+}
+.terminal-chat-view .ovm-chat-bubble-user,
+.terminal-chat-view .terminal-chat-bubble.ovm-chat-bubble-user {
+  background: #173a2b;
+  color: #d9f3e4;
+  border: 1px solid #24543c;
+  border-bottom-right-radius: 4px;
+}
+.terminal-chat-view .ovm-chat-bubble-user::after {
+  border-color: transparent #173a2b transparent transparent;
+}
+.terminal-chat-view .ovm-chat-text {
+  color: inherit;
+}
+.terminal-chat-view .ovm-chat-bubble-user .terminal-chat-content,
+.terminal-chat-view .ovm-chat-bubble-user .ovm-chat-text {
+  color: inherit !important;
+  -webkit-text-fill-color: currentColor;
+}
+.terminal-chat-view .ovm-chat-ts {
+  color: var(--text-secondary);
+  text-align: right;
+}
 .terminal-chat-card {
   max-width: min(96%, 900px);
   border-radius: 12px;
