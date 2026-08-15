@@ -2260,8 +2260,31 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
   const transcriptRef = useRef(null);
   const snapshotRef = useRef('');
   const sendingRef = useRef(false);
+  const openAgentAfterYouRef = useRef(false);
   const storageKey = 'agj_terminal_chat_' + target.replace(/[^a-zA-Z0-9_.-]/g, '_');
   const lineLimitKey = storageKey + '_line_limit';
+
+  function lastRoleIndex(list, role) {
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      if (list[i] && list[i].role === role) return i;
+    }
+    return -1;
+  }
+
+  // After YOU, the next cleaned snapshot must open a new AGENT. Never patch the pre-send agent.
+  function applyConversationSnapshot(prev, latest) {
+    const list = Array.isArray(prev) ? prev : [];
+    if (openAgentAfterYouRef.current) {
+      const lastUserIdx = lastRoleIndex(list, 'user');
+      const lastAgentIdx = lastRoleIndex(list, 'agent');
+      if (lastUserIdx < 0 || lastUserIdx < lastAgentIdx) return list;
+    }
+    const next = applyAgentPatch(list, latest);
+    if (openAgentAfterYouRef.current && lastRoleIndex(next, 'agent') > lastRoleIndex(next, 'user')) {
+      openAgentAfterYouRef.current = false;
+    }
+    return next;
+  }
 
   function syncConvFontFromStorage() {
     const next = applyTerminalConvFontSize(readTerminalConvFontSize());
@@ -2392,7 +2415,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
           snapshotRef.current = latest;
           setSnapshot(latest);
           setLastUpdatedAt(Date.now());
-          setEntries(prev => applyAgentPatch(prev, latest));
+          setEntries(prev => applyConversationSnapshot(prev, latest));
           setStatusLine(extractStatus(latest));
         }
       } catch {}
@@ -2448,6 +2471,8 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
     if (!command || sending) return;
 
     const beforeSnapshot = snapshotRef.current;
+    sendingRef.current = true;
+    openAgentAfterYouRef.current = true;
     setInput('');
     setSending(true);
     setStatus('running');
@@ -2464,7 +2489,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
       snapshotRef.current = cappedSnapshot;
       setSnapshot(cappedSnapshot);
       setLastUpdatedAt(Date.now());
-      setEntries(prev => applyAgentPatch(prev, cappedSnapshot));
+      setEntries(prev => applyConversationSnapshot(prev, cappedSnapshot));
       setStatusLine(extractStatus(cappedSnapshot));
       setStatus('connected');
     } catch (e) {
@@ -2477,6 +2502,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
       }]);
       setStatus('error');
     }
+    sendingRef.current = false;
     setSending(false);
   }
 
@@ -2484,6 +2510,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
     if (sending) return;
 
     const beforeSnapshot = snapshotRef.current;
+    sendingRef.current = true;
     setSending(true);
     setStatus('running');
 
@@ -2497,7 +2524,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
       snapshotRef.current = cappedSnapshot;
       setSnapshot(cappedSnapshot);
       setLastUpdatedAt(Date.now());
-      setEntries(prev => applyAgentPatch(prev, cappedSnapshot));
+      setEntries(prev => applyConversationSnapshot(prev, cappedSnapshot));
       setStatusLine(extractStatus(cappedSnapshot));
       setStatus('connected');
     } catch (e) {
@@ -2511,6 +2538,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
       setStatus('error');
     }
 
+    sendingRef.current = false;
     setSending(false);
   }
 
@@ -2536,7 +2564,7 @@ function FriendlyTerminalView({ target, sessionName, fullScreen, onToggleFullScr
               snapshotRef.current = latest;
               setSnapshot(latest);
               setLastUpdatedAt(Date.now());
-              setEntries(prev => applyAgentPatch(prev, latest));
+              setEntries(prev => applyConversationSnapshot(prev, latest));
               setStatusLine(extractStatus(latest));
               setStatus('connected');
             } catch (e) {

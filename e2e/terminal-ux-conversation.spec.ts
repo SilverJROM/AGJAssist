@@ -312,6 +312,7 @@ test('§7: terminal conversation composes on the served iPhone surface', async (
 type FrozenTransportHooks = {
   onOutputRequest?: (lines: number | null) => void;
   onCreateSession?: (body: unknown) => void;
+  getOutput?: () => string;
 };
 
 async function installFrozenTransport(
@@ -347,10 +348,11 @@ async function installFrozenTransport(
   await page.route(/\/api\/tmux\/panes\/[^/]+\/output/, async (route) => {
     const lines = Number(new URL(route.request().url()).searchParams.get('lines'));
     hooks.onOutputRequest?.(Number.isFinite(lines) ? lines : null);
+    const current = hooks.getOutput ? hooks.getOutput() : output;
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ output, target: TARGET, lines: 200 }),
+      body: JSON.stringify({ output: current, target: TARGET, lines: 200 }),
     });
   });
   await page.route(/\/api\/tmux\/panes\/[^/]+\/send$/, async (route) => {
@@ -402,13 +404,34 @@ async function selectPaneAndFriendly(page: import('@playwright/test').Page) {
 
 test('A3 R1b R2 production wire — YOU + AGENT bubbles and both POST shapes', async ({ page }) => {
   const posts: unknown[] = [];
-  await installFrozenTransport(page, INITIAL_OUTPUT, (body) => posts.push(body));
+  let paneOutput = INITIAL_OUTPUT;
+  await installFrozenTransport(page, INITIAL_OUTPUT, (body) => {
+    posts.push(body);
+    paneOutput = AFTER_SEND_OUTPUT;
+  }, {
+    getOutput: () => paneOutput,
+  });
   await selectPaneAndFriendly(page);
-  await expect(page.locator('[data-testid="terminal-turn-agent"]')).toHaveCount(1);
+  const agentTurns = page.locator('[data-testid="terminal-turn-agent"]');
+  const userTurns = page.locator('[data-testid="terminal-turn-user"]');
+  await expect(agentTurns).toHaveCount(1);
+  const firstAgentId = await agentTurns.first().getAttribute('data-turn-id');
   await page.locator('[data-testid="terminal-composer-input"], .terminal-chat-input-field').first().fill(COMMAND);
   await page.locator('[data-testid="terminal-send-command"], .terminal-chat-send-btn').first().click();
-  await expect(page.locator('[data-testid="terminal-turn-user"]')).toHaveCount(1);
-  await expect(page.locator('[data-testid="terminal-turn-user"]')).toContainText(COMMAND);
+  await expect(userTurns).toHaveCount(1);
+  await expect(userTurns).toContainText(COMMAND);
+  await expect(agentTurns).toHaveCount(2);
+  const latestAgentId = await agentTurns.last().getAttribute('data-turn-id');
+  expect(firstAgentId).toBeTruthy();
+  expect(latestAgentId).toBeTruthy();
+  expect(latestAgentId).not.toBe(firstAgentId);
+  await expect(agentTurns.last()).toContainText('Agent follow-up from the next live poll.');
+  await expect(agentTurns.first()).toContainText('Agent baseline from the live poll.');
+  const latestTimestamp = await agentTurns.last().locator('[data-testid="terminal-turn-time"]').textContent();
+  await page.waitForTimeout(1_100);
+  expect(await agentTurns.count()).toBe(2);
+  expect(await agentTurns.last().getAttribute('data-turn-id')).toBe(latestAgentId);
+  expect(await agentTurns.last().locator('[data-testid="terminal-turn-time"]').textContent()).toBe(latestTimestamp);
   await page.locator('[data-testid="terminal-send-enter"], .terminal-chat-enter-btn').first().click();
   expect(posts).toEqual(expect.arrayContaining([
     expect.objectContaining({ command: COMMAND, enter: true }),
