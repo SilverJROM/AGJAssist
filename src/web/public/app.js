@@ -2192,7 +2192,8 @@ function TerminalTab({ projectId, projectName } = {}) {
     const selected = normalizeLineLimit(nextValue);
     setLineLimit(selected);
     if (friendlyMode) {
-      setFriendlyRefreshTick((tick) => tick + 1);
+      // Let the child receive the new limit before restarting its real fetch effect.
+      setTimeout(() => setFriendlyRefreshTick((tick) => tick + 1), 0);
     }
   }
 
@@ -2225,7 +2226,7 @@ function TerminalTab({ projectId, projectName } = {}) {
           <div class="terminal-menu-row">
             <label class="terminal-chat-line-picker">
               <span>Lines</span>
-              <select data-testid="terminal-lines" value=${String(lineLimit)} onChange=${e => handleLineLimitChange(e.target.value)} onchange=${e => handleLineLimitChange(e.target.value)}>
+              <select data-testid="terminal-lines" defaultValue=${String(lineLimit)} onchange=${e => handleLineLimitChange(e.target.value)}>
                 <option value="25">25</option>
                 <option value="50">50</option>
                 <option value="100">100</option>

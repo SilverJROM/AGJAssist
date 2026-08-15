@@ -531,7 +531,7 @@ test('A6 R6 R7 single topbar — controls still perform their functions at 390',
   });
   await linesControl.selectOption('150');
   await linesRequest;
-  expect(requestedLines).toContain(150);
+  await expect.poll(() => requestedLines).toContain(150);
 
   const lastUpdated = page.locator('[data-testid="terminal-last-updated"], [data-terminal-last-updated], .terminal-chat-detail-pill').filter({ hasText: /updated/i }).first();
   await expect(lastUpdated).toBeVisible();
