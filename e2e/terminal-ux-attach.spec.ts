@@ -168,3 +168,69 @@ test('attach-image: paperclip -> chip -> send appends [image: path] and clears t
   expect(sentCommand).toEqual({ command: `[image: ${ATTACH_PATH}]`, enter: true });
   await expect(chip).toHaveCount(0);
 });
+
+test('attach-image: clipboard paste of an image uses the same chip and send path', async ({ page }) => {
+  test.setTimeout(60_000);
+
+  let sentCommand: unknown = null;
+  let attachRequestBody: { filename?: string; dataBase64?: string } | null = null;
+
+  await page.route(/\/api\/tmux\/attach-image$/, async (route) => {
+    attachRequestBody = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, path: ATTACH_PATH }) });
+  });
+  await page.route(/\/api\/tmux\/panes\/[^/]+\/send$/, async (route) => {
+    sentCommand = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+  });
+
+  await openFriendlyTerminal(page);
+
+  const composerInput = page.locator('[data-testid="terminal-composer-input"]');
+  const sendButton = page.locator('[data-testid="terminal-send-command"]');
+  const chip = page.locator('[data-testid="terminal-attachment-chip"]');
+
+  // Plain-text paste must not trigger attach or preventDefault.
+  await composerInput.focus();
+  await page.evaluate(() => {
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', {
+      value: {
+        items: [{ kind: 'string', type: 'text/plain', getAsFile: () => null }],
+      },
+    });
+    const field = document.querySelector('[data-testid="terminal-composer-input"]');
+    field!.dispatchEvent(event);
+  });
+  await expect(chip).toHaveCount(0);
+  expect(attachRequestBody).toBeNull();
+
+  await page.evaluate((b64) => {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    const file = new File([bytes], 'clip.png', { type: 'image/png' });
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', {
+      value: {
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => file }],
+      },
+    });
+    const field = document.querySelector('[data-testid="terminal-composer-input"]');
+    const cancelled = !field!.dispatchEvent(event);
+    (window as unknown as { __pastePrevented?: boolean }).__pastePrevented = cancelled;
+  }, TINY_PNG_BASE64);
+
+  await expect(chip).toBeVisible();
+  expect(attachRequestBody).not.toBeNull();
+  expect(attachRequestBody!.filename).toMatch(/^pasted-\d{8}T\d+Z\.png$/);
+  expect(typeof attachRequestBody!.dataBase64).toBe('string');
+  expect(attachRequestBody!.dataBase64!.length).toBeGreaterThan(0);
+  expect(await page.evaluate(() => (window as unknown as { __pastePrevented?: boolean }).__pastePrevented)).toBe(true);
+
+  await composerInput.fill('look at this');
+  await sendButton.click();
+  await expect.poll(() => sentCommand).not.toBeNull();
+  expect(sentCommand).toEqual({ command: `look at this [image: ${ATTACH_PATH}]`, enter: true });
+  await expect(chip).toHaveCount(0);
+});

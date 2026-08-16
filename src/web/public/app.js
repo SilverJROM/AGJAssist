@@ -2846,12 +2846,9 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     setAttachError('');
   }
 
-  async function handleAttachFile(event) {
-    const file = event.target.files && event.target.files[0];
-    event.target.value = '';
-    if (!file || sending || attaching) return;
-
-    const ext = (file.name.split('.').pop() || '').toLowerCase();
+  async function uploadAttachedImage(file, filename) {
+    const name = filename || file.name;
+    const ext = (name.split('.').pop() || '').toLowerCase();
     if (!['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext) && !(file.type || '').startsWith('image/')) {
       setAttachError('Choose a png, jpg, jpeg, gif, or webp image.');
       return;
@@ -2871,7 +2868,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
         reader.readAsDataURL(file);
       });
       const dataBase64 = dataUrl.replace(/^data:[^,]+,/, '');
-      const body = { filename: file.name, dataBase64 };
+      const body = { filename: name, dataBase64 };
       if (projectId) body.project_id = Number(projectId);
       const result = await api('/api/tmux/attach-image', {
         method: 'POST',
@@ -2881,12 +2878,39 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       if (!result?.ok || !result.path) {
         throw new Error('Upload did not return a path.');
       }
-      setAttachment({ path: result.path, preview: dataUrl, name: file.name });
+      setAttachment({ path: result.path, preview: dataUrl, name });
     } catch (e) {
       setAttachment(null);
       setAttachError(e.message || 'Failed to attach image.');
     }
     setAttaching(false);
+  }
+
+  async function handleAttachFile(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+    if (!file || sending || attaching) return;
+    await uploadAttachedImage(file);
+  }
+
+  function handleComposerPaste(event) {
+    const items = event.clipboardData && event.clipboardData.items;
+    if (!items) return;
+    let imageItem = null;
+    for (let i = 0; i < items.length; i += 1) {
+      const item = items[i];
+      if (item && String(item.type || '').startsWith('image/')) {
+        imageItem = item;
+        break;
+      }
+    }
+    if (!imageItem) return;
+    event.preventDefault();
+    if (sending || attaching) return;
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    const filename = 'pasted-' + new Date().toISOString().replace(/[-:.]/g, '') + '.png';
+    uploadAttachedImage(file, filename);
   }
 
   return html`
@@ -2970,6 +2994,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                     rows="1"
                     placeholder="Message the agent..."
                     onInput=${handleComposerInput}
+                    onPaste=${handleComposerPaste}
                     onKeyDown=${e => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
