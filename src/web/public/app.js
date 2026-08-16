@@ -2748,7 +2748,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   async function sendCommand() {
     const text = input.trim();
     const imageRef = attachment?.path ? `[image: ${attachment.path}]` : '';
-    const command = text && imageRef ? `${text}\n${imageRef}` : (text || imageRef);
+    const command = text && imageRef ? `${text} ${imageRef}` : (text || imageRef);
     if (!command || sending) return;
 
     const beforeSnapshot = snapshotRef.current;

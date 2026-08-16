@@ -151,7 +151,7 @@ test('attach-image: paperclip -> chip -> send appends [image: path] and clears t
   await sendButton.click();
 
   await expect.poll(() => sentCommand).not.toBeNull();
-  expect(sentCommand).toEqual({ command: `look at this\n[image: ${ATTACH_PATH}]`, enter: true });
+  expect(sentCommand).toEqual({ command: `look at this [image: ${ATTACH_PATH}]`, enter: true });
 
   // Chip clears after send (state resets synchronously, no need to wait for the poll cycle).
   await expect(chip).toHaveCount(0);
