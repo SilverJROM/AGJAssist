@@ -2531,6 +2531,39 @@ function TerminalTab({ projectId, projectName } = {}) {
   `;
 }
 
+// Long replies are windowed so a fresh open shows only the recent tail (Grok/
+// Telegram style): the last BUBBLE_VISIBLE_TAIL lines by default, with a "show
+// earlier" control that reveals a bigger tail, then everything. The tail stays
+// pinned to the bottom so scroll-to-bottom always lands on the newest line.
+const BUBBLE_COLLAPSE_THRESHOLD = 100; // only window bubbles longer than this
+const BUBBLE_VISIBLE_TAIL = 80;        // default on open: last ~80 lines
+const BUBBLE_EXPAND_TAIL = 480;        // one tap up: ~400 more lines on top
+
+function CollapsibleBubbleContent({ content }) {
+  const [level, setLevel] = useState(0); // 0 = tail80, 1 = tail480, 2 = all
+  const text = typeof content === 'string' ? content : String(content == null ? '' : content);
+  const lines = text.split('\n');
+  const total = lines.length;
+  if (total <= BUBBLE_COLLAPSE_THRESHOLD) {
+    return html`<div class="ovm-chat-text terminal-chat-content">${text}</div>`;
+  }
+  const cap = level === 0 ? BUBBLE_VISIBLE_TAIL : level === 1 ? BUBBLE_EXPAND_TAIL : total;
+  const start = Math.max(0, total - cap);
+  const hidden = start;
+  const visible = lines.slice(start).join('\n');
+  return html`
+    ${hidden > 0 ? html`
+      <button type="button" class="terminal-chat-showmore"
+              data-testid="terminal-show-earlier"
+              onclick=${() => setLevel((l) => Math.min(2, l + 1))}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"></path></svg>
+        Show earlier lines · ${hidden} more
+      </button>
+    ` : ''}
+    <div class="ovm-chat-text terminal-chat-content">${visible}</div>
+  `;
+}
+
 function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, showRawChrome = false, onStatusChange, onLastUpdated, projectId }) {
   const [status, setStatus] = useState('loading');
   const [statusLine, setStatusLine] = useState('');
@@ -3039,7 +3072,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                     : html`<span class="terminal-chat-badge">AGENT</span><span>${sessionName || 'Agent'} · <span data-testid="terminal-turn-time">${entry.timestamp}</span></span>`}
                 </div>
                 <div class=${'ovm-chat-bubble terminal-chat-bubble ' + (isUser ? 'ovm-chat-bubble-user' : 'ovm-chat-bubble-ovm')}>
-                  <div class="ovm-chat-text terminal-chat-content">${entry.content}</div>
+                  <${CollapsibleBubbleContent} content=${entry.content} />
                 </div>
               </div>
             `;
