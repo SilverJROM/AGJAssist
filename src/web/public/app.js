@@ -2478,6 +2478,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                 ? html`<${FriendlyTerminalView}
                     target=${activeTarget}
                     sessionName=${activePane?.session_name || ''}
+                    projectId=${projectId || sessions.find(s => s.session_name === activePane?.session_name)?.project_id || null}
                     fullScreen=${fullScreen}
                     key=${`${activeTarget}:${lineLimit}`}
                     lineLimit=${lineLimit}
@@ -2530,7 +2531,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   `;
 }
 
-function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, showRawChrome = false, onStatusChange, onLastUpdated }) {
+function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, showRawChrome = false, onStatusChange, onLastUpdated, projectId }) {
   const [status, setStatus] = useState('loading');
   const [statusLine, setStatusLine] = useState('');
   const [entries, setEntries] = useState([]);
@@ -2540,11 +2541,15 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [lastCommand, setLastCommand] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
   const [sendMode, setSendMode] = useState('command');
+  const [attachment, setAttachment] = useState(null);
+  const [attaching, setAttaching] = useState(false);
+  const [attachError, setAttachError] = useState('');
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
   const transcriptRef = useRef(null);
   const snapshotRef = useRef('');
   const sendingRef = useRef(false);
   const openAgentAfterYouRef = useRef(false);
+  const fileInputRef = useRef(null);
   const storageKey = 'agj_terminal_chat_' + target.replace(/[^a-zA-Z0-9_.-]/g, '_');
 
   function lastRoleIndex(list, role) {
@@ -2622,6 +2627,8 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     async function loadInitial() {
       setStatus('loading');
       setInput('');
+      setAttachment(null);
+      setAttachError('');
       setEntries([]);
       setSnapshot('');
       setStatusLine('');
@@ -2739,13 +2746,17 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   }
 
   async function sendCommand() {
-    const command = input.trim();
+    const text = input.trim();
+    const imageRef = attachment?.path ? `[image: ${attachment.path}]` : '';
+    const command = text && imageRef ? `${text}\n${imageRef}` : (text || imageRef);
     if (!command || sending) return;
 
     const beforeSnapshot = snapshotRef.current;
     sendingRef.current = true;
     openAgentAfterYouRef.current = true;
     setInput('');
+    setAttachment(null);
+    setAttachError('');
     setSending(true);
     setStatus('running');
     setLastCommand(command);
@@ -2824,6 +2835,60 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     field.style.height = Math.min(field.scrollHeight, 120) + 'px';
   }
 
+  function openAttachPicker() {
+    if (sending || attaching) return;
+    setAttachError('');
+    fileInputRef.current?.click();
+  }
+
+  function clearAttachment() {
+    setAttachment(null);
+    setAttachError('');
+  }
+
+  async function handleAttachFile(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+    if (!file || sending || attaching) return;
+
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext) && !(file.type || '').startsWith('image/')) {
+      setAttachError('Choose a png, jpg, jpeg, gif, or webp image.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setAttachError('Image exceeds 10MB limit.');
+      return;
+    }
+
+    setAttaching(true);
+    setAttachError('');
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Failed to read image.'));
+        reader.readAsDataURL(file);
+      });
+      const dataBase64 = dataUrl.replace(/^data:[^,]+,/, '');
+      const body = { filename: file.name, dataBase64 };
+      if (projectId) body.project_id = Number(projectId);
+      const result = await api('/api/tmux/attach-image', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        timeout: 60000
+      });
+      if (!result?.ok || !result.path) {
+        throw new Error('Upload did not return a path.');
+      }
+      setAttachment({ path: result.path, preview: dataUrl, name: file.name });
+    } catch (e) {
+      setAttachment(null);
+      setAttachError(e.message || 'Failed to attach image.');
+    }
+    setAttaching(false);
+  }
+
   return html`
     <div class="terminal-chat-view">
       <div class="terminal-chat-transcript" data-testid="terminal-conversation" ref=${transcriptRef}>
@@ -2881,7 +2946,24 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                   onclick=${() => { setSendMode('raw'); sendManualEnter(); }}
                   disabled=${sending}>Send raw keys</button>
         </div>
+        ${attachment ? html`
+          <div class="terminal-attachment-chip" data-testid="terminal-attachment-chip">
+            <img src=${attachment.preview} alt="" />
+            <span title=${attachment.path}>${attachment.path}</span>
+            <button type="button" onclick=${clearAttachment} aria-label="Remove attachment">×</button>
+          </div>
+        ` : ''}
+        ${attachError ? html`<div class="terminal-attach-error">${attachError}</div>` : ''}
         <div class="terminal-chat-composer-row">
+          <button type="button" class="terminal-chat-attach-btn" data-testid="terminal-attach-image"
+                  aria-label="Attach image" onclick=${openAttachPicker} disabled=${sending || attaching}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+              <circle cx="8.5" cy="10" r="1.5"></circle>
+              <path d="M21 16l-5-5-11 8"></path>
+            </svg>
+          </button>
+          <input type="file" accept="image/*" hidden ref=${fileInputRef} onChange=${handleAttachFile} />
           <textarea class="terminal-chat-input-field"
                     data-testid="terminal-composer-input"
                     value=${input}
@@ -2894,7 +2976,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                         sendCommand();
                       }
                     }}></textarea>
-          <button class="terminal-chat-send-btn" data-testid="terminal-send-command" onclick=${sendCommand} disabled=${sending || !input.trim()}>
+          <button class="terminal-chat-send-btn" data-testid="terminal-send-command" onclick=${sendCommand} disabled=${sending || (!input.trim() && !attachment)}>
             ${sending ? html`<div class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>` : '➤'}
           </button>
         </div>

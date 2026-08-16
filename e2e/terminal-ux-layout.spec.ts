@@ -156,4 +156,75 @@ for (const viewport of VIEWPORTS) {
     await page.screenshot({ path: screenshotPath });
     void testInfo;
   });
+
+  // WCAG contrast regression proof. JROM reported the shipped build's agent bubble text
+  // was faint/unreadable (a broken dark/light color mix). grok46's fix put the agent
+  // bubble text and background on a single light theme; this measures the ACTUAL
+  // rendered colors (not the CSS source) and computes the real WCAG contrast ratio,
+  // so a future regression that reintroduces a dark-on-dark or light-on-light pairing
+  // fails this test even if it doesn't touch layout geometry.
+  test(`Agent bubble text meets WCAG AA contrast at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
+    await openFriendlyTerminal(page, viewport);
+
+    const bubble = page.locator('[data-testid="terminal-turn-agent"] .terminal-chat-bubble').first();
+    await expect(bubble).toBeVisible();
+    const textNode = bubble.locator('.terminal-chat-content').first();
+    await expect(textNode).toBeVisible();
+
+    const measured = await page.evaluate(() => {
+      function parseRgb(value: string): [number, number, number, number] {
+        const match = value.match(/rgba?\(([^)]+)\)/);
+        if (!match) return [255, 255, 255, 1];
+        const parts = match[1].split(',').map((part) => Number.parseFloat(part.trim()));
+        return [parts[0] ?? 255, parts[1] ?? 255, parts[2] ?? 255, parts[3] ?? 1];
+      }
+      // Walk up the tree to find the first ancestor with a non-transparent
+      // background-color, i.e. the color that actually paints behind the text.
+      function effectiveBackground(el: Element | null): [number, number, number] {
+        let node = el;
+        while (node) {
+          const bg = getComputedStyle(node).backgroundColor;
+          const [r, g, b, a] = parseRgb(bg);
+          if (a > 0) return [r, g, b];
+          node = node.parentElement;
+        }
+        return [255, 255, 255];
+      }
+      const bubbleEl = document.querySelector('[data-testid="terminal-turn-agent"] .terminal-chat-bubble');
+      const textEl = bubbleEl?.querySelector('.terminal-chat-content');
+      if (!bubbleEl || !textEl) return null;
+      const [tr, tg, tb] = parseRgb(getComputedStyle(textEl).color);
+      const [br, bg, bb] = effectiveBackground(bubbleEl);
+      return { text: [tr, tg, tb] as [number, number, number], bg: [br, bg, bb] as [number, number, number] };
+    });
+
+    expect(measured).not.toBeNull();
+    const { text, bg } = measured!;
+
+    function relativeLuminance([r, g, b]: [number, number, number]): number {
+      const channel = (c: number) => {
+        const s = c / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    }
+
+    const lText = relativeLuminance(text);
+    const lBg = relativeLuminance(bg);
+    const lighter = Math.max(lText, lBg);
+    const darker = Math.min(lText, lBg);
+    const contrastRatio = (lighter + 0.05) / (darker + 0.05);
+
+    console.log(
+      `[contrast:${viewport.name}] text=rgb(${text.join(',')}) bg=rgb(${bg.join(',')}) ratio=${contrastRatio.toFixed(2)}:1`
+    );
+
+    // WCAG AA for normal-size body text.
+    expect(contrastRatio).toBeGreaterThanOrEqual(4.5);
+
+    const lightScreenshotPath = viewport.width <= 390
+      ? '/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/terminal-ux-2026-08-15/mockups/screenshots/LIVE-terminal-light-mobile.png'
+      : '/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/terminal-ux-2026-08-15/mockups/screenshots/LIVE-terminal-light-desktop.png';
+    await page.screenshot({ path: lightScreenshotPath });
+  });
 }

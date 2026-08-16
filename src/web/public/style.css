@@ -168,15 +168,32 @@ body {
   gap: 4px;
 }
 .terminal-shell {
+  /* Light-only terminal surface until a dedicated dark theme is reintroduced. */
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #eef1f4;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --text-secondary: #57606a;
+  --accent: #0969da;
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --danger: #cf222e;
+  --terminal-fg: #1f2328;
+  --terminal-muted: #57606a;
   display: flex;
   flex-direction: column;
   gap: 0;
   position: relative;
   min-height: 0;
   height: calc(100vh - 160px);
+  background: #f6f8fa;
+  color: #1f2328;
+  color-scheme: light;
 }
 .terminal-shell-friendly {
   background: var(--bg);
+  color: var(--text);
 }
 .terminal-shell-header {
   position: sticky;
@@ -189,7 +206,8 @@ body {
   flex-wrap: nowrap;
   overflow: hidden;
   padding: 10px 12px;
-  background: rgba(22, 27, 34, 0.92);
+  background: var(--surface);
+  color: var(--text);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
 }
@@ -276,7 +294,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 32px rgba(31, 35, 40, 0.16);
   padding: 6px;
 }
 .terminal-session-group {
@@ -383,7 +401,7 @@ body {
   font-weight: 700;
   padding: 0;
 }
-.terminal-fontpill button:active { background: #263041; }
+.terminal-fontpill button:active { background: #eaeef2; }
 .terminal-fontpill button:disabled { opacity: 0.4; cursor: not-allowed; }
 .terminal-fontpill .am { font-size: 12px; }
 .terminal-fontpill .ap { font-size: 18px; }
@@ -444,7 +462,7 @@ body {
   cursor: pointer;
   border-radius: 8px;
 }
-.terminal-sheet-stepper button:active { background: #263041; }
+.terminal-sheet-stepper button:active { background: #eaeef2; }
 .terminal-sheet-stepper button:disabled { opacity: 0.4; cursor: not-allowed; }
 .terminal-sheet-stepper .val {
   min-width: 46px;
@@ -478,7 +496,7 @@ body {
   flex: 0 0 auto;
   border: 0;
   border-radius: 999px;
-  background: #30363d;
+  background: #8c959f;
   position: relative;
   cursor: pointer;
   transition: 0.2s;
@@ -492,7 +510,7 @@ body {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #c9d1d9;
+  background: #ffffff;
   transition: 0.2s;
 }
 .terminal-switch.on { background: var(--accent); }
@@ -539,7 +557,8 @@ body {
   text-align: center;
 }
 .terminal-panel-friendly {
-  background: var(--bg);
+  background: #f6f8fa;
+  color: #1f2328;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -552,7 +571,8 @@ body {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  background: var(--bg);
+  background: #f6f8fa;
+  color: #1f2328;
 }
 .terminal-chat-header {
   display: flex;
@@ -572,7 +592,7 @@ body {
   bottom: 0;
   z-index: 5;
   flex-shrink: 0;
-  background: linear-gradient(180deg, transparent, var(--bg) 22%);
+  background: linear-gradient(180deg, transparent, #f6f8fa 22%);
   padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
@@ -624,7 +644,80 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 22px;
-  padding: 6px 6px 6px 16px;
+  padding: 6px;
+}
+.terminal-chat-attach-btn {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: #0969da;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.terminal-chat-attach-btn:hover:not(:disabled) {
+  background: rgba(9, 105, 218, 0.10);
+}
+.terminal-chat-attach-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.terminal-attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 8px;
+  padding: 6px 8px;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 12px;
+  color: #1f2328;
+  max-width: 100%;
+  min-width: 0;
+}
+.terminal-attachment-chip img {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex: 0 0 auto;
+  background: #eef1f4;
+}
+.terminal-attachment-chip span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #1f2328;
+}
+.terminal-attachment-chip button {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: #57606a;
+  cursor: pointer;
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
+.terminal-attachment-chip button:hover {
+  background: #eef1f4;
+  color: #1f2328;
+}
+.terminal-attach-error {
+  margin: 0 4px 8px;
+  font-size: 12px;
+  color: #cf222e;
 }
 .terminal-chat-composer-row:focus-within {
   border-color: var(--accent);
@@ -641,14 +734,14 @@ body {
   padding: 8px 0;
   font-family: var(--sans);
   font-size: 16px;
-  color: var(--text);
+  color: #1f2328;
   line-height: 1.4;
   outline: none;
   overflow-y: auto;
   width: auto !important;
 }
 .terminal-chat-input-field::placeholder {
-  color: var(--text-secondary);
+  color: #57606a;
 }
 .terminal-chat-input-field:focus {
   border-color: transparent;
@@ -659,8 +752,8 @@ body {
   flex: 0 0 auto;
   border-radius: 50%;
   border: none;
-  background: var(--accent);
-  color: #04101f;
+  background: #0969da;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -670,7 +763,7 @@ body {
   padding: 0;
 }
 .terminal-chat-send-btn:hover:not(:disabled) {
-  background: #1f6feb;
+  background: #0550ae;
 }
 .terminal-chat-send-btn:active:not(:disabled) {
   transform: scale(0.92);
@@ -687,9 +780,9 @@ body {
   margin: 0 0 10px;
   padding: 10px;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: rgba(12, 18, 28, 0.95);
-  color: var(--text-secondary);
+  border: 1px solid #d0d7de;
+  background: #eef1f4;
+  color: #1f2328;
   font-size: 13px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   line-height: 1.35;
@@ -699,8 +792,6 @@ body {
 
 /* Transcript (output area) fills remaining space, scrolls */
 .terminal-chat-transcript {
-  --terminal-fg: #e6edf3;
-  --terminal-muted: #8b949e;
   flex: 1 1 auto;
   overflow-y: auto;
   min-height: 0;
@@ -708,15 +799,15 @@ body {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  color: var(--terminal-fg);
-  background: var(--bg);
+  color: #1f2328;
+  background: #f6f8fa;
 }
 .terminal-chat-daydiv {
   align-self: center;
   font-size: 11px;
-  color: var(--text-secondary);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  color: #57606a;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
   border-radius: 999px;
   padding: 3px 10px;
 }
@@ -725,7 +816,7 @@ body {
   align-items: center;
   gap: 6px;
   font-size: 11.5px;
-  color: var(--text-secondary);
+  color: #57606a;
   margin-bottom: 5px;
 }
 .terminal-chat-who.user { justify-content: flex-end; }
@@ -737,12 +828,12 @@ body {
   border-radius: 5px;
 }
 .terminal-chat-entry-agent .terminal-chat-badge {
-  background: rgba(88, 166, 255, 0.16);
-  color: var(--accent);
+  background: #ddf4ff;
+  color: #0969da;
 }
 .terminal-chat-entry-user .terminal-chat-badge {
-  background: rgba(63, 185, 80, 0.16);
-  color: var(--success);
+  background: #dafbe1;
+  color: #1a7f37;
 }
 .terminal-chat-details {
   display: flex;
@@ -754,9 +845,9 @@ body {
   align-items: center;
   padding: 3px 7px;
   border-radius: 999px;
-  border: 1px solid rgba(88,166,255,0.18);
-  background: rgba(88,166,255,0.07);
-  color: var(--terminal-muted);
+  border: 1px solid #d0d7de;
+  background: #ffffff;
+  color: #57606a;
   font-size: 10px;
   line-height: 1.2;
 }
@@ -765,16 +856,16 @@ body {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: var(--terminal-muted);
+  color: #57606a;
 }
 .terminal-chat-line-picker select {
   width: auto;
   min-width: 66px;
   padding: 4px 8px;
   font-size: 11px;
-  background: rgba(13,17,23,0.9);
-  color: var(--terminal-muted);
-  border: 1px solid rgba(88,166,255,0.22);
+  background: #ffffff;
+  color: #1f2328;
+  border: 1px solid #d0d7de;
   border-radius: 6px;
 }
 .terminal-chat-entry {
@@ -792,10 +883,10 @@ body {
   gap: 9px;
   max-width: 100%;
   padding: 7px 13px;
-  border: 1px solid var(--border);
+  border: 1px solid #d0d7de;
   border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--text-secondary);
+  background: #ffffff;
+  color: #1f2328;
   font-size: 12.5px;
   line-height: 1.3;
   word-break: break-word;
@@ -841,64 +932,59 @@ body {
 }
 .terminal-chat-view .ovm-chat-bubble-ovm,
 .terminal-chat-view .terminal-chat-bubble.ovm-chat-bubble-ovm {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
+  background: #ffffff;
+  color: #1f2328;
+  border: 1px solid #d0d7de;
+  border-left: 3px solid #0969da;
   border-bottom-left-radius: 4px;
 }
 .terminal-chat-view .ovm-chat-bubble-ovm::after {
-  border-color: transparent transparent var(--surface) transparent;
+  border-color: transparent transparent #ffffff transparent;
 }
 .terminal-chat-view .ovm-chat-bubble-user,
 .terminal-chat-view .terminal-chat-bubble.ovm-chat-bubble-user {
-  background: #173a2b;
-  color: #d9f3e4;
-  border: 1px solid #24543c;
+  background: #ddf4ff;
+  color: #1f2328;
+  border: 1px solid #b6e3ff;
   border-bottom-right-radius: 4px;
 }
 .terminal-chat-view .ovm-chat-bubble-user::after {
-  border-color: transparent #173a2b transparent transparent;
+  border-color: transparent #ddf4ff transparent transparent;
 }
 .terminal-chat-view .ovm-chat-text {
-  color: inherit;
+  color: #1f2328;
   font-family: var(--sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
 }
-.terminal-chat-view .ovm-chat-bubble-user .terminal-chat-content,
-.terminal-chat-view .ovm-chat-bubble-user .ovm-chat-text {
-  color: inherit !important;
-  -webkit-text-fill-color: currentColor;
-}
 .terminal-chat-view .ovm-chat-ts {
-  color: var(--text-secondary);
+  color: #57606a;
   text-align: right;
 }
 .terminal-chat-card {
   max-width: min(96%, 900px);
   border-radius: 12px;
-  border: 1px solid rgba(88,166,255,0.14);
-  background: rgba(13,17,23,0.96);
-  color: var(--terminal-fg);
+  border: 1px solid #d0d7de;
+  background: #ffffff;
+  color: #1f2328;
   padding: 10px 12px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+  box-shadow: 0 4px 16px rgba(31, 35, 40, 0.08);
 }
 .terminal-chat-entry-user .terminal-chat-card {
-  background: rgba(88,166,255,0.14);
-  border-color: rgba(88,166,255,0.26);
+  background: #ddf4ff;
+  border-color: #b6e3ff;
 }
 .terminal-chat-entry-system .terminal-chat-card {
-  background: rgba(139,148,158,0.1);
+  background: #eef1f4;
 }
 .terminal-chat-entry-error .terminal-chat-card {
-  background: rgba(248,81,73,0.1);
-  border-color: rgba(248,81,73,0.26);
+  background: #ffebe9;
+  border-color: #ff8182;
 }
 .terminal-chat-meta {
   display: flex;
   justify-content: space-between;
   gap: 10px;
   font-size: 10px;
-  color: var(--terminal-muted);
+  color: #57606a;
   margin-bottom: 5px;
 }
 .terminal-chat-sticky-action {
@@ -912,12 +998,12 @@ body {
 }
 .terminal-chat-sticky-btn {
   pointer-events: auto;
-  background: rgba(13,17,23,0.82);
-  border-color: rgba(139,148,158,0.24);
-  color: var(--text-secondary);
+  background: #ffffff;
+  border-color: #d0d7de;
+  color: #57606a;
   backdrop-filter: blur(6px);
 }
-/* Output text: ~10% smaller, more readable on small screens */
+/* Conversation body: single dark color on light. No token / inherit / fill war. */
 .terminal-chat-content {
   white-space: pre-wrap;
   word-break: break-word;
@@ -925,8 +1011,7 @@ body {
   font-family: var(--sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
   font-size: var(--terminal-conv-font);
   line-height: 1.55;
-  color: var(--terminal-fg);
-  -webkit-text-fill-color: var(--terminal-fg);
+  color: #1f2328;
   letter-spacing: 0.01em;
 }
 .terminal-chat-single-output {
@@ -935,23 +1020,6 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-}
-.terminal-chat-transcript div,
-.terminal-chat-transcript span,
-.terminal-chat-transcript label {
-  color: inherit;
-}
-.terminal-chat-meta,
-.terminal-chat-detail-pill,
-.terminal-chat-line-picker {
-  color: var(--terminal-muted) !important;
-  -webkit-text-fill-color: var(--terminal-muted);
-}
-.terminal-chat-card,
-.terminal-chat-content,
-.terminal-chat-single-output,
-.terminal-chat-single-output .terminal-chat-content {
-  color: var(--terminal-fg) !important;
 }
 .terminal-chat-single-output .terminal-chat-content {
   flex: 1;
@@ -967,7 +1035,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 250;
-  background: var(--bg);
+  background: #f6f8fa;
   padding: 0;
   overflow: hidden;
 }
@@ -1380,12 +1448,8 @@ body {
   box-shadow: 0 1px 2px rgba(0,0,0,0.14);
 }
 
-/* OVM / incoming: white bubble, bottom-left tail */
-.ovm-chat-bubble-ovm {
-  background: #ffffff;
-  color: #111;
-  border-bottom-left-radius: 4px;
-}
+/* Bubble tail geometry is shared; fill colors stay scoped so Terminal
+   chat and OVM cannot fight over background/text. */
 .ovm-chat-bubble-ovm::after {
   content: '';
   position: absolute;
@@ -1395,14 +1459,6 @@ body {
   height: 0;
   border-style: solid;
   border-width: 0 0 10px 8px;
-  border-color: transparent transparent #ffffff transparent;
-}
-
-/* User / outgoing: light-green bubble, bottom-right tail */
-.ovm-chat-bubble-user {
-  background: #effdde;
-  color: #111;
-  border-bottom-right-radius: 4px;
 }
 .ovm-chat-bubble-user::after {
   content: '';
@@ -1413,6 +1469,27 @@ body {
   height: 0;
   border-style: solid;
   border-width: 0 8px 10px 0;
+}
+
+/* OVM / incoming: white bubble, bottom-left tail.
+   Scoped to the OVM transcript so these light rules cannot leak
+   into Terminal chat (which has its own light theme). */
+.ovm-chat-messages .ovm-chat-bubble-ovm {
+  background: #ffffff;
+  color: #111;
+  border-bottom-left-radius: 4px;
+}
+.ovm-chat-messages .ovm-chat-bubble-ovm::after {
+  border-color: transparent transparent #ffffff transparent;
+}
+
+/* User / outgoing: light-green bubble, bottom-right tail */
+.ovm-chat-messages .ovm-chat-bubble-user {
+  background: #effdde;
+  color: #111;
+  border-bottom-right-radius: 4px;
+}
+.ovm-chat-messages .ovm-chat-bubble-user::after {
   border-color: transparent #effdde transparent transparent;
 }
 
@@ -2395,6 +2472,49 @@ body.tg-miniapp {
 }
 .tg-light h2, .tg-light h3, .tg-light h4, .tg-light p, .tg-light span, .tg-light div, .tg-light label {
   color: inherit;
+}
+
+/* Terminal chat stays light + high-contrast even when Telegram remaps
+   body tokens or .tg-light inherit walks the tree. */
+.terminal-shell .terminal-chat-view,
+.terminal-shell .terminal-chat-transcript,
+.terminal-shell .terminal-chat-content,
+.terminal-shell .terminal-chat-view .ovm-chat-text,
+.terminal-shell .terminal-chat-view .ovm-chat-bubble,
+.terminal-shell .terminal-chat-view .ovm-chat-bubble-ovm,
+.terminal-shell .terminal-chat-view .ovm-chat-bubble-user,
+.terminal-shell .terminal-chat-view .terminal-chat-bubble {
+  color: #1f2328;
+}
+.terminal-shell .terminal-chat-view .ovm-chat-bubble-ovm,
+.terminal-shell .terminal-chat-view .terminal-chat-bubble.ovm-chat-bubble-ovm {
+  background: #ffffff;
+}
+.terminal-shell .terminal-chat-view .ovm-chat-bubble-user,
+.terminal-shell .terminal-chat-view .terminal-chat-bubble.ovm-chat-bubble-user {
+  background: #ddf4ff;
+}
+.terminal-shell .terminal-chat-input-field,
+.tg-miniapp .terminal-shell .terminal-chat-input-field,
+.tg-light .terminal-shell .terminal-chat-input-field {
+  color: #1f2328;
+  background: transparent;
+}
+.terminal-shell .terminal-chat-attach-btn,
+.tg-miniapp .terminal-shell .terminal-chat-attach-btn,
+.tg-light .terminal-shell .terminal-chat-attach-btn {
+  color: #0969da;
+}
+.terminal-shell .terminal-attachment-chip,
+.tg-miniapp .terminal-shell .terminal-attachment-chip,
+.tg-light .terminal-shell .terminal-attachment-chip {
+  background: #ffffff;
+  border-color: #d0d7de;
+  color: #1f2328;
+}
+.terminal-shell .terminal-chat-view .ovm-chat-pill {
+  background: #eef1f4;
+  color: #1f2328;
 }
 
 /* Fix buttons */

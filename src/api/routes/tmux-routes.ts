@@ -6,6 +6,38 @@ import { createAuthMiddleware, requireOwner } from "../../auth/auth-middleware.j
 import { AuthService } from "../../auth/auth-service.js";
 import { AuditService } from "../../services/audit-service.js";
 import { SafetyService } from "../../services/safety-service.js";
+import { ProjectService } from "../../services/project-service.js";
+import { FileService, PathTraversalError } from "../../services/file-service.js";
+
+const ATTACH_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const ATTACH_IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
+
+function sanitizeAttachImageBasename(filename: string): string | null {
+  const raw = String(filename || "");
+  const base = raw.replace(/\\/g, "/").split("/").pop() || "";
+  const strippedDots = base.replace(/\.\./g, "");
+  const cleaned = strippedDots.replace(/[^A-Za-z0-9._-]/g, "");
+  if (!cleaned) return null;
+  const dot = cleaned.lastIndexOf(".");
+  if (dot <= 0 || dot === cleaned.length - 1) return null;
+  const ext = cleaned.slice(dot + 1).toLowerCase();
+  if (!ATTACH_IMAGE_EXTS.has(ext)) return null;
+  const stem = cleaned.slice(0, dot).replace(/^\.+/, "") || "image";
+  if (!stem) return null;
+  return `${stem}.${ext}`;
+}
+
+function utcAttachStamp(): string {
+  return new Date().toISOString().replace(/[-:.]/g, "");
+}
+
+function decodeAttachImageBase64(dataBase64: string): Buffer | null {
+  const stripped = String(dataBase64 || "").replace(/^data:[^,]+,/, "").replace(/\s+/g, "");
+  if (!stripped || !/^[A-Za-z0-9+/]+=*$/.test(stripped)) return null;
+  const buf = Buffer.from(stripped, "base64");
+  if (!buf.length) return null;
+  return buf;
+}
 
 export function registerTmuxRoutes(
   app: FastifyInstance,
@@ -14,9 +46,21 @@ export function registerTmuxRoutes(
   streamManager: TmuxStreamManager,
   db: DatabaseService,
   auditService: AuditService,
-  safetyService: SafetyService
+  safetyService: SafetyService,
+  projectService?: ProjectService,
+  fileService?: FileService
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
+
+  function resolveAttachProjectRoot(projectId: number | undefined): string | null {
+    if (projectId !== undefined) {
+      if (!projectService) return null;
+      const project = projectService.getById(projectId);
+      if (!project) return null;
+      return projectService.getFullPath(project);
+    }
+    return process.cwd();
+  }
 
   // List all tmux sessions with pane info
   app.get(
@@ -218,6 +262,81 @@ export function registerTmuxRoutes(
 
         return { message: result.message };
       } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return reply.code(400).send({ error: msg });
+      }
+    }
+  );
+
+  // Save a composer screenshot into the project's tmp/ and return a cwd-relative path.
+  app.post<{ Body: { filename?: string; dataBase64?: string; project_id?: number } }>(
+    "/api/tmux/attach-image",
+    { preHandler: [authMiddleware, requireOwner], bodyLimit: 15 * 1024 * 1024 },
+    async (request, reply) => {
+      const { filename, dataBase64, project_id } = request.body || {};
+      if (!filename || !dataBase64) {
+        return reply.code(400).send({ error: "filename and dataBase64 are required" });
+      }
+
+      const sanitized = sanitizeAttachImageBasename(filename);
+      if (!sanitized) {
+        return reply.code(400).send({
+          error: "filename must be an image (png, jpg, jpeg, gif, webp) without path separators"
+        });
+      }
+
+      const buf = decodeAttachImageBase64(dataBase64);
+      if (!buf) {
+        return reply.code(400).send({ error: "dataBase64 is not valid base64" });
+      }
+      if (buf.length > ATTACH_IMAGE_MAX_BYTES) {
+        return reply.code(413).send({ error: "image exceeds 10MB limit" });
+      }
+
+      let projectId: number | undefined;
+      if (project_id !== undefined && project_id !== null) {
+        const parsed = Number(project_id);
+        if (!Number.isFinite(parsed)) {
+          return reply.code(400).send({ error: "invalid project_id" });
+        }
+        projectId = parsed;
+      }
+
+      const projectRoot = resolveAttachProjectRoot(projectId);
+      if (!projectRoot) {
+        return reply.code(404).send({ error: "Project not found" });
+      }
+
+      const relativePath = `tmp/term-${utcAttachStamp()}-${sanitized}`;
+      try {
+        if (fileService) {
+          fileService.writeBinaryFile(projectRoot, relativePath, buf);
+        } else {
+          const fs = await import("node:fs");
+          const path = await import("node:path");
+          const dest = path.resolve(projectRoot, relativePath);
+          const root = path.resolve(projectRoot);
+          if (!dest.startsWith(root + path.sep)) {
+            return reply.code(403).send({ error: "Access denied" });
+          }
+          fs.mkdirSync(path.dirname(dest), { recursive: true });
+          fs.writeFileSync(dest, buf);
+        }
+
+        auditService.log({
+          userId: request.sessionUser!.id,
+          actionType: "tmux_attach_image",
+          resourceType: "file",
+          resourceId: relativePath,
+          details: { filename: sanitized, size: buf.length, project_id: projectId ?? null },
+          surface: "web"
+        });
+
+        return { ok: true, path: relativePath };
+      } catch (error) {
+        if (error instanceof PathTraversalError) {
+          return reply.code(403).send({ error: "Access denied" });
+        }
         const msg = error instanceof Error ? error.message : String(error);
         return reply.code(400).send({ error: msg });
       }

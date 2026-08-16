@@ -177,6 +177,15 @@ export class FileService {
     fs.writeFileSync(fullPath, content, "utf-8");
   }
 
+  writeBinaryFile(projectRoot: string, relativePath: string, data: Buffer): void {
+    const fullPath = this.safePath(projectRoot, relativePath);
+    const dir = path.dirname(fullPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(fullPath, data);
+  }
+
   createFile(projectRoot: string, relativePath: string, content = ""): void {
     const fullPath = this.safePath(projectRoot, relativePath);
 

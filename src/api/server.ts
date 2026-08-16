@@ -132,7 +132,9 @@ export async function createApiServer(
     services.tmuxStreamManager,
     services.db,
     services.auditService,
-    services.safetyService
+    services.safetyService,
+    services.projectService,
+    services.fileService
   );
 
   registerDelegationRoutes(app, services.authService, services.delegationService);
