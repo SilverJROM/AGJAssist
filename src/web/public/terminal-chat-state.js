@@ -2,10 +2,22 @@ export function normalizeTerminalOutput(text) {
   return (text || "").replace(/\r\n/g, "\n").trim();
 }
 
-const _spinnerGlyphs = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷";
-const _leadingSpinnerRe = new RegExp(`^\\s*[${_spinnerGlyphs}]`, "u");
-// C1 footer/shortcut — listed tokens only (no /ps /stop /model /effort /shells /monitors).
-const _statusChromeRe = /bypass permissions|accept edits|plan mode|shift\+tab|to cycle|ctrl\+t|for agents|↓ to manage|Ctrl\+\.|ctrl\+c:cancel|⏵⏵|▶▶/i;
+/** Flatten C0 controls and DEL the same way TmuxService.sendCommand rejects them. */
+export function sanitizeOutgoingCommand(text) {
+  return String(text ?? "").replace(/[\u0000-\u001F\u007F]/g, " ");
+}
+
+// Content markers (Codex/Claude paragraph leaders + markdown bullets) are NOT chrome.
+const _contentMarkerGlyphs = "◦•●○";
+const _trueSpinnerGlyphs = "✻✶✢⎿⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷";
+const _leadingTrueSpinnerRe = new RegExp(`^\\s*[${_trueSpinnerGlyphs}]\\s*(.*)$`, "u");
+const _leadingContentMarkerRe = new RegExp(`^\\s*[${_contentMarkerGlyphs}]\\s*(.*)$`, "u");
+const _spinnerStatusRemainderRe = /^(?:Working|Thinking|Compacting|Waiting for|Worked for|Drizzl\w*|esc to interrupt)/i;
+const _boxCharRe = /[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬━┃]/u;
+const _boxOnlyRe = /^[\s┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬━┃]+$/u;
+const _boxFramedRe = /^[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬━┃].*[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬━┃]$/u;
+// C1 footer/shortcut — anchored to a complete footer/composer row, not a prose substring.
+const _statusChromeRe = /^(?:(?:⏵⏵|▶▶|⏸)\s*)?(?:bypass permissions|accept edits|plan mode)\b|^(?:shift\+tab\s+to cycle|ctrl\+t(?:\s+for agents)?|↓\s+to manage|Ctrl\+\.|ctrl\+c:cancel)\b|^(?:⏵⏵|▶▶)/i;
 // C3 model+cwd: model-name · ~/ at line start — not any mid-dot+tilde.
 const _modelFooterRe = /^\s*[\w.+-]+\s*[·•]\s*~\//;
 const _tipChromeRe = /^\s*Tip:/;
@@ -16,11 +28,39 @@ const _composerGlyphRe = /^[❯›▌]/u;
 const _composerPlaceholderRe = /^\s*Type a message\b/i;
 const _interruptChromeRe = /^\s*esc to interrupt\s*$/i;
 
+function _isStatusChromeLine(line) {
+  const trimmed = (line || "").trim();
+  if (!trimmed) return false;
+  return _statusChromeRe.test(trimmed);
+}
+
+function _isSpinnerChromeLine(line) {
+  const trimmed = (line || "").trim();
+  if (!trimmed) return false;
+  const spin = trimmed.match(_leadingTrueSpinnerRe);
+  if (spin) {
+    const remainder = (spin[1] || "").trim();
+    if (!remainder) return true;
+    if (_spinnerStatusRemainderRe.test(remainder)) return true;
+    if (_isC4StatusLine(remainder)) return true;
+    return false;
+  }
+  const mark = trimmed.match(_leadingContentMarkerRe);
+  if (mark) {
+    const remainder = (mark[1] || "").trim();
+    if (!remainder) return false;
+    if (_isC4StatusLine(remainder)) return true;
+    if (_spinnerStatusRemainderRe.test(remainder) && /(?:tokens|effort|\(\d)/i.test(remainder)) return true;
+    return false;
+  }
+  return false;
+}
+
 function _isChromeLine(line) {
   const trimmed = line.trim();
   if (trimmed === "") return false;
   // Order: C1, then C3, then C4 keep, then C2.
-  if (_statusChromeRe.test(line)) return true;
+  if (_isStatusChromeLine(line)) return true;
   if (_modelFooterRe.test(trimmed) || _tipChromeRe.test(trimmed)) return true;
   if (_turnChromeRe.test(line)) return false;
   return _composerGlyphRe.test(trimmed)
@@ -28,14 +68,14 @@ function _isChromeLine(line) {
     || _isBoxDrawingLine(line)
     || /^[─=]{3,}$/.test(trimmed)
     || _interruptChromeRe.test(trimmed)
-    || _leadingSpinnerRe.test(line)
+    || _isSpinnerChromeLine(line)
     || _tmuxConfRe.test(line);
 }
 
 function _isC1C3ChromeLine(line) {
   const trimmed = (line || "").trim();
   if (!trimmed) return false;
-  return _statusChromeRe.test(trimmed) || _modelFooterRe.test(trimmed) || _tipChromeRe.test(trimmed);
+  return _isStatusChromeLine(trimmed) || _modelFooterRe.test(trimmed) || _tipChromeRe.test(trimmed);
 }
 
 export function extractC1C3ChromeLines(text) {
@@ -60,9 +100,9 @@ export function extractStrippedChromeLines(text) {
 
 /**
  * Strip ANSI escape sequences and filter Claude-Code TUI chrome lines.
- * Returns the cleaned text with blank lines collapsed.
+ * Untrimmed: the overlap-diff path needs stable per-line text across polls.
  */
-export function cleanTerminalOutput(text) {
+function _cleanTerminalLines(text) {
   if (!text) return "";
   const lines = text
     .replace(/\r\n/g, "\n")
@@ -77,20 +117,35 @@ export function cleanTerminalOutput(text) {
     .split("\n");
 
   const kept = [];
-  let inRoundBox = false;
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
     const trimmed = line.trim();
-    if (inRoundBox) {
-      if (/╰/.test(trimmed)) inRoundBox = false;
-      continue;
-    }
-    if (/╭/.test(trimmed)) {
-      inRoundBox = true;
+    if (_isRoundBoxOpener(trimmed)) {
+      let closer = -1;
+      for (let j = i + 1; j < lines.length; j += 1) {
+        if (_isRoundBoxCloser(lines[j])) {
+          closer = j;
+          break;
+        }
+      }
+      if (closer >= 0) {
+        i = closer;
+        continue;
+      }
+      // Unterminated opener must not eat the remainder of the capture.
       continue;
     }
     if (!_isChromeLine(line)) kept.push(line);
   }
-  return kept.join("\n").trim();
+  return kept.join("\n");
+}
+
+/**
+ * Strip ANSI escape sequences and filter Claude-Code TUI chrome lines.
+ * Returns the cleaned text with blank lines collapsed.
+ */
+export function cleanTerminalOutput(text) {
+  return _cleanTerminalLines(text).trim();
 }
 
 function _isBlankLine(line) {
@@ -98,7 +153,22 @@ function _isBlankLine(line) {
 }
 
 function _isBoxDrawingLine(line) {
-  return /[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬]/u.test(line);
+  const trimmed = (line || "").trim();
+  if (!trimmed || !_boxCharRe.test(trimmed)) return false;
+  // Complete box/rule, or a framed chrome row that starts AND ends with a box glyph.
+  return _boxOnlyRe.test(trimmed) || _boxFramedRe.test(trimmed);
+}
+
+function _isRoundBoxOpener(line) {
+  const trimmed = (line || "").trim();
+  if (!trimmed.includes("╭")) return false;
+  return _isBoxDrawingLine(trimmed) || /^╭[─━═\s╮]*$/.test(trimmed);
+}
+
+function _isRoundBoxCloser(line) {
+  const trimmed = (line || "").trim();
+  if (!trimmed.includes("╰")) return false;
+  return _isBoxDrawingLine(trimmed) || /╰/.test(trimmed);
 }
 
 function _isStructuredLine(line) {
@@ -169,23 +239,41 @@ export function formatTerminalOutput(raw) {
     .trim();
 }
 
-export function diffTerminalOutput(beforeText, afterText) {
-  const before = normalizeTerminalOutput(beforeText);
-  const after = normalizeTerminalOutput(afterText);
-  if (!after) return "";
-  if (!before) return after;
-  if (after === before) return "";
+function _slidingDelta(beforeText, afterText) {
+  // Newlines only — whole-string trim would mutate a window-edge blank or indent
+  // and desync exact-line suffix/prefix overlap across adjacent polls.
+  const before = (beforeText || "").replace(/\r\n/g, "\n");
+  const after = (afterText || "").replace(/\r\n/g, "\n");
+  if (!after) return { delta: "", overlap: 0, contained: !before };
+  if (!before) return { delta: after, overlap: 0, contained: false };
+  if (after === before) {
+    return { delta: "", overlap: after.split("\n").length, contained: true };
+  }
   if (after.startsWith(before)) {
-    return after.slice(before.length).trim();
+    return {
+      delta: after.slice(before.length).replace(/^\n/, ""),
+      overlap: before.split("\n").length,
+      contained: false
+    };
+  }
+  if (before.includes(after) || before.endsWith(after)) {
+    return { delta: "", overlap: after.split("\n").length, contained: true };
   }
 
   const beforeLines = before.split("\n");
   const afterLines = after.split("\n");
-  let idx = 0;
-  while (idx < beforeLines.length && idx < afterLines.length && beforeLines[idx] === afterLines[idx]) {
-    idx += 1;
+  const max = Math.min(beforeLines.length, afterLines.length);
+  for (let n = max; n > 0; n -= 1) {
+    if (_linesEqual(beforeLines.slice(-n), afterLines.slice(0, n))) {
+      return { delta: afterLines.slice(n).join("\n"), overlap: n, contained: false };
+    }
   }
-  return afterLines.slice(idx).join("\n").trim();
+  // Zero overlap is a capture gap / repaint — never "everything is new".
+  return { delta: "", overlap: 0, contained: false };
+}
+
+export function diffTerminalOutput(beforeText, afterText) {
+  return _slidingDelta(beforeText, afterText).delta.trim();
 }
 
 export function tailTerminalOutput(text, maxLines = 50) {
@@ -214,9 +302,13 @@ const _c4DurationRe = /(?:\d+[hms]|\d+m \d+s)/i;
 function _isC4StatusLine(line) {
   const trimmed = (line || "").trim();
   if (!trimmed) return false;
-  if (_statusChromeRe.test(line)) return false;
+  if (_isStatusChromeLine(trimmed)) return false;
   if (_modelFooterRe.test(trimmed) || _tipChromeRe.test(trimmed)) return false;
-  if (_c4VerbRe.test(trimmed)) return true;
+  // Require the C4 *shape* (duration / tokens), not a leading verb alone
+  // so prose like "Working on the tests" stays in the agent body.
+  if (_c4VerbRe.test(trimmed) && (_c4DurationRe.test(trimmed) || /(?:tokens|effort)/i.test(trimmed))) {
+    return true;
+  }
   return _c4DurationRe.test(trimmed) && /(?:tokens|effort)/i.test(trimmed);
 }
 
@@ -267,7 +359,7 @@ function _removeExactText(haystack, needle) {
 
 function _stripStatusLines(text) {
   if (!text) return "";
-  return text.split("\n").filter((line) => !_isC4StatusLine(line)).join("\n").trim();
+  return text.split("\n").filter((line) => !_isC4StatusLine(line)).join("\n");
 }
 
 function _mergeAgedTail(previousContent, nextContent) {
@@ -287,24 +379,51 @@ function _mergeAgedTail(previousContent, nextContent) {
       return prevLines.concat(nextLines.slice(n)).join("\n");
     }
   }
-  return next;
+  // Zero overlap: keep the accumulated body. Never replace with an unproven window.
+  return prev;
+}
+
+function _removeUserText(body, entries, { lastUserOnly = false } = {}) {
+  let next = body || "";
+  const users = (entries || []).filter((entry) => entry && entry.role === "user");
+  const targets = lastUserOnly && users.length ? [users[users.length - 1]] : users;
+  for (const entry of targets) {
+    if (entry.sentContent) next = _removeExactText(next, entry.sentContent);
+    if (entry.content) next = _removeExactText(next, entry.content);
+  }
+  return next.trim();
+}
+
+function _prepareDiffText(text) {
+  return _stripStatusLines(_cleanTerminalLines(text || ""));
 }
 
 function _agentBodyFromSnapshot(snapshot, entries, excludeLastAgent) {
-  let body = _stripStatusLines(cleanTerminalOutput(snapshot));
-  const removals = [];
-  for (const entry of entries) {
-    if (entry && entry.role === "user" && entry.content) removals.push(entry.content);
-  }
+  let body = _prepareDiffText(snapshot);
+  body = _removeUserText(body, entries, { lastUserOnly: false });
   const agents = entries.filter((entry) => entry && entry.role === "agent");
   const priorAgents = excludeLastAgent ? agents.slice(0, -1) : agents;
   for (const entry of priorAgents) {
-    if (entry.content) removals.push(entry.content);
-  }
-  for (const needle of removals) {
-    body = _removeExactText(body, needle);
+    if (entry.content) body = _removeExactText(body, entry.content);
   }
   return body.trim();
+}
+
+/**
+ * Proven delta between two snapshots. Diffes cleaned+status-stripped text
+ * with sliding suffix/prefix overlap. Zero overlap yields an empty delta.
+ */
+function _agentBodyFromCleanedDiff(beforeText, afterText, entries) {
+  const { delta, overlap, contained } = _slidingDelta(
+    _prepareDiffText(beforeText),
+    _prepareDiffText(afterText)
+  );
+  if (!delta) return { body: "", overlap, contained };
+  return {
+    body: _removeUserText(delta, entries, { lastUserOnly: true }),
+    overlap,
+    contained
+  };
 }
 
 /**
@@ -323,27 +442,42 @@ export function extractStatus(text) {
 /**
  * Append a YOU turn from composer text. Does not rebuild prior entries.
  */
-export function appendYou(entries, text, { now = Date.now() } = {}) {
+export function appendYou(entries, text, { now = Date.now(), sentContent } = {}) {
   const content = (text || "").trim();
   const list = Array.isArray(entries) ? entries : [];
   if (!content) return list;
-  return list.concat([
-    makeEntry("you-" + now, "user", "You", content, new Date(now).toLocaleTimeString())
-  ]);
+  const entry = makeEntry("you-" + now, "user", "You", content, new Date(now).toLocaleTimeString());
+  if (typeof sentContent === "string" && sentContent) {
+    entry.sentContent = sentContent;
+  }
+  return list.concat([entry]);
 }
 
 /**
  * Patch the last AGENT in place, or open a new AGENT only after a YOU send.
  * Aged capture tails do not rebuild prior turns or restamp identities.
+ *
+ * `baselineAtSend` is used only for the FIRST post-YOU body (exclude pre-send
+ * text). Later growth diffs `previousSnapshot` -> current and accumulates.
+ * Zero-overlap windows never replace the accumulated body.
  */
-export function applyAgentPatch(entries, snapshot, { now = Date.now() } = {}) {
+export function applyAgentPatch(entries, snapshot, { now = Date.now(), baselineAtSend, previousSnapshot } = {}) {
   const list = Array.isArray(entries) ? entries : [];
   const lastAgentIdx = _lastIndexByRole(list, "agent");
   const lastUserIdx = _lastIndexByRole(list, "user");
   const openNew = lastAgentIdx < 0 || lastUserIdx > lastAgentIdx;
-  const body = _agentBodyFromSnapshot(snapshot, list, !openNew);
+  const hasBaseline = typeof baselineAtSend === "string" && baselineAtSend.length > 0;
+  const hasPrevious = typeof previousSnapshot === "string" && previousSnapshot.length > 0;
 
   if (openNew) {
+    let body = "";
+    if (hasBaseline) {
+      const cut = _agentBodyFromCleanedDiff(baselineAtSend, snapshot, list);
+      body = cut.body;
+    } else {
+      body = _agentBodyFromSnapshot(snapshot, list, false);
+    }
+    body = (body || "").trim();
     if (!body) return list;
     return list.concat([
       makeEntry("agent-" + now, "agent", "Agent", body, new Date(now).toLocaleTimeString())
@@ -351,7 +485,27 @@ export function applyAgentPatch(entries, snapshot, { now = Date.now() } = {}) {
   }
 
   const last = list[lastAgentIdx];
-  const merged = _mergeAgedTail(last.content, body);
+  let merged = last.content;
+  if (hasPrevious) {
+    const cut = _agentBodyFromCleanedDiff(previousSnapshot, snapshot, list);
+    if (cut.overlap === 0 && !cut.contained) {
+      merged = last.content;
+    } else if (cut.body) {
+      if (last.content.endsWith(cut.body)) {
+        merged = last.content;
+      } else {
+        merged = last.content ? `${last.content}\n${cut.body}` : cut.body;
+      }
+    }
+  } else if (hasBaseline) {
+    const cut = _agentBodyFromCleanedDiff(baselineAtSend, snapshot, list);
+    merged = _mergeAgedTail(last.content, cut.body);
+  } else {
+    const body = _agentBodyFromSnapshot(snapshot, list, true);
+    merged = _mergeAgedTail(last.content, body);
+  }
+
+  merged = (merged || "").trim();
   if (merged === last.content) return list;
   const next = list.slice();
   next[lastAgentIdx] = { ...last, content: merged };

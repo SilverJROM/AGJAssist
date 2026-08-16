@@ -525,20 +525,23 @@ test('A6 R6 R7 single topbar — controls still perform their functions at 390',
     opts.map((o) => (o as HTMLOptionElement).value),
   );
   for (const n of ['25', '50', '100', '150', '200']) expect(values).toContain(n);
-  const linesRequest = page.waitForRequest((request) => {
+  // Friendly extraction depth is decoupled from the picker (deep capture).
+  const isDeepOutput = (request: { url: () => string }) => {
     const url = new URL(request.url());
-    return /\/api\/tmux\/panes\/[^/]+\/output$/.test(url.pathname) && url.searchParams.get('lines') === '150';
-  });
+    const lines = Number(url.searchParams.get('lines') || '0');
+    return /\/api\/tmux\/panes\/[^/]+\/output$/.test(url.pathname) && lines >= 200;
+  };
+  const linesRequest = page.waitForRequest(isDeepOutput);
   await linesControl.selectOption('150');
   await linesRequest;
-  await expect.poll(() => requestedLines).toContain(150);
+  await expect.poll(() => requestedLines.some((n) => typeof n === 'number' && n >= 200)).toBe(true);
 
   const lastUpdated = page.locator('[data-testid="terminal-last-updated"], [data-terminal-last-updated], .terminal-chat-detail-pill').filter({ hasText: /updated/i }).first();
   await expect(lastUpdated).toBeVisible();
   const updatedBefore = await lastUpdated.textContent();
   await page.waitForTimeout(1_100);
   await openMenu();
-  const refreshRequest = page.waitForRequest((request) => /\/api\/tmux\/panes\/[^/]+\/output\?lines=150$/.test(request.url()));
+  const refreshRequest = page.waitForRequest(isDeepOutput);
   await menuSheet.getByRole('button', { name: /^Refresh$/ }).click();
   await refreshRequest;
   await expect.poll(() => lastUpdated.textContent()).not.toBe(updatedBefore);

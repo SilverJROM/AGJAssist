@@ -1,7 +1,7 @@
 import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { normalizeTerminalOutput, diffTerminalOutput, capTerminalOutput, extractStatus, appendYou, extractStrippedChromeLines, applyAgentPatch } from './terminal-chat-state.js';
+import { normalizeTerminalOutput, diffTerminalOutput, extractStatus, appendYou, extractStrippedChromeLines, applyAgentPatch, sanitizeOutgoingCommand } from './terminal-chat-state.js';
 import {
   AVAILABLE_BOTTOM_NAV_TABS,
   DEFAULT_BOTTOM_NAV_TAB_IDS,
@@ -2549,6 +2549,8 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const snapshotRef = useRef('');
   const sendingRef = useRef(false);
   const openAgentAfterYouRef = useRef(false);
+  const sendBaselineRef = useRef('');
+  const previousSnapshotRef = useRef('');
   const fileInputRef = useRef(null);
   const storageKey = 'agj_terminal_chat_' + target.replace(/[^a-zA-Z0-9_.-]/g, '_');
 
@@ -2560,16 +2562,27 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   }
 
   // After YOU, the next cleaned snapshot must open a new AGENT. Never patch the pre-send agent.
+  // First post-YOU body diffs the send-time baseline; later polls diff adjacent snapshots.
   function applyConversationSnapshot(prev, latest) {
     const list = Array.isArray(prev) ? prev : [];
+    const lastUserIdx = lastRoleIndex(list, 'user');
+    const lastAgentIdx = lastRoleIndex(list, 'agent');
     if (openAgentAfterYouRef.current) {
-      const lastUserIdx = lastRoleIndex(list, 'user');
-      const lastAgentIdx = lastRoleIndex(list, 'agent');
       if (lastUserIdx < 0 || lastUserIdx < lastAgentIdx) return list;
     }
-    const next = applyAgentPatch(list, latest);
+    const openNew = lastAgentIdx < 0 || lastUserIdx > lastAgentIdx;
+    const baselineAtSend = (openNew && sendBaselineRef.current) ? sendBaselineRef.current : undefined;
+    const previousSnapshot = (!openNew && previousSnapshotRef.current) ? previousSnapshotRef.current : undefined;
+    const next = applyAgentPatch(list, latest, { baselineAtSend, previousSnapshot });
+    previousSnapshotRef.current = latest;
     if (openAgentAfterYouRef.current && lastRoleIndex(next, 'agent') > lastRoleIndex(next, 'user')) {
       openAgentAfterYouRef.current = false;
+    }
+    // Real turn boundary: post-YOU agent exists and C4 status is no longer busy.
+    const status = extractStatus(latest);
+    const busy = /drizzl|working|thinking|compacting|waiting for/i.test(status || '');
+    if (!openNew && lastRoleIndex(next, 'agent') > lastRoleIndex(next, 'user') && !busy) {
+      sendBaselineRef.current = '';
     }
     return next;
   }
@@ -2600,7 +2613,8 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   }, []);
 
   function getCaptureLines() {
-    return lineLimit;
+    // Friendly extraction depth is independent of the UI "Lines captured" picker.
+    return 800;
   }
 
   function conversationSeed(savedState) {
@@ -2633,6 +2647,9 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       setSnapshot('');
       setStatusLine('');
       snapshotRef.current = '';
+      sendBaselineRef.current = '';
+      previousSnapshotRef.current = '';
+      openAgentAfterYouRef.current = false;
       let savedState = null;
       try {
         savedState = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
@@ -2640,10 +2657,11 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       try {
         const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=${getCaptureLines()}`);
         if (!active) return;
-        const output = capTerminalOutput(normalizeTerminalOutput(data.output), 200);
+        const output = normalizeTerminalOutput(data.output);
         const nextEntries = applyAgentPatch(conversationSeed(savedState), output);
         setSnapshot(output);
         snapshotRef.current = output;
+        previousSnapshotRef.current = output;
         setEntries(nextEntries);
         setStatusLine(extractStatus(output));
         setLastCommand(savedState?.lastCommand || '');
@@ -2655,7 +2673,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
         setStatus('error');
         const savedEntries = conversationSeed(savedState);
         if (savedEntries.length) {
-          const savedSnapshot = capTerminalOutput(savedState.snapshot || '', 200);
+          const savedSnapshot = normalizeTerminalOutput(savedState.snapshot || '');
           setSnapshot(savedSnapshot);
           snapshotRef.current = savedSnapshot;
           setEntries(savedEntries);
@@ -2688,7 +2706,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       try {
         const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=${getCaptureLines()}`);
         if (!active) return;
-        const latest = capTerminalOutput(normalizeTerminalOutput(data.output), 200);
+        const latest = normalizeTerminalOutput(data.output);
         const previous = snapshotRef.current;
         if (latest && latest !== previous) {
           snapshotRef.current = latest;
@@ -2711,7 +2729,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     try {
       sessionStorage.setItem(storageKey, JSON.stringify({
         entries,
-        snapshot: capTerminalOutput(snapshot, 200),
+        snapshot,
         lastCommand,
         updatedAt: Date.now()
       }));
@@ -2726,7 +2744,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     for (let i = 0; i < 8; i += 1) {
       await sleep(i === 0 ? 250 : 450);
       const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=${getCaptureLines()}`);
-      const current = capTerminalOutput(normalizeTerminalOutput(data.output), 200);
+      const current = normalizeTerminalOutput(data.output);
       if (current !== latest) {
         latest = current;
         changed = true;
@@ -2751,29 +2769,42 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     const command = text && imageRef ? `${text} ${imageRef}` : (text || imageRef);
     if (!command || sending) return;
 
+    const sentText = sanitizeOutgoingCommand(command).trim();
+    if (!sentText) {
+      setEntries(prev => [...prev, {
+        id: 'err-empty-' + Date.now(),
+        role: 'error',
+        label: 'Invalid input',
+        content: 'Command is empty after removing control characters.',
+        timestamp: new Date().toLocaleTimeString()
+      }]);
+      return;
+    }
+
     const beforeSnapshot = snapshotRef.current;
     sendingRef.current = true;
     openAgentAfterYouRef.current = true;
+    sendBaselineRef.current = beforeSnapshot;
     setInput('');
     setAttachment(null);
     setAttachError('');
     setSending(true);
     setStatus('running');
-    setLastCommand(command);
-    setEntries(prev => appendYou(prev, command));
+    setLastCommand(sentText);
+    setEntries(prev => appendYou(prev, command, { sentContent: sentText }));
 
     try {
       await api(`/api/tmux/panes/${encodeURIComponent(target)}/send`, {
         method: 'POST',
-        body: JSON.stringify({ command, enter: true })
+        body: JSON.stringify({ command: sentText, enter: true })
       });
       const result = await captureCommandResult(beforeSnapshot);
-      const cappedSnapshot = capTerminalOutput(result.snapshot, 200);
-      snapshotRef.current = cappedSnapshot;
-      setSnapshot(cappedSnapshot);
+      const nextSnapshot = normalizeTerminalOutput(result.snapshot);
+      snapshotRef.current = nextSnapshot;
+      setSnapshot(nextSnapshot);
       setLastUpdatedAt(Date.now());
-      setEntries(prev => applyConversationSnapshot(prev, cappedSnapshot));
-      setStatusLine(extractStatus(cappedSnapshot));
+      setEntries(prev => applyConversationSnapshot(prev, nextSnapshot));
+      setStatusLine(extractStatus(nextSnapshot));
       setStatus('connected');
     } catch (e) {
       setEntries(prev => [...prev, {
@@ -2803,12 +2834,12 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
         body: JSON.stringify({ send_enter_only: true })
       });
       const result = await captureCommandResult(beforeSnapshot);
-      const cappedSnapshot = capTerminalOutput(result.snapshot, 200);
-      snapshotRef.current = cappedSnapshot;
-      setSnapshot(cappedSnapshot);
+      const nextSnapshot = normalizeTerminalOutput(result.snapshot);
+      snapshotRef.current = nextSnapshot;
+      setSnapshot(nextSnapshot);
       setLastUpdatedAt(Date.now());
-      setEntries(prev => applyConversationSnapshot(prev, cappedSnapshot));
-      setStatusLine(extractStatus(cappedSnapshot));
+      setEntries(prev => applyConversationSnapshot(prev, nextSnapshot));
+      setStatusLine(extractStatus(nextSnapshot));
       setStatus('connected');
     } catch (e) {
       setEntries(prev => [...prev, {
