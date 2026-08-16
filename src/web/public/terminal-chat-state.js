@@ -27,6 +27,9 @@ const _tmuxConfRe = /~\/\.tmux\.conf/;
 const _composerGlyphRe = /^[❯›▌]/u;
 const _composerPlaceholderRe = /^\s*Type a message\b/i;
 const _interruptChromeRe = /^\s*esc to interrupt\s*$/i;
+// Claude TUI paints a right-aligned "HH:MM:SS [N/M]" counter over the first
+// physical line of the wrapped user box. The tail of the message survives.
+const _paneCounterRe = /\b\d{2}:\d{2}:\d{2}\s+\[\d+\/\d+\]/;
 
 function _isStatusChromeLine(line) {
   const trimmed = (line || "").trim();
@@ -430,8 +433,15 @@ function _removePriorTurnContents(text, entries) {
     const entry = list[i];
     if (!entry) continue;
     if (entry.role === "user" && i !== lastUserIdx) {
+      const before = next;
       for (const needle of _entryNeedles(entry)) {
         next = _removeExactText(next, needle);
+      }
+      // Wrapped/counter-clobbered prior echo is not an exact block — drop its
+      // tail run only when exact removal did not already take an occurrence.
+      if (next === before) {
+        const priorSent = (entry.sentContent || entry.sent || entry.content || "").trim();
+        if (priorSent) next = _removeFirstTailEcho(next, priorSent);
       }
     }
     if (entry.role === "agent" && (openNew || i !== lastAgentIdx) && entry.content) {
@@ -531,14 +541,34 @@ function _stripSentPrefixFragments(text, sent) {
 }
 
 /**
- * Agent body = cleaned lines AFTER the first YOU-echo of the *current* send.
- * Prior displayed YOU/AGENT turns are removed first so a repeat send does not
- * lock onto a stale identical echo. A later verbatim quote in the reply is a
- * later occurrence and does not move the cut.
+ * Agent body = rows AFTER the current YOU-message boundary.
+ *
+ * Primary path (real Claude TUI): ANSI-stripped but otherwise unfiltered rows.
+ * Identify structural ❯ user runs, strip only the HH:MM:SS [N/M] counter inside
+ * the run, fold whitespace, and match by suffix-at-end (64→48→32→20 ladder).
+ * Choose the LAST current-send run — never a ●-reply quote, never the first
+ * global substring. Only the rows below that run's final physical row are
+ * chrome-cleaned into the reply.
+ *
+ * Legacy path (fixtures without ❯ structure): exact line, wrapped full-echo,
+ * then cleaned tail key. Not used when any structural ❯ run is present.
  */
 function _agentBodyFromEchoAnchor(snapshot, entries) {
   const sent = _lastYouSentText(entries);
   if (!sent) return { found: false, body: "" };
+
+  const rawLines = _ansiStrippedRows(snapshot);
+  const userRuns = _collectUserRuns(rawLines);
+  const matched = _lastMatchingUserRun(userRuns, sent);
+  if (matched) {
+    const afterRaw = rawLines.slice(matched.cutAfter + 1).join("\n");
+    const body = _prepareDiffText(afterRaw);
+    return { found: true, body: _removeUserText(body, entries, { lastUserOnly: false }) };
+  }
+  // Structural ❯ runs exist but none are a trustworthy current-send match.
+  // Do NOT fall through to a global substring search (reply-quote false-anchor).
+  if (userRuns.length) return { found: false, body: "" };
+
   const prepared = _prepareDiffText(snapshot);
   if (!prepared) return { found: false, body: "" };
   const candidate = _removePriorTurnContents(prepared, entries);
@@ -553,10 +583,179 @@ function _agentBodyFromEchoAnchor(snapshot, entries) {
     const after = lines.slice(wrapped.end + 1).join("\n");
     return { found: true, body: _removeUserText(after, entries, { lastUserOnly: false }) };
   }
+  const tailKey = _anchorKeyFromSent(sent);
+  const tailAt = _findTailAnchor(lines, tailKey);
+  if (tailAt >= 0) {
+    const after = lines.slice(tailAt + 1).join("\n");
+    return { found: true, body: _removeUserText(after, entries, { lastUserOnly: false }) };
+  }
   return { found: false, body: "" };
 }
 
 function _fallbackOpenBody(snapshot, entries, baselineAtSend, previousSnapshot) {
+  const rawLines = _ansiStrippedRows(snapshot);
+  const userRuns = _collectUserRuns(rawLines);
+  if (userRuns.length) {
+    const newest = userRuns[userRuns.length - 1];
+    const bullet = _latestBulletBlocks(rawLines.slice(newest.end + 1));
+    if (bullet) {
+      const cleaned = _prepareDiffText(bullet);
+      if (cleaned) return cleaned;
+    }
+    return _provenPostSendDelta(snapshot, entries, baselineAtSend, previousSnapshot);
+  }
+  const proven = _provenPostSendDelta(snapshot, entries, baselineAtSend, previousSnapshot);
+  if (proven) return proven;
+  return _agentBodyFromSnapshot(snapshot, entries, false);
+}
+
+function _stripPaneCounters(text) {
+  return String(text || "")
+    .split("\n")
+    .map((line) => line.replace(_paneCounterRe, "").replace(/[ \t]+$/g, ""))
+    .join("\n");
+}
+
+function _normalizeWs(text) {
+  return String(text || "")
+    .replace(/[\s\u00A0\u1680\u2000-\u200B\u2028\u2029\u202F\u205F\u3000\uFEFF]+/g, " ")
+    .trim();
+}
+
+function _ansiStrippedRows(text) {
+  if (!text) return [];
+  return String(text)
+    .replace(/\r\n/g, "\n")
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+    .replace(/\x1b./g, "")
+    .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "")
+    .split("\n");
+}
+
+function _isUserPromptGlyph(line) {
+  return /^\s*[│┃║]?\s*❯/u.test(line || "");
+}
+
+function _stripUserRunLine(line, isFirst) {
+  let text = String(line ?? "").replace(_paneCounterRe, "");
+  text = text.replace(/^\s*[│┃║]\s?/, "").replace(/\s*[│┃║]\s*$/, "");
+  if (isFirst) text = text.replace(/^\s*❯\s*/u, "");
+  return text.replace(/[ \t\u00A0]+$/g, "");
+}
+
+function _isUserPromptLine(line) {
+  if (!_isUserPromptGlyph(line)) return false;
+  return Boolean(_normalizeWs(_stripUserRunLine(line, true)));
+}
+
+function _isUserRunBoundary(line) {
+  const trimmed = (line || "").trim();
+  if (!trimmed) return true;
+  if (_isUserPromptGlyph(line)) return true;
+  if (/^\s*[│┃║]?\s*●/u.test(line || "")) return true;
+  if (/^[─━═]{3,}/u.test(trimmed) || /[─━═]{5,}/u.test(trimmed)) return true;
+  if (_isRoundBoxOpener(line) || _isRoundBoxCloser(line)) return true;
+  if (_isStatusChromeLine(line) || _isC4StatusLine(line) || _isSpinnerChromeLine(line)) return true;
+  if (_statusChromeRe.test(trimmed) || _modelFooterRe.test(trimmed) || _tipChromeRe.test(trimmed)) return true;
+  if (/^[›▌]/u.test(trimmed) || _composerPlaceholderRe.test(trimmed)) return true;
+  return false;
+}
+
+function _normalizeUserRun(rawLines, start, end) {
+  const charToRow = [];
+  const pieces = [];
+  for (let i = start; i <= end; i += 1) {
+    const piece = _normalizeWs(_stripUserRunLine(rawLines[i], i === start));
+    if (!piece) continue;
+    if (pieces.length) charToRow.push(i);
+    for (let k = 0; k < piece.length; k += 1) charToRow.push(i);
+    pieces.push(piece);
+  }
+  const cutAfter = charToRow.length ? charToRow[charToRow.length - 1] : end;
+  return {
+    start,
+    end,
+    cutAfter,
+    normalized: pieces.join(" "),
+    glued: pieces.join(""),
+    charToRow
+  };
+}
+
+function _collectUserRuns(rawLines) {
+  const runs = [];
+  const lines = Array.isArray(rawLines) ? rawLines : [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!_isUserPromptLine(lines[i])) continue;
+    const start = i;
+    let end = i;
+    for (let j = i + 1; j < lines.length; j += 1) {
+      if (_isUserRunBoundary(lines[j])) break;
+      end = j;
+    }
+    runs.push(_normalizeUserRun(lines, start, end));
+    i = end;
+  }
+  return runs;
+}
+
+function _suffixLadder(normalizedSent) {
+  const lengths = [64, 48, 32, 20];
+  const out = [];
+  const seen = new Set();
+  const push = (suf) => {
+    if (suf && !seen.has(suf)) {
+      seen.add(suf);
+      out.push(suf);
+    }
+  };
+  const sent = _normalizeWs(normalizedSent);
+  if (!sent) return out;
+  if (sent.length <= 64) push(sent);
+  for (const len of lengths) {
+    if (sent.length < len) continue;
+    let start = sent.length - len;
+    if (start > 0 && sent[start] !== " " && sent[start - 1] !== " ") {
+      const prevSpace = sent.lastIndexOf(" ", start);
+      if (prevSpace >= 0) start = prevSpace + 1;
+    } else if (start < sent.length && sent[start] === " ") {
+      start += 1;
+    }
+    push(sent.slice(start).trim());
+  }
+  if (!out.length) push(sent);
+  return out;
+}
+
+function _lastMatchingUserRun(runs, sent) {
+  const ladder = _suffixLadder(sent);
+  if (!ladder.length || !runs.length) return null;
+  for (const suffix of ladder) {
+    const gluedSuffix = suffix.replace(/ /g, "");
+    const hits = runs.filter((run) =>
+      run.normalized.endsWith(suffix)
+      || run.glued.endsWith(suffix)
+      || (gluedSuffix && run.glued.endsWith(gluedSuffix))
+    );
+    if (hits.length) return hits[hits.length - 1];
+  }
+  return null;
+}
+
+function _latestBulletBlocks(lines) {
+  let first = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (/^\s*[│┃║]?\s*●/u.test(lines[i] || "")) {
+      first = i;
+      break;
+    }
+  }
+  if (first < 0) return "";
+  return lines.slice(first).join("\n");
+}
+
+function _provenPostSendDelta(snapshot, entries, baselineAtSend, previousSnapshot) {
   const hasBaseline = typeof baselineAtSend === "string" && baselineAtSend.length > 0;
   const hasPrevious = typeof previousSnapshot === "string" && previousSnapshot.length > 0;
   if (hasBaseline) {
@@ -567,11 +766,81 @@ function _fallbackOpenBody(snapshot, entries, baselineAtSend, previousSnapshot) 
     const cut = _agentBodyFromCleanedDiff(previousSnapshot, snapshot, entries);
     if (cut.body) return (cut.body || "").trim();
   }
-  return _agentBodyFromSnapshot(snapshot, entries, false);
+  return "";
+}
+
+/**
+ * Robust ANCHOR KEY = the message TAIL (last ~40-60 chars at a word boundary).
+ * The TUI counter only clobbers the first physical line, so the tail survives.
+ */
+function _anchorKeyFromSent(sent) {
+  const normalized = _normalizeWs(sent);
+  if (!normalized) return "";
+  const MIN = 40;
+  const MAX = 60;
+  const TARGET = 50;
+  if (normalized.length <= MAX) return normalized;
+  let start = Math.max(0, normalized.length - TARGET);
+  if (start > 0 && normalized[start] !== " " && normalized[start - 1] !== " ") {
+    const prevSpace = normalized.lastIndexOf(" ", start);
+    const nextSpace = normalized.indexOf(" ", start);
+    const fromPrev = prevSpace >= 0 ? prevSpace + 1 : -1;
+    const fromNext = nextSpace >= 0 ? nextSpace + 1 : -1;
+    const lenPrev = fromPrev >= 0 ? normalized.length - fromPrev : Infinity;
+    const lenNext = fromNext >= 0 ? normalized.length - fromNext : -1;
+    if (fromPrev >= 0 && lenPrev >= MIN && lenPrev <= MAX) start = fromPrev;
+    else if (fromNext >= 0 && lenNext >= MIN && lenNext <= MAX) start = fromNext;
+    else if (fromPrev >= 0 && lenPrev <= MAX) start = fromPrev;
+    else if (fromNext >= 0 && lenNext >= MIN) start = fromNext;
+  } else if (normalized[start] === " ") {
+    start += 1;
+  }
+  return normalized.slice(start).trim();
+}
+
+function _joinedContainsKey(lines, start, end, key) {
+  let spaced = "";
+  let glued = "";
+  for (let i = start; i <= end; i += 1) {
+    spaced = _normalizeWs(`${spaced} ${lines[i] || ""}`);
+    glued = _normalizeWs(glued + String(lines[i] || ""));
+  }
+  return spaced.includes(key) || glued.includes(key);
+}
+
+/**
+ * First occurrence of the normalized tail key, joining wrapped continuation
+ * lines of the user box so a tail split across physical rows still matches.
+ * Returns the last physical line index of the matching run (the boundary).
+ */
+function _findTailAnchor(lines, key) {
+  const needle = _normalizeWs(key);
+  if (!needle) return -1;
+  // Scan from the top, joining up to 8 physical rows so a wrap-split tail
+  // that appears ABOVE a later verbatim quote is the first hit.
+  for (let start = 0; start < lines.length; start += 1) {
+    for (let end = start; end < Math.min(lines.length, start + 8); end += 1) {
+      if (_joinedContainsKey(lines, start, end, needle)) return end;
+    }
+  }
+  return -1;
+}
+
+function _removeFirstTailEcho(text, sent) {
+  const key = _anchorKeyFromSent(sent);
+  if (!text || !key) return text || "";
+  const lines = text.split("\n");
+  const at = _findTailAnchor(lines, key);
+  if (at < 0) return text;
+  let runStart = at;
+  for (let s = at; s >= Math.max(0, at - 7); s -= 1) {
+    if (_joinedContainsKey(lines, s, at, key)) runStart = s;
+  }
+  return lines.slice(0, runStart).concat(lines.slice(at + 1)).join("\n");
 }
 
 function _prepareDiffText(text) {
-  return _stripStatusLines(_cleanTerminalLines(text || ""));
+  return _stripStatusLines(_stripPaneCounters(_cleanTerminalLines(text || "")));
 }
 
 function _agentBodyFromSnapshot(snapshot, entries, excludeLastAgent) {
@@ -637,12 +906,15 @@ export function appendYou(entries, text, { now = Date.now(), sentContent } = {})
  * Patch the last AGENT in place, or open a new AGENT only after a YOU send.
  * Aged capture tails do not rebuild prior turns or restamp identities.
  *
- * Primary body is everything AFTER the first YOU-echo of the current send in
- * the cleaned snapshot minus already-displayed prior turns (recomputed each
- * poll). A wrapped multi-row echo of the same command is treated as that echo.
- * If the echo is missing: sliding-overlap accumulate, then cleaned-snapshot
- * minus prior turns. Fallback prefix-strip only drops proven mid-wrap fragments.
- * Zero-overlap never freezes an OPEN-NEW turn when non-chrome reply text exists.
+ * Primary body is everything AFTER the current YOU-message boundary
+ * (recomputed each poll). On real Claude TUI panes the boundary is the LAST
+ * structural ❯ user run whose normalized text ends with a suffix-ladder match
+ * (64→48→32→20, word-bounded, Unicode-whitespace folded). Rows below that
+ * run are chrome-cleaned; a ● quote of the tail cannot become the anchor.
+ * If no trustworthy ❯ run matches: latest complete ● block(s) below the newest
+ * ❯, or a proven post-send adjacent-snapshot delta — never whole-snapshot
+ * minus prior turns when ❯ structure is present. Legacy snapshots without ❯
+ * keep exact/wrapped/tail + the unstructured never-freeze fallback.
  */
 export function applyAgentPatch(entries, snapshot, { now = Date.now(), baselineAtSend, previousSnapshot } = {}) {
   const list = Array.isArray(entries) ? entries : [];

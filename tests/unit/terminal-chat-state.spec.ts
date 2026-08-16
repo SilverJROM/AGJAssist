@@ -954,3 +954,541 @@ describe("FIX12 adversarial validation (sonnet5 final gate) — first-occurrence
     expect(body.split("\n")).toContain("Deploy");
   });
 });
+
+describe("FIX14 tail-anchor against the REAL Claude TUI pane format", () => {
+  const COUNTER = "21:30:11 [10/1805]";
+  const OLD_MARKER = "UNIQUE-OLD-REPLY-ALPHA";
+  const REPLY_1 = "I found the tail and the cut is after your message";
+  const REPLY_2 = "The new reply continues on this indented wrap";
+  const REPLY_3 = "And a third line of the new reply";
+  const REAL_CHROME = [
+    "────────────────────────────────────────",
+    "⏵⏵ bypass permissions on (shift+tab to cycle)",
+    "Working (3s)",
+    "› "
+  ];
+
+  function wrapAt(text: string, width: number): string[] {
+    const lines: string[] = [];
+    for (let i = 0; i < text.length; i += width) lines.push(text.slice(i, i + width));
+    return lines;
+  }
+
+  /** First physical line has the right-aligned counter painted OVER the text. */
+  function clobberFirstLine(lines: string[], counter: string): string[] {
+    const out = lines.slice();
+    const first = out[0] || "";
+    if (first.length >= counter.length) {
+      out[0] = first.slice(0, first.length - counter.length) + counter;
+    } else {
+      out[0] = `${first}${" ".repeat(Math.max(1, 8))}${counter}`;
+    }
+    return out;
+  }
+
+  function realPane(opts: {
+    oldReply: string[];
+    userLines: string[];
+    newReply: string[];
+    chrome?: string[];
+  }): string {
+    return [
+      ...opts.oldReply,
+      "",
+      ...opts.userLines,
+      ...opts.newReply,
+      ...(opts.chrome || REAL_CHROME)
+    ].join("\n");
+  }
+
+  it("WRAPPED+CLOBBERED user box: 3 physical lines, counter overwrites line 1, ● reply kept, older ● reply excluded", () => {
+    const t0 = 1_700_000_900_000;
+    const sent =
+      "please look over the last three agent replies in this pane and confirm that the proposed tail-anchor cut is correct for the wrapped user box then pls confirm";
+    expect(sent).not.toContain("\n");
+
+    const wrapWidth = 70;
+    const wrapped = wrapAt(sent, wrapWidth);
+    expect(wrapped.length).toBe(3);
+    const userLines = clobberFirstLine(wrapped, COUNTER);
+    expect(userLines).toHaveLength(3);
+    expect(userLines[0]).toContain(COUNTER);
+    expect(userLines[0]).not.toBe(sent);
+    for (const row of userLines) expect(row).not.toBe(sent);
+    // Head is clobbered so even a joined wrap cannot equal sentContent.
+    expect(userLines.join("")).not.toBe(sent);
+    expect(userLines.join(" ")).not.toBe(sent);
+    // Tail of the last physical line survives.
+    expect(userLines[userLines.length - 1]).toMatch(/pls confirm\s*$/);
+
+    const oldReply = [
+      `● Older analysis ${OLD_MARKER} from the previous turn`,
+      "  continuation of the older reply that must not leak"
+    ];
+    const newReply = [
+      `● ${REPLY_1}`,
+      `  ${REPLY_2}`,
+      `  ${REPLY_3}`
+    ];
+
+    const first = applyAgentPatch([], oldReply.join("\n"), { now: t0 });
+    expect(first[0].content).toContain(OLD_MARKER);
+    const withYou = appendYou(first, sent, { now: t0 + 1000, sentContent: sent });
+
+    const baselineAtSend = ["BASE-LINE-ONE-UNIQUE", "BASE-LINE-TWO-UNIQUE", "BASE-LINE-THREE-UNIQUE"].join("\n");
+    const current = realPane({ oldReply, userLines, newReply });
+    expect(diffTerminalOutput(baselineAtSend, current)).toBe("");
+
+    const after = applyAgentPatch(withYou, current, { now: t0 + 2000, baselineAtSend });
+    expect(after).toHaveLength(3);
+    const body = after[2].content;
+
+    expect(body).toContain(REPLY_1);
+    expect(body).toContain(REPLY_2);
+    expect(body).toContain(REPLY_3);
+    expect(body).toContain("●");
+    expect(body).not.toContain(OLD_MARKER);
+    expect(body).not.toContain("Older analysis");
+    expect(body).not.toContain(COUNTER);
+    expect(body).not.toContain("21:30:11");
+    expect(body).not.toContain("[10/1805]");
+    expect(body).not.toContain(sent);
+    expect(body).not.toContain("pls confirm");
+    expect(body).not.toContain("bypass permissions");
+    expect(body).not.toContain("Working (3s)");
+    for (const row of userLines) {
+      const stripped = row.replace(/\b\d{2}:\d{2}:\d{2}\s+\[\d+\/\d+\]/g, "").trim();
+      if (stripped) expect(body).not.toContain(stripped);
+    }
+  });
+
+  it("SHORT-COMMAND: one physical line with the counter to the right, not overwriting", () => {
+    const t0 = 1_700_000_910_000;
+    const sent = "hello agent";
+    const oldReply = [`● Older analysis ${OLD_MARKER}`, "  older wrap"];
+    const userLines = [`${sent}                    ${COUNTER}`];
+    expect(userLines[0]).not.toBe(sent);
+    expect(userLines[0]).toContain(COUNTER);
+    const newReply = [`● ${REPLY_1}`, `  ${REPLY_2}`, `  ${REPLY_3}`];
+
+    const first = applyAgentPatch([], oldReply.join("\n"), { now: t0 });
+    const withYou = appendYou(first, sent, { now: t0 + 1000, sentContent: sent });
+    const current = realPane({ oldReply, userLines, newReply });
+    const after = applyAgentPatch(withYou, current, {
+      now: t0 + 2000,
+      baselineAtSend: "BASE-LINE-ONE-UNIQUE\nBASE-LINE-TWO-UNIQUE"
+    });
+
+    expect(after).toHaveLength(3);
+    const body = after[2].content;
+    expect(body).toContain(REPLY_1);
+    expect(body).toContain(REPLY_2);
+    expect(body).toContain(REPLY_3);
+    expect(body).not.toContain(OLD_MARKER);
+    expect(body).not.toContain(COUNTER);
+    expect(body).not.toContain(sent);
+  });
+
+  it("REPLY-QUOTES-THE-COMMAND: tail appears again inside the reply; cut stays at the real user box", () => {
+    const t0 = 1_700_000_920_000;
+    const sent =
+      "please look over the last three agent replies in this pane and confirm that the proposed tail-anchor cut is correct for the wrapped user box then pls confirm";
+    const wrapWidth = 70;
+    const userLines = clobberFirstLine(wrapAt(sent, wrapWidth), COUNTER);
+    expect(userLines.length).toBe(3);
+    for (const row of userLines) expect(row).not.toBe(sent);
+
+    const oldReply = [`● Older analysis ${OLD_MARKER}`];
+    const quotedTail = "correct for the wrapped user box then pls confirm";
+    const newReply = [
+      `● ${REPLY_1}`,
+      `  you wrote: ${quotedTail}`,
+      `  ${REPLY_3}`
+    ];
+
+    const first = applyAgentPatch([], oldReply.join("\n"), { now: t0 });
+    const withYou = appendYou(first, sent, { now: t0 + 1000, sentContent: sent });
+    const current = realPane({ oldReply, userLines, newReply });
+    const after = applyAgentPatch(withYou, current, {
+      now: t0 + 2000,
+      baselineAtSend: "BASE-LINE-ONE-UNIQUE\nBASE-LINE-TWO-UNIQUE"
+    });
+
+    expect(after).toHaveLength(3);
+    const body = after[2].content;
+    expect(body).toContain(REPLY_1);
+    expect(body).toContain(quotedTail);
+    expect(body).toContain(REPLY_3);
+    expect(body).not.toContain(OLD_MARKER);
+    expect(body).not.toContain(COUNTER);
+    expect(body).not.toContain(userLines[0]);
+  });
+
+  it("REPLY-LONGER-THAN-CAPTURE: user box scrolled off; never freezes (fallback opens a non-empty agent turn)", () => {
+    const t0 = 1_700_000_930_000;
+    const sent =
+      "please look over the last three agent replies in this pane and confirm that the proposed tail-anchor cut is correct for the wrapped user box then pls confirm";
+    const oldReply = [`● Older analysis ${OLD_MARKER}`];
+    const first = applyAgentPatch([], oldReply.join("\n"), { now: t0 });
+    const withYou = appendYou(first, sent, { now: t0 + 1000, sentContent: sent });
+
+    const longReply = Array.from({ length: 80 }, (_, i) =>
+      i === 0 ? `● LONG-REPLY-HEAD-${i + 1}` : `  LONG-REPLY-TAIL-${i + 1}`
+    );
+    // Capture is only the last 12 reply lines — user box and echo tail are gone.
+    const current = [...longReply.slice(-12), ...REAL_CHROME].join("\n");
+    expect(current).not.toContain("pls confirm");
+    expect(current).not.toContain(sent);
+    const baselineAtSend = ["BASE-LINE-ONE-UNIQUE", "BASE-LINE-TWO-UNIQUE", "BASE-LINE-THREE-UNIQUE"].join("\n");
+    expect(diffTerminalOutput(baselineAtSend, current)).toBe("");
+
+    const after = applyAgentPatch(withYou, current, { now: t0 + 2000, baselineAtSend });
+    expect(after.length).toBeGreaterThan(withYou.length);
+    const body = after[after.length - 1].content;
+    expect(body.trim()).not.toBe("");
+    expect(body).toMatch(/LONG-REPLY-TAIL-\d+/);
+    expect(body).not.toContain(COUNTER);
+    expect(body).not.toContain("bypass permissions");
+  });
+});
+
+describe("FIX15 sol real-format fixtures (raw ❯-run tail-anchor)", () => {
+  const COUNTER = "21:30:11 [10/1805]";
+  const OLD_MARKER = "UNIQUE-OLD-REPLY-ALPHA";
+  const REPLY_1 = "Here is the retry policy summary.";
+  const REPLY_2 = "Requests retry with exponential backoff, capped at five attempts";
+  const REPLY_3 = "before surfacing a hard failure to the caller.";
+  const REAL_CHROME = [
+    "────────────────────────────────────────",
+    "Working (3s)",
+    "⏵⏵ bypass permissions on (shift+tab to cycle)",
+    "› "
+  ];
+  const SCREENSHOT_SENT =
+    "summarize the retry policy and the rollout plan for the auth refactor then scroll to the bottom it disappears pls confirm";
+
+  function wrapAt(text: string, width: number): string[] {
+    const lines: string[] = [];
+    for (let i = 0; i < text.length; i += width) lines.push(text.slice(i, i + width));
+    return lines;
+  }
+
+  function clobberFirstLine(lines: string[], counter: string): string[] {
+    const out = lines.slice();
+    const first = out[0] || "";
+    if (first.length >= counter.length) {
+      out[0] = first.slice(0, first.length - counter.length) + counter;
+    } else {
+      out[0] = `${first}${" ".repeat(Math.max(1, 8))}${counter}`;
+    }
+    return out;
+  }
+
+  /** Real Claude TUI user echo: ❯ on row 1, indented wraps, counter on row 1. */
+  function userRunLines(sent: string, width: number, counter = COUNTER): string[] {
+    const bodyWidth = Math.max(8, width - 2);
+    const chunks = wrapAt(sent, bodyWidth);
+    const rows = chunks.map((chunk, i) => (i === 0 ? `❯ ${chunk}` : `  ${chunk}`));
+    return clobberFirstLine(rows, counter);
+  }
+
+  function padWrap(sent: string, firstWidth: number, contWidth: number): string[] {
+    const rows: string[] = [];
+    rows.push(`❯ ${sent.slice(0, firstWidth)}${" ".repeat(6)}`);
+    let i = firstWidth;
+    while (i < sent.length) {
+      rows.push(`  ${sent.slice(i, i + contWidth)}${"\u00A0".repeat(2)}   `);
+      i += contWidth;
+    }
+    return clobberFirstLine(rows, COUNTER);
+  }
+
+  function realPane(opts: {
+    oldReply: string[];
+    userLines: string[];
+    newReply: string[];
+    chrome?: string[];
+    extraAbove?: string[];
+  }): string {
+    return [
+      ...(opts.extraAbove || []),
+      ...opts.oldReply,
+      "",
+      ...opts.userLines,
+      ...opts.newReply,
+      ...(opts.chrome || REAL_CHROME)
+    ].join("\n");
+  }
+
+  function workingChrome(seconds: number): string[] {
+    return [
+      "────────────────────────────────────────",
+      `Working (${seconds}s)`,
+      "⏵⏵ bypass permissions on (shift+tab to cycle)",
+      "› "
+    ];
+  }
+
+  it("1. exact screenshot shape: ❯ wrap + counter + ● multi-paragraph; zero prior/echo/counter", () => {
+    const t0 = 1_700_001_000_000;
+    const sent = SCREENSHOT_SENT;
+    const userLines = userRunLines(sent, 48);
+    expect(userLines.length).toBeGreaterThanOrEqual(3);
+    expect(userLines.length).toBeLessThanOrEqual(4);
+    expect(userLines[0]).toMatch(/^❯ /);
+    expect(userLines[0]).toContain(COUNTER);
+    expect(userLines[1]).toMatch(/^\s{2}\S/);
+    expect(userLines.join("")).not.toBe(sent);
+
+    const oldReply = [
+      `● Prior analysis of the auth refactor is complete. ${OLD_MARKER}`,
+      "  continuation of the prior analysis."
+    ];
+    const newReply = [
+      `● ${REPLY_1}`,
+      "",
+      REPLY_2,
+      `${REPLY_3}`
+    ];
+
+    const first = applyAgentPatch([], oldReply.join("\n"), { now: t0 });
+    const withYou = appendYou(first, sent, { now: t0 + 1000, sentContent: sent });
+    const current = realPane({ oldReply, userLines, newReply });
+    const after = applyAgentPatch(withYou, current, {
+      now: t0 + 2000,
+      baselineAtSend: "BASE-LINE-ONE-UNIQUE\nBASE-LINE-TWO-UNIQUE"
+    });
+
+    expect(after).toHaveLength(3);
+    const body = after[2].content;
+    expect(body).toContain(REPLY_1);
+    expect(body).toContain(REPLY_2);
+    expect(body).toContain(REPLY_3);
+    expect(body).toContain("●");
+    expect(body).not.toContain(OLD_MARKER);
+    expect(body).not.toContain("Prior analysis");
+    expect(body).not.toContain(COUNTER);
+    expect(body).not.toContain("21:30:11");
+    expect(body).not.toContain("[10/1805]");
+    expect(body).not.toContain("pls confirm");
+    expect(body).not.toContain("❯");
+    expect(body).not.toContain(sent);
+    expect(body).not.toContain("bypass permissions");
+    expect(body).not.toContain("Working (3s)");
+    for (const row of userLines) {
+      const stripped = row.replace(/\b\d{2}:\d{2}:\d{2}\s+\[\d+\/\d+\]/g, "").replace(/^❯\s*/u, "").trim();
+      if (stripped) expect(body).not.toContain(stripped);
+    }
+  });
+
+  it("2. short-message pair: ❯ yes matches; counter-clobbered suffix must not false-anchor into reply", () => {
+    const t0 = 1_700_001_010_000;
+    const oldReply = [`● Older analysis ${OLD_MARKER}`, "  older wrap"];
+
+    const yesSent = "yes";
+    const yesUser = [`❯ yes                    ${COUNTER}`];
+    const yesReply = [`● ${REPLY_1}`, `  ${REPLY_2}`];
+    const yesPane = realPane({ oldReply, userLines: yesUser, newReply: yesReply });
+    const yesEntries = appendYou(
+      applyAgentPatch([], oldReply.join("\n"), { now: t0 }),
+      yesSent,
+      { now: t0 + 1000, sentContent: yesSent }
+    );
+    const yesAfter = applyAgentPatch(yesEntries, yesPane, {
+      now: t0 + 2000,
+      baselineAtSend: "BASE-LINE-ONE-UNIQUE\nBASE-LINE-TWO-UNIQUE"
+    });
+    expect(yesAfter).toHaveLength(3);
+    expect(yesAfter[2].content).toContain(REPLY_1);
+    expect(yesAfter[2].content).toContain(REPLY_2);
+    expect(yesAfter[2].content).not.toContain(OLD_MARKER);
+    expect(yesAfter[2].content).not.toContain("❯");
+    expect(yesAfter[2].content).not.toMatch(/\byes\b/);
+
+    const longSent = "please confirm the rollout window is next Tuesday morning for prod";
+    const clobbered = clobberFirstLine([`❯ ${longSent}`], COUNTER);
+    expect(clobbered[0]).toContain(COUNTER);
+    expect(clobbered[0]).not.toContain("Tuesday morning");
+    const quotedTail = "next Tuesday morning for prod";
+    const replyPrefix = "I will confirm the window now:";
+    const clobberReply = [
+      `● ${replyPrefix}`,
+      `  you wrote: ${quotedTail}`,
+      `  ${REPLY_3}`
+    ];
+    const clobberPane = realPane({ oldReply, userLines: clobbered, newReply: clobberReply });
+    const clobberEntries = appendYou(
+      applyAgentPatch([], oldReply.join("\n"), { now: t0 + 3000 }),
+      longSent,
+      { now: t0 + 4000, sentContent: longSent }
+    );
+    const clobberAfter = applyAgentPatch(clobberEntries, clobberPane, {
+      now: t0 + 5000,
+      baselineAtSend: "BASE-LINE-ONE-UNIQUE\nBASE-LINE-TWO-UNIQUE"
+    });
+    expect(clobberAfter).toHaveLength(3);
+    const body = clobberAfter[2].content;
+    expect(body).toContain(replyPrefix);
+    expect(body).toContain(quotedTail);
+    expect(body).toContain(REPLY_3);
+    expect(body).not.toContain(OLD_MARKER);
+    expect(body).not.toContain(COUNTER);
+    expect(body).not.toContain("❯");
+  });
+
+  it("3. tail crosses a wrap with indent + trailing padding, plus a pane-width-change replay", () => {
+    const t0 = 1_700_001_020_000;
+    const sent = SCREENSHOT_SENT;
+    const oldReply = [`● Older analysis ${OLD_MARKER}`];
+    const newReply = [`● ${REPLY_1}`, `  ${REPLY_2}`, `  ${REPLY_3}`];
+
+    const narrow = padWrap(sent, 36, 34);
+    expect(narrow.length).toBeGreaterThanOrEqual(3);
+    expect(narrow[0]).toMatch(/^❯ /);
+    expect(narrow[1]).toMatch(/^\s{2}/);
+    expect(narrow.some((row) => /\s{2,}$/.test(row) || row.includes("\u00A0"))).toBe(true);
+
+    const first = applyAgentPatch([], oldReply.join("\n"), { now: t0 });
+    const withYou = appendYou(first, sent, { now: t0 + 1000, sentContent: sent });
+    const snapNarrow = realPane({ oldReply, userLines: narrow, newReply });
+    const afterNarrow = applyAgentPatch(withYou, snapNarrow, {
+      now: t0 + 2000,
+      baselineAtSend: "BASE-LINE-ONE-UNIQUE\nBASE-LINE-TWO-UNIQUE"
+    });
+    expect(afterNarrow).toHaveLength(3);
+    expect(afterNarrow[2].content).toContain(REPLY_1);
+    expect(afterNarrow[2].content).toContain(REPLY_2);
+    expect(afterNarrow[2].content).toContain(REPLY_3);
+    expect(afterNarrow[2].content).not.toContain("pls confirm");
+    expect(afterNarrow[2].content).not.toContain(OLD_MARKER);
+
+    const wide = padWrap(sent, 62, 58);
+    expect(wide.length).toBeLessThan(narrow.length);
+    const snapWide = realPane({ oldReply, userLines: wide, newReply: [...newReply, "  extra width-replay line"] });
+    const afterWide = applyAgentPatch(afterNarrow, snapWide, {
+      now: t0 + 3000,
+      previousSnapshot: snapNarrow
+    });
+    expect(afterWide).toHaveLength(3);
+    expect(afterWide[2].id).toBe(afterNarrow[2].id);
+    expect(afterWide[2].content).toContain(REPLY_1);
+    expect(afterWide[2].content).toContain("extra width-replay line");
+    expect(afterWide[2].content).not.toContain("pls confirm");
+    expect(afterWide[2].content).not.toContain(OLD_MARKER);
+    expect((afterWide[2].content.match(new RegExp(REPLY_1.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length).toBe(1);
+  });
+
+  it("4. repeated/shared-tail: current ❯ run wins; reply prefix kept; prior reply not duplicated", () => {
+    const t0 = 1_700_001_030_000;
+    const sent = SCREENSHOT_SENT;
+    const userLines = userRunLines(sent, 48);
+    const oldReply = [`● Older analysis ${OLD_MARKER}`, "  continuation of the older reply"];
+    const priorQuoted = [
+      "● Prior turn already quoted the tail:",
+      "  pls confirm",
+      "  PRIOR-TURN-ONLY-LINE"
+    ];
+    const newPrefix = "NEW-REPLY-PREFIX-MUST-SURVIVE";
+    const newReply = [
+      `● ${newPrefix}`,
+      "  the previous instruction ended with pls confirm",
+      `  ${REPLY_3}`
+    ];
+
+    let entries = applyAgentPatch([], oldReply.join("\n"), { now: t0 });
+    entries = appendYou(entries, sent, { now: t0 + 1000, sentContent: sent });
+    const turn1 = realPane({ oldReply, userLines, newReply: priorQuoted });
+    entries = applyAgentPatch(entries, turn1, {
+      now: t0 + 2000,
+      baselineAtSend: oldReply.join("\n")
+    });
+    expect(entries).toHaveLength(3);
+    expect(entries[2].content).toContain("PRIOR-TURN-ONLY-LINE");
+
+    entries = appendYou(entries, sent, { now: t0 + 3000, sentContent: sent });
+    const turn2 = [turn1, ...userLines, ...newReply, ...REAL_CHROME].join("\n");
+    entries = applyAgentPatch(entries, turn2, {
+      now: t0 + 4000,
+      baselineAtSend: turn1
+    });
+
+    expect(entries).toHaveLength(5);
+    const body = entries[4].content;
+    expect(body).toContain(newPrefix);
+    expect(body).toContain("pls confirm");
+    expect(body).toContain(REPLY_3);
+    expect(body).not.toContain("PRIOR-TURN-ONLY-LINE");
+    expect(body).not.toContain(OLD_MARKER);
+    expect(body).not.toContain("❯");
+    expect((body.match(/NEW-REPLY-PREFIX-MUST-SURVIVE/g) || []).length).toBe(1);
+  });
+
+  it("5. poll sequence: echo-only / Working / partial ● / 800+ row window never duplicates or freezes", () => {
+    const t0 = 1_700_001_040_000;
+    const sent = SCREENSHOT_SENT;
+    const userLines = userRunLines(sent, 48);
+    const oldReply = [`● Older analysis ${OLD_MARKER}`, "  continuation of the prior analysis."];
+    const preSend = [...oldReply, ...workingChrome(0)].join("\n");
+
+    let entries = applyAgentPatch([], preSend, { now: t0 });
+    expect(entries).toHaveLength(1);
+    entries = appendYou(entries, sent, { now: t0 + 1000, sentContent: sent });
+    expect(entries).toHaveLength(2);
+
+    const echoOnly = realPane({ oldReply, userLines, newReply: [], chrome: workingChrome(1) });
+    entries = applyAgentPatch(entries, echoOnly, { now: t0 + 2000, baselineAtSend: preSend });
+    expect(entries).toHaveLength(2);
+
+    const ticking = realPane({ oldReply, userLines, newReply: [], chrome: workingChrome(2) });
+    entries = applyAgentPatch(entries, ticking, {
+      now: t0 + 3000,
+      baselineAtSend: preSend,
+      previousSnapshot: echoOnly
+    });
+    expect(entries).toHaveLength(2);
+
+    const partialReply = [`● ${REPLY_1}`];
+    const partial = realPane({ oldReply, userLines, newReply: partialReply, chrome: workingChrome(3) });
+    entries = applyAgentPatch(entries, partial, {
+      now: t0 + 4000,
+      baselineAtSend: preSend,
+      previousSnapshot: ticking
+    });
+    expect(entries).toHaveLength(3);
+    expect(entries[2].content).toContain(REPLY_1);
+    expect(entries[2].content).not.toContain(OLD_MARKER);
+
+    const longReply = Array.from({ length: 820 }, (_, i) =>
+      i === 0 ? `● ${REPLY_1}` : `  REPLY-LINE-${String(i + 1).padStart(4, "0")}`
+    );
+    const deepRows = [
+      ...oldReply,
+      "",
+      ...userLines,
+      ...longReply,
+      ...workingChrome(12)
+    ];
+    expect(deepRows.length).toBeGreaterThan(800);
+    const last800 = deepRows.slice(-800).join("\n");
+    const last2000 = deepRows.slice(-2000).join("\n");
+    expect(last800).not.toContain("❯");
+    expect(last2000).toContain("❯");
+    expect(last2000.split("\n").length).toBeGreaterThan(800);
+
+    entries = applyAgentPatch(entries, last2000, {
+      now: t0 + 5000,
+      previousSnapshot: partial
+    });
+    expect(entries).toHaveLength(3);
+    const body = entries[2].content;
+    expect(body).toContain(REPLY_1);
+    expect(body).toContain("REPLY-LINE-0820");
+    expect(body).toContain("REPLY-LINE-0002");
+    expect((body.match(new RegExp(REPLY_1.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length).toBe(1);
+    expect(body).not.toContain(OLD_MARKER);
+    expect(body).not.toContain("pls confirm");
+    expect(body).not.toContain("❯");
+    expect(body).not.toContain("Working (12s)");
+    expect(body).not.toContain("bypass permissions");
+  });
+});

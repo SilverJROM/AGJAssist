@@ -2545,6 +2545,8 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [attaching, setAttaching] = useState(false);
   const [attachError, setAttachError] = useState('');
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [unseenWhileUp, setUnseenWhileUp] = useState(0);
   const transcriptRef = useRef(null);
   const snapshotRef = useRef('');
   const sendingRef = useRef(false);
@@ -2553,6 +2555,8 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const previousSnapshotRef = useRef('');
   const lastSentRef = useRef('');
   const fileInputRef = useRef(null);
+  const pinToBottomRef = useRef(true);
+  const entryCountRef = useRef(0);
   const storageKey = 'agj_terminal_chat_' + target.replace(/[^a-zA-Z0-9_.-]/g, '_');
 
   function lastRoleIndex(list, role) {
@@ -2621,8 +2625,10 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   }, []);
 
   function getCaptureLines() {
+    // peekPane clamps at 2000. Request that bound so a ❯ user run stays in-window
+    // past the old 800-row poll, without pulling full scrollback (capturePane 5000).
     // Friendly extraction depth is independent of the UI "Lines captured" picker.
-    return 800;
+    return 2000;
   }
 
   function conversationSeed(savedState) {
@@ -2659,6 +2665,10 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       previousSnapshotRef.current = '';
       openAgentAfterYouRef.current = false;
       lastSentRef.current = '';
+      pinToBottomRef.current = true;
+      entryCountRef.current = 0;
+      setShowScrollBottom(false);
+      setUnseenWhileUp(0);
       let savedState = null;
       try {
         savedState = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
@@ -2795,6 +2805,9 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     openAgentAfterYouRef.current = true;
     sendBaselineRef.current = beforeSnapshot;
     lastSentRef.current = sentText;
+    pinToBottomRef.current = true;
+    setShowScrollBottom(false);
+    setUnseenWhileUp(0);
     setInput('');
     setAttachment(null);
     setAttachError('');
@@ -2954,8 +2967,58 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     uploadAttachedImage(file, filename);
   }
 
+  function isTranscriptNearBottom(node) {
+    if (!node) return true;
+    return node.scrollHeight - node.scrollTop - node.clientHeight < 80;
+  }
+
+  function updateScrollBottomButton() {
+    const node = transcriptRef.current;
+    if (!node) return;
+    const near = isTranscriptNearBottom(node);
+    pinToBottomRef.current = near;
+    const canScroll = node.scrollHeight > node.clientHeight + 4;
+    setShowScrollBottom(canScroll && !near);
+    if (near) setUnseenWhileUp(0);
+  }
+
+  function scrollTranscriptToBottom() {
+    const node = transcriptRef.current;
+    if (!node) return;
+    node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+    pinToBottomRef.current = true;
+    setShowScrollBottom(false);
+    setUnseenWhileUp(0);
+  }
+
+  useEffect(() => {
+    const node = transcriptRef.current;
+    if (!node) return;
+    const onScroll = () => updateScrollBottomButton();
+    node.addEventListener('scroll', onScroll, { passive: true });
+    updateScrollBottomButton();
+    return () => node.removeEventListener('scroll', onScroll);
+  }, [target]);
+
+  useEffect(() => {
+    const node = transcriptRef.current;
+    if (!node) return;
+    const prevCount = entryCountRef.current;
+    const grew = entries.length > prevCount;
+    entryCountRef.current = entries.length;
+    if (pinToBottomRef.current) {
+      node.scrollTop = node.scrollHeight;
+      setShowScrollBottom(false);
+      setUnseenWhileUp(0);
+    } else if (grew) {
+      setUnseenWhileUp((n) => n + (entries.length - prevCount));
+      updateScrollBottomButton();
+    }
+  }, [entries, sending, statusLine]);
+
   return html`
     <div class="terminal-chat-view">
+      <div class="terminal-chat-transcript-wrap">
       <div class="terminal-chat-transcript" data-testid="terminal-conversation" ref=${transcriptRef}>
         <div class="terminal-chat-daydiv">Today</div>
         ${rawChrome ? html`
@@ -3000,6 +3063,19 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
             </div>
           </div>
         `}
+      </div>
+      ${showScrollBottom ? html`
+        <button type="button"
+                class="terminal-scroll-bottom"
+                data-testid="terminal-scroll-bottom"
+                aria-label="Scroll to bottom"
+                onclick=${scrollTranscriptToBottom}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 9l6 6 6-6"></path>
+          </svg>
+          ${unseenWhileUp > 0 ? html`<span class="terminal-scroll-bottom-dot"></span>` : ''}
+        </button>
+      ` : ''}
       </div>
 
       <div class="terminal-chat-composer">

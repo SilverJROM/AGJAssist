@@ -77,7 +77,9 @@ export class TmuxService {
 
   async peekPane(target: string, lines = 200): Promise<string> {
     this.ensureValidTarget(target);
-    const safeLines = Math.max(20, Math.min(lines, 1000));
+    // Friendly /output path: allow a 2000-row window so the ❯ user run stays
+    // in-frame. Do not raise this to capturePane's 5000-row scrollback cap.
+    const safeLines = Math.max(20, Math.min(lines, 2000));
     const { stdout } = await execFileAsync("tmux", [
       "capture-pane",
       "-p",
