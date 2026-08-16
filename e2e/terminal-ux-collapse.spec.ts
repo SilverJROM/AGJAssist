@@ -1,9 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-// On-open windowing proof: a long agent reply is collapsed to its recent tail
-// (BUBBLE_VISIBLE_TAIL = 80 lines) with a "show earlier" control that reveals
-// more on top (BUBBLE_EXPAND_TAIL = 480, then all). The newest line stays
-// pinned at the bottom; older lines are hidden above until requested.
+// Minimize proof: agent replies compact to the most recent N lines (default 50),
+// tail pinned to the bottom, with a per-reply expand/minimize toggle. The ☰ menu
+// reply-length picker (10 / 50 / Full) changes N. User messages never compact.
 
 const APP_ORIGIN = process.env.AGJ_TERMINAL_BASE_URL || 'http://localhost:3210';
 const TERMINAL_PATH = `${APP_ORIGIN}/index.html#/terminals`;
@@ -11,12 +10,10 @@ const TARGET = 'GATE-TERM:0.0';
 
 const REPLY_COUNT = 220;
 const REPLY_LINES = Array.from({ length: REPLY_COUNT }, (_, i) => `reply-line-${String(i + 1).padStart(3, '0')}`);
-const NEWEST = REPLY_LINES[REPLY_COUNT - 1]; // reply-line-220 (bottom)
-const EARLY = REPLY_LINES[9];               // reply-line-010 (hidden until expanded)
+const NEWEST = REPLY_LINES[REPLY_COUNT - 1]; // reply-line-220 (bottom, always shown)
+const AT_170 = REPLY_LINES[169];             // reply-line-170 (hidden at 50, shown when expanded)
+const AT_205 = REPLY_LINES[204];             // reply-line-205 (shown at 50, hidden at 10)
 
-// Structure mirrors a live claude pane: an OLD reply, the newest ❯ user run,
-// then a long ● reply below it, then chrome. The anchor cuts below the ❯ run,
-// so the OLD reply is excluded (dedup) and the long reply is the agent body.
 const OUTPUT = [
   '● OLD-REPLY-ABOVE should never appear in the current turn',
   '─────────────────────────────────────────',
@@ -80,36 +77,43 @@ async function openFriendly(page: import('@playwright/test').Page) {
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
 }
 
-test('long reply opens collapsed to the recent tail with a working show-earlier control', async ({ page }) => {
+test('agent reply minimizes to the recent tail, expands/collapses, and the picker changes N', async ({ page }) => {
   test.setTimeout(60_000);
   await installTransport(page);
   await openFriendly(page);
 
   const agent = page.locator('[data-testid="terminal-turn-agent"]').last();
   await expect(agent).toBeVisible({ timeout: 15_000 });
+  await expect(agent).not.toContainText('OLD-REPLY-ABOVE'); // dedup on open
 
-  // Dedup on open: the OLD reply above the ❯ run is excluded.
-  await expect(agent).not.toContainText('OLD-REPLY-ABOVE');
-
-  // Default: newest line shown, an early line hidden, show-earlier offered.
-  const showEarlier = page.locator('[data-testid="terminal-show-earlier"]');
-  await expect(showEarlier).toBeVisible();
-  await expect(showEarlier).toContainText(/Show earlier lines/);
+  // Default limit 50: last 50 shown (newest present, line 170 hidden), expand offered.
+  const expandBtn = page.locator('[data-testid="terminal-reply-expand"]');
+  await expect(expandBtn).toBeVisible();
+  await expect(expandBtn).toContainText(/Show full reply/);
   await expect(agent).toContainText(NEWEST);
-  await expect(agent).not.toContainText(EARLY);
+  await expect(agent).toContainText(AT_205);
+  await expect(agent).not.toContainText(AT_170);
+  await page.screenshot({ path: 'AGJ_Upgrade/terminal-ux-2026-08-15/mockups/screenshots/LIVE-minimize-50.png' });
 
-  await page.screenshot({ path: 'AGJ_Upgrade/terminal-ux-2026-08-15/mockups/screenshots/LIVE-collapse-default.png' });
+  // Expand → full reply (line 170 now visible), toggle flips to Minimize.
+  await expandBtn.click();
+  await expect(agent).toContainText(AT_170);
+  const minimizeBtn = page.locator('[data-testid="terminal-reply-minimize"]');
+  await expect(minimizeBtn).toBeVisible();
+  await expect(minimizeBtn).toContainText(/Minimize to 50/);
 
-  // Scroll the transcript to the top so the show-earlier control is in view, and
-  // capture it (it sits above the visible tail on open).
-  await page.locator('[data-testid="terminal-conversation"]').evaluate((el) => { el.scrollTop = 0; });
-  await expect(showEarlier).toBeInViewport({ timeout: 5_000 });
-  await page.screenshot({ path: 'AGJ_Upgrade/terminal-ux-2026-08-15/mockups/screenshots/LIVE-collapse-button.png' });
+  // Minimize → back to compact.
+  await minimizeBtn.click();
+  await expect(agent).not.toContainText(AT_170);
+  await expect(page.locator('[data-testid="terminal-reply-expand"]')).toBeVisible();
 
-  // Expand: the early line becomes visible (revealed on top).
-  await showEarlier.click();
-  await expect(agent).toContainText(EARLY, { timeout: 10_000 });
+  // ☰ menu → set reply length to 10: now last 10 only (line 205 hidden).
+  await page.locator('[data-testid="terminal-menu"]').click();
+  const seg = page.locator('[data-testid="terminal-reply-limit"]');
+  await expect(seg).toBeVisible();
+  await seg.getByRole('button', { name: '10', exact: true }).click();
+  await page.locator('.terminal-menu-overlay').click({ position: { x: 5, y: 5 } }).catch(() => {});
   await expect(agent).toContainText(NEWEST);
-
-  await page.screenshot({ path: 'AGJ_Upgrade/terminal-ux-2026-08-15/mockups/screenshots/LIVE-collapse-expanded.png' });
+  await expect(agent).not.toContainText(AT_205);
+  await expect(page.locator('[data-testid="terminal-reply-expand"]')).toContainText(/210 earlier lines/);
 });

@@ -71,6 +71,74 @@ function writeTerminalConvFontSize(size) {
 
 applyTerminalConvFontSize(readTerminalConvFontSize());
 
+// Reply-length (minimize): agent replies compact to the most recent N lines.
+// 0 = Full (no compaction). Persisted per-device, synced via a custom event so
+// the ☰ menu picker and the chat re-render together (same pattern as the font).
+const TERMINAL_REPLY_LIMIT_STORAGE_KEY = 'agj_terminal_reply_limit';
+const TERMINAL_REPLY_LIMIT_DEFAULT = 50;
+const TERMINAL_REPLY_LIMIT_OPTIONS = [10, 50, 0]; // 0 = Full
+function readTerminalReplyLimit() {
+  try {
+    const stored = localStorage.getItem(TERMINAL_REPLY_LIMIT_STORAGE_KEY);
+    if (stored == null || stored === '') return TERMINAL_REPLY_LIMIT_DEFAULT;
+    const n = Number(stored);
+    return TERMINAL_REPLY_LIMIT_OPTIONS.includes(n) ? n : TERMINAL_REPLY_LIMIT_DEFAULT;
+  } catch {
+    return TERMINAL_REPLY_LIMIT_DEFAULT;
+  }
+}
+function writeTerminalReplyLimit(value) {
+  const n = TERMINAL_REPLY_LIMIT_OPTIONS.includes(Number(value)) ? Number(value) : TERMINAL_REPLY_LIMIT_DEFAULT;
+  try { localStorage.setItem(TERMINAL_REPLY_LIMIT_STORAGE_KEY, String(n)); } catch {}
+  try { window.dispatchEvent(new CustomEvent('agj-terminal-reply-limit', { detail: n })); } catch {}
+  return n;
+}
+
+// Recent-message memory: the app remembers the last N exchanges (your message +
+// the reply after it) per session in localStorage, so they survive closing and
+// reopening the app and can be seeded back into the chat. Rolling — the oldest
+// exchange drops out when an 11th arrives. Stored replies are length-capped so
+// the store stays small.
+const TERMINAL_MEMORY_KEY_PREFIX = 'agj_term_mem_';
+const TERMINAL_MEMORY_MAX_EXCHANGES = 10;
+const TERMINAL_MEMORY_REPLY_CAP = 4000; // chars kept per stored reply (tail)
+function terminalMemoryKey(target) {
+  return TERMINAL_MEMORY_KEY_PREFIX + String(target).replace(/[^a-zA-Z0-9_.-]/g, '_');
+}
+function capMemoryReply(text) {
+  const s = typeof text === 'string' ? text : String(text == null ? '' : text);
+  if (s.length <= TERMINAL_MEMORY_REPLY_CAP) return s;
+  return '…' + s.slice(s.length - TERMINAL_MEMORY_REPLY_CAP);
+}
+function trimConversationForMemory(entries) {
+  const conv = (Array.isArray(entries) ? entries : []).filter(
+    (e) => e && (e.role === 'user' || e.role === 'agent') && typeof e.content === 'string'
+  );
+  const userIdx = [];
+  conv.forEach((e, i) => { if (e.role === 'user') userIdx.push(i); });
+  const start = userIdx.length > TERMINAL_MEMORY_MAX_EXCHANGES
+    ? userIdx[userIdx.length - TERMINAL_MEMORY_MAX_EXCHANGES]
+    : 0;
+  return conv.slice(start).map((e) => (e.role === 'agent' ? { ...e, content: capMemoryReply(e.content) } : e));
+}
+function readTerminalMemory(target) {
+  try {
+    const raw = localStorage.getItem(terminalMemoryKey(target));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.entries) && parsed.entries.length ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+function writeTerminalMemory(target, entries) {
+  try {
+    const trimmed = trimConversationForMemory(entries);
+    if (!trimmed.length) return;
+    localStorage.setItem(terminalMemoryKey(target), JSON.stringify({ entries: trimmed, updatedAt: Date.now() }));
+  } catch {}
+}
+
 // Telegram Mini App detection
 const seededTgContext = (() => {
   try {
@@ -2066,6 +2134,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
   const [friendlyRefreshTick, setFriendlyRefreshTick] = useState(0);
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
+  const [replyLimit, setReplyLimit] = useState(() => readTerminalReplyLimit());
   const [showRawChrome, setShowRawChrome] = useState(false);
   const menuRef = useRef(null);
   const switcherRef = useRef(null);
@@ -2229,6 +2298,10 @@ function TerminalTab({ projectId, projectName } = {}) {
     setConvFontSize(writeTerminalConvFontSize(nextSize));
   }
 
+  function updateReplyLimit(nextValue) {
+    setReplyLimit(writeTerminalReplyLimit(nextValue));
+  }
+
   function normalizeLineLimit(value) {
     const parsed = Number(value);
     return [25, 50, 100, 150, 200].includes(parsed) ? parsed : 25;
@@ -2337,6 +2410,19 @@ function TerminalTab({ projectId, projectName } = {}) {
           <div class="terminal-sheet-row" style="margin-bottom:16px">
             <div class="terminal-sheet-lbl">Reset to default</div>
             <button type="button" class="terminal-sheet-chip" onclick=${() => updateConvFontSize(TERMINAL_CONV_FONT_DEFAULT)}>Reset · ${TERMINAL_CONV_FONT_DEFAULT}px</button>
+          </div>
+
+          <div class="terminal-sheet-sect">Reply length</div>
+          <div class="terminal-sheet-row" style="margin-bottom:16px">
+            <div class="terminal-sheet-lbl">Minimize agent replies<small>Shows the most recent N lines · tap a reply to expand</small></div>
+            <div class="terminal-seg" role="group" aria-label="Reply length" data-testid="terminal-reply-limit">
+              <button type="button" class=${'terminal-seg-btn' + (replyLimit === 10 ? ' sel' : '')}
+                      onclick=${() => updateReplyLimit(10)}>10</button>
+              <button type="button" class=${'terminal-seg-btn' + (replyLimit === 50 ? ' sel' : '')}
+                      onclick=${() => updateReplyLimit(50)}>50</button>
+              <button type="button" class=${'terminal-seg-btn' + (replyLimit === 0 ? ' sel' : '')}
+                      onclick=${() => updateReplyLimit(0)}>Full</button>
+            </div>
           </div>
 
           ${hasTarget && html`
@@ -2531,35 +2617,44 @@ function TerminalTab({ projectId, projectName } = {}) {
   `;
 }
 
-// Long replies are windowed so a fresh open shows only the recent tail (Grok/
-// Telegram style): the last BUBBLE_VISIBLE_TAIL lines by default, with a "show
-// earlier" control that reveals a bigger tail, then everything. The tail stays
-// pinned to the bottom so scroll-to-bottom always lands on the newest line.
-const BUBBLE_COLLAPSE_THRESHOLD = 100; // only window bubbles longer than this
-const BUBBLE_VISIBLE_TAIL = 80;        // default on open: last ~80 lines
-const BUBBLE_EXPAND_TAIL = 480;        // one tap up: ~400 more lines on top
+// Minimize: agent replies compact to the most recent `limit` lines (the tail,
+// so scroll-to-bottom still lands on the newest line), with a per-reply toggle
+// to expand to full and back. `limit` comes from the ☰ menu picker (0 = Full).
+// User messages are never compacted so they stay easy to scan. A small slack
+// avoids collapsing a reply that's only a few lines over the limit.
+const BUBBLE_COMPACT_SLACK = 4;
 
-function CollapsibleBubbleContent({ content }) {
-  const [level, setLevel] = useState(0); // 0 = tail80, 1 = tail480, 2 = all
+function CollapsibleBubbleContent({ content, role, limit }) {
+  const [expanded, setExpanded] = useState(false);
   const text = typeof content === 'string' ? content : String(content == null ? '' : content);
+  const cap = Number(limit);
   const lines = text.split('\n');
   const total = lines.length;
-  if (total <= BUBBLE_COLLAPSE_THRESHOLD) {
+  const compactable = role === 'agent' && cap > 0 && total > cap + BUBBLE_COMPACT_SLACK;
+
+  if (!compactable) {
     return html`<div class="ovm-chat-text terminal-chat-content">${text}</div>`;
   }
-  const cap = level === 0 ? BUBBLE_VISIBLE_TAIL : level === 1 ? BUBBLE_EXPAND_TAIL : total;
-  const start = Math.max(0, total - cap);
-  const hidden = start;
-  const visible = lines.slice(start).join('\n');
-  return html`
-    ${hidden > 0 ? html`
-      <button type="button" class="terminal-chat-showmore"
-              data-testid="terminal-show-earlier"
-              onclick=${() => setLevel((l) => Math.min(2, l + 1))}>
+
+  if (expanded) {
+    return html`
+      <button type="button" class="terminal-chat-showmore" data-testid="terminal-reply-minimize"
+              onclick=${() => setExpanded(false)}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"></path></svg>
-        Show earlier lines · ${hidden} more
+        Minimize to ${cap} lines
       </button>
-    ` : ''}
+      <div class="ovm-chat-text terminal-chat-content">${text}</div>
+    `;
+  }
+
+  const hidden = total - cap;
+  const visible = lines.slice(total - cap).join('\n');
+  return html`
+    <button type="button" class="terminal-chat-showmore" data-testid="terminal-reply-expand"
+            onclick=${() => setExpanded(true)}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+      Show full reply · ${hidden} earlier lines
+    </button>
     <div class="ovm-chat-text terminal-chat-content">${visible}</div>
   `;
 }
@@ -2577,6 +2672,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [attachment, setAttachment] = useState(null);
   const [attaching, setAttaching] = useState(false);
   const [attachError, setAttachError] = useState('');
+  const [replyLimit, setReplyLimit] = useState(() => readTerminalReplyLimit());
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [unseenWhileUp, setUnseenWhileUp] = useState(0);
@@ -2657,6 +2753,20 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     };
   }, []);
 
+  useEffect(() => {
+    const sync = () => setReplyLimit(readTerminalReplyLimit());
+    const onStorage = (event) => {
+      if (event.key && event.key !== TERMINAL_REPLY_LIMIT_STORAGE_KEY) return;
+      sync();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('agj-terminal-reply-limit', sync);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('agj-terminal-reply-limit', sync);
+    };
+  }, []);
+
   function getCaptureLines() {
     // peekPane clamps at 2000. Request that bound so a ❯ user run stays in-window
     // past the old 800-row poll, without pulling full scrollback (capturePane 5000).
@@ -2706,11 +2816,15 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       try {
         savedState = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
       } catch {}
+      // Persistent recent-message memory (localStorage) survives app reopens and
+      // is preferred as the on-open seed; sessionStorage is the within-session fallback.
+      const memoryState = readTerminalMemory(target);
+      const seedState = memoryState || savedState;
       try {
         const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=${getCaptureLines()}`);
         if (!active) return;
         const output = normalizeTerminalOutput(data.output);
-        const nextEntries = applyAgentPatch(conversationSeed(savedState), output);
+        const nextEntries = applyAgentPatch(conversationSeed(seedState), output);
         setSnapshot(output);
         snapshotRef.current = output;
         previousSnapshotRef.current = output;
@@ -2723,15 +2837,15 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       } catch (e) {
         if (!active) return;
         setStatus('error');
-        const savedEntries = conversationSeed(savedState);
+        const savedEntries = conversationSeed(seedState);
         if (savedEntries.length) {
-          const savedSnapshot = normalizeTerminalOutput(savedState.snapshot || '');
+          const savedSnapshot = normalizeTerminalOutput(savedState?.snapshot || '');
           setSnapshot(savedSnapshot);
           snapshotRef.current = savedSnapshot;
           setEntries(savedEntries);
           setStatusLine(extractStatus(savedSnapshot));
-          setLastCommand(savedState.lastCommand || '');
-          setLastUpdatedAt(savedState.updatedAt || 0);
+          setLastCommand(savedState?.lastCommand || '');
+          setLastUpdatedAt(savedState?.updatedAt || 0);
         } else {
           setEntries([{
             id: 'initial-error',
@@ -2786,7 +2900,10 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
         updatedAt: Date.now()
       }));
     } catch {}
-  }, [entries, snapshot, lastCommand, storageKey, status]);
+    // Persist the rolling recent-message memory (last 10 exchanges) so it
+    // survives app reopens; trimming + reply-capping happen in the writer.
+    writeTerminalMemory(target, entries);
+  }, [entries, snapshot, lastCommand, storageKey, status, target]);
 
   async function captureCommandResult(beforeSnapshot) {
     let latest = beforeSnapshot;
@@ -3072,7 +3189,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                     : html`<span class="terminal-chat-badge">AGENT</span><span>${sessionName || 'Agent'} · <span data-testid="terminal-turn-time">${entry.timestamp}</span></span>`}
                 </div>
                 <div class=${'ovm-chat-bubble terminal-chat-bubble ' + (isUser ? 'ovm-chat-bubble-user' : 'ovm-chat-bubble-ovm')}>
-                  <${CollapsibleBubbleContent} content=${entry.content} />
+                  <${CollapsibleBubbleContent} content=${entry.content} role=${entry.role} limit=${replyLimit} />
                 </div>
               </div>
             `;
