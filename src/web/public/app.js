@@ -2551,6 +2551,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const openAgentAfterYouRef = useRef(false);
   const sendBaselineRef = useRef('');
   const previousSnapshotRef = useRef('');
+  const lastSentRef = useRef('');
   const fileInputRef = useRef(null);
   const storageKey = 'agj_terminal_chat_' + target.replace(/[^a-zA-Z0-9_.-]/g, '_');
 
@@ -2564,11 +2565,18 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   // After YOU, the next cleaned snapshot must open a new AGENT. Never patch the pre-send agent.
   // First post-YOU body diffs the send-time baseline; later polls diff adjacent snapshots.
   function applyConversationSnapshot(prev, latest) {
-    const list = Array.isArray(prev) ? prev : [];
+    let list = Array.isArray(prev) ? prev : [];
     const lastUserIdx = lastRoleIndex(list, 'user');
     const lastAgentIdx = lastRoleIndex(list, 'agent');
     if (openAgentAfterYouRef.current) {
       if (lastUserIdx < 0 || lastUserIdx < lastAgentIdx) return list;
+    }
+    if (lastUserIdx >= 0 && lastSentRef.current) {
+      const you = list[lastUserIdx];
+      if (you && !you.sentContent && !you.sent) {
+        list = list.slice();
+        list[lastUserIdx] = { ...you, sentContent: lastSentRef.current, sent: lastSentRef.current };
+      }
     }
     const openNew = lastAgentIdx < 0 || lastUserIdx > lastAgentIdx;
     const baselineAtSend = (openNew && sendBaselineRef.current) ? sendBaselineRef.current : undefined;
@@ -2650,6 +2658,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       sendBaselineRef.current = '';
       previousSnapshotRef.current = '';
       openAgentAfterYouRef.current = false;
+      lastSentRef.current = '';
       let savedState = null;
       try {
         savedState = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
@@ -2785,6 +2794,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     sendingRef.current = true;
     openAgentAfterYouRef.current = true;
     sendBaselineRef.current = beforeSnapshot;
+    lastSentRef.current = sentText;
     setInput('');
     setAttachment(null);
     setAttachError('');

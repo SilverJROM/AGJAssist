@@ -677,3 +677,280 @@ describe("FIX09 integration: realistic multi-paragraph CLI reply across a slidin
     expect(body).not.toContain("Type a message");
   });
 });
+
+describe("FIX11 YOU-echo-anchor never-freeze", () => {
+  const SENT = "hello agent";
+
+  it("FREEZE REPRO: zero sliding-overlap after a YOU send still opens an agent turn from the echoed command", () => {
+    const t0 = 1_700_000_400_000;
+    const oldReply = "OLD-REPLY-ABOVE-THE-ECHO";
+    const first = applyAgentPatch([], oldReply, { now: t0 });
+    const withYou = appendYou(first, SENT, { now: t0 + 1000, sentContent: SENT });
+
+    // Send-time baseline has ZERO sliding overlap with the repainted window.
+    // Cleaned current does NOT start with any baseline suffix (reordered/rewrapped top).
+    const baselineAtSend = [
+      "BASE-LINE-ONE-UNIQUE",
+      "BASE-LINE-TWO-UNIQUE",
+      "BASE-LINE-THREE-UNIQUE"
+    ].join("\n");
+    const current = [
+      "REWRAP-TOP-ALPHA",
+      "REWRAP-TOP-BETA",
+      oldReply,
+      SENT,
+      "AGENT-REPLY-LINE-1",
+      "AGENT-REPLY-LINE-2",
+      "Working… (3s · esc to interrupt)"
+    ].join("\n");
+
+    expect(diffTerminalOutput(baselineAtSend, current)).toBe("");
+
+    const after = applyAgentPatch(withYou, current, {
+      now: t0 + 2000,
+      baselineAtSend
+    });
+    expect(after).toHaveLength(3);
+    expect(after[2]).toMatchObject({
+      id: "agent-1700000402000",
+      role: "agent"
+    });
+    const body = after[2].content;
+    expect(body).toContain("AGENT-REPLY-LINE-1");
+    expect(body).toContain("AGENT-REPLY-LINE-2");
+    expect(body).not.toContain(oldReply);
+    expect(body).not.toContain(SENT);
+    expect(body).not.toContain("Working…");
+    expect(body).not.toContain("REWRAP-TOP-ALPHA");
+  });
+
+  it("grows the agent turn across polls via the YOU-echo anchor", () => {
+    const t0 = 1_700_000_410_000;
+    const oldReply = "OLD-REPLY-ABOVE-THE-ECHO";
+    const first = applyAgentPatch([], oldReply, { now: t0 });
+    const withYou = appendYou(first, SENT, { now: t0 + 1000, sentContent: SENT });
+    const baselineAtSend = [
+      "BASE-LINE-ONE-UNIQUE",
+      "BASE-LINE-TWO-UNIQUE",
+      "BASE-LINE-THREE-UNIQUE"
+    ].join("\n");
+    const poll1 = [
+      "REWRAP-TOP-ALPHA",
+      "REWRAP-TOP-BETA",
+      oldReply,
+      SENT,
+      "AGENT-REPLY-LINE-1",
+      "AGENT-REPLY-LINE-2"
+    ].join("\n");
+    const opened = applyAgentPatch(withYou, poll1, { now: t0 + 2000, baselineAtSend });
+    expect(opened[2].content).toBe("AGENT-REPLY-LINE-1\nAGENT-REPLY-LINE-2");
+
+    const poll2 = [
+      "REWRAP-TOP-GAMMA",
+      oldReply,
+      SENT,
+      "AGENT-REPLY-LINE-1",
+      "AGENT-REPLY-LINE-2",
+      "AGENT-REPLY-LINE-3"
+    ].join("\n");
+    const grown = applyAgentPatch(opened, poll2, {
+      now: t0 + 3000,
+      previousSnapshot: poll1
+    });
+    expect(grown).toHaveLength(3);
+    expect(grown[2].id).toBe(opened[2].id);
+    expect(grown[2].timestamp).toBe(opened[2].timestamp);
+    expect(grown[2].content).toBe("AGENT-REPLY-LINE-1\nAGENT-REPLY-LINE-2\nAGENT-REPLY-LINE-3");
+    expect(grown[2].content).not.toContain(oldReply);
+    expect(grown[2].content).not.toContain(SENT);
+  });
+
+  it("falls back to a non-empty body when the YOU echo is missing from the snapshot", () => {
+    const t0 = 1_700_000_420_000;
+    const oldReply = "OLD-REPLY-ABOVE-THE-ECHO";
+    const first = applyAgentPatch([], oldReply, { now: t0 });
+    const withYou = appendYou(first, SENT, { now: t0 + 1000, sentContent: SENT });
+    const baselineAtSend = [
+      "BASE-LINE-ONE-UNIQUE",
+      "BASE-LINE-TWO-UNIQUE",
+      "BASE-LINE-THREE-UNIQUE"
+    ].join("\n");
+    const current = [
+      "REWRAP-TOP-ALPHA",
+      "REWRAP-TOP-BETA",
+      "AGENT-FALLBACK-LINE-1",
+      "AGENT-FALLBACK-LINE-2"
+    ].join("\n");
+
+    expect(current.split("\n")).not.toContain(SENT);
+    expect(diffTerminalOutput(baselineAtSend, current)).toBe("");
+
+    const after = applyAgentPatch(withYou, current, {
+      now: t0 + 2000,
+      baselineAtSend
+    });
+    expect(after.length).toBeGreaterThan(withYou.length);
+    const body = after[after.length - 1].content;
+    expect(body.trim()).not.toBe("");
+    expect(body).toContain("AGENT-FALLBACK-LINE-1");
+    expect(body).toContain("AGENT-FALLBACK-LINE-2");
+  });
+});
+
+describe("FIX11 adversarial validation (sonnet5 independent) — wrapped echo + false anchor", () => {
+  const OLD_REPLY = "OLD-REPLY-ABOVE-THE-ECHO";
+
+  it("WRAPPED-ECHO: a long single-line send that the pane echoes as several wrapped rows still opens the agent turn (does not freeze)", () => {
+    const t0 = 1_700_000_500_000;
+    const first = applyAgentPatch([], OLD_REPLY, { now: t0 });
+
+    // A realistic long composer send: >200 chars plus an [image: ...] reference.
+    // sanitizeOutgoingCommand flattens it to ONE line (no \n) before it's ever sent,
+    // but tmux `capture-pane -p` does NOT rejoin visually-wrapped rows (no -J), so the
+    // pane echo of this one logical line is split across several physical capture lines.
+    // None of those physical lines is individually equal to the full sent text, so the
+    // exact-line echo anchor (`_lastEchoLineIndex`) cannot find it.
+    const longCommand =
+      "please walk through the entire authentication refactor end to end, covering the " +
+      "session store, the token refresh path, retry policy, and rollout plan in detail " +
+      "[image: /tmp/screenshot-auth-flow-2026-08-16.png]";
+    const sent = sanitizeOutgoingCommand(longCommand).trim();
+    expect(sent).not.toContain("\n");
+    expect(sent.length).toBeGreaterThan(200);
+
+    const withYou = appendYou(first, longCommand, { now: t0 + 1000, sentContent: sent });
+
+    // Simulate the pane wrapping the echoed logical line at a terminal width of 80 cols.
+    const wrapWidth = 80;
+    const wrappedEcho = [];
+    for (let i = 0; i < sent.length; i += wrapWidth) wrappedEcho.push(sent.slice(i, i + wrapWidth));
+    expect(wrappedEcho.length).toBeGreaterThanOrEqual(2);
+    // Confirm the adversarial premise: no single wrapped row equals the full sent text.
+    for (const row of wrappedEcho) expect(row).not.toBe(sent);
+
+    // The send-time baseline has ZERO sliding overlap with the repainted window (TUI repaint).
+    const baselineAtSend = ["BASE-LINE-ONE-UNIQUE", "BASE-LINE-TWO-UNIQUE", "BASE-LINE-THREE-UNIQUE"].join("\n");
+    const current = [OLD_REPLY, ...wrappedEcho, "AGENT-REPLY-LINE-1", "AGENT-REPLY-LINE-2"].join("\n");
+    expect(diffTerminalOutput(baselineAtSend, current)).toBe("");
+
+    const after = applyAgentPatch(withYou, current, { now: t0 + 2000, baselineAtSend });
+
+    // Primary requirement: the chat must NOT freeze — a new agent turn is created and it
+    // contains the reply lines that follow the wrapped echo.
+    expect(after).toHaveLength(3);
+    const body = after[2].content;
+    expect(body).toContain("AGENT-REPLY-LINE-1");
+    expect(body).toContain("AGENT-REPLY-LINE-2");
+
+    // Secondary quality bar: the prior agent turn must not bleed into the new one, and the
+    // user's own (wrapped) echoed command must not leak into the visible AGENT bubble.
+    expect(body).not.toContain(OLD_REPLY);
+    expect(body).not.toContain(sent);
+    for (const row of wrappedEcho) expect(body).not.toContain(row);
+  });
+
+  it("FALSE-ANCHOR: an agent reply that quotes the sent command verbatim must not truncate the reply at the quoted line", () => {
+    const t0 = 1_700_000_600_000;
+    const SENT = "hello agent";
+    const first = applyAgentPatch([], OLD_REPLY, { now: t0 });
+    const withYou = appendYou(first, SENT, { now: t0 + 1000, sentContent: SENT });
+
+    // The reply legitimately restates the user's command verbatim on its own line
+    // (e.g. "You asked: hello agent") partway through a longer reply. `_lastEchoLineIndex`
+    // anchors on the LAST line equal to `sent`, which is this quoted line, not the real
+    // pane echo — so real reply content written BEFORE the quote is at risk of being cut.
+    const current = [
+      OLD_REPLY,
+      SENT, // real pane echo of the user's send
+      "AGENT-REPLY-LINE-1 important analysis",
+      "AGENT-REPLY-LINE-2 more analysis",
+      "AGENT-REPLY-LINE-3 conclusion building",
+      SENT, // reply quotes the command again verbatim -> false anchor candidate
+      "AGENT-REPLY-LINE-4 final remark"
+    ].join("\n");
+    const baselineAtSend = ["BASE-LINE-ONE-UNIQUE", "BASE-LINE-TWO-UNIQUE"].join("\n");
+
+    const after = applyAgentPatch(withYou, current, { now: t0 + 2000, baselineAtSend });
+    expect(after).toHaveLength(3);
+    const body = after[2].content;
+
+    expect(body).toContain("AGENT-REPLY-LINE-1 important analysis");
+    expect(body).toContain("AGENT-REPLY-LINE-2 more analysis");
+    expect(body).toContain("AGENT-REPLY-LINE-3 conclusion building");
+    expect(body).toContain("AGENT-REPLY-LINE-4 final remark");
+    expect(body).not.toContain(OLD_REPLY);
+  });
+});
+
+describe("FIX12 adversarial validation (sonnet5 final gate) — first-occurrence anchor + wrapped-run fallback", () => {
+  it("REPEAT-SEND: the same command sent again must not anchor on the earlier turn's stale echo and pull the prior reply into the new turn", () => {
+    // grok46's fix12 replaced the LAST-occurrence echo anchor with a FIRST-occurrence
+    // anchor (_firstEchoLineIndex) to fix the FALSE-ANCHOR case above. But if the user
+    // sends the exact same command text twice, the first echo is now the STALE one from
+    // the earlier turn, still present in the deep capture above the current turn's echo.
+    const t0 = 1_700_000_700_000;
+    const SENT = "hello agent";
+
+    const first = applyAgentPatch([], "PRE-EXISTING-CONTEXT", { now: t0 });
+    let entries = appendYou(first, SENT, { now: t0 + 1000, sentContent: SENT });
+    const snapshotTurn1 = ["PRE-EXISTING-CONTEXT", SENT, "TURN1-REPLY-LINE"].join("\n");
+    entries = applyAgentPatch(entries, snapshotTurn1, {
+      now: t0 + 2000,
+      baselineAtSend: "PRE-EXISTING-CONTEXT"
+    });
+    expect(entries).toHaveLength(3);
+    expect(entries[2].content).toBe("TURN1-REPLY-LINE");
+
+    // Second turn: SAME command text again. The pane still shows the old echo + old
+    // reply above the new echo + new reply (nothing has scrolled off).
+    entries = appendYou(entries, SENT, { now: t0 + 3000, sentContent: SENT });
+    const snapshotTurn2 = [snapshotTurn1, SENT, "TURN2-REPLY-LINE"].join("\n");
+    entries = applyAgentPatch(entries, snapshotTurn2, {
+      now: t0 + 4000,
+      baselineAtSend: snapshotTurn1
+    });
+
+    expect(entries).toHaveLength(5);
+    const body = entries[4].content;
+    expect(body).toContain("TURN2-REPLY-LINE");
+    expect(body).not.toContain("TURN1-REPLY-LINE");
+  });
+
+  it("PREFIX-FRAGMENT: a genuine short reply line that happens to be a text-prefix of the sent command must not be stripped by _stripSentPrefixFragments", () => {
+    // _stripSentPrefixFragments (the fallback-path cleanup added alongside
+    // _findWrappedEchoRun) drops any line whose trimmed text is a PREFIX of the sent
+    // command — intended to mop up leftover partial-wrap echo fragments. But it applies
+    // to ANY line satisfying that shape, including a legitimate short reply line (e.g. a
+    // one-word heading) that simply happens to start the same way as the command.
+    const t0 = 1_700_000_800_000;
+    const OLD_REPLY = "OLD-REPLY-ABOVE-THE-ECHO";
+    const SENT = "Deploy the staging build";
+
+    const first = applyAgentPatch([], OLD_REPLY, { now: t0 });
+    const withYou = appendYou(first, SENT, { now: t0 + 1000, sentContent: SENT });
+
+    // Echo is fully scrolled off / absent from this capture window (zero overlap with
+    // baselineAtSend), so both echo anchors miss and the fallback+prefix-strip path runs.
+    const baselineAtSend = ["BASE-LINE-ONE-UNIQUE", "BASE-LINE-TWO-UNIQUE", "BASE-LINE-THREE-UNIQUE"].join(
+      "\n"
+    );
+    const current = [
+      "REWRAP-TOP-ALPHA",
+      "REWRAP-TOP-BETA",
+      "Deploy", // genuine one-word reply heading — also a prefix of SENT
+      "Deploying to staging now...",
+      "Build pushed successfully."
+    ].join("\n");
+
+    expect(current.split("\n")).not.toContain(SENT);
+    expect(diffTerminalOutput(baselineAtSend, current)).toBe("");
+
+    const after = applyAgentPatch(withYou, current, { now: t0 + 2000, baselineAtSend });
+    expect(after).toHaveLength(3);
+    const body = after[2].content;
+
+    expect(body).toContain("Deploying to staging now...");
+    expect(body).toContain("Build pushed successfully.");
+    expect(body.split("\n")).toContain("Deploy");
+  });
+});

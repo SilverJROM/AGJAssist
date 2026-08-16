@@ -389,9 +389,185 @@ function _removeUserText(body, entries, { lastUserOnly = false } = {}) {
   const targets = lastUserOnly && users.length ? [users[users.length - 1]] : users;
   for (const entry of targets) {
     if (entry.sentContent) next = _removeExactText(next, entry.sentContent);
+    if (entry.sent && entry.sent !== entry.sentContent) next = _removeExactText(next, entry.sent);
     if (entry.content) next = _removeExactText(next, entry.content);
   }
   return next.trim();
+}
+
+function _lastYouSentText(entries) {
+  const idx = _lastIndexByRole(entries, "user");
+  if (idx < 0) return "";
+  const entry = entries[idx];
+  const sent = (typeof entry.sentContent === "string" && entry.sentContent)
+    || (typeof entry.sent === "string" && entry.sent)
+    || "";
+  return String(sent).trim();
+}
+
+function _entryNeedles(entry) {
+  const needles = [];
+  const add = (value) => {
+    if (typeof value === "string" && value && !needles.includes(value)) needles.push(value);
+  };
+  add(entry && entry.content);
+  add(entry && entry.sentContent);
+  add(entry && entry.sent);
+  return needles;
+}
+
+/**
+ * Drop already-displayed prior YOU/AGENT turns from a cleaned snapshot so the
+ * first remaining sentContent echo is this turn's echo, not a stale identical one.
+ */
+function _removePriorTurnContents(text, entries) {
+  let next = text || "";
+  const list = Array.isArray(entries) ? entries : [];
+  const lastUserIdx = _lastIndexByRole(list, "user");
+  const lastAgentIdx = _lastIndexByRole(list, "agent");
+  const openNew = lastAgentIdx < 0 || lastUserIdx > lastAgentIdx;
+  for (let i = 0; i < list.length; i += 1) {
+    const entry = list[i];
+    if (!entry) continue;
+    if (entry.role === "user" && i !== lastUserIdx) {
+      for (const needle of _entryNeedles(entry)) {
+        next = _removeExactText(next, needle);
+      }
+    }
+    if (entry.role === "agent" && (openNew || i !== lastAgentIdx) && entry.content) {
+      next = _removeExactText(next, entry.content);
+    }
+  }
+  return next;
+}
+
+function _firstEchoLineIndex(lines, needle) {
+  const target = (needle || "").trim();
+  if (!target) return -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if ((lines[i] || "").trim() === target) return i;
+  }
+  return -1;
+}
+
+function _compactSpaces(text) {
+  return String(text || "").replace(/\s+/g, "");
+}
+
+/**
+ * Shortest consecutive run that reconstitutes a hard-wrapped pane echo of `needle`.
+ * tmux capture-pane without -J splits one logical line across physical rows.
+ */
+function _findWrappedEchoRun(lines, needle) {
+  const target = (needle || "").trim();
+  if (!target) return null;
+  const compactTarget = _compactSpaces(target);
+  if (!compactTarget) return null;
+  let best = null;
+  for (let start = 0; start < lines.length; start += 1) {
+    let joined = "";
+    let joinedTrimmed = "";
+    for (let end = start; end < lines.length; end += 1) {
+      const raw = String(lines[end] ?? "");
+      joined += raw;
+      joinedTrimmed += raw.trim();
+      const runLen = end - start + 1;
+      if (runLen < 2) continue;
+      const matches = joined.trim() === target
+        || joinedTrimmed === target
+        || _compactSpaces(joined) === compactTarget
+        || _compactSpaces(joinedTrimmed) === compactTarget;
+      if (matches) {
+        if (!best || runLen < (best.end - best.start + 1)) {
+          best = { start, end };
+        }
+        break;
+      }
+      if (
+        _compactSpaces(joined).length > compactTarget.length
+        && _compactSpaces(joinedTrimmed).length > compactTarget.length
+      ) {
+        break;
+      }
+    }
+    if (best && (best.end - best.start + 1) === 2) break;
+  }
+  return best;
+}
+
+function _joinStaysSentPrefix(left, right, target) {
+  const compactTarget = _compactSpaces(target);
+  if (!left || !right || !compactTarget) return false;
+  const variants = [left + right, `${left} ${right}`];
+  for (const joined of variants) {
+    if (target.startsWith(joined) || joined === target) return true;
+    const compact = _compactSpaces(joined);
+    if (compactTarget.startsWith(compact) || compact === compactTarget) return true;
+  }
+  return false;
+}
+
+/**
+ * Drop leftover wrapped-echo PREFIX fragments only when they are provably a
+ * mid-wrap run (this line plus the next still prefixes / equals sentContent).
+ * A standalone heading that merely equals a prefix of the command is kept.
+ */
+function _stripSentPrefixFragments(text, sent) {
+  const target = (sent || "").trim();
+  if (!text || !target) return text || "";
+  const lines = text.split("\n");
+  const kept = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const trimmed = (lines[i] || "").trim();
+    if (!trimmed || trimmed === target || !target.startsWith(trimmed)) {
+      kept.push(lines[i]);
+      continue;
+    }
+    const next = (lines[i + 1] || "").trim();
+    if (next && _joinStaysSentPrefix(trimmed, next, target)) continue;
+    kept.push(lines[i]);
+  }
+  return kept.join("\n");
+}
+
+/**
+ * Agent body = cleaned lines AFTER the first YOU-echo of the *current* send.
+ * Prior displayed YOU/AGENT turns are removed first so a repeat send does not
+ * lock onto a stale identical echo. A later verbatim quote in the reply is a
+ * later occurrence and does not move the cut.
+ */
+function _agentBodyFromEchoAnchor(snapshot, entries) {
+  const sent = _lastYouSentText(entries);
+  if (!sent) return { found: false, body: "" };
+  const prepared = _prepareDiffText(snapshot);
+  if (!prepared) return { found: false, body: "" };
+  const candidate = _removePriorTurnContents(prepared, entries);
+  const lines = candidate.split("\n");
+  const echoAt = _firstEchoLineIndex(lines, sent);
+  if (echoAt >= 0) {
+    const after = lines.slice(echoAt + 1).join("\n");
+    return { found: true, body: _removeUserText(after, entries, { lastUserOnly: false }) };
+  }
+  const wrapped = _findWrappedEchoRun(lines, sent);
+  if (wrapped) {
+    const after = lines.slice(wrapped.end + 1).join("\n");
+    return { found: true, body: _removeUserText(after, entries, { lastUserOnly: false }) };
+  }
+  return { found: false, body: "" };
+}
+
+function _fallbackOpenBody(snapshot, entries, baselineAtSend, previousSnapshot) {
+  const hasBaseline = typeof baselineAtSend === "string" && baselineAtSend.length > 0;
+  const hasPrevious = typeof previousSnapshot === "string" && previousSnapshot.length > 0;
+  if (hasBaseline) {
+    const cut = _agentBodyFromCleanedDiff(baselineAtSend, snapshot, entries);
+    if (cut.body) return (cut.body || "").trim();
+  }
+  if (hasPrevious) {
+    const cut = _agentBodyFromCleanedDiff(previousSnapshot, snapshot, entries);
+    if (cut.body) return (cut.body || "").trim();
+  }
+  return _agentBodyFromSnapshot(snapshot, entries, false);
 }
 
 function _prepareDiffText(text) {
@@ -447,8 +623,12 @@ export function appendYou(entries, text, { now = Date.now(), sentContent } = {})
   const list = Array.isArray(entries) ? entries : [];
   if (!content) return list;
   const entry = makeEntry("you-" + now, "user", "You", content, new Date(now).toLocaleTimeString());
-  if (typeof sentContent === "string" && sentContent) {
-    entry.sentContent = sentContent;
+  const sent = (typeof sentContent === "string" && sentContent)
+    ? sentContent
+    : sanitizeOutgoingCommand(content).trim();
+  if (sent) {
+    entry.sentContent = sent;
+    entry.sent = sent;
   }
   return list.concat([entry]);
 }
@@ -457,9 +637,12 @@ export function appendYou(entries, text, { now = Date.now(), sentContent } = {})
  * Patch the last AGENT in place, or open a new AGENT only after a YOU send.
  * Aged capture tails do not rebuild prior turns or restamp identities.
  *
- * `baselineAtSend` is used only for the FIRST post-YOU body (exclude pre-send
- * text). Later growth diffs `previousSnapshot` -> current and accumulates.
- * Zero-overlap windows never replace the accumulated body.
+ * Primary body is everything AFTER the first YOU-echo of the current send in
+ * the cleaned snapshot minus already-displayed prior turns (recomputed each
+ * poll). A wrapped multi-row echo of the same command is treated as that echo.
+ * If the echo is missing: sliding-overlap accumulate, then cleaned-snapshot
+ * minus prior turns. Fallback prefix-strip only drops proven mid-wrap fragments.
+ * Zero-overlap never freezes an OPEN-NEW turn when non-chrome reply text exists.
  */
 export function applyAgentPatch(entries, snapshot, { now = Date.now(), baselineAtSend, previousSnapshot } = {}) {
   const list = Array.isArray(entries) ? entries : [];
@@ -468,14 +651,15 @@ export function applyAgentPatch(entries, snapshot, { now = Date.now(), baselineA
   const openNew = lastAgentIdx < 0 || lastUserIdx > lastAgentIdx;
   const hasBaseline = typeof baselineAtSend === "string" && baselineAtSend.length > 0;
   const hasPrevious = typeof previousSnapshot === "string" && previousSnapshot.length > 0;
+  const echo = _agentBodyFromEchoAnchor(snapshot, list);
 
   if (openNew) {
     let body = "";
-    if (hasBaseline) {
-      const cut = _agentBodyFromCleanedDiff(baselineAtSend, snapshot, list);
-      body = cut.body;
+    if (echo.found) {
+      body = echo.body;
     } else {
-      body = _agentBodyFromSnapshot(snapshot, list, false);
+      body = _fallbackOpenBody(snapshot, list, baselineAtSend, previousSnapshot);
+      body = _stripSentPrefixFragments(body, _lastYouSentText(list));
     }
     body = (body || "").trim();
     if (!body) return list;
@@ -486,10 +670,17 @@ export function applyAgentPatch(entries, snapshot, { now = Date.now(), baselineA
 
   const last = list[lastAgentIdx];
   let merged = last.content;
-  if (hasPrevious) {
+  if (echo.found && echo.body) {
+    merged = echo.body;
+  } else if (hasPrevious) {
     const cut = _agentBodyFromCleanedDiff(previousSnapshot, snapshot, list);
     if (cut.overlap === 0 && !cut.contained) {
-      merged = last.content;
+      if (!cut.body) {
+        const snapBody = _agentBodyFromSnapshot(snapshot, list, true);
+        merged = _mergeAgedTail(last.content, snapBody);
+      } else {
+        merged = last.content;
+      }
     } else if (cut.body) {
       if (last.content.endsWith(cut.body)) {
         merged = last.content;
@@ -499,7 +690,12 @@ export function applyAgentPatch(entries, snapshot, { now = Date.now(), baselineA
     }
   } else if (hasBaseline) {
     const cut = _agentBodyFromCleanedDiff(baselineAtSend, snapshot, list);
-    merged = _mergeAgedTail(last.content, cut.body);
+    if (cut.body) {
+      merged = _mergeAgedTail(last.content, cut.body);
+    } else {
+      const snapBody = _agentBodyFromSnapshot(snapshot, list, true);
+      merged = _mergeAgedTail(last.content, snapBody);
+    }
   } else {
     const body = _agentBodyFromSnapshot(snapshot, list, true);
     merged = _mergeAgedTail(last.content, body);
