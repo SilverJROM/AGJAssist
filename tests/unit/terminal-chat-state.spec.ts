@@ -5,6 +5,7 @@ import {
   buildInitialFriendlyState,
   capTerminalOutput,
   cleanTerminalOutput,
+  detectSelectionPrompt,
   diffTerminalOutput,
   extractStatus,
   formatFriendlyTerminalOutput,
@@ -1490,5 +1491,87 @@ describe("FIX15 sol real-format fixtures (raw ❯-run tail-anchor)", () => {
     expect(body).not.toContain("❯");
     expect(body).not.toContain("Working (12s)");
     expect(body).not.toContain("bypass permissions");
+  });
+});
+
+describe("detectSelectionPrompt", () => {
+  it("parses a tool-permission dialog (boxed, ❯ cursor on option 1)", () => {
+    const pane = [
+      "● I'll run the build.",
+      "╭──────────────────────────────────────────────╮",
+      "│ Bash command                                 │",
+      "│ npm run build                                │",
+      "│                                              │",
+      "│ Do you want to proceed?                      │",
+      "│ ❯ 1. Yes                                     │",
+      "│   2. Yes, and don't ask again this session   │",
+      "│   3. No, and tell Claude what to do (esc)    │",
+      "╰──────────────────────────────────────────────╯",
+    ].join("\n");
+    const sel = detectSelectionPrompt(pane);
+    expect(sel).not.toBeNull();
+    expect(sel!.options.map((o) => o.label)).toEqual([
+      "Yes",
+      "Yes, and don't ask again this session",
+      "No, and tell Claude what to do (esc)",
+    ]);
+    expect(sel!.selectedIndex).toBe(0);
+    expect(sel!.title).toMatch(/do you want to proceed/i);
+  });
+
+  it("parses an AskUserQuestion menu detected by its footer (no ❯ glyph)", () => {
+    const pane = [
+      "Which library should we use?",
+      "  1. date-fns",
+      "  2. dayjs",
+      "  3. luxon",
+      "",
+      "Enter to select · ↑/↓ to navigate · Esc to cancel",
+    ].join("\n");
+    const sel = detectSelectionPrompt(pane);
+    expect(sel).not.toBeNull();
+    expect(sel!.options).toHaveLength(3);
+    expect(sel!.options[1].label).toBe("dayjs");
+    expect(sel!.selectedIndex).toBe(-1); // highlight is ANSI-only; footer confirms active
+  });
+
+  it("flags a multi-question / checkbox selection as multi", () => {
+    const pane = [
+      "Pick the features:",
+      "  1. Minimize",
+      "  2. Memory",
+      "Enter to select · Tab to switch questions · Space to toggle",
+    ].join("\n");
+    const sel = detectSelectionPrompt(pane);
+    expect(sel).not.toBeNull();
+    expect(sel!.multi).toBe(true);
+  });
+
+  it("returns null for an ordinary numbered list in prose (no footer/cursor/question)", () => {
+    const pane = [
+      "● Here is the plan:",
+      "  1. Read the file",
+      "  2. Make the change",
+      "  3. Run the tests",
+      "Working (4s · esc to interrupt)",
+    ].join("\n");
+    expect(detectSelectionPrompt(pane)).toBeNull();
+  });
+
+  it("returns null when there are fewer than two options", () => {
+    const pane = ["Do you want to proceed?", "❯ 1. Yes"].join("\n");
+    expect(detectSelectionPrompt(pane)).toBeNull();
+  });
+
+  it("ignores ANSI colour codes around the options", () => {
+    const pane = [
+      "Do you want to proceed?",
+      "\x1b[36m❯ 1. Yes\x1b[0m",
+      "\x1b[2m  2. No\x1b[0m",
+    ].join("\n");
+    const sel = detectSelectionPrompt(pane);
+    expect(sel).not.toBeNull();
+    expect(sel!.options.map((o) => o.label)).toEqual(["Yes", "No"]);
+    expect(sel!.selectedIndex).toBe(0);
   });
 });

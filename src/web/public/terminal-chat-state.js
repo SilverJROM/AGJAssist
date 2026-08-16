@@ -980,6 +980,68 @@ export function applyAgentPatch(entries, snapshot, { now = Date.now(), baselineA
   return next;
 }
 
+// Interactive selection detection: when the CLI is waiting on a numbered choice
+// (tool-permission "Do you want to proceed? 1. Yes 2. No", or an AskUserQuestion
+// menu with an "Enter to select · ↑/↓ to navigate" footer), surface the options
+// so the chat can render tappable buttons. Returns null when no active selection
+// is present. Conservative on purpose: a bare numbered list in prose must NOT
+// trigger it — we require a footer signal, a ❯ cursor glyph, or a question line.
+// NB: excludes "esc to interrupt" on purpose — that's the Working spinner's hint,
+// not a selection footer (selections say "esc to cancel/reject/go back").
+const _SELECT_FOOTER_RE = /(enter to (?:select|confirm|submit|continue)|↑\s*\/\s*↓|to navigate|esc to (?:cancel|reject|go back|exit)|tab to (?:switch|select|cycle)|to add notes|use arrows)/i;
+const _SELECT_QUESTION_RE = /(do you want to proceed|would you like|which\b|select (?:an?|one|the)|choose\b|pick\b|\?\s*$)/i;
+const _SELECT_OPTION_RE = /^\s*(?:[│┃║]\s*)?(❯|›|»|▶|\*|>)?\s*(\d{1,2})[.)]\s+(\S.*?)\s*$/u;
+const _SELECT_MULTI_RE = /(to switch questions|\bcheckbox|space to (?:toggle|select)|\[[ x✓]\]|☐|☑)/i;
+
+export function detectSelectionPrompt(rawSnapshot) {
+  const rows = _ansiStrippedRows(rawSnapshot);
+  if (!rows.length) return null;
+  const tail = rows.slice(-45);
+
+  let options = [];
+  let selectedIndex = -1;
+  for (const line of tail) {
+    const m = line.match(_SELECT_OPTION_RE);
+    if (!m) continue;
+    const n = Number(m[2]);
+    const cursor = !!m[1];
+    // Drop trailing columnar/wrapped junk after a 2+ space gap.
+    const label = m[3].replace(/\s{2,}\S.*$/, "").replace(/[│┃║]\s*$/, "").trim();
+    if (!label) continue;
+    if (n === options.length + 1) {
+      options.push({ n, label });
+      if (cursor) selectedIndex = options.length - 1;
+    } else if (n === 1) {
+      options = [{ n, label }];
+      selectedIndex = cursor ? 0 : -1;
+    }
+  }
+
+  if (options.length < 2) return null;
+
+  const hasFooter = tail.some((l) => _SELECT_FOOTER_RE.test(l));
+  const hasQuestion = tail.some((l) => _SELECT_QUESTION_RE.test(l));
+  const hasCursor = selectedIndex >= 0;
+  if (!hasFooter && !hasCursor && !hasQuestion) return null;
+
+  let title = "";
+  for (let i = tail.length - 1; i >= 0; i--) {
+    if (_SELECT_OPTION_RE.test(tail[i])) continue;
+    if (_SELECT_QUESTION_RE.test(tail[i])) {
+      title = tail[i].replace(/^[\s│┃║╭╰─╮╯]+/, "").replace(/[\s│┃║]+$/, "").trim();
+      break;
+    }
+  }
+
+  return {
+    active: true,
+    title,
+    options,
+    selectedIndex,
+    multi: _SELECT_MULTI_RE.test(tail.join("\n")),
+  };
+}
+
 export function buildInitialFriendlyState({
   target,
   sessionName,
