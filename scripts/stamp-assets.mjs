@@ -17,7 +17,10 @@ if (!existsSync(indexPath)) {
 }
 
 const hash = createHash('sha256');
-for (const asset of ['app.js', 'style.css']) {
+// Hash every runtime module app.js imports (not just app.js/style.css) so the
+// stamped version changes whenever ANY of them change — otherwise an edit to
+// e.g. terminal-chat-state.js would not bump the cache-buster.
+for (const asset of ['app.js', 'style.css', 'terminal-chat-state.js']) {
   const p = join(dir, asset);
   if (existsSync(p)) hash.update(readFileSync(p));
 }

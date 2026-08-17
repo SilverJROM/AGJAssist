@@ -1555,6 +1555,32 @@ describe("moved-on pane reconciliation (stale-tab / SSH-driven)", () => {
     expect(out.filter((e) => e.role === "user").map((e) => e.content)).toContain("archive-tag the unmerged ones then drop them");
   });
 
+  it("syncs when the agent's latest output is ABOVE a trailing ❯ prompt (hris case)", () => {
+    // Background-command completions / auto-recap produced after the last exchange
+    // sit ABOVE a trailing "❯ did it pass?" prompt with only chrome below it. The
+    // chat must reflect that live output instead of freezing on the old reply.
+    const pane = [
+      "● That's a stale wait-loop finishing — the Gate 11 run (19/19, exit 0). Nothing new.",
+      "",
+      "  Everything's parked and clean. Waiting on you.",
+      "● Background command \"Long wait for gate 11\" completed (exit code 0)",
+      "● Another duplicate wait-loop from the same run. Nothing new.",
+      "────────────────────────────────────────────",
+      "❯ did it pass?",
+      "────────────────────────────────────────────",
+      "  ⏵⏵ bypass permissions on · 1 shell · ← 1 agent",
+    ].join("\n");
+    // Chat currently frozen on an older reply.
+    const existing = [
+      { id: "a-old", role: "agent", label: "Agent", content: "● An older reply from earlier", timestamp: "" },
+    ];
+    const out = applyAgentPatch(existing, pane, { previousSnapshot: "totally different old snapshot" });
+    const agentText = out.filter((e) => e.role === "agent").map((e) => e.content).join("\n");
+    expect(agentText).toMatch(/wait-loop|Another duplicate|Background command/);
+    expect(agentText).not.toContain("An older reply from earlier"); // no longer frozen
+    expect(out.filter((e) => e.role === "agent")).toHaveLength(1);   // patched in place
+  });
+
   it("does NOT reconcile/duplicate during the normal live send→reply flow", () => {
     let e = appendYou([], "hello agent");
     const afterSend = ["❯ hello agent", "● Hi there, working on it."].join("\n");

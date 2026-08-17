@@ -617,6 +617,7 @@ function _agentBodyFromEchoAnchor(snapshot, entries) {
 function _fallbackOpenBody(snapshot, entries, baselineAtSend, previousSnapshot) {
   const rawLines = _ansiStrippedRows(snapshot);
   const userRuns = _collectUserRuns(rawLines);
+  const hasBaseline = typeof baselineAtSend === "string" && baselineAtSend.length > 0;
   if (userRuns.length) {
     const newest = userRuns[userRuns.length - 1];
     const bullet = _latestBulletBlocks(rawLines.slice(newest.end + 1));
@@ -624,7 +625,22 @@ function _fallbackOpenBody(snapshot, entries, baselineAtSend, previousSnapshot) 
       const cleaned = _prepareDiffText(bullet);
       if (cleaned) return cleaned;
     }
-    return _provenPostSendDelta(snapshot, entries, baselineAtSend, previousSnapshot);
+    const proven = _provenPostSendDelta(snapshot, entries, baselineAtSend, previousSnapshot);
+    if (proven) return proven;
+    // No reply BELOW the newest ❯ and no proven send-delta. When we are NOT in an
+    // active send waiting for a fresh reply (no baseline), the agent's latest
+    // output sits ABOVE the trailing prompt — e.g. background-command completions
+    // or an auto-recap after the last exchange (the hris "chat ≠ terminal" case).
+    // Show the latest ● block above the prompt so the chat reflects the pane
+    // instead of freezing on a stale/empty body.
+    if (!hasBaseline) {
+      const above = _latestBulletBlocks(rawLines.slice(0, newest.start));
+      if (above) {
+        const cleaned = _prepareDiffText(above);
+        if (cleaned) return _removeUserText(cleaned, entries, { lastUserOnly: false });
+      }
+    }
+    return proven;
   }
   const proven = _provenPostSendDelta(snapshot, entries, baselineAtSend, previousSnapshot);
   if (proven) return proven;
@@ -980,16 +996,36 @@ function _reconcileMovedOnPane(list, snapshot, now) {
 
   const afterRaw = rawLines.slice(newest.cutAfter + 1).join("\n");
   const body = _removeUserText(_prepareDiffText(afterRaw), list, { lastUserOnly: false }).trim();
-  if (!body) return null;
 
-  if (lastAgentIdx >= 0 && (list[lastAgentIdx].content || "").trim().endsWith(body)) return null;
+  if (body) {
+    // A real reply below the newest ❯ — this is a new exchange the chat missed
+    // (tab switch / SSH-driven). Append it as a user + agent turn.
+    if (lastAgentIdx >= 0 && (list[lastAgentIdx].content || "").trim().endsWith(body)) return null;
+    const ts = new Date(now).toLocaleTimeString();
+    const userEntry = makeEntry("you-reco-" + now, "user", "You", newestText, ts);
+    userEntry.sentContent = newestText;
+    userEntry.sent = newestText;
+    const agentEntry = makeEntry("agent-reco-" + now, "agent", "Agent", body, ts);
+    return list.concat([userEntry, agentEntry]);
+  }
 
-  const ts = new Date(now).toLocaleTimeString();
-  const userEntry = makeEntry("you-reco-" + now, "user", "You", newestText, ts);
-  userEntry.sentContent = newestText;
-  userEntry.sent = newestText;
-  const agentEntry = makeEntry("agent-reco-" + now, "agent", "Agent", body, ts);
-  return list.concat([userEntry, agentEntry]);
+  // No reply BELOW the newest ❯: the agent's latest output sits ABOVE the trailing
+  // prompt — background-command completions or an auto-recap produced after the
+  // last exchange (the hris "chat frozen while terminal moved on" case). Keep the
+  // shown reply current by patching the last agent turn to that live block.
+  const aboveBullet = _latestBulletBlocks(rawLines.slice(0, newest.start));
+  const aboveBody = aboveBullet
+    ? _removeUserText(_prepareDiffText(aboveBullet), list, { lastUserOnly: false }).trim()
+    : "";
+  if (!aboveBody) return null;
+  if (lastAgentIdx >= 0) {
+    const cur = (list[lastAgentIdx].content || "").trim();
+    if (cur === aboveBody || cur.endsWith(aboveBody) || aboveBody.endsWith(cur)) return null;
+    const next = list.slice();
+    next[lastAgentIdx] = { ...list[lastAgentIdx], content: aboveBody };
+    return next;
+  }
+  return null;
 }
 
 export function applyAgentPatch(entries, snapshot, { now = Date.now(), baselineAtSend, previousSnapshot } = {}) {
