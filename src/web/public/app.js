@@ -2631,6 +2631,86 @@ function TerminalTab({ projectId, projectName } = {}) {
   `;
 }
 
+// Agent task-panel detection: the CLI prints a live todo list as lines led by a
+// task glyph (◻/◼ open, ✔/✓/☑ done, ☐/☒ checkbox), the first often after a ⎿
+// connector. We collapse a run of these into one "📋 N tasks" line so the panel
+// stops eating chat space (JROM). A single glyph line is left alone.
+const _TASK_LINE_RE = /^\s*(?:⎿\s*)?([◻◼▪☐☒✔✓☑])\s+(\S.*?)\s*$/u;
+const _TASK_DONE_RE = /[✔✓☑]/u;
+function parseTaskLine(line) {
+  const m = String(line).match(_TASK_LINE_RE);
+  if (!m) return null;
+  return { done: _TASK_DONE_RE.test(m[1]), label: m[2].trim() };
+}
+// Split bubble text into ordered segments of plain text and task blocks (>=2
+// consecutive task lines).
+function splitTaskSegments(text) {
+  const lines = String(text).split('\n');
+  const segments = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (parseTaskLine(lines[i])) {
+      let j = i;
+      const items = [];
+      while (j < lines.length && parseTaskLine(lines[j])) { items.push(parseTaskLine(lines[j])); j++; }
+      if (items.length >= 2) {
+        segments.push({ type: 'tasks', items });
+        i = j;
+        continue;
+      }
+    }
+    // accumulate a text run
+    let k = i;
+    const buf = [];
+    while (k < lines.length) {
+      if (parseTaskLine(lines[k])) {
+        // peek: only break the text run if a real (>=2) task block starts here
+        let p = k, cnt = 0;
+        while (p < lines.length && parseTaskLine(lines[p])) { cnt++; p++; }
+        if (cnt >= 2) break;
+      }
+      buf.push(lines[k]); k++;
+    }
+    segments.push({ type: 'text', text: buf.join('\n') });
+    i = k;
+  }
+  return segments;
+}
+
+function TaskBlock({ items }) {
+  const [open, setOpen] = useState(false);
+  const total = items.length;
+  const done = items.filter((it) => it.done).length;
+  return html`
+    <div class="terminal-taskblock" data-testid="terminal-taskblock">
+      <button type="button" class="terminal-taskblock-toggle" data-testid="terminal-taskblock-toggle"
+              aria-expanded=${open} onclick=${() => setOpen((o) => !o)}>
+        <span class="terminal-taskblock-caret">${open ? '▾' : '▸'}</span>
+        📋 ${total} task${total === 1 ? '' : 's'} · ${done} done / ${total - done} open
+      </button>
+      ${open ? html`
+        <div class="terminal-taskblock-items">
+          ${items.map((it) => html`
+            <div class=${'terminal-taskblock-item' + (it.done ? ' done' : '')}>
+              <span class="terminal-taskblock-mark">${it.done ? '✔' : '◻'}</span>${it.label}
+            </div>
+          `)}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderBubbleText(text) {
+  const segments = splitTaskSegments(text);
+  if (!segments.some((s) => s.type === 'tasks')) return null; // no task block
+  return html`<div class="ovm-chat-text terminal-chat-content">
+    ${segments.map((seg) => seg.type === 'tasks'
+      ? html`<${TaskBlock} items=${seg.items} />`
+      : (seg.text ? html`<span class="terminal-chat-textseg">${seg.text}</span>` : ''))}
+  </div>`;
+}
+
 // Minimize: agent replies compact to the most recent `limit` lines (the tail,
 // so scroll-to-bottom still lands on the newest line), with a per-reply toggle
 // to expand to full and back. `limit` comes from the ☰ menu picker (0 = Full).
@@ -2641,6 +2721,11 @@ const BUBBLE_COMPACT_SLACK = 4;
 function CollapsibleBubbleContent({ content, role, limit }) {
   const [expanded, setExpanded] = useState(false);
   const text = typeof content === 'string' ? content : String(content == null ? '' : content);
+
+  // A visible task panel is collapsed in place (independent of the line-minimize).
+  const withTasks = role === 'agent' ? renderBubbleText(text) : null;
+  if (withTasks) return withTasks;
+
   const cap = Number(limit);
   const lines = text.split('\n');
   const total = lines.length;
