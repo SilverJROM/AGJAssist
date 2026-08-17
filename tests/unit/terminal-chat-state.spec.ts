@@ -82,6 +82,22 @@ describe("terminal chat state", () => {
       expect(result).toContain("some output");
     });
 
+    it("drops the ⧉ editor-tabs indicator and related hint chrome", () => {
+      const input = [
+        "real reply content here",
+        "⧉  index · index · index · ctrl+] to open",
+        "  (ctrl+b ctrl+b (twice) to run in background)",
+        "... +1 completed",
+        "another real line",
+      ].join("\n");
+      const result = cleanTerminalOutput(input);
+      expect(result).toContain("real reply content here");
+      expect(result).toContain("another real line");
+      expect(result).not.toContain("index · index");
+      expect(result).not.toContain("run in background");
+      expect(result).not.toContain("+1 completed");
+    });
+
     it("drops horizontal rule lines", () => {
       const input = "content\n────────────────────\nmore content";
       const result = cleanTerminalOutput(input);
@@ -1491,6 +1507,40 @@ describe("FIX15 sol real-format fixtures (raw ❯-run tail-anchor)", () => {
     expect(body).not.toContain("❯");
     expect(body).not.toContain("Working (12s)");
     expect(body).not.toContain("bypass permissions");
+  });
+});
+
+describe("moved-on pane reconciliation (stale-tab / SSH-driven)", () => {
+  it("shows the live reply when a tab is seeded from stale memory but the pane moved on", () => {
+    const memory = [
+      { id: "u1", role: "user", label: "You", content: "explain the merge", sentContent: "explain the merge", sent: "explain the merge", timestamp: "" },
+      { id: "a1", role: "agent", label: "Agent", content: "● Merged hotfix/dcr-rate-limit — H-11..H-15.", timestamp: "" },
+    ];
+    const livePane = [
+      "● (older context that scrolled)",
+      "❯ archive-tag the unmerged ones then drop them",
+      "● Stashes: 99 → 69. I dropped 30 that I verified were disposable.",
+      "  68 of the 69 belong to branches that no longer exist.",
+    ].join("\n");
+    const out = applyAgentPatch(memory, livePane, { previousSnapshot: "totally different old snapshot" });
+    const agentText = out.filter((e) => e.role === "agent").map((e) => e.content).join("\n");
+    expect(agentText).toContain("Stashes: 99 → 69");           // fresh reply now shown
+    expect(agentText).toContain("Merged hotfix");               // old kept as history
+    expect(out[out.length - 1].role).toBe("agent");
+    expect(out.filter((e) => e.role === "user").map((e) => e.content)).toContain("archive-tag the unmerged ones then drop them");
+  });
+
+  it("does NOT reconcile/duplicate during the normal live send→reply flow", () => {
+    let e = appendYou([], "hello agent");
+    const afterSend = ["❯ hello agent", "● Hi there, working on it."].join("\n");
+    e = applyAgentPatch(e, afterSend, { baselineAtSend: "" });
+    const grows = ["❯ hello agent", "● Hi there, working on it.", "  more of the reply now."].join("\n");
+    e = applyAgentPatch(e, grows, { previousSnapshot: afterSend });
+    expect(e.filter((x) => x.role === "user")).toHaveLength(1);
+    expect(e.filter((x) => x.role === "agent")).toHaveLength(1);
+    const agent = e.find((x) => x.role === "agent")!.content;
+    expect(agent).toContain("more of the reply now");
+    expect((agent.match(/Hi there/g) || []).length).toBe(1);
   });
 });
 

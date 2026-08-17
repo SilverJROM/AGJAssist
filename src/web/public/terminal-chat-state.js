@@ -27,6 +27,12 @@ const _tmuxConfRe = /~\/\.tmux\.conf/;
 const _composerGlyphRe = /^[❯›▌]/u;
 const _composerPlaceholderRe = /^\s*Type a message\b/i;
 const _interruptChromeRe = /^\s*esc to interrupt\s*$/i;
+// Editor-tabs indicator ("⧉ index · index · index · ctrl+] to open") and related
+// CLI hint chrome ("… to run in background", "… +N completed/more/lines") — pure
+// chrome that eats chat space; strip it.
+const _editorTabsChromeRe = /^\s*⧉/u;
+const _bgRunHintRe = /to run in background\)?\s*$/i;
+const _overflowChromeRe = /^\s*(?:…|\.\.\.)\s*\+\d+\s+(?:completed|more|lines?)\b/i;
 // Claude TUI paints a right-aligned "HH:MM:SS [N/M]" counter over the first
 // physical line of the wrapped user box. The tail of the message survives.
 const _paneCounterRe = /\b\d{2}:\d{2}:\d{2}\s+\[\d+\/\d+\]/;
@@ -71,6 +77,9 @@ function _isChromeLine(line) {
     || _isBoxDrawingLine(line)
     || /^[─=]{3,}$/.test(trimmed)
     || _interruptChromeRe.test(trimmed)
+    || _editorTabsChromeRe.test(trimmed)
+    || _bgRunHintRe.test(trimmed)
+    || _overflowChromeRe.test(trimmed)
     || _isSpinnerChromeLine(line)
     || _tmuxConfRe.test(line);
 }
@@ -916,8 +925,66 @@ export function appendYou(entries, text, { now = Date.now(), sentContent } = {})
  * minus prior turns when ❯ structure is present. Legacy snapshots without ❯
  * keep exact/wrapped/tail + the unstructured never-freeze fallback.
  */
+// Does a pane ❯ run correspond to a stored sent message (suffix-ladder tail)?
+function _runMatchesSent(run, sent) {
+  if (!run || !sent) return false;
+  const ladder = _suffixLadder(sent);
+  for (const suffix of ladder) {
+    const glued = suffix.replace(/ /g, "");
+    if (run.normalized.endsWith(suffix) || run.glued.endsWith(suffix) || (glued && run.glued.endsWith(glued))) return true;
+  }
+  return false;
+}
+
+// Reconcile a pane that has MOVED ON past the seeded entries. Happens when you
+// switch back to a tab (seeded from stale recent-message memory) or when the pane
+// was driven outside the app (SSH): the newest ❯ run no longer matches the last
+// stored user turn, so the normal anchor freezes the old reply. Detect that and
+// append the newest run as a fresh user turn + its live reply, so the chat shows
+// current data. Returns null when the pane is already in sync (normal live flow).
+function _reconcileMovedOnPane(list, snapshot, now) {
+  const lastUserIdx = _lastIndexByRole(list, "user");
+  const lastAgentIdx = _lastIndexByRole(list, "agent");
+  // Only reconcile a SETTLED exchange (last turn is an agent reply). During an
+  // active send (last turn is the user, awaiting a reply — openNew) the normal
+  // anchor path handles it, incl. counter-clobbered short messages.
+  if (!(lastAgentIdx >= 0 && lastAgentIdx >= lastUserIdx)) return null;
+
+  const rawLines = _ansiStrippedRows(snapshot);
+  const runs = _collectUserRuns(rawLines);
+  if (!runs.length) return null;
+  const newest = runs[runs.length - 1];
+  const newestText = (newest.normalized || "").trim();
+  if (!newestText) return null;
+
+  const lastUser = lastUserIdx >= 0 ? list[lastUserIdx] : null;
+  // In sync? The last stored user turn corresponds to the newest pane run.
+  if (lastUser) {
+    const sent = lastUser.sentContent || lastUser.sent || lastUser.content || "";
+    if (_runMatchesSent(newest, sent)) return null;
+    if ((lastUser.content || "").trim() === newestText) return null;
+  }
+
+  const afterRaw = rawLines.slice(newest.cutAfter + 1).join("\n");
+  const body = _removeUserText(_prepareDiffText(afterRaw), list, { lastUserOnly: false }).trim();
+  if (!body) return null;
+
+  if (lastAgentIdx >= 0 && (list[lastAgentIdx].content || "").trim().endsWith(body)) return null;
+
+  const ts = new Date(now).toLocaleTimeString();
+  const userEntry = makeEntry("you-reco-" + now, "user", "You", newestText, ts);
+  userEntry.sentContent = newestText;
+  userEntry.sent = newestText;
+  const agentEntry = makeEntry("agent-reco-" + now, "agent", "Agent", body, ts);
+  return list.concat([userEntry, agentEntry]);
+}
+
 export function applyAgentPatch(entries, snapshot, { now = Date.now(), baselineAtSend, previousSnapshot } = {}) {
   const list = Array.isArray(entries) ? entries : [];
+  // A moved-on pane (stale-memory tab switch / SSH-driven) must reflect live data
+  // rather than freeze on the seeded turn.
+  const reconciled = _reconcileMovedOnPane(list, snapshot, now);
+  if (reconciled) return reconciled;
   const lastAgentIdx = _lastIndexByRole(list, "agent");
   const lastUserIdx = _lastIndexByRole(list, "user");
   const openNew = lastAgentIdx < 0 || lastUserIdx > lastAgentIdx;

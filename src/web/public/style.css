@@ -601,6 +601,23 @@ body {
   flex-direction: column;
   gap: 0;
 }
+/* Drag handle to resize the chat input taller/shorter (double-tap resets). */
+.terminal-composer-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 14px;
+  margin: -2px 0 2px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.terminal-composer-grip-bar {
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: #c8d1da;
+}
+.terminal-composer-grip:hover .terminal-composer-grip-bar { background: #0969da; }
 .terminal-chat-modebar {
   display: flex;
   gap: 6px;
@@ -766,7 +783,9 @@ body {
 .terminal-chat-input-field {
   flex: 1 1 auto;
   min-height: 36px;
-  max-height: 120px;
+  /* Auto-grow is JS-capped at 120px; a manual drag-resize may go taller (up to
+     60vh), so the CSS cap must not clip it. */
+  max-height: 60vh;
   resize: none;
   background: transparent;
   border: 0;
@@ -1099,6 +1118,128 @@ body {
   border-radius: 999px;
   white-space: nowrap;
 }
+/* Multi-session tab strip */
+.terminal-tabstrip {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  padding: 5px 8px;
+  background: var(--surface, #ffffff);
+  border-bottom: 1px solid var(--border, #d0d7de);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 20;
+}
+.terminal-tabstrip-scroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  scrollbar-width: none;
+}
+.terminal-tabstrip-scroll::-webkit-scrollbar { display: none; }
+.terminal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  max-width: 160px;
+  padding: 5px 8px 5px 10px;
+  font-size: 12.5px;
+  color: #57606a;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.terminal-tab.active {
+  color: #1f2328;
+  background: #ffffff;
+  border-color: #0969da;
+  box-shadow: 0 0 0 1px #0969da inset;
+}
+.terminal-tab-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #afb8c1;
+}
+.terminal-tab-dot.on { background: #1a7f37; }
+.terminal-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.terminal-tab-close {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: #57606a;
+  border-radius: 50%;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+.terminal-tab-close:hover { background: #e2e8ee; color: #1f2328; }
+.terminal-tab-addwrap { position: relative; flex: 0 0 auto; }
+.terminal-tab-add {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #d0d7de;
+  background: #f6f8fa;
+  color: #57606a;
+  border-radius: 9px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.terminal-tab-add:hover { background: #ffffff; color: #0969da; border-color: #0969da; }
+.terminal-tabpicker-overlay {
+  position: fixed;
+  inset: 0;
+  /* Below the tab strip (z-index 20) so the picker renders above it, but above
+     the chat so an outside tap still closes the picker. */
+  z-index: 15;
+}
+.terminal-tab-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 220px;
+  max-width: 84vw;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(31, 35, 40, 0.18);
+  padding: 6px;
+}
+.terminal-tab-picker-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.terminal-tab-picker-item:hover { background: #f6faff; }
+.terminal-tab-picker-name { font-size: 13px; font-weight: 600; color: #1f2328; }
+.terminal-tab-picker-target { font-size: 11px; color: #57606a; }
+.terminal-tab-picker-empty { padding: 10px; font-size: 12px; color: #57606a; }
+
 .terminal-chat-daydiv {
   align-self: center;
   font-size: 11px;

@@ -2119,6 +2119,13 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [sessions, setSessions] = useState([]);
   const [sessionsError, setSessionsError] = useState(null);
   const [activeTarget, setActiveTarget] = useState(null);
+  const [openTabs, setOpenTabs] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('agj_terminal_open_tabs') || '[]');
+      return Array.isArray(raw) ? raw.filter((t) => typeof t === 'string') : [];
+    } catch { return []; }
+  });
+  const [tabPickerOpen, setTabPickerOpen] = useState(false);
   const [showNewSession, setShowNewSession] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [friendlyMode, setFriendlyMode] = useState(isTgMiniApp);
@@ -2335,6 +2342,47 @@ function TerminalTab({ projectId, projectName } = {}) {
     setActiveTarget(nextTarget || null);
   }
 
+  // Multi-session tabs: the active target is auto-added as an open tab; each tab
+  // keeps its own chat/memory (FriendlyTerminalView is keyed by target and its
+  // state is persisted per target). Open tabs survive reloads via localStorage.
+  useEffect(() => {
+    try { localStorage.setItem('agj_terminal_open_tabs', JSON.stringify(openTabs)); } catch {}
+  }, [openTabs]);
+
+  useEffect(() => {
+    if (activeTarget && !openTabs.includes(activeTarget)) {
+      setOpenTabs((prev) => (prev.includes(activeTarget) ? prev : [...prev, activeTarget]));
+    }
+  }, [activeTarget]);
+
+  // Drop tabs whose pane no longer exists (once sessions have loaded).
+  const panesKey = allPanes.map((p) => p.target).join('|');
+  useEffect(() => {
+    if (!allPanes.length) return;
+    setOpenTabs((prev) => {
+      const valid = prev.filter((t) => allPanes.some((p) => p.target === t));
+      return valid.length === prev.length ? prev : valid;
+    });
+  }, [panesKey]);
+
+  function openSessionTab(target) {
+    setTabPickerOpen(false);
+    if (!target) return;
+    switchActiveTarget(target);
+  }
+
+  function closeSessionTab(target) {
+    setOpenTabs((prev) => {
+      const idx = prev.indexOf(target);
+      const next = prev.filter((t) => t !== target);
+      if (target === activeTarget) {
+        const fallback = next[idx] || next[idx - 1] || next[0] || null;
+        setActiveTarget(fallback);
+      }
+      return next;
+    });
+  }
+
   const updatedLabel = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : '';
   const targetSubtitle = [
     activeTarget || '',
@@ -2405,7 +2453,48 @@ function TerminalTab({ projectId, projectName } = {}) {
           </div>
         </div>
       </div>
+      ${friendlyMode && (openTabs.length > 0 || tabPickerOpen) && html`
+        <div class="terminal-tabstrip" data-testid="terminal-tabstrip">
+          <div class="terminal-tabstrip-scroll">
+            ${openTabs.map((t) => {
+              const pane = allPanes.find((p) => p.target === t);
+              const name = pane?.session_name || t.split(':')[0];
+              const on = pane && (t === activeTarget) && (terminalStatus === 'connected' || terminalStatus === 'running');
+              return html`
+                <div key=${t} class=${'terminal-tab' + (t === activeTarget ? ' active' : '')}
+                     data-testid="terminal-tab" data-tab-target=${t}
+                     onclick=${() => switchActiveTarget(t)}>
+                  <span class=${'terminal-tab-dot' + (on ? ' on' : '')}></span>
+                  <span class="terminal-tab-name">${name}</span>
+                  <button type="button" class="terminal-tab-close" data-testid="terminal-tab-close"
+                          aria-label=${`Close ${name}`}
+                          onclick=${(e) => { e.stopPropagation(); closeSessionTab(t); }}>×</button>
+                </div>
+              `;
+            })}
+          </div>
+          <div class="terminal-tab-addwrap">
+            <button type="button" class="terminal-tab-add" data-testid="terminal-tab-add"
+                    aria-label="Open a session" aria-expanded=${tabPickerOpen}
+                    onclick=${() => setTabPickerOpen((o) => !o)}>+</button>
+            ${tabPickerOpen && html`
+              <div class="terminal-tab-picker" data-testid="terminal-tab-picker" role="listbox">
+                ${allPanes.filter((p) => !openTabs.includes(p.target)).map((p) => html`
+                  <button type="button" class="terminal-tab-picker-item" data-testid="terminal-tab-picker-item"
+                          role="option" onclick=${() => openSessionTab(p.target)}>
+                    <span class="terminal-tab-picker-name">${p.session_name}</span>
+                    <span class="terminal-tab-picker-target">${p.target} · ${p.command}</span>
+                  </button>
+                `)}
+                ${allPanes.filter((p) => !openTabs.includes(p.target)).length === 0
+                  ? html`<div class="terminal-tab-picker-empty">All sessions are open</div>` : ''}
+              </div>
+            `}
+          </div>
+        </div>
+      `}
       ${menuOpen ? html`<div class="terminal-menu-overlay" onclick=${() => setMenuOpen(false)}></div>` : ''}
+      ${friendlyMode && tabPickerOpen ? html`<div class="terminal-tabpicker-overlay" onclick=${() => setTabPickerOpen(false)}></div>` : ''}
       <div class=${'terminal-menu-sheet' + (menuOpen ? ' open' : '')} data-term-menu-sheet data-testid="terminal-menu-sheet" role="menu" ref=${menuRef} inert=${!menuOpen} onclick=${(event) => event.stopPropagation()}>
         <div class="terminal-sheet-inner">
           <div class="terminal-sheet-sect">Text size</div>
@@ -2763,6 +2852,11 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [statusLine, setStatusLine] = useState('');
   const [entries, setEntries] = useState([]);
   const [input, setInput] = useState('');
+  const [composerHeight, setComposerHeight] = useState(() => {
+    try { const v = Number(localStorage.getItem('agj_terminal_composer_h')); return Number.isFinite(v) && v > 0 ? v : 0; } catch { return 0; }
+  });
+  const composerFieldRef = useRef(null);
+  const composerHeightRef = useRef(0);
   const [sending, setSending] = useState(false);
   const [snapshot, setSnapshot] = useState('');
   const [lastCommand, setLastCommand] = useState('');
@@ -3292,8 +3386,52 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   function handleComposerInput(event) {
     setInput(event.target.value);
     const field = event.target;
+    // If the user set a manual height by dragging, keep it (scroll inside);
+    // otherwise auto-grow up to 120px.
+    if (composerHeightRef.current) {
+      field.style.height = composerHeightRef.current + 'px';
+      return;
+    }
     field.style.height = 'auto';
     field.style.height = Math.min(field.scrollHeight, 120) + 'px';
+  }
+
+  // Draggable composer resize: drag the grip up to make the input taller, down to
+  // shrink; persisted per-device. composerHeight 0 = auto-grow (default).
+  useEffect(() => {
+    composerHeightRef.current = composerHeight;
+    const field = composerFieldRef.current;
+    if (field && composerHeight) field.style.height = composerHeight + 'px';
+  }, [composerHeight]);
+
+  function startComposerResize(e) {
+    e.preventDefault();
+    const field = composerFieldRef.current;
+    const startY = e.clientY != null ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+    const startH = composerHeightRef.current || (field ? field.clientHeight : 44) || 44;
+    const maxH = Math.round((window.innerHeight || 800) * 0.6);
+    const move = (ev) => {
+      const y = ev.clientY != null ? ev.clientY : (ev.touches && ev.touches[0] ? ev.touches[0].clientY : startY);
+      const next = Math.max(40, Math.min(maxH, Math.round(startH + (startY - y))));
+      composerHeightRef.current = next;
+      setComposerHeight(next);
+      if (field) field.style.height = next + 'px';
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      try { localStorage.setItem('agj_terminal_composer_h', String(composerHeightRef.current || 0)); } catch {}
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  function resetComposerHeight() {
+    composerHeightRef.current = 0;
+    setComposerHeight(0);
+    const field = composerFieldRef.current;
+    if (field) { field.style.height = 'auto'; field.style.height = Math.min(field.scrollHeight, 120) + 'px'; }
+    try { localStorage.setItem('agj_terminal_composer_h', '0'); } catch {}
   }
 
   function openAttachPicker() {
@@ -3514,6 +3652,11 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       </div>
 
       <div class="terminal-chat-composer">
+        <div class="terminal-composer-grip" data-testid="terminal-composer-grip"
+             title="Drag to resize · double-tap to reset"
+             onPointerDown=${startComposerResize} onDblClick=${resetComposerHeight}>
+          <span class="terminal-composer-grip-bar"></span>
+        </div>
         <div class="terminal-chat-modebar">
           <button type="button" class=${sendMode === 'command' ? 'sel' : ''}
                   onclick=${() => setSendMode('command')}>Send as command</button>
@@ -3541,8 +3684,10 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
           ` : ''}
           <textarea class="terminal-chat-input-field"
                     data-testid="terminal-composer-input"
+                    ref=${composerFieldRef}
                     value=${input}
                     rows="1"
+                    style=${composerHeight ? `height:${composerHeight}px` : ''}
                     placeholder="Message the agent..."
                     onInput=${handleComposerInput}
                     onPaste=${handleComposerPaste}

@@ -112,7 +112,9 @@ test('agent reply minimizes to the recent tail, expands/collapses, and the picke
   const seg = page.locator('[data-testid="terminal-reply-limit"]');
   await expect(seg).toBeVisible();
   await seg.getByRole('button', { name: '10', exact: true }).click();
-  await page.locator('.terminal-menu-overlay').click({ position: { x: 5, y: 5 } }).catch(() => {});
+  // Close the menu via its trigger (robust; avoids positional clicks that a tab
+  // strip could intercept).
+  await page.locator('[data-testid="terminal-menu"]').click();
   await expect(agent).toContainText(NEWEST);
   await expect(agent).not.toContainText(AT_205);
   await expect(page.locator('[data-testid="terminal-reply-expand"]')).toContainText(/210 earlier lines/);
