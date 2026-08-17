@@ -1,7 +1,7 @@
 import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { normalizeTerminalOutput, diffTerminalOutput, extractStatus, appendYou, extractStrippedChromeLines, applyAgentPatch, sanitizeOutgoingCommand } from './terminal-chat-state.js';
+import { normalizeTerminalOutput, diffTerminalOutput, extractStatus, appendYou, extractStrippedChromeLines, applyAgentPatch, sanitizeOutgoingCommand, detectSelectionPrompt } from './terminal-chat-state.js';
 import {
   AVAILABLE_BOTTOM_NAV_TABS,
   DEFAULT_BOTTOM_NAV_TAB_IDS,
@@ -138,6 +138,21 @@ function writeTerminalMemory(target, entries) {
     localStorage.setItem(terminalMemoryKey(target), JSON.stringify({ entries: trimmed, updatedAt: Date.now() }));
   } catch {}
 }
+
+// Raw key sequences sent over the tmux WebSocket to drive the agent from chat.
+// These are the actual terminal bytes the CLI expects; the WS input path forwards
+// them via `tmux send-keys` (control bytes are fine there — unlike the REST send).
+const TERM_ESC = String.fromCharCode(27);
+const TERM_KEYS = {
+  enter: '\r',
+  esc: TERM_ESC,
+  ctrlc: String.fromCharCode(3),
+  up: TERM_ESC + '[A',
+  down: TERM_ESC + '[B',
+  tab: '\t',
+  shiftTab: TERM_ESC + '[Z',
+  space: ' ',
+};
 
 // Telegram Mini App detection
 const seededTgContext = (() => {
@@ -2686,6 +2701,9 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const fileInputRef = useRef(null);
   const pinToBottomRef = useRef(true);
   const entryCountRef = useRef(0);
+  const wsRef = useRef(null);
+  const wsLiveRef = useRef(false);
+  const pollNowRef = useRef(null);
   const storageKey = 'agj_terminal_chat_' + target.replace(/[^a-zA-Z0-9_.-]/g, '_');
 
   function lastRoleIndex(list, role) {
@@ -2726,6 +2744,60 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       sendBaselineRef.current = '';
     }
     return next;
+  }
+
+  // Shared snapshot handler for the REST poll AND the WS change-trigger, so the
+  // render path (dedup/minimize) is identical no matter what woke it.
+  function processSnapshot(latest) {
+    if (!latest || latest === snapshotRef.current) return;
+    snapshotRef.current = latest;
+    setSnapshot(latest);
+    setLastUpdatedAt(Date.now());
+    setEntries(prev => applyConversationSnapshot(prev, latest));
+    setStatusLine(extractStatus(latest));
+  }
+
+  // On-demand fetch of the proven 2000-line snapshot (same source the interval
+  // uses) — called right after a keypress and when the WS says the pane changed,
+  // so the chat reflects the result within a fetch instead of the poll interval.
+  async function pollNow() {
+    if (sendingRef.current) return;
+    try {
+      const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=${getCaptureLines()}`);
+      processSnapshot(normalizeTerminalOutput(data.output));
+    } catch {}
+  }
+  pollNowRef.current = pollNow;
+
+  // Send raw key bytes to the pane over the tmux WebSocket (control bytes are OK
+  // there, unlike the REST send path), then refresh so the effect shows live.
+  function sendKeys(bytes) {
+    const ws = wsRef.current;
+    if (!bytes || !ws || ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      ws.send(JSON.stringify({ type: 'input', data: bytes }));
+    } catch {
+      return false;
+    }
+    setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 120);
+    setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 400);
+    return true;
+  }
+
+  // Drive a parsed selection: move the cursor to option `idx` (0-based) and Enter.
+  // Prefer relative navigation when the ❯ cursor position is known; otherwise
+  // clamp to the top (Up × count) then step down — deterministic without wrap.
+  function chooseSelectionOption(selection, idx) {
+    if (!selection || idx < 0 || idx >= selection.options.length) return;
+    let seq = '';
+    if (selection.selectedIndex >= 0) {
+      const delta = idx - selection.selectedIndex;
+      seq = (delta >= 0 ? TERM_KEYS.down.repeat(delta) : TERM_KEYS.up.repeat(-delta));
+    } else {
+      seq = TERM_KEYS.up.repeat(selection.options.length) + TERM_KEYS.down.repeat(idx);
+    }
+    seq += TERM_KEYS.enter;
+    sendKeys(seq);
   }
 
   function syncConvFontFromStorage() {
@@ -2872,21 +2944,51 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       try {
         const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=${getCaptureLines()}`);
         if (!active) return;
-        const latest = normalizeTerminalOutput(data.output);
-        const previous = snapshotRef.current;
-        if (latest && latest !== previous) {
-          snapshotRef.current = latest;
-          setSnapshot(latest);
-          setLastUpdatedAt(Date.now());
-          setEntries(prev => applyConversationSnapshot(prev, latest));
-          setStatusLine(extractStatus(latest));
-        }
+        processSnapshot(normalizeTerminalOutput(data.output));
       } catch {}
     }, 1000);
 
     return () => {
       active = false;
       clearInterval(refreshTimer);
+    };
+  }, [target]);
+
+  // Live tmux WebSocket: used to SEND raw keys (control bar + selection) and as a
+  // change-trigger — when the pane changes, refresh the 2000-line snapshot at once
+  // so tapping a choice/key updates the chat live. Render source stays the proven
+  // REST poll to avoid any capture-depth mismatch with the WS buffer.
+  useEffect(() => {
+    if (!target) return undefined;
+    let closed = false;
+    let debounce = null;
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${proto}//${location.host}/ws/tmux/${encodeURIComponent(target)}?token=${encodeURIComponent(authToken || '')}`;
+    let ws;
+    try {
+      ws = new WebSocket(url);
+    } catch {
+      return undefined;
+    }
+    wsRef.current = ws;
+    ws.onopen = () => { if (!closed) wsLiveRef.current = true; };
+    ws.onclose = () => { wsLiveRef.current = false; if (wsRef.current === ws) wsRef.current = null; };
+    ws.onerror = () => { wsLiveRef.current = false; };
+    ws.onmessage = (e) => {
+      if (closed || sendingRef.current) return;
+      let msg;
+      try { msg = JSON.parse(e.data); } catch { return; }
+      if (msg.type === 'snapshot' || msg.type === 'output') {
+        if (debounce) return;
+        debounce = setTimeout(() => { debounce = null; pollNowRef.current && pollNowRef.current(); }, 100);
+      }
+    };
+    return () => {
+      closed = true;
+      wsLiveRef.current = false;
+      if (debounce) clearTimeout(debounce);
+      try { ws.close(); } catch {}
+      if (wsRef.current === ws) wsRef.current = null;
     };
   }, [target]);
 
@@ -3031,6 +3133,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
 
   const rawChrome = showRawChrome ? extractStrippedChromeLines(snapshot) : '';
   const statusBusy = /drizzl|working|thinking|running/i.test(statusLine || '');
+  const selection = useMemo(() => detectSelectionPrompt(snapshot), [snapshot]);
 
   function handleComposerInput(event) {
     setInput(event.target.value);
@@ -3226,6 +3329,33 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
           ${unseenWhileUp > 0 ? html`<span class="terminal-scroll-bottom-dot"></span>` : ''}
         </button>
       ` : ''}
+      </div>
+
+      ${selection ? html`
+        <div class="terminal-selection" data-testid="terminal-selection">
+          <div class="terminal-selection-head">
+            <span class="terminal-selection-dot"></span>
+            <span class="terminal-selection-title">${selection.title || 'Claude is asking'}</span>
+          </div>
+          <div class="terminal-selection-opts">
+            ${selection.options.map((opt, i) => html`
+              <button type="button" class="terminal-selection-opt" data-testid="terminal-selection-opt"
+                      onclick=${() => chooseSelectionOption(selection, i)}>
+                <span class="terminal-selection-num">${opt.n}</span>${opt.label}
+              </button>
+            `)}
+          </div>
+          ${selection.multi ? html`<div class="terminal-selection-hint">Multi-select — use Space to toggle, then Enter</div>` : ''}
+        </div>
+      ` : ''}
+
+      <div class="terminal-control-bar" data-testid="terminal-control-bar" role="group" aria-label="Terminal keys">
+        <button type="button" data-testid="ctl-enter" title="Enter" onclick=${() => sendKeys(TERM_KEYS.enter)}>⏎</button>
+        <button type="button" data-testid="ctl-esc" title="Esc / interrupt" onclick=${() => sendKeys(TERM_KEYS.esc)}>Esc</button>
+        <button type="button" data-testid="ctl-ctrlc" title="Ctrl-C / cancel" onclick=${() => sendKeys(TERM_KEYS.ctrlc)}>^C</button>
+        <button type="button" data-testid="ctl-mode" title="Shift-Tab / cycle mode" onclick=${() => sendKeys(TERM_KEYS.shiftTab)}>⇧⇥</button>
+        <button type="button" data-testid="ctl-up" title="Up" onclick=${() => sendKeys(TERM_KEYS.up)}>↑</button>
+        <button type="button" data-testid="ctl-down" title="Down" onclick=${() => sendKeys(TERM_KEYS.down)}>↓</button>
       </div>
 
       <div class="terminal-chat-composer">
