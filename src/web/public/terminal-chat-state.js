@@ -954,6 +954,15 @@ export function appendYou(entries, text, { now = Date.now(), sentContent } = {})
  * minus prior turns when ❯ structure is present. Legacy snapshots without ❯
  * keep exact/wrapped/tail + the unstructured never-freeze fallback.
  */
+// A full-screen interactive dialog (not a conversational reply): Claude's Login /
+// OAuth flow, or an "Esc to cancel" prompt. Used to allow a stale-turn repaint on
+// ❯-less panes WITHOUT disturbing the normal conversational sliding-window flow.
+const _DIALOG_RE = /(paste code here|browser didn'?t open|oauth\/authorize\?code|use the url below to sign in|\bEsc to cancel\b|Select login method|Opening browser to sign in)/i;
+function _isInteractiveDialogPane(snapshot) {
+  const rows = _ansiStrippedRows(snapshot);
+  return rows.slice(-30).some((l) => _DIALOG_RE.test(l));
+}
+
 // Does a pane ❯ run correspond to a stored sent message (suffix-ladder tail)?
 function _runMatchesSent(run, sent) {
   if (!run || !sent) return false;
@@ -981,7 +990,24 @@ function _reconcileMovedOnPane(list, snapshot, now) {
 
   const rawLines = _ansiStrippedRows(snapshot);
   const runs = _collectUserRuns(rawLines);
-  if (!runs.length) return null;
+
+  // No ❯ prompt AND the pane is a full-screen interactive DIALOG (Claude's Login
+  // dialog: "Browser didn't open? … <url> … Paste code here", or a "… Esc to
+  // cancel" prompt). The normal diff sees a full repaint with zero overlap and
+  // freezes the old turn, so the URL + paste prompt never appear. Patch the last
+  // agent turn to the live cleaned snapshot. Gated to dialogs so the normal
+  // conversational sliding-window accumulate flow (also ❯-less) is untouched.
+  if (!runs.length) {
+    if (!_isInteractiveDialogPane(snapshot)) return null;
+    const live = _agentBodyFromSnapshot(snapshot, list.filter((e) => e !== list[lastAgentIdx]), false).trim();
+    if (!live) return null;
+    const cur = (list[lastAgentIdx].content || "").trim();
+    if (cur === live || cur.endsWith(live) || live.endsWith(cur)) return null;
+    const next = list.slice();
+    next[lastAgentIdx] = { ...list[lastAgentIdx], content: live };
+    return next;
+  }
+
   const newest = runs[runs.length - 1];
   const newestText = (newest.normalized || "").trim();
   if (!newestText) return null;

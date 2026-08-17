@@ -1581,6 +1581,34 @@ describe("moved-on pane reconciliation (stale-tab / SSH-driven)", () => {
     expect(out.filter((e) => e.role === "agent")).toHaveLength(1);   // patched in place
   });
 
+  it("updates the chat when a ❯-less Login DIALOG replaces the shown turn (hris login)", () => {
+    // Claude's Login flow has NO ❯ prompt: "Browser didn't open? … <url> … Paste
+    // code here". A full repaint has zero overlap, so the normal diff froze the
+    // old turn and the URL + paste prompt never appeared.
+    const loginPane = [
+      "● Recap: all four items live on QA. Nothing outstanding.",
+      "✻ Brewed for 40s · 1 shell still running",
+      "   Login",
+      "",
+      "   Browser didn't open? Use the url below to sign in (c to copy)",
+      "https://claude.com/cai/oauth/authorize?code=true&client_id=abc&scope=x",
+      "",
+      "   Paste code here if prompted >",
+      "   Esc to cancel",
+    ].join("\n");
+    const existing = [
+      { id: "a-old", role: "agent", label: "Agent", content: "● seats reaped\n\n   Login\n\n   Opening browser to sign in…\n\n   Esc to cancel", timestamp: "" },
+    ];
+    const out = applyAgentPatch(existing, loginPane, { previousSnapshot: "an older login snapshot with zero overlap" });
+    const agentText = out.filter((e) => e.role === "agent").map((e) => e.content).join("\n");
+    expect(agentText).toContain("claude.com/cai/oauth"); // URL now shown
+    expect(agentText).toContain("Paste code here");        // paste prompt now shown
+    expect(out.filter((e) => e.role === "agent")).toHaveLength(1); // patched in place
+    // Idempotent: a second identical poll is a no-op.
+    const out2 = applyAgentPatch(out, loginPane, { previousSnapshot: loginPane });
+    expect(out2.map((e) => e.content)).toEqual(out.map((e) => e.content));
+  });
+
   it("does NOT reconcile/duplicate during the normal live send→reply flow", () => {
     let e = appendYou([], "hello agent");
     const afterSend = ["❯ hello agent", "● Hi there, working on it."].join("\n");
