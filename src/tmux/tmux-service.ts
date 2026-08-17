@@ -240,7 +240,16 @@ export class TmuxService {
         throw new Error(`unsupported key: ${String(k).slice(0, 16)}`);
       }
     }
-    await execFileAsync("tmux", ["send-keys", "-t", target, ...keys]);
+    // Send one key at a time with a small gap. Sending them in a single call
+    // lets a trailing Enter race ahead of the navigation keys in Claude's Ink
+    // TUI (e.g. "Down Down Enter" would select option 1 instead of 3); a gap
+    // guarantees each key is processed and re-rendered before the next.
+    for (let i = 0; i < keys.length; i++) {
+      await execFileAsync("tmux", ["send-keys", "-t", target, keys[i]]);
+      if (i < keys.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      }
+    }
     return { message: `Sent ${keys.length} key(s) to ${target}`, blocked: false };
   }
 
