@@ -218,6 +218,32 @@ export class TmuxService {
     };
   }
 
+  // Send named control keys (arrows, Enter, Escape, etc.) to a pane so the chat
+  // UI can drive interactive selections without the raw-terminal WebSocket. Only
+  // an allowlisted set is accepted — these are tmux key NAMES (not raw bytes), so
+  // there is no shell/command injection surface and no control-char problem.
+  async sendNamedKeys(target: string, keys: string[]): Promise<SendCommandResult> {
+    this.ensureValidTarget(target);
+    if (!Array.isArray(keys) || keys.length === 0) {
+      throw new Error("keys is required");
+    }
+    if (keys.length > 64) {
+      throw new Error("too many keys");
+    }
+    const allowed = new Set([
+      "Up", "Down", "Left", "Right", "Enter", "Escape", "Space", "Tab", "BTab",
+      "C-c", "BSpace", "Home", "End", "PageUp", "PageDown",
+      "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "y", "n",
+    ]);
+    for (const k of keys) {
+      if (!allowed.has(k)) {
+        throw new Error(`unsupported key: ${String(k).slice(0, 16)}`);
+      }
+    }
+    await execFileAsync("tmux", ["send-keys", "-t", target, ...keys]);
+    return { message: `Sent ${keys.length} key(s) to ${target}`, blocked: false };
+  }
+
   async createSession(name: string, cwd?: string): Promise<string> {
     this.ensureValidSessionName(name);
     const args = ["new-session", "-d", "-s", name];

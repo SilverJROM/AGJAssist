@@ -990,6 +990,18 @@ body {
 .terminal-control-bar button:active {
   background: #eaf2ff;
 }
+.terminal-key-flash {
+  align-self: center;
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #1a7f37;
+  background: #e6f7ec;
+  border: 1px solid #aadfbc;
+  border-radius: 999px;
+  white-space: nowrap;
+}
 .terminal-chat-daydiv {
   align-self: center;
   font-size: 11px;

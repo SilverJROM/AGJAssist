@@ -139,19 +139,18 @@ function writeTerminalMemory(target, entries) {
   } catch {}
 }
 
-// Raw key sequences sent over the tmux WebSocket to drive the agent from chat.
-// These are the actual terminal bytes the CLI expects; the WS input path forwards
-// them via `tmux send-keys` (control bytes are fine there — unlike the REST send).
-const TERM_ESC = String.fromCharCode(27);
+// tmux key NAMES sent to the /keys REST endpoint (works over the tunnel — no
+// WebSocket required — and no control-char issues since these are names, not
+// bytes). The backend strictly allowlists this set.
 const TERM_KEYS = {
-  enter: '\r',
-  esc: TERM_ESC,
-  ctrlc: String.fromCharCode(3),
-  up: TERM_ESC + '[A',
-  down: TERM_ESC + '[B',
-  tab: '\t',
-  shiftTab: TERM_ESC + '[Z',
-  space: ' ',
+  enter: 'Enter',
+  esc: 'Escape',
+  ctrlc: 'C-c',
+  up: 'Up',
+  down: 'Down',
+  tab: 'Tab',
+  shiftTab: 'BTab',
+  space: 'Space',
 };
 
 // Telegram Mini App detection
@@ -2688,6 +2687,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [attaching, setAttaching] = useState(false);
   const [attachError, setAttachError] = useState('');
   const [replyLimit, setReplyLimit] = useState(() => readTerminalReplyLimit());
+  const [keyFlash, setKeyFlash] = useState(0);
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [unseenWhileUp, setUnseenWhileUp] = useState(0);
@@ -2769,18 +2769,24 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   }
   pollNowRef.current = pollNow;
 
-  // Send raw key bytes to the pane over the tmux WebSocket (control bytes are OK
-  // there, unlike the REST send path), then refresh so the effect shows live.
-  function sendKeys(bytes) {
-    const ws = wsRef.current;
-    if (!bytes || !ws || ws.readyState !== WebSocket.OPEN) return false;
+  // Send named control keys to the pane over plain REST (/keys). Works over the
+  // tunnel like every other API call — no WebSocket dependency — then refresh so
+  // the effect shows quickly. Accepts a single key name or an array (a sequence).
+  async function sendKeys(keys) {
+    const arr = (Array.isArray(keys) ? keys : [keys]).filter(Boolean);
+    if (!arr.length) return false;
+    setKeyFlash(Date.now());
+    setTimeout(() => setKeyFlash(0), 900);
     try {
-      ws.send(JSON.stringify({ type: 'input', data: bytes }));
+      await api(`/api/tmux/panes/${encodeURIComponent(target)}/keys`, {
+        method: 'POST',
+        body: JSON.stringify({ keys: arr }),
+      });
     } catch {
       return false;
     }
     setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 120);
-    setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 400);
+    setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 450);
     return true;
   }
 
@@ -2789,14 +2795,15 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   // clamp to the top (Up × count) then step down — deterministic without wrap.
   function chooseSelectionOption(selection, idx) {
     if (!selection || idx < 0 || idx >= selection.options.length) return;
-    let seq = '';
+    const seq = [];
     if (selection.selectedIndex >= 0) {
       const delta = idx - selection.selectedIndex;
-      seq = (delta >= 0 ? TERM_KEYS.down.repeat(delta) : TERM_KEYS.up.repeat(-delta));
+      for (let i = 0; i < Math.abs(delta); i++) seq.push(delta >= 0 ? TERM_KEYS.down : TERM_KEYS.up);
     } else {
-      seq = TERM_KEYS.up.repeat(selection.options.length) + TERM_KEYS.down.repeat(idx);
+      for (let i = 0; i < selection.options.length; i++) seq.push(TERM_KEYS.up);
+      for (let i = 0; i < idx; i++) seq.push(TERM_KEYS.down);
     }
-    seq += TERM_KEYS.enter;
+    seq.push(TERM_KEYS.enter);
     sendKeys(seq);
   }
 
@@ -3356,6 +3363,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
         <button type="button" data-testid="ctl-mode" title="Shift-Tab / cycle mode" onclick=${() => sendKeys(TERM_KEYS.shiftTab)}>⇧⇥</button>
         <button type="button" data-testid="ctl-up" title="Up" onclick=${() => sendKeys(TERM_KEYS.up)}>↑</button>
         <button type="button" data-testid="ctl-down" title="Down" onclick=${() => sendKeys(TERM_KEYS.down)}>↓</button>
+        ${keyFlash ? html`<span class="terminal-key-flash" data-testid="terminal-key-flash">sent ✓</span>` : ''}
       </div>
 
       <div class="terminal-chat-composer">

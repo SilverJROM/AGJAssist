@@ -8,8 +8,6 @@ import { expect, test } from '@playwright/test';
 const APP_ORIGIN = process.env.AGJ_TERMINAL_BASE_URL || 'http://localhost:3210';
 const TERMINAL_PATH = `${APP_ORIGIN}/index.html#/terminals`;
 const TARGET = 'GATE-TERM:0.0';
-const ESC = String.fromCharCode(27);
-const ETX = String.fromCharCode(3);
 
 // Tool-permission dialog: ❯ cursor on option 1 (selectedIndex 0).
 const PROMPT_OUTPUT = [
@@ -79,14 +77,13 @@ async function openFriendly(page: import('@playwright/test').Page) {
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
 }
 
-test('selection prompt → option buttons + control bar send the right key bytes over WS', async ({ page }) => {
+test('selection prompt → option buttons + control bar POST the right named keys over REST', async ({ page }) => {
   test.setTimeout(60_000);
-  const sent: Array<{ type: string; data?: string }> = [];
-  await page.routeWebSocket(/\/ws\/tmux\//, (ws) => {
-    ws.onMessage((message) => {
-      try { sent.push(JSON.parse(typeof message === 'string' ? message : message.toString())); } catch {}
-    });
-    // Mock server: connection stays open; we don't echo anything back.
+  // The action path is REST /keys (works over the tunnel; no WebSocket).
+  const sent: string[][] = [];
+  await page.route(/\/api\/tmux\/panes\/[^/]+\/keys$/, async (route) => {
+    try { sent.push((route.request().postDataJSON() as { keys: string[] }).keys); } catch {}
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ message: 'ok' }) });
   });
   await installTransport(page);
   await openFriendly(page);
@@ -105,30 +102,26 @@ test('selection prompt → option buttons + control bar send the right key bytes
     await expect(page.locator(`[data-testid="${id}"]`)).toBeVisible();
   }
 
-  // Give the mocked WS a moment to open.
-  await expect.poll(async () => page.evaluate(() => true)).toBeTruthy();
-  await page.waitForTimeout(300);
-
   // Tap option 2 (index 1). Cursor is at index 0 → Down once, then Enter.
   await opts.nth(1).click();
-  await expect.poll(() => sent.filter((m) => m.type === 'input').length).toBeGreaterThan(0);
-  expect(sent.filter((m) => m.type === 'input').map((m) => m.data).join('')).toBe(`${ESC}[B\r`);
+  await expect.poll(() => sent.length).toBeGreaterThan(0);
+  expect(sent.at(-1)).toEqual(['Down', 'Enter']);
 
-  // Control bar: Esc, Ctrl-C, Shift-Tab send the raw bytes.
+  // Control bar: each key POSTs its named key.
   sent.length = 0;
   await page.locator('[data-testid="ctl-esc"]').click();
   await expect.poll(() => sent.length).toBeGreaterThan(0);
-  expect(sent.at(-1)!.data).toBe(ESC);
+  expect(sent.at(-1)).toEqual(['Escape']);
 
   sent.length = 0;
   await page.locator('[data-testid="ctl-ctrlc"]').click();
   await expect.poll(() => sent.length).toBeGreaterThan(0);
-  expect(sent.at(-1)!.data).toBe(ETX);
+  expect(sent.at(-1)).toEqual(['C-c']);
 
   sent.length = 0;
   await page.locator('[data-testid="ctl-mode"]').click();
   await expect.poll(() => sent.length).toBeGreaterThan(0);
-  expect(sent.at(-1)!.data).toBe(`${ESC}[Z`);
+  expect(sent.at(-1)).toEqual(['BTab']);
 
   await page.screenshot({ path: 'AGJ_Upgrade/terminal-ux-2026-08-15/mockups/screenshots/LIVE-selection-control.png' });
 });

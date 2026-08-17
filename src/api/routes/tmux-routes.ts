@@ -268,6 +268,36 @@ export function registerTmuxRoutes(
     }
   );
 
+  // Send named control keys (Down/Enter/Escape/…) so the chat UI can drive
+  // interactive selections over plain REST — no WebSocket required (works over
+  // the tunnel), no control-char issue (tmux key names, strictly allowlisted).
+  app.post<{ Params: { target: string }; Body: { keys?: string[] } }>(
+    "/api/tmux/panes/:target/keys",
+    { preHandler: [authMiddleware, requireOwner] },
+    async (request, reply) => {
+      const target = decodeURIComponent(request.params.target);
+      const keys = request.body?.keys;
+      if (!Array.isArray(keys) || keys.length === 0) {
+        return reply.code(400).send({ error: "keys is required" });
+      }
+      try {
+        const result = await tmuxService.sendNamedKeys(target, keys);
+        auditService.log({
+          userId: request.sessionUser!.id,
+          actionType: "tmux_keys_send",
+          resourceType: "tmux",
+          tmuxTarget: target,
+          details: { keys },
+          surface: "web"
+        });
+        return { message: result.message };
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return reply.code(400).send({ error: msg });
+      }
+    }
+  );
+
   // Save a composer screenshot into the project's tmp/ and return a cwd-relative path.
   app.post<{ Body: { filename?: string; dataBase64?: string; project_id?: number } }>(
     "/api/tmux/attach-image",
