@@ -2126,6 +2126,7 @@ function TerminalTab({ projectId, projectName } = {}) {
     } catch { return []; }
   });
   const [tabPickerOpen, setTabPickerOpen] = useState(false);
+  const [sectionNavOpen, setSectionNavOpen] = useState(false);
   const [showNewSession, setShowNewSession] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [friendlyMode, setFriendlyMode] = useState(isTgMiniApp);
@@ -2159,6 +2160,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [showRawChrome, setShowRawChrome] = useState(false);
   const menuRef = useRef(null);
   const switcherRef = useRef(null);
+  const sectionNavRef = useRef(null);
   const webAppContext = window.Telegram?.WebApp;
   const isTgMiniAppContext = isTgMiniApp || Boolean(
     webAppContext?.initData
@@ -2244,6 +2246,15 @@ function TerminalTab({ projectId, projectName } = {}) {
     document.body.classList.toggle('tg-terminal-focus', fullScreen);
     return () => document.body.classList.remove('tg-terminal-focus');
   }, [fullScreen]);
+
+  // Reclaim the bottom nav's vertical space ON THE TERMINAL TAB ONLY (JROM): the
+  // Terminal chat surfaces the section-nav in its header instead, so the bottom
+  // tab bar + bot footer are hidden here. Other sections keep the bottom nav.
+  useEffect(() => {
+    if (!isTgMiniAppContext) return undefined;
+    document.body.classList.add('tg-terminal-nav');
+    return () => document.body.classList.remove('tg-terminal-nav');
+  }, []);
 
   useEffect(() => {
     const sync = () => setConvFontSize(applyTerminalConvFontSize(readTerminalConvFontSize()));
@@ -2390,6 +2401,10 @@ function TerminalTab({ projectId, projectName } = {}) {
     updatedLabel ? `updated ${updatedLabel}` : ''
   ].filter(Boolean).join(' · ');
 
+  // Section-nav (Home/Notes/Chat/…) surfaced in the terminal header so the bottom
+  // nav can be reclaimed for chat space on this tab only.
+  const sectionNavItems = getBottomNavTabs(readBottomNavTabIds()).filter((t) => t.id !== '/terminals');
+
   const shell = html`
     <div class=${'terminal-shell' + (fullScreen ? ' terminal-shell-fullscreen' : '') + (friendlyMode ? ' terminal-shell-friendly' : '')}>
       <div class=${'terminal-shell-header' + (sessionSwitcherOpen ? ' is-switching' : '')} data-term-topbar>
@@ -2451,8 +2466,26 @@ function TerminalTab({ projectId, projectName } = {}) {
                     onclick=${() => updateConvFontSize(convFontSize + 1)}
                     disabled=${convFontSize >= TERMINAL_CONV_FONT_MAX}>A+</button>
           </div>
+          ${isTgMiniAppContext && html`
+            <div class="terminal-sectionnav" ref=${sectionNavRef}>
+              <button type="button" class="terminal-topbar-icon-btn terminal-sectionnav-trigger"
+                      data-testid="terminal-sectionnav" aria-label="Go to section" aria-expanded=${sectionNavOpen}
+                      onclick=${() => { setMenuOpen(false); setSessionSwitcherOpen(false); setSectionNavOpen((o) => !o); }}>▦</button>
+              ${sectionNavOpen && html`
+                <div class="terminal-sectionnav-menu" data-testid="terminal-sectionnav-menu" role="menu">
+                  ${sectionNavItems.map((it) => html`
+                    <button type="button" class="terminal-sectionnav-item" role="menuitem"
+                            onclick=${() => { setSectionNavOpen(false); navigate(it.id); try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged(); } catch {} }}>
+                      <span class="terminal-sectionnav-icon">${it.icon}</span>${it.label}
+                    </button>
+                  `)}
+                </div>
+              `}
+            </div>
+          `}
         </div>
       </div>
+      ${sectionNavOpen ? html`<div class="terminal-sectionnav-overlay" onclick=${() => setSectionNavOpen(false)}></div>` : ''}
       ${friendlyMode && (openTabs.length > 0 || tabPickerOpen) && html`
         <div class="terminal-tabstrip" data-testid="terminal-tabstrip">
           <div class="terminal-tabstrip-scroll">
@@ -2790,13 +2823,34 @@ function TaskBlock({ items }) {
   `;
 }
 
+// Make http(s) URLs in agent output tappable (e.g. a `/login` auth link). Splits
+// text on a URL match and renders each URL as a safe new-tab link; everything
+// else stays plain text. Trailing punctuation is not swallowed into the link.
+const _URL_RE = /(https?:\/\/[^\s<>()[\]{}"']+[^\s<>()[\]{}"'.,;:!?])/g;
+function linkify(text) {
+  const s = typeof text === 'string' ? text : String(text == null ? '' : text);
+  if (!/https?:\/\//.test(s)) return s;
+  const out = [];
+  let last = 0;
+  let m;
+  _URL_RE.lastIndex = 0;
+  while ((m = _URL_RE.exec(s)) !== null) {
+    if (m.index > last) out.push(s.slice(last, m.index));
+    const url = m[0];
+    out.push(html`<a class="terminal-chat-link" href=${url} target="_blank" rel="noopener noreferrer">${url}</a>`);
+    last = m.index + url.length;
+  }
+  if (last < s.length) out.push(s.slice(last));
+  return out;
+}
+
 function renderBubbleText(text) {
   const segments = splitTaskSegments(text);
   if (!segments.some((s) => s.type === 'tasks')) return null; // no task block
   return html`<div class="ovm-chat-text terminal-chat-content">
     ${segments.map((seg) => seg.type === 'tasks'
       ? html`<${TaskBlock} items=${seg.items} />`
-      : (seg.text ? html`<span class="terminal-chat-textseg">${seg.text}</span>` : ''))}
+      : (seg.text ? html`<span class="terminal-chat-textseg">${linkify(seg.text)}</span>` : ''))}
   </div>`;
 }
 
@@ -2815,13 +2869,16 @@ function CollapsibleBubbleContent({ content, role, limit }) {
   const withTasks = role === 'agent' ? renderBubbleText(text) : null;
   if (withTasks) return withTasks;
 
+  // Linkify URLs in agent replies (e.g. a /login auth link); leave user text plain.
+  const rt = (s) => (role === 'agent' ? linkify(s) : s);
+
   const cap = Number(limit);
   const lines = text.split('\n');
   const total = lines.length;
   const compactable = role === 'agent' && cap > 0 && total > cap + BUBBLE_COMPACT_SLACK;
 
   if (!compactable) {
-    return html`<div class="ovm-chat-text terminal-chat-content">${text}</div>`;
+    return html`<div class="ovm-chat-text terminal-chat-content">${rt(text)}</div>`;
   }
 
   if (expanded) {
@@ -2831,7 +2888,7 @@ function CollapsibleBubbleContent({ content, role, limit }) {
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"></path></svg>
         Minimize to ${cap} lines
       </button>
-      <div class="ovm-chat-text terminal-chat-content">${text}</div>
+      <div class="ovm-chat-text terminal-chat-content">${rt(text)}</div>
     `;
   }
 
@@ -2843,7 +2900,7 @@ function CollapsibleBubbleContent({ content, role, limit }) {
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
       Show full reply · ${hidden} earlier lines
     </button>
-    <div class="ovm-chat-text terminal-chat-content">${visible}</div>
+    <div class="ovm-chat-text terminal-chat-content">${rt(visible)}</div>
   `;
 }
 

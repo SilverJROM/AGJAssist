@@ -981,6 +981,12 @@ body {
 .terminal-chat-textseg {
   white-space: pre-wrap;
 }
+.terminal-chat-link {
+  color: #0969da;
+  text-decoration: underline;
+  word-break: break-all;
+}
+.terminal-chat-link:active { color: #0a4ea3; }
 .terminal-seg {
   display: inline-flex;
   border: 1px solid #d0d7de;
@@ -2865,6 +2871,54 @@ body.tg-miniapp {
 .tg-miniapp.tg-terminal-focus .tg-tab-bar {
   display: none;
 }
+
+/* Terminal tab reclaims the bottom-nav space: hide the bottom tab bar here and
+   give the terminal shell the full height (section-nav lives in the header). */
+.tg-miniapp.tg-terminal-nav .tg-tab-bar {
+  display: none;
+}
+.tg-miniapp.tg-terminal-nav .main {
+  padding-bottom: 0;
+}
+.tg-miniapp.tg-terminal-nav .terminal-shell {
+  height: calc(100dvh - var(--tg-content-safe-area-inset-top, env(safe-area-inset-top, 0px)));
+}
+
+/* Section-nav in the terminal header */
+.terminal-sectionnav { position: relative; flex: 0 0 auto; }
+.terminal-sectionnav-trigger { font-size: 17px; }
+.terminal-sectionnav-overlay { position: fixed; inset: 0; z-index: 25; }
+.terminal-sectionnav-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 190px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #d0d7de);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(31, 35, 40, 0.18);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.terminal-sectionnav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 11px;
+  font-size: 14px;
+  color: var(--text, #1f2328);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.terminal-sectionnav-item:hover { background: rgba(9, 105, 218, 0.08); }
+.terminal-sectionnav-icon { font-size: 17px; }
 
 /* Fix input/select/textarea in TG to follow theme */
 .tg-miniapp input:not([type="checkbox"]),
