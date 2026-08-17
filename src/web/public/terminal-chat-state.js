@@ -16,6 +16,7 @@ const _spinnerStatusRemainderRe = /^(?:Working|Thinking|Compacting|Waiting for|W
 const _boxCharRe = /[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬━┃]/u;
 const _boxOnlyRe = /^[\s┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬━┃]+$/u;
 const _boxFramedRe = /^[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬━┃].*[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬━┃]$/u;
+const _boxAllRe = /[┌┐└┘├┤┬┴┼─│╭╮╰╯═║╔╗╚╝╠╣╦╩╬━┃]/gu;
 // C1 footer/shortcut — anchored to a complete footer/composer row, not a prose substring.
 const _statusChromeRe = /^(?:(?:⏵⏵|▶▶|⏸)\s*)?(?:bypass permissions|accept edits|plan mode)\b|^(?:shift\+tab\s+to cycle|ctrl\+t(?:\s+for agents)?|↓\s+to manage|Ctrl\+\.|ctrl\+c:cancel)\b|^(?:⏵⏵|▶▶)/i;
 // C3 model+cwd: model-name · ~/ at line start — not any mid-dot+tilde.
@@ -167,8 +168,20 @@ function _isBlankLine(line) {
 function _isBoxDrawingLine(line) {
   const trimmed = (line || "").trim();
   if (!trimmed || !_boxCharRe.test(trimmed)) return false;
-  // Complete box/rule, or a framed chrome row that starts AND ends with a box glyph.
-  return _boxOnlyRe.test(trimmed) || _boxFramedRe.test(trimmed);
+  // Pure frame/rule (all box glyphs + whitespace) is chrome → strip.
+  if (_boxOnlyRe.test(trimmed)) return true;
+  // A framed row (starts AND ends with a box glyph) is kept ONLY when it is a
+  // MULTI-COLUMN data-table row: alphanumeric content AND 3+ vertical bars (2+
+  // cells), e.g. "│ Tree hash │ 6ae244fc5 │ 6ae244fc5 │". A single-cell framed
+  // line is chrome (claude's composer/dialog box, e.g. "│ Type a message │") and
+  // is stripped.
+  if (_boxFramedRe.test(trimmed)) {
+    const inner = trimmed.replace(_boxAllRe, "").trim();
+    const hasContent = /[A-Za-z0-9]/.test(inner);
+    const vbars = (trimmed.match(/[│┃]/gu) || []).length;
+    return !(hasContent && vbars >= 3);
+  }
+  return false;
 }
 
 function _isRoundBoxOpener(line) {

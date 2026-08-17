@@ -82,6 +82,31 @@ describe("terminal chat state", () => {
       expect(result).toContain("some output");
     });
 
+    it("keeps box-drawing TABLE data rows (only strips pure frame rules)", () => {
+      const input = [
+        "Done — proof:",
+        "┌───────────────────┬──────────────┬──────────────┐",
+        "│                   │   Before     │    After     │",
+        "├───────────────────┼──────────────┼──────────────┤",
+        "│ Tree hash         │ 6ae244fc5    │ 6ae244fc5    │",
+        "│ Tracked files     │ 21,168       │ 21,168       │",
+        "└───────────────────┴──────────────┴──────────────┘",
+        "The tree hash is decisive.",
+      ].join("\n");
+      const result = cleanTerminalOutput(input);
+      // Data rows survive (were being deleted as chrome).
+      expect(result).toContain("Tree hash");
+      expect(result).toContain("6ae244fc5");
+      expect(result).toContain("Tracked files");
+      expect(result).toContain("Before");
+      expect(result).toContain("After");
+      // Prose survives; pure frame rules are stripped.
+      expect(result).toContain("Done — proof");
+      expect(result).toContain("The tree hash is decisive");
+      expect(result).not.toContain("├───");
+      expect(result).not.toContain("┌───");
+    });
+
     it("drops the ⧉ editor-tabs indicator and related hint chrome", () => {
       const input = [
         "real reply content here",

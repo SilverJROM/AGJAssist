@@ -2885,13 +2885,58 @@ function linkify(text) {
   return out;
 }
 
+// A monospace box-drawing table (│-delimited rows with content) is rendered in a
+// <pre> so its columns line up exactly like the terminal, instead of collapsing
+// into ragged proportional text. Split a string into ordered text / table runs.
+function _isTableLine(line) {
+  return /[│┃]/.test(line) && /[A-Za-z0-9]/.test(line);
+}
+function splitTableRuns(text) {
+  const lines = String(text).split('\n');
+  const segments = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (_isTableLine(lines[i])) {
+      let j = i;
+      while (j < lines.length && _isTableLine(lines[j])) j++;
+      if (j - i >= 2) { segments.push({ type: 'table', text: lines.slice(i, j).join('\n') }); i = j; continue; }
+    }
+    let k = i;
+    const buf = [];
+    while (k < lines.length) {
+      if (_isTableLine(lines[k])) {
+        let p = k, cnt = 0;
+        while (p < lines.length && _isTableLine(lines[p])) { cnt++; p++; }
+        if (cnt >= 2) break;
+      }
+      buf.push(lines[k]); k++;
+    }
+    segments.push({ type: 'text', text: buf.join('\n') });
+    i = k;
+  }
+  return segments;
+}
+
+// Render agent text with tappable URLs AND aligned monospace tables. Non-table
+// runs are linkified (agent) or left plain (user); table runs go in a <pre>.
+function renderRichText(text, role) {
+  const s = typeof text === 'string' ? text : String(text == null ? '' : text);
+  const segs = splitTableRuns(s);
+  if (!segs.some((seg) => seg.type === 'table')) {
+    return role === 'agent' ? linkify(s) : s;
+  }
+  return segs.map((seg) => seg.type === 'table'
+    ? html`<pre class="terminal-chat-table">${seg.text}</pre>`
+    : (seg.text ? html`<span class="terminal-chat-textseg">${role === 'agent' ? linkify(seg.text) : seg.text}</span>` : ''));
+}
+
 function renderBubbleText(text) {
   const segments = splitTaskSegments(text);
   if (!segments.some((s) => s.type === 'tasks')) return null; // no task block
   return html`<div class="ovm-chat-text terminal-chat-content">
     ${segments.map((seg) => seg.type === 'tasks'
       ? html`<${TaskBlock} items=${seg.items} />`
-      : (seg.text ? html`<span class="terminal-chat-textseg">${linkify(seg.text)}</span>` : ''))}
+      : (seg.text ? html`<span class="terminal-chat-textseg">${renderRichText(seg.text, 'agent')}</span>` : ''))}
   </div>`;
 }
 
@@ -2911,7 +2956,7 @@ function CollapsibleBubbleContent({ content, role, limit }) {
   if (withTasks) return withTasks;
 
   // Linkify URLs in agent replies (e.g. a /login auth link); leave user text plain.
-  const rt = (s) => (role === 'agent' ? linkify(s) : s);
+  const rt = (s) => renderRichText(s, role);
 
   const cap = Number(limit);
   const lines = text.split('\n');
