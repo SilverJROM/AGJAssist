@@ -2704,6 +2704,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const wsRef = useRef(null);
   const wsLiveRef = useRef(false);
   const pollNowRef = useRef(null);
+  const pendingNoteRef = useRef(null);
   const storageKey = 'agj_terminal_chat_' + target.replace(/[^a-zA-Z0-9_.-]/g, '_');
 
   function lastRoleIndex(list, role) {
@@ -2749,12 +2750,36 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   // Shared snapshot handler for the REST poll AND the WS change-trigger, so the
   // render path (dedup/minimize) is identical no matter what woke it.
   function processSnapshot(latest) {
-    if (!latest || latest === snapshotRef.current) return;
+    if (!latest) return;
+    // Note delivery must be checked every poll — even when the pane is unchanged
+    // (an idle agent produces a stable snapshot, which is exactly when to send).
+    maybeFlushPendingNote(latest);
+    if (latest === snapshotRef.current) return;
     snapshotRef.current = latest;
     setSnapshot(latest);
     setLastUpdatedAt(Date.now());
     setEntries(prev => applyConversationSnapshot(prev, latest));
     setStatusLine(extractStatus(latest));
+  }
+
+  // A note attached to a selection can only be delivered once the agent is idle
+  // again (typing into a busy composer doesn't submit). Hold it until the prompt
+  // is gone and the agent isn't generating — after we've seen it busy, or a
+  // timeout for instant replies. Give up after a while so it can't leak.
+  function maybeFlushPendingNote(latest) {
+    const p = pendingNoteRef.current;
+    if (!p) return;
+    const now = Date.now();
+    if (now > p.expireAt) { pendingNoteRef.current = null; return; }
+    const busy = /esc to interrupt|drizzl|working|thinking|precipitat|cook|compacting/i.test(latest || '');
+    if (busy) { p.sawBusy = true; return; }
+    if (detectSelectionPrompt(latest)) return;
+    if (!p.sawBusy && now < p.readyAt) return; // let a real generation start first
+    pendingNoteRef.current = null;
+    api(`/api/tmux/panes/${encodeURIComponent(target)}/send`, {
+      method: 'POST',
+      body: JSON.stringify({ command: p.note, enter: true }),
+    }).catch(() => {}).then(() => setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 300));
   }
 
   // On-demand fetch of the proven 2000-line snapshot (same source the interval
@@ -2793,7 +2818,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   // Drive a parsed selection: move the cursor to option `idx` (0-based) and Enter.
   // Prefer relative navigation when the ❯ cursor position is known; otherwise
   // clamp to the top (Up × count) then step down — deterministic without wrap.
-  function chooseSelectionOption(selection, idx) {
+  async function chooseSelectionOption(selection, idx) {
     if (!selection || idx < 0 || idx >= selection.options.length) return;
     const seq = [];
     if (selection.selectedIndex >= 0) {
@@ -2804,7 +2829,20 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       for (let i = 0; i < idx; i++) seq.push(TERM_KEYS.down);
     }
     seq.push(TERM_KEYS.enter);
-    sendKeys(seq);
+    // If the composer has text, attach it to the choice: select the option, wait
+    // for the prompt to close, then send the text as a follow-up note so the agent
+    // gets both the pick and the context (works on any prompt, incl. ones without
+    // a native "n to add notes" affordance).
+    const note = sanitizeOutgoingCommand(input || '').trim();
+    await sendKeys(seq);
+    if (note) {
+      setInput('');
+      // Queue the note; the poll loop delivers it once the agent is idle again
+      // (submitting into a busy composer silently fails).
+      const now = Date.now();
+      pendingNoteRef.current = { note, sawBusy: false, readyAt: now + 4000, expireAt: now + 45000 };
+      setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 1200);
+    }
   }
 
   function syncConvFontFromStorage() {
