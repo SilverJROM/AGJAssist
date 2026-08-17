@@ -2171,11 +2171,35 @@ function TerminalTab({ projectId, projectName } = {}) {
   function loadSessions() {
     setSessionsError(null);
     api('/api/tmux/sessions')
-      .then(d => setSessions(d.sessions))
+      .then(d => {
+        const next = Array.isArray(d.sessions) ? d.sessions : [];
+        // Only update when the list actually changed, so the background poll
+        // doesn't churn re-renders or flicker the open dropdown.
+        setSessions(prev => {
+          const sig = (arr) => JSON.stringify(
+            (arr || []).map(s => [s.session_name, (s.panes || []).map(p => p.target + ':' + p.command).join(',')])
+          );
+          return sig(prev) === sig(next) ? prev : next;
+        });
+      })
       .catch(e => setSessionsError(e.message || 'Failed to load sessions'));
   }
 
   useEffect(() => { loadSessions(); }, []);
+
+  // Keep the session list fresh so a newly-created tmux session shows in the
+  // switcher/picker without reopening the chat: refresh when the dropdown opens
+  // (always current the moment it's looked at) and poll lightly in the background.
+  useEffect(() => {
+    if (sessionSwitcherOpen || tabPickerOpen) loadSessions();
+  }, [sessionSwitcherOpen, tabPickerOpen]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') loadSessions();
+    }, 8000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!activeTarget) return;
