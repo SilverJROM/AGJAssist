@@ -2771,15 +2771,26 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     if (!p) return;
     const now = Date.now();
     if (now > p.expireAt) { pendingNoteRef.current = null; return; }
-    const busy = /esc to interrupt|drizzl|working|thinking|precipitat|cook|compacting/i.test(latest || '');
-    if (busy) { p.sawBusy = true; return; }
+    // Deliver as soon as the selection prompt has closed (plus a small settle).
+    // Do NOT wait for idle — the agent may stay busy indefinitely; Claude queues
+    // a message typed while it's working, so a busy agent still receives it.
     if (detectSelectionPrompt(latest)) return;
-    if (!p.sawBusy && now < p.readyAt) return; // let a real generation start first
+    if (now < p.readyAt) return;
     pendingNoteRef.current = null;
-    api(`/api/tmux/panes/${encodeURIComponent(target)}/send`, {
-      method: 'POST',
-      body: JSON.stringify({ command: p.note, enter: true }),
-    }).catch(() => {}).then(() => setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 300));
+    (async () => {
+      try {
+        // Type the note, then a separated Enter so it submits (or queues, if the
+        // agent is busy) — a trailing Enter in the same send races the text.
+        await api(`/api/tmux/panes/${encodeURIComponent(target)}/send`, {
+          method: 'POST', body: JSON.stringify({ command: p.note, enter: false }),
+        });
+        await new Promise((r) => setTimeout(r, 400));
+        await api(`/api/tmux/panes/${encodeURIComponent(target)}/send`, {
+          method: 'POST', body: JSON.stringify({ send_enter_only: true }),
+        });
+      } catch {}
+      setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 300);
+    })();
   }
 
   // On-demand fetch of the proven 2000-line snapshot (same source the interval
@@ -2843,11 +2854,11 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     await sendKeys(seq);
     if (note) {
       setInput('');
-      // Queue the note; the poll loop delivers it once the agent is idle again
-      // (submitting into a busy composer silently fails).
+      // Hold the note only until the prompt closes (a short settle), then the
+      // poll loop delivers it — queued by Claude if the agent is still busy.
       const now = Date.now();
-      pendingNoteRef.current = { note, sawBusy: false, readyAt: now + 4000, expireAt: now + 45000 };
-      setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 1200);
+      pendingNoteRef.current = { note, readyAt: now + 1500, expireAt: now + 60000 };
+      setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 1600);
     }
   }
 
