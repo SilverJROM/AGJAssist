@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc -p tsconfig.json && cp -r src/web dist/",
+    "build": "tsc -p tsconfig.json && cp -r src/web dist/ && node scripts/stamp-assets.mjs",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:e2e": "playwright test"
