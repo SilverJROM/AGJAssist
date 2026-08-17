@@ -2412,25 +2412,13 @@ function TerminalTab({ projectId, projectName } = {}) {
           ${isTgMiniAppContext && fullScreen && html`
             <button class="terminal-topbar-icon-btn" onclick=${exitFullScreen} aria-label="Back">←</button>
           `}
-          <div class="terminal-sectionnav" ref=${sectionNavRef}>
-            <button class="terminal-topbar-icon-btn terminal-menu-trigger" data-testid="terminal-sectionnav"
-                    aria-label="Sections" aria-expanded=${sectionNavOpen}
-                    onclick=${() => {
-                      setMenuOpen(false);
-                      setSessionSwitcherOpen(false);
-                      setSectionNavOpen((current) => !current);
-                    }}>☰</button>
-            ${(isTgMiniAppContext && sectionNavOpen) ? html`
-              <div class="terminal-sectionnav-menu terminal-sectionnav-menu-left" data-testid="terminal-sectionnav-menu" role="menu">
-                ${sectionNavItems.map((it) => html`
-                  <button type="button" class="terminal-sectionnav-item" role="menuitem"
-                          onclick=${() => { setSectionNavOpen(false); navigate(it.id); try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged(); } catch {} }}>
-                    <span class="terminal-sectionnav-icon">${it.icon}</span>${it.label}
-                  </button>
-                `)}
-              </div>
-            ` : ''}
-          </div>
+          <button class="terminal-topbar-icon-btn terminal-menu-trigger" data-testid="terminal-sectionnav"
+                  aria-label="Sections" aria-expanded=${sectionNavOpen}
+                  onclick=${() => {
+                    setMenuOpen(false);
+                    setSessionSwitcherOpen(false);
+                    setSectionNavOpen((current) => !current);
+                  }}>☰</button>
           <div class="terminal-topbar-target" ref=${switcherRef}>
             <button type="button" class="terminal-topbar-name" data-testid="terminal-session-switcher"
                     aria-haspopup="listbox" aria-expanded=${sessionSwitcherOpen}
@@ -2489,7 +2477,18 @@ function TerminalTab({ projectId, projectName } = {}) {
           </button>
         </div>
       </div>
-      ${sectionNavOpen ? html`<div class="terminal-sectionnav-overlay" onclick=${() => setSectionNavOpen(false)}></div>` : ''}
+      <div key="sectionnav-overlay" class="terminal-sectionnav-overlay"
+           hidden=${!sectionNavOpen} onclick=${() => setSectionNavOpen(false)}></div>
+      ${(isTgMiniAppContext && sectionNavOpen) ? html`
+        <div class="terminal-sectionnav-menu terminal-sectionnav-menu-fixed" data-testid="terminal-sectionnav-menu" role="menu">
+          ${sectionNavItems.map((it) => html`
+            <button type="button" class="terminal-sectionnav-item" role="menuitem"
+                    onclick=${() => { setSectionNavOpen(false); navigate(it.id); try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged(); } catch {} }}>
+              <span class="terminal-sectionnav-icon">${it.icon}</span>${it.label}
+            </button>
+          `)}
+        </div>
+      ` : ''}
       ${(friendlyMode && (openTabs.length > 0 || tabPickerOpen)) ? html`
         <div class="terminal-tabstrip" data-testid="terminal-tabstrip" key="terminal-tabstrip">
           <div class="terminal-tabstrip-scroll">
@@ -2530,9 +2529,9 @@ function TerminalTab({ projectId, projectName } = {}) {
           </div>
         </div>
       ` : html`<div key="terminal-tabstrip" hidden></div>`}
-      ${menuOpen ? html`<div class="terminal-menu-overlay" onclick=${() => setMenuOpen(false)}></div>` : ''}
-      ${friendlyMode && tabPickerOpen ? html`<div class="terminal-tabpicker-overlay" onclick=${() => setTabPickerOpen(false)}></div>` : ''}
-      <div class=${'terminal-menu-sheet' + (menuOpen ? ' open' : '')} data-term-menu-sheet data-testid="terminal-menu-sheet" role="menu" ref=${menuRef} inert=${!menuOpen} onclick=${(event) => event.stopPropagation()}>
+      <div key="menu-overlay" class="terminal-menu-overlay" hidden=${!menuOpen} onclick=${() => setMenuOpen(false)}></div>
+      <div key="tabpicker-overlay" class="terminal-tabpicker-overlay" hidden=${!(friendlyMode && tabPickerOpen)} onclick=${() => setTabPickerOpen(false)}></div>
+      <div key="menu-sheet" class=${'terminal-menu-sheet' + (menuOpen ? ' open' : '')} data-term-menu-sheet data-testid="terminal-menu-sheet" role="menu" ref=${menuRef} inert=${!menuOpen} onclick=${(event) => event.stopPropagation()}>
         <div class="terminal-sheet-inner">
           <div class="terminal-sheet-topbar">
             <span class="terminal-sheet-title">Terminal settings</span>
@@ -3500,6 +3499,21 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     try { localStorage.setItem('agj_terminal_composer_h', '0'); } catch {}
   }
 
+  // One-tap small/large input toggle (in addition to the drag grip). Small =
+  // auto-grow (0); large = a comfortable fixed height for long messages.
+  const COMPOSER_LARGE_H = 200;
+  function toggleComposerSize() {
+    const next = composerHeightRef.current ? 0 : COMPOSER_LARGE_H;
+    composerHeightRef.current = next;
+    setComposerHeight(next);
+    const field = composerFieldRef.current;
+    if (field) {
+      if (next) field.style.height = next + 'px';
+      else { field.style.height = 'auto'; field.style.height = Math.min(field.scrollHeight, 120) + 'px'; }
+    }
+    try { localStorage.setItem('agj_terminal_composer_h', String(next)); } catch {}
+  }
+
   function openAttachPicker() {
     if (sending || attaching) return;
     setAttachError('');
@@ -3730,6 +3744,12 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                   data-testid="terminal-send-enter"
                   onclick=${() => { setSendMode('raw'); sendManualEnter(); }}
                   disabled=${sending}>Send raw keys</button>
+          <button type="button" class=${'terminal-size-toggle' + (composerHeight ? ' sel' : '')}
+                  data-testid="terminal-size-toggle"
+                  title=${composerHeight ? 'Shrink the input' : 'Enlarge the input'}
+                  onclick=${toggleComposerSize}>
+            ${composerHeight ? '▾ Small input' : '▴ Large input'}
+          </button>
         </div>
         ${attachError ? html`<div class="terminal-attach-error">${attachError}</div>` : ''}
         <div class="terminal-chat-composer-row">
