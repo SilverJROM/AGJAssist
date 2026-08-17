@@ -619,23 +619,39 @@ body {
   flex-direction: column;
   gap: 0;
 }
-/* Drag handle to resize the chat input taller/shorter (double-tap resets). */
+/* Drag handle to resize the chat input taller/shorter (double-tap resets).
+   A visible pill + up/down chevrons so it clearly reads as draggable. */
 .terminal-composer-grip {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 14px;
-  margin: -2px 0 2px;
+  gap: 6px;
+  height: 22px;
+  margin: 0 auto 4px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eef1f4;
+  border: 1px solid #d0d7de;
+  color: #57606a;
   cursor: ns-resize;
   touch-action: none;
+  user-select: none;
+}
+.terminal-composer-grip:hover,
+.terminal-composer-grip:active {
+  background: #e2e8ee;
+  border-color: #0969da;
+  color: #0969da;
 }
 .terminal-composer-grip-bar {
-  width: 40px;
+  width: 26px;
   height: 4px;
   border-radius: 999px;
-  background: #c8d1da;
+  background: currentColor;
+  opacity: 0.65;
 }
-.terminal-composer-grip:hover .terminal-composer-grip-bar { background: #0969da; }
+.terminal-composer-grip::before { content: '⌃'; font-size: 11px; line-height: 1; }
+.terminal-composer-grip::after { content: '⌄'; font-size: 11px; line-height: 1; }
 .terminal-chat-modebar {
   display: flex;
   gap: 6px;
@@ -2937,6 +2953,8 @@ body.tg-miniapp {
 }
 .terminal-sectionnav-item:hover { background: rgba(9, 105, 218, 0.08); }
 .terminal-sectionnav-icon { font-size: 17px; }
+/* When opened from the ☰ on the left, anchor the menu to the left edge. */
+.terminal-sectionnav-menu-left { right: auto; left: 0; }
 
 /* Fix input/select/textarea in TG to follow theme */
 .tg-miniapp input:not([type="checkbox"]),

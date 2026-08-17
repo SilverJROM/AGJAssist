@@ -509,7 +509,7 @@ test('A6 R6 R7 single topbar — controls still perform their functions at 390',
   });
   await selectPaneAndFriendly(page);
 
-  const menu = page.locator('[data-testid="terminal-menu"], [data-term-menu], button:has-text("☰")');
+  const menu = page.locator('[data-testid="terminal-menu"]');
   const menuSheet = page.locator('[data-testid="terminal-menu-sheet"], [data-term-menu-sheet], .terminal-menu-sheet, [role="menu"]').first();
   const openMenu = async () => {
     if (!(await menuSheet.isVisible().catch(() => false))) await menu.click();
@@ -592,7 +592,7 @@ test('A6 R6 R7 single topbar — controls still perform their functions at 390',
     await installXtermStub(desktopPage);
     await installFrozenTransport(desktopPage, INITIAL_OUTPUT);
     await selectPaneAndFriendly(desktopPage);
-    const desktopMenu = desktopPage.locator('[data-testid="terminal-menu"], [data-term-menu], button:has-text("☰")');
+    const desktopMenu = desktopPage.locator('[data-testid="terminal-menu"]');
     await desktopMenu.click();
     const desktopSheet = desktopPage.locator('[data-testid="terminal-menu-sheet"], [data-term-menu-sheet], .terminal-menu-sheet, [role="menu"]').first();
     await expect(desktopSheet).toBeVisible();
@@ -609,7 +609,7 @@ test('A6 R6 R7 single topbar — controls still perform their functions at 390',
 test('A7 R8 show-raw reveals stripped chrome', async ({ page }) => {
   await installFrozenTransport(page, INITIAL_OUTPUT);
   await selectPaneAndFriendly(page);
-  const menu = page.locator('[data-testid="terminal-menu"], [data-term-menu], button:has-text("☰")');
+  const menu = page.locator('[data-testid="terminal-menu"]');
   const menuSheet = page.locator('[data-testid="terminal-menu-sheet"], [data-term-menu-sheet], .terminal-menu-sheet, [role="menu"]').first();
   if (!(await menuSheet.isVisible().catch(() => false))) await menu.click();
   await expect(menuSheet).toBeVisible();

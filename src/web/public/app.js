@@ -2412,12 +2412,25 @@ function TerminalTab({ projectId, projectName } = {}) {
           ${isTgMiniAppContext && fullScreen && html`
             <button class="terminal-topbar-icon-btn" onclick=${exitFullScreen} aria-label="Back">←</button>
           `}
-          <button class="terminal-topbar-icon-btn terminal-menu-trigger" data-term-menu data-testid="terminal-menu"
-                  aria-label="menu" aria-expanded=${menuOpen}
-                  onclick=${() => {
-                    setSessionSwitcherOpen(false);
-                    setMenuOpen((current) => !current);
-                  }}>☰</button>
+          <div class="terminal-sectionnav" ref=${sectionNavRef}>
+            <button class="terminal-topbar-icon-btn terminal-menu-trigger" data-testid="terminal-sectionnav"
+                    aria-label="Sections" aria-expanded=${sectionNavOpen}
+                    onclick=${() => {
+                      setMenuOpen(false);
+                      setSessionSwitcherOpen(false);
+                      setSectionNavOpen((current) => !current);
+                    }}>☰</button>
+            ${(isTgMiniAppContext && sectionNavOpen) ? html`
+              <div class="terminal-sectionnav-menu terminal-sectionnav-menu-left" data-testid="terminal-sectionnav-menu" role="menu">
+                ${sectionNavItems.map((it) => html`
+                  <button type="button" class="terminal-sectionnav-item" role="menuitem"
+                          onclick=${() => { setSectionNavOpen(false); navigate(it.id); try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged(); } catch {} }}>
+                    <span class="terminal-sectionnav-icon">${it.icon}</span>${it.label}
+                  </button>
+                `)}
+              </div>
+            ` : ''}
+          </div>
           <div class="terminal-topbar-target" ref=${switcherRef}>
             <button type="button" class="terminal-topbar-name" data-testid="terminal-session-switcher"
                     aria-haspopup="listbox" aria-expanded=${sessionSwitcherOpen}
@@ -2466,23 +2479,14 @@ function TerminalTab({ projectId, projectName } = {}) {
                     onclick=${() => updateConvFontSize(convFontSize + 1)}
                     disabled=${convFontSize >= TERMINAL_CONV_FONT_MAX}>A+</button>
           </div>
-          ${isTgMiniAppContext && html`
-            <div class="terminal-sectionnav" ref=${sectionNavRef}>
-              <button type="button" class="terminal-topbar-icon-btn terminal-sectionnav-trigger"
-                      data-testid="terminal-sectionnav" aria-label="Go to section" aria-expanded=${sectionNavOpen}
-                      onclick=${() => { setMenuOpen(false); setSessionSwitcherOpen(false); setSectionNavOpen((o) => !o); }}>▦</button>
-              ${sectionNavOpen && html`
-                <div class="terminal-sectionnav-menu" data-testid="terminal-sectionnav-menu" role="menu">
-                  ${sectionNavItems.map((it) => html`
-                    <button type="button" class="terminal-sectionnav-item" role="menuitem"
-                            onclick=${() => { setSectionNavOpen(false); navigate(it.id); try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged(); } catch {} }}>
-                      <span class="terminal-sectionnav-icon">${it.icon}</span>${it.label}
-                    </button>
-                  `)}
-                </div>
-              `}
-            </div>
-          `}
+          <button type="button" class="terminal-topbar-icon-btn terminal-settings-trigger"
+                  data-term-menu data-testid="terminal-menu" aria-label="Terminal settings" aria-expanded=${menuOpen}
+                  onclick=${() => { setSessionSwitcherOpen(false); setSectionNavOpen(false); setMenuOpen((current) => !current); }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
         </div>
       </div>
       ${sectionNavOpen ? html`<div class="terminal-sectionnav-overlay" onclick=${() => setSectionNavOpen(false)}></div>` : ''}
