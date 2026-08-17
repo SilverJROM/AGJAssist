@@ -1117,10 +1117,44 @@ body {
   border-radius: 6px;
 }
 .terminal-selection-hint {
-  margin-top: 8px;
   font-size: 11.5px;
   color: #57606a;
 }
+/* Multi-select: checkbox glyph + a Submit bar */
+.terminal-selection-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex: 0 0 auto;
+  font-size: 16px;
+  line-height: 1;
+  color: #57606a;
+}
+.terminal-selection-opt.checked {
+  border-color: #0969da;
+  background: #f2f8ff;
+}
+.terminal-selection-opt.checked .terminal-selection-check { color: #0969da; }
+.terminal-selection-multibar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+.terminal-selection-submit {
+  flex: 0 0 auto;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #0969da;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.terminal-selection-submit:hover { background: #0a5cc7; }
 
 /* Always-available key control bar (drive the agent without the terminal) */
 .terminal-control-bar {

@@ -3175,14 +3175,8 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   // Drive a parsed selection: move the cursor to option `idx` (0-based) and Enter.
   // Prefer relative navigation when the ❯ cursor position is known; otherwise
   // clamp to the top (Up × count) then step down — deterministic without wrap.
-  async function chooseSelectionOption(selection, idx) {
-    if (!selection || idx < 0 || idx >= selection.options.length) return;
-    // Hide the card immediately (keyed by this option set). Safety: if the same
-    // prompt is somehow still up 3s later (the tap didn't take), un-hide it so
-    // it can be retried.
-    const sig = selection.options.map((o) => o.n + ':' + o.label).join('|');
-    setDismissedSel(sig);
-    setTimeout(() => setDismissedSel((prev) => (prev === sig ? '' : prev)), 3000);
+  // Navigation keys to move the cursor from its current position to option `idx`.
+  function _navToOption(selection, idx) {
     const seq = [];
     if (selection.selectedIndex >= 0) {
       const delta = idx - selection.selectedIndex;
@@ -3191,21 +3185,51 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       for (let i = 0; i < selection.options.length; i++) seq.push(TERM_KEYS.up);
       for (let i = 0; i < idx; i++) seq.push(TERM_KEYS.down);
     }
-    seq.push(TERM_KEYS.enter);
-    // If the composer has text, attach it to the choice: select the option, wait
-    // for the prompt to close, then send the text as a follow-up note so the agent
-    // gets both the pick and the context (works on any prompt, incl. ones without
-    // a native "n to add notes" affordance).
+    return seq;
+  }
+
+  function _deliverPendingNote() {
     const note = sanitizeOutgoingCommand(input || '').trim();
+    if (!note) return;
+    setInput('');
+    const now = Date.now();
+    pendingNoteRef.current = { note, readyAt: now + 1500, expireAt: now + 60000 };
+    setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 1600);
+  }
+
+  // Multi-select: tap an option to TOGGLE it (Space) and keep the card open so
+  // several can be toggled; the pane re-renders each poll so the checkbox state
+  // updates. Submit them all with the Submit button (or the ⏎ control key).
+  async function toggleSelectionOption(selection, idx) {
+    if (!selection || idx < 0 || idx >= selection.options.length) return;
+    const seq = _navToOption(selection, idx);
+    seq.push(TERM_KEYS.space);
     await sendKeys(seq);
-    if (note) {
-      setInput('');
-      // Hold the note only until the prompt closes (a short settle), then the
-      // poll loop delivers it — queued by Claude if the agent is still busy.
-      const now = Date.now();
-      pendingNoteRef.current = { note, readyAt: now + 1500, expireAt: now + 60000 };
-      setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 1600);
+    setTimeout(() => { pollNowRef.current && pollNowRef.current(); }, 250);
+  }
+
+  // Submit the current selection (Enter) — used by the multi-select Submit button.
+  async function submitSelection(selection) {
+    if (selection) {
+      const sig = selection.options.map((o) => o.n + ':' + o.label).join('|');
+      setDismissedSel(sig);
+      setTimeout(() => setDismissedSel((prev) => (prev === sig ? '' : prev)), 3000);
     }
+    await sendKeys(TERM_KEYS.enter);
+    _deliverPendingNote();
+  }
+
+  // Single-select: tap an option to pick + submit it (navigate + Enter). Hides
+  // the card immediately; un-hides after 3s if the tap didn't take (retry).
+  async function chooseSelectionOption(selection, idx) {
+    if (!selection || idx < 0 || idx >= selection.options.length) return;
+    const sig = selection.options.map((o) => o.n + ':' + o.label).join('|');
+    setDismissedSel(sig);
+    setTimeout(() => setDismissedSel((prev) => (prev === sig ? '' : prev)), 3000);
+    const seq = _navToOption(selection, idx);
+    seq.push(TERM_KEYS.enter);
+    await sendKeys(seq);
+    _deliverPendingNote();
   }
 
   function syncConvFontFromStorage() {
@@ -3814,20 +3838,36 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       </div>
 
       ${showSelection ? html`
-        <div class="terminal-selection" data-testid="terminal-selection">
+        <div class=${'terminal-selection' + (selection.multi ? ' multi' : '')} data-testid="terminal-selection">
           <div class="terminal-selection-head">
             <span class="terminal-selection-dot"></span>
             <span class="terminal-selection-title">${selection.title || 'Claude is asking'}</span>
           </div>
           <div class="terminal-selection-opts">
-            ${selection.options.map((opt, i) => html`
-              <button type="button" class="terminal-selection-opt" data-testid="terminal-selection-opt"
-                      onclick=${() => chooseSelectionOption(selection, i)}>
-                <span class="terminal-selection-num">${opt.n}</span>${opt.label}
-              </button>
-            `)}
+            ${selection.options.map((opt, i) => {
+              // In multi-select the checkbox state is carried in the label ([✓]/[ ]
+              // or ☑/☐); show it as a checked pill and toggle on tap.
+              const checked = /\[[x✓]\]|☑|☒|◉|●/u.test(opt.label);
+              const label = selection.multi ? opt.label.replace(/^\s*(\[[ x✓]\]|☑|☒|☐|◉|○|●)\s*/u, '') : opt.label;
+              return html`
+                <button type="button" class=${'terminal-selection-opt' + (selection.multi && checked ? ' checked' : '')}
+                        data-testid="terminal-selection-opt"
+                        onclick=${() => (selection.multi ? toggleSelectionOption(selection, i) : chooseSelectionOption(selection, i))}>
+                  ${selection.multi
+                    ? html`<span class="terminal-selection-check">${checked ? '☑' : '☐'}</span>`
+                    : html`<span class="terminal-selection-num">${opt.n}</span>`}
+                  ${label}
+                </button>
+              `;
+            })}
           </div>
-          ${selection.multi ? html`<div class="terminal-selection-hint">Multi-select — use Space to toggle, then Enter</div>` : ''}
+          ${selection.multi ? html`
+            <div class="terminal-selection-multibar">
+              <span class="terminal-selection-hint">Tap to toggle, then Submit</span>
+              <button type="button" class="terminal-selection-submit" data-testid="terminal-selection-submit"
+                      onclick=${() => submitSelection(selection)}>Submit ⏎</button>
+            </div>
+          ` : ''}
         </div>
       ` : ''}
 
@@ -3890,7 +3930,14 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                     onKeyDown=${e => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        sendCommand();
+                        // Empty composer + an active multi-select prompt → Enter
+                        // submits the toggled options (like the terminal). With
+                        // text, it sends the message as usual.
+                        if (!input.trim() && !attachment && showSelection && selection?.multi) {
+                          submitSelection(selection);
+                        } else {
+                          sendCommand();
+                        }
                       }
                     }}></textarea>
           <button class="terminal-chat-send-btn" data-testid="terminal-send-command" onclick=${sendCommand} disabled=${sending || (!input.trim() && !attachment)}>
