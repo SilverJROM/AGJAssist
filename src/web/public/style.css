@@ -205,6 +205,9 @@ body {
   gap: 10px;
   flex-wrap: nowrap;
   overflow: hidden;
+  /* Never let the flex column squeeze the header (which would clip its content
+     to the top half when the viewport is short, e.g. inside Telegram). */
+  flex-shrink: 0;
   padding: 10px 12px;
   background: var(--surface);
   color: var(--text);
@@ -2840,10 +2843,19 @@ body.tg-miniapp {
 }
 
 /* Compact terminal header on Telegram so the session name + subtitle both show
-   and less vertical space is spent on chrome (more room for chat). */
+   and less vertical space is spent on chrome (more room for chat). The explicit
+   min-height + flex-shrink:0 guarantee both lines are never clipped. */
 .tg-miniapp .terminal-shell-header {
   padding: 6px 10px;
   gap: 8px;
+  flex-shrink: 0;
+  min-height: 46px;
+  box-sizing: border-box;
+}
+.tg-miniapp .terminal-control-bar,
+.tg-miniapp .terminal-chat-composer,
+.tg-miniapp .terminal-chat-modebar {
+  flex-shrink: 0;
 }
 .tg-miniapp .terminal-topbar-icon-btn {
   width: 32px;
