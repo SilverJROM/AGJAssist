@@ -2486,8 +2486,8 @@ function TerminalTab({ projectId, projectName } = {}) {
         </div>
       </div>
       ${sectionNavOpen ? html`<div class="terminal-sectionnav-overlay" onclick=${() => setSectionNavOpen(false)}></div>` : ''}
-      ${friendlyMode && (openTabs.length > 0 || tabPickerOpen) && html`
-        <div class="terminal-tabstrip" data-testid="terminal-tabstrip">
+      ${(friendlyMode && (openTabs.length > 0 || tabPickerOpen)) ? html`
+        <div class="terminal-tabstrip" data-testid="terminal-tabstrip" key="terminal-tabstrip">
           <div class="terminal-tabstrip-scroll">
             ${openTabs.map((t) => {
               const pane = allPanes.find((p) => p.target === t);
@@ -2525,11 +2525,16 @@ function TerminalTab({ projectId, projectName } = {}) {
             `}
           </div>
         </div>
-      `}
+      ` : html`<div key="terminal-tabstrip" hidden></div>`}
       ${menuOpen ? html`<div class="terminal-menu-overlay" onclick=${() => setMenuOpen(false)}></div>` : ''}
       ${friendlyMode && tabPickerOpen ? html`<div class="terminal-tabpicker-overlay" onclick=${() => setTabPickerOpen(false)}></div>` : ''}
       <div class=${'terminal-menu-sheet' + (menuOpen ? ' open' : '')} data-term-menu-sheet data-testid="terminal-menu-sheet" role="menu" ref=${menuRef} inert=${!menuOpen} onclick=${(event) => event.stopPropagation()}>
         <div class="terminal-sheet-inner">
+          <div class="terminal-sheet-topbar">
+            <span class="terminal-sheet-title">Terminal settings</span>
+            <button type="button" class="terminal-sheet-done" data-testid="terminal-menu-done"
+                    onclick=${() => setMenuOpen(false)} aria-label="Close settings">Done</button>
+          </div>
           <div class="terminal-sheet-sect">Text size</div>
           <div class="terminal-sheet-row">
             <div class="terminal-sheet-lbl">Conversation size<small>Also in Settings ▸ Appearance (syncs everywhere)</small></div>
@@ -2670,7 +2675,7 @@ function TerminalTab({ projectId, projectName } = {}) {
         </div>
       `}
 
-      <div class="terminal-container">
+      <div class="terminal-container" key="terminal-container">
         ${!isTgMiniAppContext && html`
           <div class="session-tree">
             <div style="display:flex;gap:4px;margin-bottom:8px">

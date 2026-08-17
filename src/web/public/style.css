@@ -424,8 +424,26 @@ body {
   visibility: hidden;
   pointer-events: none;
 }
-.terminal-menu-sheet.open { max-height: 640px; overflow-y: auto; visibility: visible; pointer-events: auto; }
+.terminal-menu-sheet.open { max-height: min(640px, 70vh); overflow-y: auto; visibility: visible; pointer-events: auto; }
 .terminal-sheet-inner { padding: 14px 14px 16px; }
+.terminal-sheet-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.terminal-sheet-title { font-size: 13px; font-weight: 700; color: var(--text, #1f2328); }
+.terminal-sheet-done {
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #0969da;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.terminal-sheet-done:hover { background: #0a5cc7; }
 .terminal-sheet-sect {
   font-size: 11px;
   letter-spacing: 0.06em;
