@@ -714,6 +714,43 @@ body {
   background: #eef1f4;
   color: #1f2328;
 }
+/* Minimal inline attachment pill: a small thumbnail + ✕, sits in the composer
+   row so attaching an image does NOT add a row or shrink the input. */
+.terminal-attach-pill {
+  position: relative;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: inline-block;
+}
+.terminal-attach-pill img {
+  width: 34px;
+  height: 34px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #d0d7de;
+  background: #eef1f4;
+  display: block;
+}
+.terminal-attach-pill button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: #57606a;
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px #ffffff;
+}
+.terminal-attach-pill button:hover {
+  background: #1f2328;
+}
 .terminal-attach-error {
   margin: 0 4px 8px;
   font-size: 12px;
@@ -2608,19 +2645,21 @@ body.tg-miniapp {
 
 .tg-miniapp .header { display: none !important; }
 
+/* Telegram overlays its own header at the top; offset by the content-safe-area
+   inset (Bot API 8.0+) with an env() fallback so the app header isn't clipped.
+   Bottom tab bar is now slim, so less bottom padding — more room for chat. */
 .tg-miniapp .main {
-  padding: 12px 12px 80px 12px;
+  padding: calc(6px + var(--tg-content-safe-area-inset-top, env(safe-area-inset-top, 0px))) 10px 58px 10px;
   max-width: 100%;
 }
 .tg-miniapp .terminal-shell {
-  height: calc(100dvh - 100px);
+  height: calc(100dvh - 70px - var(--tg-content-safe-area-inset-top, env(safe-area-inset-top, 0px)));
 }
 .tg-miniapp.tg-terminal-focus .main {
-  padding: 0;
-  padding-bottom: 0;
+  padding: var(--tg-content-safe-area-inset-top, env(safe-area-inset-top, 0px)) 0 0 0;
 }
 .tg-miniapp.tg-terminal-focus .terminal-shell {
-  height: 100dvh;
+  height: calc(100dvh - var(--tg-content-safe-area-inset-top, env(safe-area-inset-top, 0px)));
 }
 .tg-miniapp.tg-terminal-focus .tg-tab-bar {
   display: none;
@@ -2767,7 +2806,7 @@ body.tg-miniapp {
   background: var(--surface);
   border-top: 1px solid var(--border);
   z-index: 100;
-  padding: 4px 0 env(safe-area-inset-bottom, 6px);
+  padding: 1px 0 env(safe-area-inset-bottom, 2px);
 }
 
 .tg-tab-item {
@@ -2775,8 +2814,8 @@ body.tg-miniapp {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 6px 0 5px;
-  font-size: 9px;
+  padding: 3px 0 2px;
+  font-size: 8px;
   color: var(--text-secondary);
   background: none;
   border: none;
@@ -2790,14 +2829,35 @@ body.tg-miniapp {
 }
 
 .tg-tab-icon {
-  font-size: 20px;
-  margin-bottom: 2px;
+  font-size: 16px;
+  margin-bottom: 1px;
   line-height: 1;
 }
 
 .tg-tab-label {
   font-weight: 500;
-  font-size: 9px;
+  font-size: 8px;
+}
+
+/* Compact terminal header on Telegram so the session name + subtitle both show
+   and less vertical space is spent on chrome (more room for chat). */
+.tg-miniapp .terminal-shell-header {
+  padding: 6px 10px;
+  gap: 8px;
+}
+.tg-miniapp .terminal-topbar-icon-btn {
+  width: 32px;
+  height: 32px;
+  font-size: 15px;
+}
+.tg-miniapp .terminal-topbar-name {
+  font-size: 14px;
+}
+.tg-miniapp .terminal-topbar-sub {
+  font-size: 10px;
+}
+.tg-miniapp .terminal-fontpill button {
+  padding: 4px 8px;
 }
 
 .tg-nav-editor {

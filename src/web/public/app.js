@@ -3437,13 +3437,6 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                   onclick=${() => { setSendMode('raw'); sendManualEnter(); }}
                   disabled=${sending}>Send raw keys</button>
         </div>
-        ${attachment ? html`
-          <div class="terminal-attachment-chip" data-testid="terminal-attachment-chip">
-            <img src=${attachment.preview} alt="" />
-            <span title=${attachment.path}>${attachment.path}</span>
-            <button type="button" onclick=${clearAttachment} aria-label="Remove attachment">×</button>
-          </div>
-        ` : ''}
         ${attachError ? html`<div class="terminal-attach-error">${attachError}</div>` : ''}
         <div class="terminal-chat-composer-row">
           <button type="button" class="terminal-chat-attach-btn" data-testid="terminal-attach-image"
@@ -3455,6 +3448,12 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
             </svg>
           </button>
           <input type="file" accept="image/*" hidden ref=${fileInputRef} onChange=${handleAttachFile} />
+          ${attachment ? html`
+            <span class="terminal-attach-pill" data-testid="terminal-attachment-chip" title=${attachment.path}>
+              <img src=${attachment.preview} alt="" />
+              <button type="button" onclick=${clearAttachment} aria-label="Remove attachment">×</button>
+            </span>
+          ` : ''}
           <textarea class="terminal-chat-input-field"
                     data-testid="terminal-composer-input"
                     value=${input}
