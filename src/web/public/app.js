@@ -2820,6 +2820,12 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   // clamp to the top (Up × count) then step down — deterministic without wrap.
   async function chooseSelectionOption(selection, idx) {
     if (!selection || idx < 0 || idx >= selection.options.length) return;
+    // Hide the card immediately (keyed by this option set). Safety: if the same
+    // prompt is somehow still up 3s later (the tap didn't take), un-hide it so
+    // it can be retried.
+    const sig = selection.options.map((o) => o.n + ':' + o.label).join('|');
+    setDismissedSel(sig);
+    setTimeout(() => setDismissedSel((prev) => (prev === sig ? '' : prev)), 3000);
     const seq = [];
     if (selection.selectedIndex >= 0) {
       const delta = idx - selection.selectedIndex;
@@ -3179,6 +3185,13 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const rawChrome = showRawChrome ? extractStrippedChromeLines(snapshot) : '';
   const statusBusy = /drizzl|working|thinking|running/i.test(statusLine || '');
   const selection = useMemo(() => detectSelectionPrompt(snapshot), [snapshot]);
+  // Instant-dismiss: hide the card the moment an option is tapped (before the
+  // pane poll catches up), keyed by the option set so a genuinely NEW prompt
+  // still shows. Reset when the prompt resolves so the same question can reappear.
+  const [dismissedSel, setDismissedSel] = useState('');
+  const selectionSig = selection ? selection.options.map((o) => o.n + ':' + o.label).join('|') : '';
+  useEffect(() => { if (!selection) setDismissedSel(''); }, [selection]);
+  const showSelection = selection && selectionSig !== dismissedSel;
 
   function handleComposerInput(event) {
     setInput(event.target.value);
@@ -3376,7 +3389,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       ` : ''}
       </div>
 
-      ${selection ? html`
+      ${showSelection ? html`
         <div class="terminal-selection" data-testid="terminal-selection">
           <div class="terminal-selection-head">
             <span class="terminal-selection-dot"></span>
