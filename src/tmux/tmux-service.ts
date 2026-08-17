@@ -232,7 +232,7 @@ export class TmuxService {
     }
     const allowed = new Set([
       "Up", "Down", "Left", "Right", "Enter", "Escape", "Space", "Tab", "BTab",
-      "C-c", "BSpace", "Home", "End", "PageUp", "PageDown",
+      "C-c", "C-u", "BSpace", "Home", "End", "PageUp", "PageDown",
       "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "y", "n",
     ]);
     for (const k of keys) {

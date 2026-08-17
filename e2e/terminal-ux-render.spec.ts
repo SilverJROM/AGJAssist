@@ -215,7 +215,7 @@ test('FIX B: multi-line composer text is flattened; POST has no control characte
   await sendButton.click();
 
   await expect.poll(() => sentPayload).not.toBeNull();
-  expect(sentPayload).toEqual({ command: 'line one line two', enter: true });
+  expect(sentPayload).toEqual({ command: 'line one line two', enter: true, clear_first: false });
   expect(CONTROL_CHAR_RE.test(sentPayload!.command || '')).toBe(false);
 
   await expect(page.locator('.terminal-chat-entry-error')).toHaveCount(0);

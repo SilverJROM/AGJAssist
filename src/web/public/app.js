@@ -3408,9 +3408,17 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     setEntries(prev => appendYou(prev, command, { sentContent: sentText }));
 
     try {
+      // Clear the input first (Ctrl-U) when this looks like an OAuth login code:
+      // after a rejected code + retry, claude's "Paste code here" field keeps
+      // residual content, so a plain send appends to junk and never submits.
+      // Fires when the snapshot shows the OAuth prompt OR the text is a long
+      // space-free token (an auth code) — clearing is harmless on an empty line.
+      const atLoginPrompt = /paste code here|oauth\/authorize\?code|browser didn'?t open/i.test(beforeSnapshot || '');
+      const looksLikeCode = /^[^\s]{30,}$/.test(sentText);
+      const clearFirst = atLoginPrompt || looksLikeCode;
       await api(`/api/tmux/panes/${encodeURIComponent(target)}/send`, {
         method: 'POST',
-        body: JSON.stringify({ command: sentText, enter: true })
+        body: JSON.stringify({ command: sentText, enter: true, clear_first: clearFirst })
       });
       const result = await captureCommandResult(beforeSnapshot);
       const nextSnapshot = normalizeTerminalOutput(result.snapshot);

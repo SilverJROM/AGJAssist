@@ -228,18 +228,28 @@ export function registerTmuxRoutes(
   );
 
   // Send command to pane
-  app.post<{ Params: { target: string }; Body: { command?: string; enter?: boolean; force?: boolean; send_enter_only?: boolean } }>(
+  app.post<{ Params: { target: string }; Body: { command?: string; enter?: boolean; force?: boolean; send_enter_only?: boolean; clear_first?: boolean } }>(
     "/api/tmux/panes/:target/send",
     { preHandler: [authMiddleware, requireOwner] },
     async (request, reply) => {
       const target = decodeURIComponent(request.params.target);
-      const { command, enter = true, force = false, send_enter_only = false } = request.body || {};
+      const { command, enter = true, force = false, send_enter_only = false, clear_first = false } = request.body || {};
 
       if (!command && !send_enter_only) {
         return reply.code(400).send({ error: "command is required" });
       }
 
       try {
+        // Clear the input line first (Ctrl-U) when asked — used for the OAuth
+        // "Paste code here" prompt, which retains residual content after a retry
+        // so a plain send would append to junk and never submit. Harmless on an
+        // already-empty prompt.
+        if (clear_first && command) {
+          try {
+            await tmuxService.sendNamedKeys(target, ["C-u"]);
+            await new Promise((r) => setTimeout(r, 120));
+          } catch { /* non-fatal */ }
+        }
         const result = send_enter_only
           ? await tmuxService.sendEnter(target)
           : await tmuxService.sendCommand(target, command!, enter, force);

@@ -197,7 +197,7 @@ test('§7: terminal conversation composes on the served iPhone surface', async (
     await page.waitForTimeout(1_500);
 
     await check('R1b', async () => {
-      expect(sentPayload).toEqual({ command: COMMAND, enter: true });
+      expect(sentPayload).toEqual({ command: COMMAND, enter: true, clear_first: false });
       const agentTurns = page.locator('[data-testid="terminal-turn-agent"]');
       const userTurns = page.locator('[data-testid="terminal-turn-user"]');
       expect(await agentTurns.count()).toBeGreaterThanOrEqual(2);
