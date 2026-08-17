@@ -2831,12 +2831,45 @@ function TaskBlock({ items }) {
   `;
 }
 
+// The terminal wraps a long URL across physical lines (no space at the wrap
+// point). Rejoin those fragments so the whole URL is one contiguous string the
+// linkifier can capture — otherwise only the first wrapped line becomes a link.
+// A continuation is joined only when the current line ends in a URL and the next
+// line's leading token is long and space-free (a URL continuation, not prose).
+function rejoinWrappedUrls(text) {
+  const s = String(text);
+  if (!/https?:\/\//.test(s)) return s;
+  const lines = s.split('\n');
+  const endsWithUrl = /https?:\/\/\S+$/;   // a URL running to end-of-line
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    let line = lines[i];
+    while (
+      i + 1 < lines.length &&
+      endsWithUrl.test(line) &&            // (accumulated) line ends in a URL
+      line.length >= 24 &&                 // long line => a wrap, not short prose
+      lines[i + 1].length > 0 &&
+      !/^\s/.test(lines[i + 1]) &&         // continuation has no leading space
+      !/^https?:\/\//.test(lines[i + 1]) &&// and isn't a brand-new URL
+      /^\S{12,}/.test(lines[i + 1])        // its leading token is long (URL, not prose)
+    ) {
+      line += lines[i + 1];
+      i += 1;
+    }
+    out.push(line);
+    i += 1;
+  }
+  return out.join('\n');
+}
+
 // Make http(s) URLs in agent output tappable (e.g. a `/login` auth link). Splits
 // text on a URL match and renders each URL as a safe new-tab link; everything
 // else stays plain text. Trailing punctuation is not swallowed into the link.
 const _URL_RE = /(https?:\/\/[^\s<>()[\]{}"']+[^\s<>()[\]{}"'.,;:!?])/g;
 function linkify(text) {
-  const s = typeof text === 'string' ? text : String(text == null ? '' : text);
+  const s0 = typeof text === 'string' ? text : String(text == null ? '' : text);
+  const s = rejoinWrappedUrls(s0);
   if (!/https?:\/\//.test(s)) return s;
   const out = [];
   let last = 0;

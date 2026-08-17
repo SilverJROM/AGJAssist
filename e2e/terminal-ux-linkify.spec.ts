@@ -76,3 +76,36 @@ test('a URL in an agent reply becomes a safe, tappable link', async ({ page }) =
   // Surrounding text stays intact.
   await expect(page.locator('[data-testid="terminal-turn-agent"]').last()).toContainText('paste the code here');
 });
+
+test('a long URL wrapped across terminal lines links as ONE complete URL', async ({ page }) => {
+  test.setTimeout(60_000);
+  // The terminal wraps the URL across physical lines (no space at wrap points).
+  const WRAPPED = [
+    '● Please visit the following URL to log in:',
+    '',
+    'https://claude.com/cai/oauth/authorize?code=true&client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e&response_type=code&redir',
+    'ect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=org%3Acreate_api_key+user%3Aprofile+user%3Ainf',
+    'erence+user%3Amcp_servers%3Afile_upload&code_challenge=HBVsC2SnG44I2ABa-1O2rC4f8S3AuA',
+    'QzqhnGIAVQObw&code_challenge_method=S256&state=xDvbNz_lHIefKJ2G1S7HSF6-9lfEWatEWiuDZ4fiYPc',
+    '',
+    'Paste code here if prompted:',
+    '▌ Type a message',
+  ].join('\n');
+  await page.route(/\/api\/auth\/me(?:\?.*)?$/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 1, username: 'e2e', display_name: 'e2e', role: 'owner', totp_enabled: false }) }));
+  await page.route(/\/api\/safety\/patterns(?:\?.*)?$/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"patterns":[]}' }));
+  await page.route(/\/api\/tmux\/sessions(?:\?.*)?$/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ sessions: [{ session_name: 'LOGIN', panes: [{ target: TARGET, command: 'claude' }] }] }) }));
+  await page.route(/\/api\/tmux\/panes\/[^/]+\/output(?:\?.*)?$/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ output: WRAPPED, target: TARGET, lines: 200 }) }));
+  await openFriendly(page);
+
+  const link = page.locator('a.terminal-chat-link');
+  await expect(link).toHaveCount(1);
+  const href = await link.first().getAttribute('href');
+  // The full URL — from scheme through the trailing state token — is one link.
+  expect(href).toMatch(/^https:\/\/claude\.com\/cai\/oauth\/authorize\?/);
+  expect(href).toContain('redirect_uri=');
+  expect(href).toContain('code_challenge_method=S256');
+  expect(href).toMatch(/9lfEWatEWiuDZ4fiYPc$/);
+  // Prose after the URL is not swallowed into the link.
+  expect(href).not.toContain('Paste code');
+  await expect(page.locator('[data-testid="terminal-turn-agent"]').last()).toContainText('Paste code here if prompted');
+});
