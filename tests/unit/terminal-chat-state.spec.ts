@@ -1558,6 +1558,42 @@ describe("detectSelectionPrompt", () => {
     expect(detectSelectionPrompt(pane)).toBeNull();
   });
 
+  it("does NOT fire on a prose numbered list above the 'shift+tab to cycle' chrome (regression)", () => {
+    // Reproduces the live false positive: the assistant printed a numbered plan,
+    // and the CLI chrome line contains 'tab to cycle', which used to be read as a
+    // selection footer.
+    const pane = [
+      "3. Multi-session tabs at the top",
+      "",
+      "A compact horizontal tab strip at the top of the Terminal.",
+      "",
+      "  1. Compact the Telegram layout + fix the top cutoff",
+      "  2. Attachment -> minimal icon (no composer shrink)",
+      "  3. Multi-session tabs at the top",
+      "",
+      "Confirm and I'll build it in that order.",
+      "❯ confirmed, go ahead",
+      "⏵⏵ bypass permissions on (shift+tab to cycle) · ctrl+t to hide tasks · ← 1 agent",
+    ].join("\n");
+    expect(detectSelectionPrompt(pane)).toBeNull();
+  });
+
+  it("does NOT fire when a real footer is far above the options (not bottom-anchored)", () => {
+    const pane = [
+      "Enter to select · ↑/↓ to navigate · Esc to cancel",
+      "…many lines of unrelated output…",
+      "some prose here",
+      "more prose",
+      "even more prose",
+      "and more",
+      "  1. Alpha",
+      "  2. Bravo",
+      "  3. Charlie",
+      "❯ just a normal input line",
+    ].join("\n");
+    expect(detectSelectionPrompt(pane)).toBeNull();
+  });
+
   it("returns null when there are fewer than two options", () => {
     const pane = ["Do you want to proceed?", "❯ 1. Yes"].join("\n");
     expect(detectSelectionPrompt(pane)).toBeNull();

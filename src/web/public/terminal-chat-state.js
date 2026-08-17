@@ -986,11 +986,15 @@ export function applyAgentPatch(entries, snapshot, { now = Date.now(), baselineA
 // so the chat can render tappable buttons. Returns null when no active selection
 // is present. Conservative on purpose: a bare numbered list in prose must NOT
 // trigger it — we require a footer signal, a ❯ cursor glyph, or a question line.
-// NB: excludes "esc to interrupt" on purpose — that's the Working spinner's hint,
-// not a selection footer (selections say "esc to cancel/reject/go back").
-const _SELECT_FOOTER_RE = /(enter to (?:select|confirm|submit|continue)|↑\s*\/\s*↓|to navigate|esc to (?:cancel|reject|go back|exit)|tab to (?:switch|select|cycle)|to add notes|use arrows)/i;
-const _SELECT_QUESTION_RE = /(do you want to proceed|would you like|which\b|select (?:an?|one|the)|choose\b|pick\b|\?\s*$)/i;
-const _SELECT_OPTION_RE = /^\s*(?:[│┃║]\s*)?(❯|›|»|▶|\*|>)?\s*(\d{1,2})[.)]\s+(\S.*?)\s*$/u;
+// A genuine selection footer. NB: does NOT match "esc to interrupt" (Working
+// spinner) or "shift+tab to cycle" (mode-cycle chrome) — those are handled by
+// _SELECT_CHROME_RE below and must never be read as a selection.
+const _SELECT_FOOTER_RE = /(enter to (?:select|confirm|submit|continue)|↑\s*\/\s*↓|\bto navigate\b|esc to (?:cancel|reject|go back|exit)|tab to switch|space to (?:toggle|select)|to add notes|use arrows)/i;
+// CLI chrome / status lines that resemble a footer but are NOT selection prompts.
+const _SELECT_CHROME_RE = /(bypass permissions|shift[\s+]*\+?[\s+]*tab|to cycle|esc to interrupt|to hide tasks|to manage|\bctrl\b|shell still running|auto-?update|for shortcuts)/i;
+const _SELECT_QUESTION_RE = /(do you want to proceed|would you like|which\b|select (?:an?|one|the)|choose\b|\bpick\b)/i;
+// Only real cursor glyphs (no *,> which appear in markdown/prose).
+const _SELECT_OPTION_RE = /^\s*(?:[│┃║]\s*)?(❯|›|»|▶)?\s*(\d{1,2})[.)]\s+(\S.*?)\s*$/u;
 const _SELECT_MULTI_RE = /(to switch questions|\bcheckbox|space to (?:toggle|select)|\[[ x✓]\]|☐|☑)/i;
 
 export function detectSelectionPrompt(rawSnapshot) {
@@ -998,10 +1002,12 @@ export function detectSelectionPrompt(rawSnapshot) {
   if (!rows.length) return null;
   const tail = rows.slice(-45);
 
+  // Parse a contiguous numbered option list, tracking each option's line index.
   let options = [];
+  let optLineIdx = [];
   let selectedIndex = -1;
-  for (const line of tail) {
-    const m = line.match(_SELECT_OPTION_RE);
+  for (let i = 0; i < tail.length; i++) {
+    const m = tail[i].match(_SELECT_OPTION_RE);
     if (!m) continue;
     const n = Number(m[2]);
     const cursor = !!m[1];
@@ -1010,25 +1016,42 @@ export function detectSelectionPrompt(rawSnapshot) {
     if (!label) continue;
     if (n === options.length + 1) {
       options.push({ n, label });
+      optLineIdx.push(i);
       if (cursor) selectedIndex = options.length - 1;
     } else if (n === 1) {
       options = [{ n, label }];
+      optLineIdx = [i];
       selectedIndex = cursor ? 0 : -1;
     }
   }
 
   if (options.length < 2) return null;
+  const firstOptIdx = optLineIdx[0];
+  const lastOptIdx = optLineIdx[optLineIdx.length - 1];
 
-  const hasFooter = tail.some((l) => _SELECT_FOOTER_RE.test(l));
-  const hasQuestion = tail.some((l) => _SELECT_QUESTION_RE.test(l));
-  const hasCursor = selectedIndex >= 0;
-  if (!hasFooter && !hasCursor && !hasQuestion) return null;
+  // A real selection footer must appear JUST BELOW the options (not chrome, and
+  // not buried elsewhere in scrollback). This is the structural anchor that
+  // distinguishes an active prompt from a numbered list printed in prose.
+  let footerIdx = -1;
+  for (let i = lastOptIdx + 1; i < tail.length && i <= lastOptIdx + 8; i++) {
+    if (_SELECT_CHROME_RE.test(tail[i])) continue;
+    if (_SELECT_FOOTER_RE.test(tail[i])) { footerIdx = i; break; }
+  }
+  const hasFooter = footerIdx >= 0;
+  const hasCursor = selectedIndex >= 0; // ❯ on a numbered option = tool dialog
 
+  // Require a structural signal: a footer directly under the options, or a
+  // cursor on an option. A bare numbered list in prose has neither → null.
+  if (!hasFooter && !hasCursor) return null;
+
+  // Title: nearest question-ish line just above the first option.
   let title = "";
-  for (let i = tail.length - 1; i >= 0; i--) {
-    if (_SELECT_OPTION_RE.test(tail[i])) continue;
-    if (_SELECT_QUESTION_RE.test(tail[i])) {
-      title = tail[i].replace(/^[\s│┃║╭╰─╮╯]+/, "").replace(/[\s│┃║]+$/, "").trim();
+  for (let i = firstOptIdx - 1; i >= 0 && i >= firstOptIdx - 8; i--) {
+    const l = tail[i];
+    if (!l.trim()) continue;
+    if (_SELECT_CHROME_RE.test(l)) break;
+    if (_SELECT_QUESTION_RE.test(l) || /\?\s*$/.test(l)) {
+      title = l.replace(/^[\s│┃║╭╰─╮╯]+/, "").replace(/[\s│┃║]+$/, "").trim();
       break;
     }
   }
