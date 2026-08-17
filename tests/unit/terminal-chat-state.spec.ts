@@ -1581,6 +1581,35 @@ describe("moved-on pane reconciliation (stale-tab / SSH-driven)", () => {
     expect(out.filter((e) => e.role === "agent")).toHaveLength(1);   // patched in place
   });
 
+  it("syncs to the newest reply when it sits above an IDLE empty ❯ prompt (hris desync)", () => {
+    // hris keeps producing replies while the composer prompt stays empty ("❯ ").
+    // The empty prompt isn't a user run, and the reply's ● marker has scrolled off
+    // the capture window, so the chat froze on the previous reply.
+    const pane = [
+      "None. Every check came back clean:",
+      "  - 0 — native install matches installMethod; no npm leftovers.",
+      "  Hooks: healthy. PreToolUse ran 224 times, zero timeouts.",
+      "  No confirmation needed — nothing to apply.",
+      "✻ Churned for 1m 15s · 1 shell still running",
+      "────────────────────────────────────────────",
+      "❯ ",
+      "────────────────────────────────────────────",
+      "  ⏵⏵ bypass permissions on · 1 shell · ← 1 agent",
+    ].join("\n");
+    const existing = [
+      { id: "a-old", role: "agent", label: "Agent", content: "● QA green. Repo clean — 0 stashes.", timestamp: "" },
+    ];
+    const out = applyAgentPatch(existing, pane, { previousSnapshot: "an older snapshot with zero overlap" });
+    const agentText = out.filter((e) => e.role === "agent").map((e) => e.content).join("\n");
+    expect(agentText).toMatch(/Every check came back clean|Hooks: healthy|No confirmation needed/);
+    expect(agentText).not.toContain("QA green"); // no longer frozen
+    expect(agentText).not.toContain("❯");         // prompt not leaked
+    expect(out.filter((e) => e.role === "agent")).toHaveLength(1);
+    // Idempotent.
+    const out2 = applyAgentPatch(out, pane, { previousSnapshot: pane });
+    expect(out2.map((e) => e.content)).toEqual(out.map((e) => e.content));
+  });
+
   it("updates the chat when a ❯-less Login DIALOG replaces the shown turn (hris login)", () => {
     // Claude's Login flow has NO ❯ prompt: "Browser didn't open? … <url> … Paste
     // code here". A full repaint has zero overlap, so the normal diff froze the

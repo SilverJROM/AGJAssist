@@ -963,6 +963,20 @@ function _isInteractiveDialogPane(snapshot) {
   return rows.slice(-30).some((l) => _DIALOG_RE.test(l));
 }
 
+// Index of a trailing IDLE empty ❯ composer prompt (the "❯ " with nothing typed),
+// scanning the tail only. -1 if none. Distinguishes hris's idle-with-fresh-reply
+// state from a mid-stream conversational capture (which has no trailing prompt).
+function _lastEmptyPromptIndex(rawLines) {
+  const from = Math.max(0, rawLines.length - 12);
+  for (let i = rawLines.length - 1; i >= from; i--) {
+    const line = rawLines[i];
+    if (!_isUserPromptGlyph(line)) continue;
+    const rest = _normalizeWs(_stripUserRunLine(line, true));
+    if (!rest) return i; // ❯ with no typed content
+  }
+  return -1;
+}
+
 // Does a pane ❯ run correspond to a stored sent message (suffix-ladder tail)?
 function _runMatchesSent(run, sent) {
   if (!run || !sent) return false;
@@ -998,8 +1012,21 @@ function _reconcileMovedOnPane(list, snapshot, now) {
   // agent turn to the live cleaned snapshot. Gated to dialogs so the normal
   // conversational sliding-window accumulate flow (also ❯-less) is untouched.
   if (!runs.length) {
-    if (!_isInteractiveDialogPane(snapshot)) return null;
-    const live = _agentBodyFromSnapshot(snapshot, list.filter((e) => e !== list[lastAgentIdx]), false).trim();
+    // Two settled ❯-less cases where the pane's live content should replace a
+    // frozen turn (both patch in place, gated so the conversational sliding-window
+    // accumulate flow — no dialog, no idle prompt — is never touched):
+    //   (a) a full-screen interactive dialog (Login/OAuth, "Paste code here", …);
+    //   (b) an IDLE empty ❯ composer prompt with a fresh reply above it — hris's
+    //       recurring desync (the empty "❯ " is not collected as a user run, so
+    //       the agent's newest reply sits above a promptless-looking tail).
+    const idlePromptIdx = _lastEmptyPromptIndex(rawLines);
+    const isDialog = _isInteractiveDialogPane(snapshot);
+    if (!isDialog && idlePromptIdx < 0) return null;
+    // Body = the live agent output. For the idle-prompt case take everything above
+    // the prompt (the reply's ● marker may have scrolled off the capture window,
+    // so don't require one); for a dialog take the whole cleaned snapshot.
+    const source = idlePromptIdx >= 0 ? rawLines.slice(0, idlePromptIdx).join("\n") : snapshot;
+    const live = _removeUserText(_prepareDiffText(source), list, { lastUserOnly: false }).trim();
     if (!live) return null;
     const cur = (list[lastAgentIdx].content || "").trim();
     if (cur === live || cur.endsWith(live) || live.endsWith(cur)) return null;
