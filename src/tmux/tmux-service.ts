@@ -131,6 +131,11 @@ export class TmuxService {
 
     await execFileAsync("tmux", ["send-keys", "-l", "-t", target, "--", trimmed]);
     if (pressEnter) {
+      // Let Claude's Ink composer fully ingest the typed text BEFORE Enter, or the
+      // Enter races ahead and the message sits pending/unsubmitted (JROM). A short
+      // settle (~0.35s, a touch longer for very long messages) submits reliably.
+      const settleMs = Math.min(600, 350 + Math.floor(trimmed.length / 200) * 100);
+      await new Promise((resolve) => setTimeout(resolve, settleMs));
       await execFileAsync("tmux", ["send-keys", "-t", target, "C-m"]);
     }
     return {
