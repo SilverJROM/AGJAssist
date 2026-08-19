@@ -3466,6 +3466,54 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     };
   }
 
+  // Deliver a message to the pane. On failure the YOU bubble (youId) is marked
+  // `failed` with the exact text/attachment needed to resend — it persists via the
+  // recent-message memory, so a message that didn't go through is never silently
+  // lost when you leave the session; you can see it and one-tap resend.
+  async function performSend(command, youId, attachmentPath) {
+    const sentText = sanitizeOutgoingCommand(command).trim();
+    if (!sentText) return;
+    const beforeSnapshot = snapshotRef.current;
+    sendingRef.current = true;
+    openAgentAfterYouRef.current = true;
+    sendBaselineRef.current = beforeSnapshot;
+    lastSentRef.current = sentText;
+    pinToBottomRef.current = true;
+    setShowScrollBottom(false);
+    setUnseenWhileUp(0);
+    setSending(true);
+    setStatus('running');
+    setLastCommand(sentText);
+    try {
+      // Clear the input first (Ctrl-U) when this looks like an OAuth login code:
+      // after a rejected code + retry, claude's "Paste code here" field keeps
+      // residual content, so a plain send appends to junk and never submits.
+      const atLoginPrompt = /paste code here|oauth\/authorize\?code|browser didn'?t open/i.test(beforeSnapshot || '');
+      const looksLikeCode = /^[^\s]{30,}$/.test(sentText);
+      const clearFirst = atLoginPrompt || looksLikeCode;
+      await api(`/api/tmux/panes/${encodeURIComponent(target)}/send`, {
+        method: 'POST',
+        body: JSON.stringify({ command: sentText, enter: true, clear_first: clearFirst })
+      });
+      const result = await captureCommandResult(beforeSnapshot);
+      const nextSnapshot = normalizeTerminalOutput(result.snapshot);
+      snapshotRef.current = nextSnapshot;
+      setSnapshot(nextSnapshot);
+      setLastUpdatedAt(Date.now());
+      setEntries(prev => applyConversationSnapshot(prev, nextSnapshot));
+      setStatusLine(extractStatus(nextSnapshot));
+      setStatus('connected');
+    } catch (e) {
+      // Mark the YOU bubble as not-delivered + attach resend data (persists).
+      setEntries(prev => prev.map(entry => entry.id === youId
+        ? { ...entry, failed: true, retrying: false, resendText: command, resendAttachmentPath: attachmentPath || null, failReason: e.message || 'Not sent' }
+        : entry));
+      setStatus('error');
+    }
+    sendingRef.current = false;
+    setSending(false);
+  }
+
   async function sendCommand() {
     const text = input.trim();
     const imageRef = attachment?.path ? `[image: ${attachment.path}]` : '';
@@ -3484,55 +3532,21 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       return;
     }
 
-    const beforeSnapshot = snapshotRef.current;
-    sendingRef.current = true;
-    openAgentAfterYouRef.current = true;
-    sendBaselineRef.current = beforeSnapshot;
-    lastSentRef.current = sentText;
-    pinToBottomRef.current = true;
-    setShowScrollBottom(false);
-    setUnseenWhileUp(0);
+    const now = Date.now();
+    const youId = 'you-' + now;
+    const attachmentPath = attachment?.path || null;
     setInput('');
     setAttachment(null);
     setAttachError('');
-    setSending(true);
-    setStatus('running');
-    setLastCommand(sentText);
-    setEntries(prev => appendYou(prev, command, { sentContent: sentText }));
+    setEntries(prev => appendYou(prev, command, { now, sentContent: sentText }));
+    await performSend(command, youId, attachmentPath);
+  }
 
-    try {
-      // Clear the input first (Ctrl-U) when this looks like an OAuth login code:
-      // after a rejected code + retry, claude's "Paste code here" field keeps
-      // residual content, so a plain send appends to junk and never submits.
-      // Fires when the snapshot shows the OAuth prompt OR the text is a long
-      // space-free token (an auth code) — clearing is harmless on an empty line.
-      const atLoginPrompt = /paste code here|oauth\/authorize\?code|browser didn'?t open/i.test(beforeSnapshot || '');
-      const looksLikeCode = /^[^\s]{30,}$/.test(sentText);
-      const clearFirst = atLoginPrompt || looksLikeCode;
-      await api(`/api/tmux/panes/${encodeURIComponent(target)}/send`, {
-        method: 'POST',
-        body: JSON.stringify({ command: sentText, enter: true, clear_first: clearFirst })
-      });
-      const result = await captureCommandResult(beforeSnapshot);
-      const nextSnapshot = normalizeTerminalOutput(result.snapshot);
-      snapshotRef.current = nextSnapshot;
-      setSnapshot(nextSnapshot);
-      setLastUpdatedAt(Date.now());
-      setEntries(prev => applyConversationSnapshot(prev, nextSnapshot));
-      setStatusLine(extractStatus(nextSnapshot));
-      setStatus('connected');
-    } catch (e) {
-      setEntries(prev => [...prev, {
-        id: 'err-' + Date.now(),
-        role: 'error',
-        label: 'Command failed',
-        content: e.message || 'Failed to send command.',
-        timestamp: new Date().toLocaleTimeString()
-      }]);
-      setStatus('error');
-    }
-    sendingRef.current = false;
-    setSending(false);
+  // One-tap resend of a message that failed to send.
+  async function resendFailed(entry) {
+    if (sending || !entry || !entry.resendText) return;
+    setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, failed: false, retrying: true } : e));
+    await performSend(entry.resendText, entry.id, entry.resendAttachmentPath);
   }
 
   async function sendManualEnter() {
@@ -3789,7 +3803,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
             const isUser = entry.role === 'user';
             return html`
               <div key=${entry.id}
-                   class=${'ovm-chat-row ' + (isUser ? 'ovm-chat-row-user' : 'ovm-chat-row-ovm') + ' terminal-chat-entry ' + (isUser ? 'terminal-chat-entry-user' : 'terminal-chat-entry-agent')}
+                   class=${'ovm-chat-row ' + (isUser ? 'ovm-chat-row-user' : 'ovm-chat-row-ovm') + ' terminal-chat-entry ' + (isUser ? 'terminal-chat-entry-user' : 'terminal-chat-entry-agent') + (isUser && entry.failed ? ' failed' : '')}
                    data-testid=${isUser ? 'terminal-turn-user' : 'terminal-turn-agent'}
                    data-turn-id=${entry.id}>
                 <div class=${'terminal-chat-who' + (isUser ? ' user' : '')}>
@@ -3797,9 +3811,16 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                     ? html`<span data-testid="terminal-turn-time">${entry.timestamp}</span><span class="terminal-chat-badge">YOU</span>`
                     : html`<span class="terminal-chat-badge">AGENT</span><span>${sessionName || 'Agent'} · <span data-testid="terminal-turn-time">${entry.timestamp}</span></span>`}
                 </div>
-                <div class=${'ovm-chat-bubble terminal-chat-bubble ' + (isUser ? 'ovm-chat-bubble-user' : 'ovm-chat-bubble-ovm')}>
+                <div class=${'ovm-chat-bubble terminal-chat-bubble ' + (isUser ? 'ovm-chat-bubble-user' : 'ovm-chat-bubble-ovm') + (isUser && entry.failed ? ' failed' : '')}>
                   <${CollapsibleBubbleContent} content=${entry.content} role=${entry.role} limit=${replyLimit} />
                 </div>
+                ${isUser && entry.failed ? html`
+                  <div class="terminal-chat-failed" data-testid="terminal-turn-failed">
+                    <span class="terminal-chat-failed-msg">⚠ Not sent${entry.failReason ? ' · ' + entry.failReason.replace(/\.$/, '') : ''}</span>
+                    <button type="button" class="terminal-chat-resend" data-testid="terminal-resend"
+                            onclick=${() => resendFailed(entry)} disabled=${sending}>↻ Resend</button>
+                  </div>
+                ` : (isUser && entry.retrying ? html`<div class="terminal-chat-failed"><span class="terminal-chat-failed-msg">↻ Resending…</span></div>` : '')}
               </div>
             `;
           }

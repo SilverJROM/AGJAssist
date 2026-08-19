@@ -102,6 +102,24 @@ export class TmuxService {
     }
   }
 
+  // If the pane is in tmux copy-mode (the user scrolled up to read), a plain
+  // send-keys is interpreted as COPY-MODE COMMANDS (e.g. 'f' → "jump to forward")
+  // instead of typed into Claude's composer, so the message silently never sends
+  // (JROM). Exit copy-mode first so input lands in the live prompt.
+  private async exitCopyMode(target: string): Promise<void> {
+    try {
+      const { stdout } = await execFileAsync("tmux", [
+        "display-message", "-p", "-t", target, "#{pane_in_mode}"
+      ]);
+      if (stdout.trim() === "1") {
+        await execFileAsync("tmux", ["send-keys", "-X", "-t", target, "cancel"]);
+        await new Promise((resolve) => setTimeout(resolve, 60));
+      }
+    } catch {
+      /* non-fatal: if we can't check, proceed with the send */
+    }
+  }
+
   async sendCommand(
     target: string,
     command: string,
@@ -129,6 +147,7 @@ export class TmuxService {
       }
     }
 
+    await this.exitCopyMode(target);
     await execFileAsync("tmux", ["send-keys", "-l", "-t", target, "--", trimmed]);
     if (pressEnter) {
       // Let Claude's Ink composer fully ingest the typed text BEFORE Enter, or the
@@ -216,6 +235,7 @@ export class TmuxService {
 
   async sendEnter(target: string): Promise<SendCommandResult> {
     this.ensureValidTarget(target);
+    await this.exitCopyMode(target);
     await execFileAsync("tmux", ["send-keys", "-t", target, "C-m"]);
     return {
       message: `Sent Enter to ${target}`,
@@ -245,6 +265,10 @@ export class TmuxService {
         throw new Error(`unsupported key: ${String(k).slice(0, 16)}`);
       }
     }
+    // Drive the live prompt, not tmux copy-mode: if the pane is scrolled into
+    // copy-mode the nav keys would move the copy cursor instead of the agent's
+    // selection, so drop back to the live prompt first.
+    await this.exitCopyMode(target);
     // Send one key at a time with a small gap. Sending them in a single call
     // lets a trailing Enter race ahead of the navigation keys in Claude's Ink
     // TUI (e.g. "Down Down Enter" would select option 1 instead of 3); a gap

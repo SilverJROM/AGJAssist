@@ -1388,6 +1388,35 @@ body {
 }
 .terminal-chat-entry-user { justify-content: flex-end; }
 .terminal-chat-entry-agent { justify-content: flex-start; }
+/* A message that failed to send: keep it visible (never silently lost) with a
+   one-tap resend, and mark the bubble so JROM can see it didn't go through. */
+.terminal-chat-entry-user.failed { flex-wrap: wrap; }
+.ovm-chat-bubble-user.failed {
+  border: 1px solid #d1242f;
+  background: #fff5f5;
+}
+.terminal-chat-failed {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 3px;
+  padding-right: 2px;
+}
+.terminal-chat-failed-msg { font-size: 11.5px; color: #d1242f; }
+.terminal-chat-resend {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #d1242f;
+  border: none;
+  border-radius: 7px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.terminal-chat-resend:hover { background: #b31d27; }
+.terminal-chat-resend:disabled { opacity: 0.5; cursor: not-allowed; }
 .terminal-chat-entry-terminal,
 .terminal-chat-entry-system,
 .terminal-chat-entry-error { justify-content: flex-start; }
