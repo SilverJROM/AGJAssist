@@ -203,6 +203,20 @@ export function registerMcpRoutes(app: FastifyInstance, deps: McpRouteDeps): voi
       });
       await server.connect(transport);
 
+      // Client compatibility: the SDK's Streamable-HTTP transport rejects (406)
+      // any POST whose Accept header does not list BOTH application/json and
+      // text/event-stream. We run enableJsonResponse (always a JSON reply, never
+      // SSE), so that requirement is unnecessary and breaks real MCP clients that
+      // send only `Accept: application/json` (e.g. Grok). Normalize it here so the
+      // response is unchanged (still JSON) but the handshake/tool calls succeed.
+      const acceptHeader = String(request.raw.headers.accept || "");
+      if (
+        !acceptHeader.includes("application/json") ||
+        !acceptHeader.includes("text/event-stream")
+      ) {
+        request.raw.headers.accept = "application/json, text/event-stream";
+      }
+
       reply.raw.setHeader("Cache-Control", "no-store");
       reply.hijack();
       try {

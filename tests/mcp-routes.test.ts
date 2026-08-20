@@ -270,6 +270,25 @@ describe("POST /mcp Streamable HTTP core (B15)", () => {
     expect(ping.json).toEqual({ jsonrpc: "2.0", id: 3, result: {} });
   });
 
+  it("accepts clients that send only `Accept: application/json` (real-client compat, no 406)", async () => {
+    const ctx = await boot({ permissions: ["list_sessions"] });
+    // Many MCP clients (e.g. Grok) send `Accept: application/json` only; the SDK
+    // transport 406s on that. We normalize it because we always return JSON.
+    for (const accept of ["application/json", "*/*", ""]) {
+      const initialized = await rpc(ctx, ctx.accessToken, initialize(1), { accept });
+      expect(initialized.status).toBe(200);
+      expect(initialized.json.result.protocolVersion).toBe(PROTOCOL_VERSION);
+      const called = await rpc(
+        ctx,
+        ctx.accessToken,
+        { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "list_sessions", arguments: {} } },
+        { accept }
+      );
+      expect(called.status).toBe(200);
+      expect(called.json.error).toBeUndefined();
+    }
+  });
+
   it("returns an empty tools/list result when the active grant has no permissions", async () => {
     const ctx = await boot({ permissions: [] });
     const listed = await rpc(ctx, ctx.accessToken, {
