@@ -9,6 +9,8 @@ import {
 import { createMcpServerForRequest } from "../../mcp/mcp-server-factory.js";
 import { resolveMcpOrigin } from "../../mcp/oauth-metadata.js";
 import { AuditService } from "../../services/audit-service.js";
+import { DatabaseService } from "../../db/database.js";
+import { TmuxService } from "../../tmux/tmux-service.js";
 
 const MCP_BODY_LIMIT = 15 * 1024 * 1024;
 const MCP_METHODS = new Set([
@@ -30,6 +32,8 @@ export interface McpRouteDeps {
   bearer: McpBearerService;
   limiter: McpRateLimiter;
   audit: AuditService;
+  tmux: TmuxService;
+  db: DatabaseService;
 }
 
 function noStore(reply: FastifyReply): void {
@@ -182,7 +186,11 @@ export function registerMcpRoutes(app: FastifyInstance, deps: McpRouteDeps): voi
       const context = contexts.get(request);
       if (!context) return sendUnauthorized(reply, resolveMcpOrigin(request) ?? "");
 
-      const server = createMcpServerForRequest(context);
+      const server = createMcpServerForRequest(context, {
+        tmux: deps.tmux,
+        audit: deps.audit,
+        db: deps.db
+      });
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true

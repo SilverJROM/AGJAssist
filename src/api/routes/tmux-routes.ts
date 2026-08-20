@@ -8,10 +8,10 @@ import { AuditService } from "../../services/audit-service.js";
 import { SafetyService } from "../../services/safety-service.js";
 import { ProjectService } from "../../services/project-service.js";
 import { FileService, PathTraversalError } from "../../services/file-service.js";
+import { paneLooksBusy } from "../../tmux/tmux-busy.js";
 
 const ATTACH_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const ATTACH_IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
-const TMUX_BUSY_RE = /(✻|✳|✶|◐|◓|◑|◒).*(for \d|esc to interrupt|running|\btokens?\b)/i;
 
 function sanitizeAttachImageBasename(filename: string): string | null {
   const raw = String(filename || "");
@@ -38,10 +38,6 @@ function decodeAttachImageBase64(dataBase64: string): Buffer | null {
   const buf = Buffer.from(stripped, "base64");
   if (!buf.length) return null;
   return buf;
-}
-
-function paneLooksBusy(output: string): boolean {
-  return TMUX_BUSY_RE.test(output) || /esc to interrupt/i.test(output);
 }
 
 export function registerTmuxRoutes(

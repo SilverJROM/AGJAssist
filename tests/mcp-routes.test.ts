@@ -78,6 +78,8 @@ async function boot(options: {
       title: "north"
     }
   ]);
+  vi.spyOn(tmux, "peekPane").mockResolvedValue("idle");
+  vi.spyOn(tmux, "capturePane").mockResolvedValue("idle");
   pool.replaceSet(ownerId, ["NORTH"]);
   const client = clients.register({
     client_name: "mcp-route-fixture",
@@ -96,7 +98,9 @@ async function boot(options: {
   registerMcpRoutes(app, {
     bearer,
     limiter: options.limiter ?? new McpRateLimiter(),
-    audit
+    audit,
+    tmux,
+    db
   });
   const address = new URL(await app.listen({ host: "127.0.0.1", port: 0 }));
   context = {
@@ -298,7 +302,10 @@ describe("POST /mcp Streamable HTTP core (B15)", () => {
     for (let i = 1; i <= MCP_TOOLS_CALL_LIMIT; i++) {
       const allowed = await rpc(ctx, ctx.accessToken, callTool(i, "list_sessions"));
       expect(allowed.status).toBe(200);
-      expect(allowed.json.result.structuredContent.code).toBe("mcp_tool_denied");
+      expect(allowed.json.result.isError).not.toBe(true);
+      expect(allowed.json.result.structuredContent.sessions).toEqual([
+        expect.objectContaining({ session: "NORTH" })
+      ]);
     }
 
     const blocked = await rpc(
@@ -325,7 +332,10 @@ describe("POST /mcp Streamable HTTP core (B15)", () => {
       callTool(MCP_TOOLS_CALL_LIMIT + 2, "list_sessions")
     );
     expect(recovered.status).toBe(200);
-    expect(recovered.json.result.structuredContent.code).toBe("mcp_tool_denied");
+    expect(recovered.json.result.isError).not.toBe(true);
+    expect(recovered.json.result.structuredContent.sessions).toEqual([
+      expect.objectContaining({ session: "NORTH" })
+    ]);
   });
 
   it("denies lifecycle and pane-management tool names without invoking tmux (Blocker 6)", async () => {

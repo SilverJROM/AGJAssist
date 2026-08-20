@@ -216,7 +216,9 @@ export async function createApiServer(
   registerMcpRoutes(app, {
     bearer: mcpBearer,
     limiter: new McpRateLimiter(),
-    audit: services.auditService
+    audit: services.auditService,
+    tmux: services.tmuxService,
+    db: services.db
   });
 
   return app;
