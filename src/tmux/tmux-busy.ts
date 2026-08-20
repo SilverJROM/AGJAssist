@@ -2,7 +2,10 @@ import { setTimeout as setTimeoutPromise } from "node:timers/promises";
 
 export const TMUX_BUSY_SAMPLE_LINES = 40;
 export const TMUX_BUSY_SAMPLE_DELAY_MS = 700;
-export const TMUX_SPINNER_RE = /[✻✳✶◐◓◑◒⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/;
+export const TMUX_SPINNER_RE = /[·✢✳✶✻✽∗*◐◓◑◒⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/;
+const TMUX_ACTIVITY_TIMER_RE =
+  /\(\d+m\s*\d+s\b|\(\d+s\b|\b\d+s\b.*(?:tokens?|↓|↑|·)|esc to interrupt/i;
+const TMUX_SUBSTANTIAL_SCROLL_CHARS = 12;
 
 export interface PaneBusySampleOptions {
   lines?: number;
@@ -28,20 +31,22 @@ function paneDiffLooksActive(before: string, after: string): boolean {
   const beforeLines = before.split("\n");
   const afterLines = after.split("\n");
   const max = Math.max(beforeLines.length, afterLines.length);
-  let changed = 0;
-  let spinnerOnChangedLine = false;
 
   for (let i = 0; i < max; i++) {
     const prior = beforeLines[i] ?? "";
     const current = afterLines[i] ?? "";
     if (prior === current) continue;
-    changed += changedChars(prior, current);
-    if (TMUX_SPINNER_RE.test(prior) || TMUX_SPINNER_RE.test(current)) {
-      spinnerOnChangedLine = true;
+    const changedLine = `${prior}\n${current}`;
+    if (
+      TMUX_SPINNER_RE.test(changedLine) ||
+      TMUX_ACTIVITY_TIMER_RE.test(changedLine) ||
+      changedChars(prior, current) > TMUX_SUBSTANTIAL_SCROLL_CHARS
+    ) {
+      return true;
     }
   }
 
-  return spinnerOnChangedLine || changed > 4;
+  return false;
 }
 
 export function paneLooksBusyFromSamples(before: string, after: string): boolean {

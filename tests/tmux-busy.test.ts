@@ -10,7 +10,30 @@ describe("tmux busy detection", () => {
 
   it("treats changed paired captures as busy", () => {
     expect(paneLooksBusyFromSamples("✻ Working for 3s", "✳ Working for 3s")).toBe(true);
-    expect(paneLooksBusyFromSamples("Building\nline 1", "Building\nline 1\nline 2")).toBe(true);
+    expect(
+      paneLooksBusyFromSamples(
+        "Building\nline 1",
+        "Building\nfinished compiling module output"
+      )
+    ).toBe(true);
+  });
+
+  it("treats a small Claude star-cycle glyph change as busy", () => {
+    expect(
+      paneLooksBusyFromSamples(
+        "· ✢ ✽ ✻ ✶ * Gusting… (6m 2s · ↓ 3.7k tokens)",
+        "· ✢ ✽ ✻ ✶ ✳ Gusting… (6m 2s · ↓ 3.7k tokens)"
+      )
+    ).toBe(true);
+  });
+
+  it("treats an incrementing active elapsed timer as busy", () => {
+    expect(
+      paneLooksBusyFromSamples(
+        "Gusting… (6m 2s · ↓ 3.7k tokens)",
+        "Gusting… (6m 3s · ↓ 3.7k tokens)"
+      )
+    ).toBe(true);
   });
 
   it("ignores tiny non-spinner changes such as a one-second clock edge", () => {
