@@ -81,6 +81,28 @@ export interface AppConfig {
   overmind: {
     token: string;
   };
+  mcp: {
+    publicHost: string;
+    tokenTtlDays: number;
+  };
+}
+
+export const MCP_PUBLIC_HOST_DEFAULT = "agjasst.silverjrom.app";
+export const MCP_TOKEN_TTL_DAYS_DEFAULT = 7;
+export const MCP_TOKEN_TTL_DAYS_MIN = 7;
+export const MCP_TOKEN_TTL_DAYS_MAX = 10;
+
+export function parseMcpTokenTtlDays(raw: string | undefined): number {
+  if (raw == null || raw.trim() === "") return MCP_TOKEN_TTL_DAYS_DEFAULT;
+  const trimmed = raw.trim();
+  if (!/^[0-9]+$/.test(trimmed)) {
+    throw new Error("Invalid MCP_TOKEN_LIFETIME_DAYS: must be an integer 7..10");
+  }
+  const n = Number(trimmed);
+  if (!Number.isInteger(n) || n < MCP_TOKEN_TTL_DAYS_MIN || n > MCP_TOKEN_TTL_DAYS_MAX) {
+    throw new Error("Invalid MCP_TOKEN_LIFETIME_DAYS: must be an integer 7..10");
+  }
+  return n;
 }
 
 export function loadConfig(): AppConfig {
@@ -152,6 +174,10 @@ export function loadConfig(): AppConfig {
     },
     overmind: {
       token: optional("OVERMIND_TOKEN", "REDACTED_OVERMIND_TOKEN")
+    },
+    mcp: {
+      publicHost: optional("MCP_PUBLIC_HOST", MCP_PUBLIC_HOST_DEFAULT),
+      tokenTtlDays: parseMcpTokenTtlDays(process.env.MCP_TOKEN_LIFETIME_DAYS)
     }
   };
 }
