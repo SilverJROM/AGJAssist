@@ -13,6 +13,8 @@ export interface AuditEntry {
   surface: string | null;
 }
 
+export type AuditSurface = "bot" | "miniapp" | "web" | "agent" | "mcp";
+
 export interface AuditLogParams {
   userId?: number | null;
   agentName?: string | null;
@@ -21,7 +23,7 @@ export interface AuditLogParams {
   resourceId?: string | null;
   details?: Record<string, unknown> | null;
   tmuxTarget?: string | null;
-  surface?: "bot" | "miniapp" | "web" | "agent" | null;
+  surface?: AuditSurface | null;
 }
 
 export interface AuditQueryFilters {
@@ -29,6 +31,7 @@ export interface AuditQueryFilters {
   resourceType?: string;
   agentName?: string;
   userId?: number;
+  surface?: AuditSurface;
   since?: string;
   until?: string;
   limit?: number;
@@ -38,8 +41,8 @@ export interface AuditQueryFilters {
 export class AuditService {
   constructor(private readonly db: DatabaseService) {}
 
-  log(params: AuditLogParams): void {
-    this.db
+  log(params: AuditLogParams): number {
+    const result = this.db
       .prepare(
         `INSERT INTO audit_log (user_id, agent_name, action_type, resource_type, resource_id, details, tmux_target, surface)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
@@ -54,6 +57,29 @@ export class AuditService {
         params.tmuxTarget ?? null,
         params.surface ?? null
       );
+    return Number(result.lastInsertRowid);
+  }
+
+  completeAudit(id: number, details: Record<string, unknown>): boolean {
+    const row = this.db
+      .prepare("SELECT details FROM audit_log WHERE id = ?")
+      .get(id) as { details: string | null } | undefined;
+    if (!row) return false;
+    let merged: Record<string, unknown> = { ...details };
+    if (row.details) {
+      try {
+        const prev = JSON.parse(row.details) as unknown;
+        if (prev && typeof prev === "object" && !Array.isArray(prev)) {
+          merged = { ...(prev as Record<string, unknown>), ...details };
+        }
+      } catch {
+        /* keep the new details only */
+      }
+    }
+    this.db
+      .prepare("UPDATE audit_log SET details = ? WHERE id = ?")
+      .run(JSON.stringify(merged), id);
+    return true;
   }
 
   query(filters: AuditQueryFilters): AuditEntry[] {
@@ -75,6 +101,10 @@ export class AuditService {
     if (filters.userId) {
       conditions.push("user_id = ?");
       values.push(filters.userId);
+    }
+    if (filters.surface) {
+      conditions.push("surface = ?");
+      values.push(filters.surface);
     }
     if (filters.since) {
       conditions.push("timestamp >= ?");
