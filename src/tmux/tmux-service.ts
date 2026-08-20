@@ -24,6 +24,7 @@ export interface TmuxPane {
   pane: string;
   command: string;
   title: string;
+  activity?: number;
 }
 
 export interface SendCommandResult {
@@ -41,7 +42,7 @@ export class TmuxService {
 
   async listPanes(): Promise<TmuxPane[]> {
     try {
-      const format = "#{session_name}|#{window_index}|#{pane_index}|#{pane_current_command}|#{pane_title}";
+      const format = "#{session_name}|#{window_index}|#{pane_index}|#{pane_current_command}|#{pane_title}|#{window_activity}|#{session_activity}";
       const { stdout } = await execFileAsync("tmux", ["list-panes", "-a", "-F", format]);
 
       return stdout
@@ -49,14 +50,16 @@ export class TmuxService {
         .map((line) => line.trim())
         .filter(Boolean)
         .map((line) => {
-          const [session, window, pane, command, title] = line.split("|");
+          const [session, window, pane, command, title, windowActivity, sessionActivity] = line.split("|");
+          const activity = Number(windowActivity || sessionActivity || 0);
           return {
             target: `${session}:${window}.${pane}`,
             session,
             window,
             pane,
             command,
-            title
+            title,
+            activity: Number.isFinite(activity) ? activity : 0
           };
         });
     } catch {

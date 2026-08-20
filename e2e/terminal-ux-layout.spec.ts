@@ -64,14 +64,9 @@ async function openFriendlyTerminal(page: import('@playwright/test').Page, viewp
   // viewport; the session tree is desktop-only, so pick at a wide width first.
   await page.setViewportSize({ width: Math.max(viewport.width, 800), height: Math.max(viewport.height, 844) });
   await page.goto(TERMINAL_PATH, { waitUntil: 'domcontentloaded' });
-  const picker = page.locator('.terminal-mobile-picker select');
-  if (await picker.isVisible().catch(() => false)) {
-    await picker.selectOption(TARGET);
-  } else {
-    const pane = page.locator('.session-tree .tree-item', { hasText: TARGET });
-    await expect(pane).toBeVisible({ timeout: 15_000 });
-    await pane.click();
-  }
+  const row = page.locator(`[data-testid="terminal-session-row"][data-session-target="${TARGET}"]`);
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await row.click();
   await page.setViewportSize(viewport);
   const conversation = page.locator('[data-testid="terminal-conversation"]');
   if (!(await conversation.isVisible().catch(() => false))) {

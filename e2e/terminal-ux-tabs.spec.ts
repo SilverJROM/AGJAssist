@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// Multi-session tabs: selecting a session opens a tab; the + opens a picker to
-// open another; tapping a tab switches; ✕ closes; open tabs persist across reload.
+// The old multi-session tab strip has been removed. Session navigation is via the
+// list -> chat -> back flow.
 
 const APP_ORIGIN = process.env.AGJ_TERMINAL_BASE_URL || 'http://localhost:3210';
 const TERMINAL_PATH = `${APP_ORIGIN}/index.html#/terminals`;
@@ -43,40 +43,20 @@ async function installTransport(page: import('@playwright/test').Page) {
   });
 }
 
-async function pickFromSwitcher(page: import('@playwright/test').Page, name: string) {
-  await page.locator('[data-testid="terminal-session-switcher"]').click();
-  await page.locator('[data-testid="terminal-session-option"]').filter({ hasText: name }).first().click();
-}
-
-test('open, switch, close and persist session tabs', async ({ page }) => {
+test('session tabs are removed; list rows open chats instead', async ({ page }) => {
   test.setTimeout(60_000);
   await installTransport(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(TERMINAL_PATH, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
 
-  await pickFromSwitcher(page, 'TABA');
+  await page.locator(`[data-testid="terminal-session-row"][data-session-target="${A}"]`).click();
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator('[data-testid="terminal-tab"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="terminal-tabstrip"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="terminal-tab"]')).toHaveCount(0);
 
-  // Open a second tab via the + picker.
-  await page.locator('[data-testid="terminal-tab-add"]').click();
-  await expect(page.locator('[data-testid="terminal-tab-picker"]')).toBeVisible();
-  await page.locator('[data-testid="terminal-tab-picker-item"]').filter({ hasText: 'TABB' }).first().click();
-  await expect(page.locator('[data-testid="terminal-tab"]')).toHaveCount(2);
-  await expect(page.locator('.terminal-tab.active')).toContainText('TABB');
-
-  // Switch back to TABA.
-  await page.locator('[data-testid="terminal-tab"]').filter({ hasText: 'TABA' }).first().click();
-  await expect(page.locator('.terminal-tab.active')).toContainText('TABA');
-
-  // Persist across reload.
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(1500);
-  await expect(page.locator('[data-testid="terminal-tab"]')).toHaveCount(2);
-
-  // Close TABB.
-  await page.locator('[data-testid="terminal-tab"]').filter({ hasText: 'TABB' })
-    .locator('[data-testid="terminal-tab-close"]').first().click();
-  await expect(page.locator('[data-testid="terminal-tab"]')).toHaveCount(1);
+  await page.locator('[data-testid="terminal-back-list"]').click();
+  await page.locator(`[data-testid="terminal-session-row"][data-session-target="${B}"]`).click();
+  await expect(page.locator('[data-testid="terminal-session-name"]')).toContainText('TABB', { timeout: 10_000 });
+  await expect(page.locator('[data-testid="terminal-tabstrip"]')).toHaveCount(0);
 });

@@ -27,8 +27,7 @@ async function open(page: import('@playwright/test').Page) {
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
-  await page.locator('[data-testid="terminal-session-switcher"]').click();
-  await page.locator('[data-testid="terminal-session-option"]').filter({ hasText: 'FT' }).first().click();
+  await page.locator(`[data-testid="terminal-session-row"][data-session-target="${TARGET}"]`).click();
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(300);
 }
@@ -62,8 +61,7 @@ test('a failed message is preserved, persists across reload, and can be resent',
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1500);
   if (!(await page.locator('.terminal-chat-view').isVisible().catch(() => false))) {
-    await page.locator('[data-testid="terminal-session-switcher"]').click();
-    await page.locator('[data-testid="terminal-session-option"]').filter({ hasText: 'FT' }).first().click();
+    await page.locator(`[data-testid="terminal-session-row"][data-session-target="${TARGET}"]`).click();
     await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
   }
   await expect(page.locator('[data-testid="terminal-turn-user"]').last()).toContainText('this message will fail to send');

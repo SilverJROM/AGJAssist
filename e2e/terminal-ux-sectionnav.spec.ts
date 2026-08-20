@@ -48,11 +48,8 @@ test('terminal hides the bottom nav and offers a header section-nav; other secti
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
-  await page.locator('[data-testid="terminal-session-switcher"]').click();
-  await page.locator('[data-testid="terminal-session-option"]').filter({ hasText: 'SN' }).first().click();
-  await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
 
-  // Bottom nav hidden on the terminal; section-nav present.
+  // Bottom nav hidden on the terminal list; section-nav present.
   await expect(page.locator('.tg-tab-bar')).toBeHidden();
   const sn = page.locator('[data-testid="terminal-sectionnav"]');
   await expect(sn).toBeVisible();

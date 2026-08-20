@@ -88,14 +88,9 @@ test('§7: terminal conversation composes on the served iPhone surface', async (
     // session tree at mobile width.
     await page.setViewportSize({ width: 800, height: 844 });
     await page.goto(TERMINAL_PATH, { waitUntil: 'domcontentloaded' });
-    const picker = page.locator('.terminal-mobile-picker select');
-    if (await picker.isVisible().catch(() => false)) {
-      await picker.selectOption(TARGET);
-    } else {
-      const pane = page.locator('.session-tree .tree-item', { hasText: TARGET });
-      await expect(pane).toBeVisible({ timeout: 15_000 });
-      await pane.click();
-    }
+    const row = page.locator(`[data-testid="terminal-session-row"][data-session-target="${TARGET}"]`);
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    await row.click();
     await page.setViewportSize({ width: 390, height: 844 });
 
     const conversation = page.locator('[data-testid="terminal-conversation"]');
@@ -371,14 +366,9 @@ async function installXtermStub(page: import('@playwright/test').Page) {
 async function selectPaneAndFriendly(page: import('@playwright/test').Page) {
   await page.setViewportSize({ width: 800, height: 844 });
   await page.goto(TERMINAL_PATH, { waitUntil: 'domcontentloaded' });
-  const picker = page.locator('.terminal-mobile-picker select');
-  if (await picker.isVisible().catch(() => false)) {
-    await picker.selectOption(TARGET);
-  } else {
-    const pane = page.locator('.session-tree .tree-item', { hasText: TARGET });
-    await expect(pane).toBeVisible({ timeout: 15_000 });
-    await pane.click();
-  }
+  const row = page.locator(`[data-testid="terminal-session-row"][data-session-target="${TARGET}"]`);
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await row.click();
   await page.setViewportSize({ width: 390, height: 844 });
   const friendly = page.getByRole('button', { name: /^Friendly$/ }).first();
   if (await friendly.isVisible().catch(() => false)) await friendly.click();
@@ -603,7 +593,7 @@ test('A6 R6 R7 single topbar — controls still perform their functions at 390',
 
   await openMenu();
   await menuSheet.getByRole('button', { name: /^Disconnect$/ }).click();
-  await expect(page.getByText('No terminal selected')).toBeVisible();
+  await expect(page.locator('[data-testid="terminal-session-list"]')).toBeVisible();
 });
 
 test('A7 R8 show-raw reveals stripped chrome', async ({ page }) => {

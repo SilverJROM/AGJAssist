@@ -11,6 +11,7 @@ import { FileService, PathTraversalError } from "../../services/file-service.js"
 
 const ATTACH_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const ATTACH_IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
+const TMUX_BUSY_RE = /(✻|✳|✶|◐|◓|◑|◒).*(for \d|esc to interrupt|running|\btokens?\b)/i;
 
 function sanitizeAttachImageBasename(filename: string): string | null {
   const raw = String(filename || "");
@@ -37,6 +38,10 @@ function decodeAttachImageBase64(dataBase64: string): Buffer | null {
   const buf = Buffer.from(stripped, "base64");
   if (!buf.length) return null;
   return buf;
+}
+
+function paneLooksBusy(output: string): boolean {
+  return TMUX_BUSY_RE.test(output) || /esc to interrupt/i.test(output);
 }
 
 export function registerTmuxRoutes(
@@ -70,10 +75,16 @@ export function registerTmuxRoutes(
       const panes = await tmuxService.listPanes();
 
       // Group by session
-      const sessions = new Map<string, typeof panes>();
+      const sessions = new Map<string, Array<(typeof panes)[number] & { busy: boolean }>>();
       for (const pane of panes) {
         const existing = sessions.get(pane.session) || [];
-        existing.push(pane);
+        let busy = false;
+        try {
+          busy = paneLooksBusy(await tmuxService.peekPane(pane.target, 40));
+        } catch {
+          busy = false;
+        }
+        existing.push({ ...pane, busy });
         sessions.set(pane.session, existing);
       }
 

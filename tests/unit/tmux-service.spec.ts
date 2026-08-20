@@ -31,6 +31,13 @@ describe("TmuxService sendCommand", () => {
     await service.sendCommand("agj-7:0.0", "npm test", true, true);
 
     expect(execFileMock).toHaveBeenNthCalledWith(1, "tmux", [
+      "display-message",
+      "-p",
+      "-t",
+      "agj-7:0.0",
+      "#{pane_in_mode}"
+    ]);
+    expect(execFileMock).toHaveBeenNthCalledWith(2, "tmux", [
       "send-keys",
       "-l",
       "-t",
@@ -38,7 +45,7 @@ describe("TmuxService sendCommand", () => {
       "--",
       "npm test"
     ]);
-    expect(execFileMock).toHaveBeenNthCalledWith(2, "tmux", [
+    expect(execFileMock).toHaveBeenNthCalledWith(3, "tmux", [
       "send-keys",
       "-t",
       "agj-7:0.0",
@@ -70,6 +77,31 @@ describe("TmuxService sendCommand", () => {
     expect(() => service.ensureValidTarget("ovm build")).toThrow("Invalid tmux target");
     expect(() => service.ensureValidTarget("ovm-build;rm")).toThrow("Invalid tmux target");
     expect(() => service.ensureValidTarget("sess:0.1;rm")).toThrow("Invalid tmux target");
+  });
+});
+
+describe("TmuxService listPanes", () => {
+  beforeEach(() => {
+    execFileMock.mockReset();
+  });
+
+  it("includes tmux activity seconds for panes", async () => {
+    execFileMock.mockResolvedValueOnce({
+      stdout: "AGJ|0|0|claude|title|1787240400|1787240000\n"
+    });
+    const service = new TmuxService();
+
+    await expect(service.listPanes()).resolves.toEqual([
+      {
+        target: "AGJ:0.0",
+        session: "AGJ",
+        window: "0",
+        pane: "0",
+        command: "claude",
+        title: "title",
+        activity: 1787240400
+      }
+    ]);
   });
 });
 

@@ -42,8 +42,7 @@ async function openTarget(page: import('@playwright/test').Page) {
   await page.setViewportSize({ width: 390, height: 780 });
   await page.goto(TERMINAL_PATH, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
-  await page.locator('[data-testid="terminal-session-switcher"]').click();
-  await page.locator('[data-testid="terminal-session-option"]').filter({ hasText: 'RESIZE' }).first().click();
+  await page.locator(`[data-testid="terminal-session-row"][data-session-target="${TARGET}"]`).click();
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
 }
 
@@ -70,8 +69,7 @@ test('drag the grip to resize the composer; height persists; double-tap resets',
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1400);
   if (!(await page.locator('.terminal-chat-view').isVisible().catch(() => false))) {
-    await page.locator('[data-testid="terminal-session-switcher"]').click();
-    await page.locator('[data-testid="terminal-session-option"]').filter({ hasText: 'RESIZE' }).first().click();
+    await page.locator(`[data-testid="terminal-session-row"][data-session-target="${TARGET}"]`).click();
     await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
   }
   const persisted = (await page.locator('[data-testid="terminal-composer-input"]').boundingBox())!.height;

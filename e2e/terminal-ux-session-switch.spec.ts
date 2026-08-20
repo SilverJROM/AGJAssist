@@ -1,12 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-// Independent validation of the SESSION SWITCHER grok46 added to the AGJAssist
-// Terminal topbar: clicking the session name (data-testid=terminal-session-switcher)
-// opens a dropdown (data-testid=terminal-session-dropdown) listing every tmux
-// session/pane (data-testid=terminal-session-option); picking one calls
-// switchActiveTarget -> setActiveTarget and the terminal reconnects to the new
-// target. Reuses the auth/tmux-route-stub pattern from
-// e2e/terminal-ux-conversation.spec.ts and e2e/terminal-ux-layout.spec.ts.
+// Independent validation of the terminal list -> chat navigation model. Tapping
+// a session row calls switchActiveTarget -> setActiveTarget and remounts the chat
+// on that target; the chat back button returns to the list.
 
 const APP_ORIGIN = process.env.AGJ_TERMINAL_BASE_URL || 'http://localhost:3210';
 const TERMINAL_PATH = `${APP_ORIGIN}/index.html#/terminals`;
@@ -78,14 +74,9 @@ async function openTerminalOnSessA(page: import('@playwright/test').Page, viewpo
   // layout + conversation specs).
   await page.setViewportSize({ width: Math.max(viewport.width, 800), height: Math.max(viewport.height, 844) });
   await page.goto(TERMINAL_PATH, { waitUntil: 'domcontentloaded' });
-  const picker = page.locator('.terminal-mobile-picker select');
-  if (await picker.isVisible().catch(() => false)) {
-    await picker.selectOption(SESS_A.target);
-  } else {
-    const pane = page.locator('.session-tree .tree-item', { hasText: SESS_A.target });
-    await expect(pane).toBeVisible({ timeout: 15_000 });
-    await pane.click();
-  }
+  const row = page.locator(`[data-testid="terminal-session-row"][data-session-target="${SESS_A.target}"]`);
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await row.click();
   await page.setViewportSize(viewport);
   const conversation = page.locator('[data-testid="terminal-conversation"]');
   if (!(await conversation.isVisible().catch(() => false))) {
@@ -93,8 +84,8 @@ async function openTerminalOnSessA(page: import('@playwright/test').Page, viewpo
     if (await friendly.isVisible().catch(() => false)) await friendly.click();
   }
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
-  // Confirm we're actually connected to SESS-A before exercising the switcher.
-  await expect(page.locator('[data-testid="terminal-session-switcher"]')).toContainText(SESS_A.name, { timeout: 15_000 });
+  // Confirm we're actually connected to SESS-A before exercising list navigation.
+  await expect(page.locator('[data-testid="terminal-session-name"]')).toContainText(SESS_A.name, { timeout: 15_000 });
 }
 
 const VIEWPORTS = [
@@ -103,20 +94,18 @@ const VIEWPORTS = [
 ];
 
 for (const viewport of VIEWPORTS) {
-  test(`Session switcher dropdown lists and switches sessions at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }, testInfo) => {
+  test(`Session list opens and switches sessions at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }, testInfo) => {
     await openTerminalOnSessA(page, viewport);
 
-    const switcher = page.locator('[data-testid="terminal-session-switcher"]');
-    const dropdown = page.locator('[data-testid="terminal-session-dropdown"]');
-    const options = page.locator('[data-testid="terminal-session-option"]');
+    const back = page.locator('[data-testid="terminal-back-list"]');
+    await expect(back).toBeVisible();
+    await back.click();
 
-    // --- Dropdown opens and lists both sessions ---
-    await expect(dropdown).toBeHidden();
-    await switcher.click();
-    await expect(dropdown).toBeVisible();
-    await expect(options).toHaveCount(2);
-    await expect(dropdown).toContainText(SESS_A.name);
-    await expect(dropdown).toContainText(SESS_B.name);
+    const rows = page.locator('[data-testid="terminal-session-row"]');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.filter({ hasText: SESS_A.name })).toBeVisible();
+    await expect(rows.filter({ hasText: SESS_B.name })).toBeVisible();
+    await expect(page.locator('[data-testid="terminal-tabstrip"]')).toHaveCount(0);
 
     // --- Selecting SESS-B actually switches the active target end-to-end ---
     // Watch for the poll/reconnect request to SESS-B's output endpoint, which only
@@ -126,74 +115,27 @@ for (const viewport of VIEWPORTS) {
       /\/api\/tmux\/panes\/SESS-B(%3A|:)0\.0\/output/.test(req.url())
     , { timeout: 10_000 });
 
-    const sessBOption = options.filter({ hasText: SESS_B.target });
-    await expect(sessBOption).toHaveCount(1);
-    await sessBOption.click();
+    const sessBRow = page.locator(`[data-testid="terminal-session-row"][data-session-target="${SESS_B.target}"]`);
+    await expect(sessBRow).toBeVisible();
+    await sessBRow.click();
 
     await sessBRequest;
 
     // Topbar name now reflects SESS-B, not SESS-A.
-    await expect(switcher).toContainText(SESS_B.name, { timeout: 10_000 });
-    await expect(switcher).not.toContainText(SESS_A.name);
+    const sessionName = page.locator('[data-testid="terminal-session-name"]');
+    await expect(sessionName).toContainText(SESS_B.name, { timeout: 10_000 });
+    await expect(sessionName).not.toContainText(SESS_A.name);
 
     // The transcript now shows SESS-B's identifiable output, not SESS-A's.
     const conversation = page.locator('[data-testid="terminal-conversation"]');
     await expect(conversation).toContainText('SESS-B baseline output', { timeout: 10_000 });
 
-    // --- Dropdown closes after selecting ---
-    await expect(dropdown).toBeHidden();
-
-    // Close-on-outside-click/Escape is wired via a useEffect that attaches its
-    // window listeners AFTER the dropdown commits to the DOM (not synchronously with
-    // the click that opened it), so there's a sub-10ms window, immediately after
-    // open, where those listeners aren't registered yet. A real human's reaction
-    // time (~150ms+) never lands inside that window, but Playwright's synthetic
-    // input can act inside the same tick. 30ms comfortably clears the effect
-    // (confirmed empirically: any wait >=10ms passes reliably, 0ms fails ~100% of
-    // the time) without masking whether the close behavior itself actually works.
-    const clearsOpenEffectRace = () => page.waitForTimeout(30);
-
-    // --- Dropdown closes on outside click ---
-    await switcher.click();
-    await expect(dropdown).toBeVisible();
-    await clearsOpenEffectRace();
-    await page.mouse.click(10, 10);
-    await expect(dropdown).toBeHidden();
-
-    // --- Dropdown closes on Escape ---
-    await switcher.click();
-    await expect(dropdown).toBeVisible();
-    await clearsOpenEffectRace();
-    await page.keyboard.press('Escape');
-    await expect(dropdown).toBeHidden();
-
-    // NON-VACUITY CHECK: prove the switch assertions above are falsifiable, i.e. they
-    // would fail if selecting an option did nothing. Simulate the "broken" behavior
-    // (click registers but activeTarget never changes) by re-opening the dropdown,
-    // and confirming that the CURRENT (already-switched) active option is SESS-B and
-    // SESS-A's option is not marked active — if switchActiveTarget were a no-op, the
-    // active option would still be SESS-A here (we started on SESS-A and only ever
-    // clicked SESS-B once). This shows the active-state marker genuinely tracks the
-    // real activeTarget rather than always reporting the initial pane.
-    await switcher.click();
-    await expect(dropdown).toBeVisible();
-    const activeOption = page.locator('[data-testid="terminal-session-option"].active');
-    await expect(activeOption).toHaveCount(1);
-    await expect(activeOption).toContainText(SESS_B.target);
-    await expect(activeOption).not.toContainText(SESS_A.target);
-    await clearsOpenEffectRace();
-    await page.keyboard.press('Escape');
-    await expect(dropdown).toBeHidden();
-
     if (viewport.width <= 390) {
-      // Reopen so JROM can see the working dropdown at mobile width.
-      await switcher.click();
-      await expect(dropdown).toBeVisible();
+      await back.click();
+      await expect(page.locator('[data-testid="terminal-session-list"]')).toBeVisible();
       await page.screenshot({
-        path: '/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/terminal-ux-2026-08-15/mockups/screenshots/LIVE-session-dropdown.png',
+        path: '/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/terminal-ux-2026-08-15/mockups/screenshots/LIVE-session-list.png',
       });
-      await clearsOpenEffectRace();
-      await page.keyboard.press('Escape');
     }
     void testInfo;
   });

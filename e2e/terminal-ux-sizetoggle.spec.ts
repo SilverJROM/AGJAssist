@@ -41,8 +41,7 @@ async function open(page: import('@playwright/test').Page) {
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
-  await page.locator('[data-testid="terminal-session-switcher"]').click();
-  await page.locator('[data-testid="terminal-session-option"]').filter({ hasText: 'ST' }).first().click();
+  await page.locator(`[data-testid="terminal-session-row"][data-session-target="${TARGET}"]`).click();
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
 }
 
@@ -66,8 +65,7 @@ test('small/large input toggle enlarges and shrinks the composer', async ({ page
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
   if (!(await page.locator('.terminal-chat-view').isVisible().catch(() => false))) {
-    await page.locator('[data-testid="terminal-session-switcher"]').click();
-    await page.locator('[data-testid="terminal-session-option"]').filter({ hasText: 'ST' }).first().click();
+    await page.locator(`[data-testid="terminal-session-row"][data-session-target="${TARGET}"]`).click();
     await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
   }
   const persisted = (await page.locator('[data-testid="terminal-composer-input"]').boundingBox())!.height;

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// A newly-created tmux session appears in the switcher dropdown WITHOUT reopening
-// the chat: the list refreshes when the dropdown opens and via a background poll.
+// A newly-created tmux session appears in the session list after the background
+// sessions poll refreshes.
 
 const APP_ORIGIN = process.env.AGJ_TERMINAL_BASE_URL || 'http://localhost:3210';
 
@@ -21,7 +21,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('a new session shows in the dropdown without reopening the chat', async ({ page }) => {
+test('a new session shows in the list after background refresh', async ({ page }) => {
   test.setTimeout(60_000);
   // Mutable session list — a second session is "created" mid-session.
   let sessions: unknown[] = [{ session_name: 'SESA', panes: [{ target: 'SESA:0.0', command: 'claude' }] }];
@@ -35,8 +35,7 @@ test('a new session shows in the dropdown without reopening the chat', async ({ 
   await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
 
-  await page.locator('[data-testid="terminal-session-switcher"]').click();
-  await page.locator('[data-testid="terminal-session-option"]').filter({ hasText: 'SESA' }).first().click();
+  await page.locator('[data-testid="terminal-session-row"][data-session-target="SESA:0.0"]').click();
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
 
   // A new session is created externally (chat stays open).
@@ -45,7 +44,6 @@ test('a new session shows in the dropdown without reopening the chat', async ({ 
     { session_name: 'SESB-NEW', panes: [{ target: 'SESB-NEW:0.0', command: 'claude' }] },
   ];
 
-  // Opening the dropdown refreshes → the new session is there without reopening.
-  await page.locator('[data-testid="terminal-session-switcher"]').click();
-  await expect(page.locator('[data-testid="terminal-session-option"]').filter({ hasText: 'SESB-NEW' })).toBeVisible({ timeout: 5_000 });
+  await page.locator('[data-testid="terminal-back-list"]').click();
+  await expect(page.locator('[data-testid="terminal-session-row"]').filter({ hasText: 'SESB-NEW' })).toBeVisible({ timeout: 12_000 });
 });

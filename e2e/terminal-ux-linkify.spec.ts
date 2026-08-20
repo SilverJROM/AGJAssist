@@ -57,8 +57,7 @@ async function openFriendly(page: import('@playwright/test').Page) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(TERMINAL_PATH, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
-  await page.locator('[data-testid="terminal-session-switcher"]').click();
-  await page.locator('[data-testid="terminal-session-option"]').filter({ hasText: 'LOGIN' }).first().click();
+  await page.locator(`[data-testid="terminal-session-row"][data-session-target="${TARGET}"]`).click();
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
 }
 

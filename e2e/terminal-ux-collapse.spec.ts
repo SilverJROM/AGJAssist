@@ -65,14 +65,9 @@ async function installTransport(page: import('@playwright/test').Page) {
 async function openFriendly(page: import('@playwright/test').Page) {
   await page.setViewportSize({ width: 800, height: 844 });
   await page.goto(TERMINAL_PATH, { waitUntil: 'domcontentloaded' });
-  const picker = page.locator('.terminal-mobile-picker select');
-  if (await picker.isVisible().catch(() => false)) {
-    await picker.selectOption(TARGET);
-  } else {
-    const pane = page.locator('.session-tree .tree-item', { hasText: TARGET });
-    await expect(pane).toBeVisible({ timeout: 15_000 });
-    await pane.click();
-  }
+  const row = page.locator(`[data-testid="terminal-session-row"][data-session-target="${TARGET}"]`);
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await row.click();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
 }
