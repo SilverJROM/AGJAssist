@@ -8401,6 +8401,7 @@ function TgApp() {
 const MCP_POOL_NAME_RE = /^[A-Za-z0-9_.-]{1,128}$/;
 const MCP_ORCH_HINT = /(?:^x-|_validator_|_planner_|_impl_|projcore)/i;
 const MCP_AUDIT_PAGE = 20;
+const MCP_PERM_NAMES = ['list_sessions', 'read_session', 'send_message', 'send_keys', 'upload_image', 'read_image'];
 
 function mcpAuditBlocked(details) {
   if (!details) return false;
@@ -8412,12 +8413,187 @@ function mcpAuditBlocked(details) {
   }
 }
 
+function parseGrantSessions(grant) {
+  if (grant?.scope_type !== 'sessions') return [];
+  try {
+    const parsed = JSON.parse(grant.scope_ref);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function McpGrantRow({ grant, pool, groups, onUpdated, onRevoked }) {
+  const [error, setError] = useState('');
+  const [scopeType, setScopeType] = useState(grant.scope_type === 'group' ? 'group' : 'sessions');
+  const [selectedSessions, setSelectedSessions] = useState(() => parseGrantSessions(grant));
+  const [selectedGroup, setSelectedGroup] = useState(grant.scope_type === 'group' ? grant.scope_ref : '');
+  const [perms, setPerms] = useState(() => (Array.isArray(grant.permissions) ? grant.permissions.slice() : []));
+  const [lifetime, setLifetime] = useState(!!grant.lifetime);
+  const [lifetimeStep, setLifetimeStep] = useState(null);
+  const [lifetimeTyped, setLifetimeTyped] = useState('');
+  const [revokeStep, setRevokeStep] = useState(false);
+
+  const group = (groups || []).find((g) => g.id === (scopeType === 'group' ? selectedGroup : grant.scope_ref));
+
+  async function patchScope(nextType, nextSessions, nextGroup) {
+    setError('');
+    const body = nextType === 'group'
+      ? { scope_type: 'group', scope_ref: nextGroup }
+      : { sessions: nextSessions };
+    try {
+      const data = await api(`/api/mcp/grants/${grant.id}/scope`, {
+        method: 'PATCH',
+        body: JSON.stringify(body)
+      });
+      setScopeType(data.scope_type === 'group' ? 'group' : 'sessions');
+      if (data.scope_type === 'group') setSelectedGroup(data.scope_ref);
+      else setSelectedSessions(parseGrantSessions({ scope_type: 'sessions', scope_ref: data.scope_ref }));
+      onUpdated({ ...grant, scope_type: data.scope_type, scope_ref: data.scope_ref });
+    } catch (e) {
+      setError(e.message || 'Scope update failed');
+    }
+  }
+
+  async function toggleSession(name) {
+    const next = selectedSessions.includes(name)
+      ? selectedSessions.filter((s) => s !== name)
+      : selectedSessions.concat(name);
+    setSelectedSessions(next);
+    await patchScope('sessions', next, selectedGroup);
+  }
+
+  async function togglePerm(name) {
+    setError('');
+    const next = perms.includes(name) ? perms.filter((p) => p !== name) : perms.concat(name);
+    try {
+      const data = await api(`/api/mcp/grants/${grant.id}/permissions`, {
+        method: 'PATCH',
+        body: JSON.stringify({ permissions: next })
+      });
+      setPerms(Array.isArray(data.permissions) ? data.permissions : next);
+      onUpdated({ ...grant, permissions: data.permissions || next });
+    } catch (e) {
+      setError(e.message || 'Permission update failed');
+    }
+  }
+
+  async function confirmLifetime() {
+    if (lifetimeTyped !== 'LIFETIME' || !lifetimeStep) return;
+    setError('');
+    const on = lifetimeStep === 'on';
+    try {
+      const data = await api(`/api/mcp/grants/${grant.id}/lifetime`, {
+        method: 'PATCH',
+        body: JSON.stringify({ lifetime: on, confirm: 'LIFETIME' })
+      });
+      setLifetime(!!data.lifetime);
+      setLifetimeStep(null);
+      setLifetimeTyped('');
+      onUpdated({ ...grant, lifetime: !!data.lifetime, access_expires_at: data.lifetime ? null : grant.access_expires_at });
+    } catch (e) {
+      setError(e.message || 'Lifetime update failed');
+    }
+  }
+
+  async function confirmRevoke() {
+    setError('');
+    try {
+      await api(`/api/mcp/grants/${grant.id}/revoke`, { method: 'POST' });
+      onRevoked(grant.id);
+    } catch (e) {
+      setError(e.message || 'Revoke failed');
+      setRevokeStep(false);
+    }
+  }
+
+  return html`
+    <article class="mcp-grant-row" data-testid="mcp-grant-row" data-grant-id=${String(grant.id)}>
+      <header class="mcp-grant-head">
+        <div>
+          <div class="mcp-grant-name" data-testid="mcp-grant-name">${grant.client_name || 'Unknown'}</div>
+          <div class="mcp-grant-id" data-testid="mcp-grant-id">id …${grant.client_id_suffix || (grant.client_id || '').slice(-8)}</div>
+        </div>
+        <div class="mcp-grant-meta">
+          <span data-testid="mcp-grant-granted">granted ${grant.granted_at || '—'}</span>
+          <span data-testid="mcp-grant-last-used">last-used ${grant.last_used_at || '—'}</span>
+          ${lifetime
+            ? html`<span class="mcp-grant-badge" data-testid="mcp-grant-lifetime-badge">Lifetime</span>`
+            : html`<span class="mcp-grant-badge" data-testid="mcp-grant-expiry-badge">${grant.access_expires_at || 'expires'}</span>`}
+        </div>
+      </header>
+      ${scopeType === 'group' && group ? html`<p class="mcp-access-hint" data-testid="mcp-grant-group-live">live with group ${group.name}</p>` : ''}
+
+      <div class="mcp-scope-picker" data-testid="mcp-scope-picker">
+        <label class="mcp-check"><input type="radio" name=${'mcp-scope-type-' + grant.id} checked=${scopeType === 'sessions'}
+          onChange=${() => { setScopeType('sessions'); patchScope('sessions', selectedSessions, selectedGroup); }} /> Sessions</label>
+        <label class="mcp-check"><input type="radio" name=${'mcp-scope-type-' + grant.id} checked=${scopeType === 'group'}
+          onChange=${() => { setScopeType('group'); if (selectedGroup) patchScope('group', selectedSessions, selectedGroup); }} /> Group</label>
+        ${scopeType === 'sessions'
+          ? (pool || []).map((name) => html`
+              <label class="mcp-check" data-testid="mcp-scope-option" data-session=${name}>
+                <input type="checkbox" checked=${selectedSessions.includes(name)} onChange=${() => toggleSession(name)} />
+                ${name}
+              </label>
+            `)
+          : (groups || []).map((g) => html`
+              <label class="mcp-check" data-testid="mcp-scope-option" data-group=${g.id}>
+                <input type="radio" name=${'mcp-scope-group-' + grant.id} checked=${selectedGroup === g.id}
+                  onChange=${() => { setSelectedGroup(g.id); patchScope('group', selectedSessions, g.id); }} />
+                ${g.name}
+              </label>
+            `)}
+      </div>
+
+      <div class="mcp-perm-list">
+        ${MCP_PERM_NAMES.map((name) => html`
+          <label class="mcp-check" data-testid="mcp-perm-toggle" data-perm=${name}>
+            <input type="checkbox" checked=${perms.includes(name)} onChange=${() => togglePerm(name)} />
+            ${name}
+          </label>
+        `)}
+      </div>
+
+      <div class="mcp-grant-actions">
+        <label class="mcp-check">
+          <input type="checkbox" data-testid="mcp-lifetime-toggle" checked=${lifetime}
+            onClick=${(e) => {
+              e.preventDefault();
+              setLifetimeTyped('');
+              setLifetimeStep(lifetime ? 'off' : 'on');
+            }} />
+          Lifetime
+        </label>
+        ${lifetimeStep && html`
+          <div class="mcp-confirm" data-testid="mcp-lifetime-confirm">
+            <p>Type LIFETIME to ${lifetimeStep === 'on' ? 'enable' : 'disable'} lifetime access.</p>
+            <input data-testid="mcp-lifetime-confirm-input" value=${lifetimeTyped}
+              onInput=${(e) => setLifetimeTyped(e.target.value)} placeholder="LIFETIME" />
+            <button type="button" class="btn btn-primary btn-sm" data-testid="mcp-lifetime-confirm-btn"
+              disabled=${lifetimeTyped !== 'LIFETIME'} onclick=${confirmLifetime}>Confirm</button>
+            <button type="button" class="btn btn-sm" onclick=${() => { setLifetimeStep(null); setLifetimeTyped(''); }}>Cancel</button>
+          </div>
+        `}
+        ${!revokeStep
+          ? html`<button type="button" class="btn btn-danger btn-sm" data-testid="mcp-revoke" onclick=${() => setRevokeStep(true)}>Revoke</button>`
+          : html`<div class="mcp-confirm" data-testid="mcp-revoke-confirm">
+              <p>Revoke this agent’s access?</p>
+              <button type="button" class="btn btn-danger btn-sm" data-testid="mcp-revoke-confirm-btn" onclick=${confirmRevoke}>Confirm revoke</button>
+              <button type="button" class="btn btn-sm" onclick=${() => setRevokeStep(false)}>Cancel</button>
+            </div>`}
+      </div>
+      ${error && html`<p class="mcp-access-error" data-testid="mcp-grant-error">${error}</p>`}
+    </article>
+  `;
+}
+
 function McpAccessPage() {
   const user = JSON.parse(localStorage.getItem('agj_user') || 'null');
   const [pool, setPool] = useState([]);
   const [poolDraft, setPoolDraft] = useState('');
   const [poolError, setPoolError] = useState('');
   const [groups, setGroups] = useState([]);
+  const [grants, setGrants] = useState([]);
   const [auditRows, setAuditRows] = useState([]);
   const [auditOffset, setAuditOffset] = useState(0);
   const [auditMore, setAuditMore] = useState(false);
@@ -8445,6 +8621,7 @@ function McpAccessPage() {
     Promise.all([
       loadPool().catch((e) => setPoolError(e.message || 'Failed to load pool')),
       api('/api/terminal/groups').then((d) => setGroups(Array.isArray(d.groups) ? d.groups : [])).catch(() => setGroups([])),
+      api('/api/mcp/grants').then((d) => setGrants((d.grants || []).filter((g) => g.status === 'active'))).catch(() => setGrants([])),
       loadAudit(0).catch(() => { setAuditRows([]); setAuditMore(false); })
     ]).finally(() => setLoading(false));
   }, []);
@@ -8527,7 +8704,13 @@ function McpAccessPage() {
 
       <section class="mcp-access-section" data-testid="mcp-connected-agents">
         <h3>Connected agents</h3>
-        <p class="mcp-access-hint">Active grants will appear here.</p>
+        ${grants.length === 0
+          ? html`<p class="mcp-access-hint">No active grants.</p>`
+          : html`<div class="mcp-grant-list">
+              ${grants.map((g) => html`<${McpGrantRow} key=${g.id} grant=${g} pool=${pool} groups=${groups}
+                onUpdated=${(next) => setGrants((prev) => prev.map((row) => row.id === next.id ? { ...row, ...next } : row))}
+                onRevoked=${(id) => setGrants((prev) => prev.filter((row) => row.id !== id))} />`)}
+            </div>`}
       </section>
 
       <section class="mcp-access-section" data-testid="mcp-audit">

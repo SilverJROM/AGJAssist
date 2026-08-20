@@ -13,6 +13,45 @@ test.describe("MCP Access admin UI (B20)", () => {
     });
 
     let pool = ["NORTH"];
+    let grants = [
+      {
+        id: 1,
+        client_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        client_id_suffix: "aaaaaaaa",
+        client_name: "grok",
+        scope_type: "sessions",
+        scope_ref: JSON.stringify(["NORTH"]),
+        permissions: [
+          "list_sessions",
+          "read_session",
+          "send_message",
+          "send_keys",
+          "upload_image",
+          "read_image"
+        ],
+        lifetime: false,
+        token_ttl_days: 7,
+        status: "active",
+        granted_at: "2026-08-20T08:00:00Z",
+        last_used_at: "2026-08-20T09:00:00Z",
+        access_expires_at: "2026-08-27T08:00:00Z"
+      },
+      {
+        id: 2,
+        client_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        client_id_suffix: "bbbbbbbb",
+        client_name: "claude",
+        scope_type: "sessions",
+        scope_ref: JSON.stringify(["OTHER"]),
+        permissions: ["list_sessions", "read_session"],
+        lifetime: false,
+        token_ttl_days: 7,
+        status: "active",
+        granted_at: "2026-08-20T08:05:00Z",
+        last_used_at: null,
+        access_expires_at: "2026-08-27T08:05:00Z"
+      }
+    ];
     const auditPage1 = Array.from({ length: 20 }, (_, i) => ({
       timestamp: `2026-08-20T10:${String(19 - i).padStart(2, "0")}:00Z`,
       agent_name: i === 1 ? "grok" : "grok",
@@ -66,6 +105,78 @@ test.describe("MCP Access admin UI (B20)", () => {
         })
       });
     });
+    await page.route(/\/api\/mcp\/grants\/(\d+)\/scope(?:\?.*)?$/, async (route) => {
+      const id = Number(route.request().url().match(/grants\/(\d+)/)?.[1]);
+      const grant = grants.find((g) => g.id === id);
+      if (!grant) {
+        await route.fulfill({ status: 404, contentType: "application/json", body: '{"error":"not_found"}' });
+        return;
+      }
+      const body = route.request().postDataJSON() as { sessions?: string[]; scope_type?: string; scope_ref?: string };
+      if (Array.isArray(body.sessions)) {
+        const missing = body.sessions.filter((s) => !pool.includes(s));
+        if (missing.length) {
+          await route.fulfill({
+            status: 400,
+            contentType: "application/json",
+            body: JSON.stringify({ error: "outside_pool" })
+          });
+          return;
+        }
+        grant.scope_type = "sessions";
+        grant.scope_ref = JSON.stringify(body.sessions);
+      } else {
+        grant.scope_type = body.scope_type === "group" ? "group" : "sessions";
+        grant.scope_ref = String(body.scope_ref || "");
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ id: grant.id, scope_type: grant.scope_type, scope_ref: grant.scope_ref })
+      });
+    });
+    await page.route(/\/api\/mcp\/grants\/(\d+)\/permissions(?:\?.*)?$/, async (route) => {
+      const id = Number(route.request().url().match(/grants\/(\d+)/)?.[1]);
+      const grant = grants.find((g) => g.id === id);
+      const body = route.request().postDataJSON() as { permissions?: string[] };
+      if (grant) grant.permissions = Array.isArray(body.permissions) ? body.permissions : grant.permissions;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ id, permissions: grant?.permissions || [] })
+      });
+    });
+    await page.route(/\/api\/mcp\/grants\/(\d+)\/lifetime(?:\?.*)?$/, async (route) => {
+      const id = Number(route.request().url().match(/grants\/(\d+)/)?.[1]);
+      const grant = grants.find((g) => g.id === id);
+      const body = route.request().postDataJSON() as { lifetime?: boolean; confirm?: string };
+      if (body.confirm !== "LIFETIME") {
+        await route.fulfill({ status: 400, contentType: "application/json", body: '{"error":"confirm_required"}' });
+        return;
+      }
+      if (grant) grant.lifetime = body.lifetime === true;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ id, lifetime: grant?.lifetime === true })
+      });
+    });
+    await page.route(/\/api\/mcp\/grants\/(\d+)\/revoke(?:\?.*)?$/, async (route) => {
+      const id = Number(route.request().url().match(/grants\/(\d+)/)?.[1]);
+      grants = grants.filter((g) => g.id !== id);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ id, status: "revoked" })
+      });
+    });
+    await page.route(/\/api\/mcp\/grants(?:\?.*)?$/, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ grants })
+      });
+    });
     await page.route(/\/api\/mcp\/audit(?:\?.*)?$/, async (route) => {
       const url = new URL(route.request().url());
       const offset = Number(url.searchParams.get("offset") || "0");
@@ -109,5 +220,53 @@ test.describe("MCP Access admin UI (B20)", () => {
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > 390);
     expect(overflow).toBe(false);
+  });
+
+  test("AC-22: grant-row controls render at 390px", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.goto(`${APP_ORIGIN}/index.html#/mcp-access`, { waitUntil: "domcontentloaded" });
+    const grok = page.locator('[data-testid="mcp-grant-row"][data-grant-id="1"]');
+    await expect(grok).toBeVisible({ timeout: 15_000 });
+    await expect(grok.locator('[data-testid="mcp-grant-name"]')).toHaveText("grok");
+    await expect(grok.locator('[data-testid="mcp-grant-id"]')).toContainText("aaaaaaaa");
+    await expect(grok.locator('[data-testid="mcp-scope-picker"]')).toBeVisible();
+    await expect(grok.locator('[data-testid="mcp-scope-option"]')).toHaveCount(1);
+    await expect(grok.locator('[data-testid="mcp-perm-toggle"]')).toHaveCount(6);
+    await expect(grok.locator('[data-testid="mcp-lifetime-toggle"]')).not.toBeChecked();
+    await expect(grok.locator('[data-testid="mcp-grant-expiry-badge"]')).toBeVisible();
+    await expect(grok.locator('[data-testid="mcp-revoke"]')).toBeVisible();
+    await expect(page.locator('[data-testid="mcp-grant-row"][data-grant-id="2"]')).toBeVisible();
+  });
+
+  test("AC-25/AC-28/AC-30: live scope and perm edits stay isolated per grant", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.goto(`${APP_ORIGIN}/index.html#/mcp-access`, { waitUntil: "domcontentloaded" });
+    const grok = page.locator('[data-testid="mcp-grant-row"][data-grant-id="1"]');
+    const claude = page.locator('[data-testid="mcp-grant-row"][data-grant-id="2"]');
+    await expect(grok).toBeVisible({ timeout: 15_000 });
+
+    await page.locator('[data-testid="mcp-pool-add-input"]').fill("OTHER");
+    await page.locator('[data-testid="mcp-pool-add"]').click();
+    await expect(grok.locator('[data-testid="mcp-scope-option"][data-session="OTHER"]')).toBeVisible();
+    await grok.locator('[data-testid="mcp-scope-option"][data-session="OTHER"] input').check();
+    await expect(grok.locator('[data-testid="mcp-scope-option"][data-session="NORTH"] input')).toBeChecked();
+    await expect(grok.locator('[data-testid="mcp-scope-option"][data-session="OTHER"] input')).toBeChecked();
+    await expect(claude.locator('[data-testid="mcp-scope-option"][data-session="OTHER"] input')).toBeChecked();
+    await expect(claude.locator('[data-testid="mcp-scope-option"][data-session="NORTH"] input')).not.toBeChecked();
+
+    await grok.locator('[data-testid="mcp-perm-toggle"][data-perm="send_message"] input').uncheck();
+    await expect(grok.locator('[data-testid="mcp-perm-toggle"][data-perm="send_message"] input')).not.toBeChecked();
+    await expect(claude.locator('[data-testid="mcp-perm-toggle"][data-perm="send_message"] input')).not.toBeChecked();
+
+    await grok.locator('[data-testid="mcp-lifetime-toggle"]').click();
+    await grok.locator('[data-testid="mcp-lifetime-confirm-input"]').fill("LIFETIME");
+    await grok.locator('[data-testid="mcp-lifetime-confirm-btn"]').click();
+    await expect(grok.locator('[data-testid="mcp-grant-lifetime-badge"]')).toBeVisible();
+    await expect(claude.locator('[data-testid="mcp-grant-expiry-badge"]')).toBeVisible();
+
+    await grok.locator('[data-testid="mcp-revoke"]').click();
+    await grok.locator('[data-testid="mcp-revoke-confirm-btn"]').click();
+    await expect(page.locator('[data-testid="mcp-grant-row"][data-grant-id="1"]')).toHaveCount(0);
+    await expect(claude).toBeVisible();
   });
 });
