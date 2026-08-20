@@ -11,9 +11,10 @@ import { McpClientRegistrationError, McpClientService, type McpClientRow } from 
 import { McpCodeError, McpCodeService } from "../../mcp/mcp-code-service.js";
 import { McpGrantError, McpGrantService } from "../../mcp/mcp-grant-service.js";
 import { McpPoolService } from "../../mcp/mcp-pool-service.js";
-import { McpTokenService } from "../../mcp/mcp-token-service.js";
+import { McpTokenError, McpTokenService, type McpTokenPair } from "../../mcp/mcp-token-service.js";
 import {
   authorizationServerMetadata,
+  mcpAudience,
   protectedResourceMetadata,
   resolveMcpOrigin
 } from "../../mcp/oauth-metadata.js";
@@ -60,6 +61,35 @@ function oauthHtmlHeaders(reply: FastifyReply): void {
 function qstr(value: unknown): string {
   if (Array.isArray(value)) return String(value[0] ?? "");
   return value == null ? "" : String(value);
+}
+
+type OAuthTokenError =
+  | "invalid_request"
+  | "invalid_grant"
+  | "unsupported_grant_type"
+  | "invalid_target"
+  | "invalid_client";
+
+function formValue(body: Record<string, unknown>, name: string): string | null {
+  const value = body[name];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function sendTokenError(reply: FastifyReply, error: OAuthTokenError) {
+  noStoreJson(reply);
+  reply.header("Pragma", "no-cache");
+  return reply.code(400).send({ error });
+}
+
+function sendTokenPair(reply: FastifyReply, pair: McpTokenPair) {
+  noStoreJson(reply);
+  reply.header("Pragma", "no-cache");
+  return reply.code(200).send({
+    access_token: pair.accessToken,
+    token_type: pair.tokenType,
+    ...(pair.expiresIn === undefined ? {} : { expires_in: pair.expiresIn }),
+    refresh_token: pair.refreshToken
+  });
 }
 
 interface AuthorizeParams {
@@ -154,6 +184,71 @@ export function registerMcpOauthRoutes(app: FastifyInstance, deps: McpOauthRoute
     const token = typeof body.token === "string" ? body.token : "";
     deps.tokens.revokePresentedToken(token);
     return reply.code(200).send();
+  });
+
+  app.post("/oauth/token", async (request, reply) => {
+    const origin = requireOrigin(request, reply);
+    if (!origin) return;
+    const contentType = String(request.headers["content-type"] ?? "")
+      .split(";", 1)[0]
+      .trim()
+      .toLowerCase();
+    if (contentType !== "application/x-www-form-urlencoded") {
+      return sendTokenError(reply, "invalid_request");
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const grantType = formValue(body, "grant_type");
+    if (!grantType) return sendTokenError(reply, "invalid_request");
+    if (grantType !== "authorization_code" && grantType !== "refresh_token") {
+      return sendTokenError(reply, "unsupported_grant_type");
+    }
+
+    const clientId = formValue(body, "client_id");
+    if (!clientId) return sendTokenError(reply, "invalid_request");
+    if (!deps.clients.get(clientId)) return sendTokenError(reply, "invalid_client");
+
+    const audience = mcpAudience(origin);
+    const resource = body.resource;
+    if (resource !== undefined) {
+      if (typeof resource !== "string" || resource.length === 0) {
+        return sendTokenError(reply, "invalid_request");
+      }
+      if (resource !== audience) return sendTokenError(reply, "invalid_target");
+    }
+
+    try {
+      if (grantType === "authorization_code") {
+        const code = formValue(body, "code");
+        const codeVerifier = formValue(body, "code_verifier");
+        const redirectUri = formValue(body, "redirect_uri");
+        if (!code || !codeVerifier || !redirectUri) {
+          return sendTokenError(reply, "invalid_request");
+        }
+        return sendTokenPair(
+          reply,
+          deps.codes.exchangeCode({
+            code,
+            codeVerifier,
+            redirectUri,
+            clientId,
+            audience
+          })
+        );
+      }
+
+      const refreshToken = formValue(body, "refresh_token");
+      if (!refreshToken) return sendTokenError(reply, "invalid_request");
+      return sendTokenPair(
+        reply,
+        deps.tokens.rotateRefresh(refreshToken, { clientId, audience })
+      );
+    } catch (err) {
+      if (err instanceof McpCodeError || err instanceof McpTokenError) {
+        return sendTokenError(reply, err.code);
+      }
+      throw err;
+    }
   });
 
   app.get("/oauth/authorize", async (request, reply) => {
