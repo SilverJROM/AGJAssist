@@ -1,3 +1,4 @@
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { DatabaseService } from "../db/database.js";
 import { AuditService } from "../services/audit-service.js";
 import { paneLooksBusy } from "../tmux/tmux-busy.js";
@@ -11,11 +12,7 @@ export interface McpToolServices {
   db: DatabaseService;
 }
 
-export interface McpToolResult {
-  content: Array<{ type: "text"; text: string }>;
-  isError?: boolean;
-  structuredContent?: Record<string, unknown>;
-}
+export type McpToolResult = CallToolResult;
 
 const SESSION_BARE = /^[a-zA-Z0-9_.-]+$/;
 const SESSION_PANE = /^[a-zA-Z0-9_.-]+:[0-9]+\.[0-9]+$/;
