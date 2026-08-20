@@ -129,4 +129,15 @@ describe("AuthService", () => {
     const ownerRemoved = auth.removeUser(111222);
     expect(ownerRemoved).toBe(false);
   });
+
+  it("rejects an active non-owner (viewer) even with valid initData (owner-only)", () => {
+    auth.addUser(333444, "viewer");
+    const initData = createInitData(
+      { id: 333444, first_name: "Viewer", username: "viewer" },
+      BOT_TOKEN
+    );
+    // Valid signature + active row, but role !== owner -> no token.
+    expect(auth.authenticateTelegram(initData, "miniapp")).toBeNull();
+    expect(auth.authenticateTelegram(initData, "web")).toBeNull();
+  });
 });

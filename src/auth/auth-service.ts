@@ -115,6 +115,8 @@ export class AuthService {
       .get(tgUser.id) as UserRow | undefined;
 
     if (!userRow) return null;
+    // Owner-only: even an active non-owner row can never obtain a token.
+    if (userRow.role !== "owner") return null;
 
     // Update user info from Telegram
     this.db
