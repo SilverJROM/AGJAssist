@@ -22,6 +22,19 @@ test.beforeEach(async ({ page }) => {
     localStorage.setItem('agj_user', JSON.stringify({ id: 1, name: 'groups', username: 'e2e', role: 'owner' }));
   });
 
+  const serverStore = { groups: [] as Array<{ id: string; name: string; sessions: string[] }>, activeGroup: 'all' };
+  await page.route(/\/api\/terminal\/groups(?:\?.*)?$/, async (route) => {
+    const method = route.request().method();
+    if (method === 'PUT') {
+      const body = route.request().postDataJSON() as { groups?: typeof serverStore.groups; activeGroup?: string };
+      serverStore.groups = Array.isArray(body?.groups) ? body.groups : [];
+      serverStore.activeGroup = typeof body?.activeGroup === 'string' ? body.activeGroup : 'all';
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(serverStore) });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(serverStore) });
+  });
+
   await page.route(/\/api\/auth\/me(?:\?.*)?$/, async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 1, username: 'e2e', display_name: 'e2e', role: 'owner', totp_enabled: false }) });
   });
@@ -48,7 +61,11 @@ test.beforeEach(async ({ page }) => {
 
 async function openTerminalList(page: import('@playwright/test').Page) {
   await page.setViewportSize({ width: 390, height: 844 });
+  const groupsGet = page.waitForResponse((res) =>
+    /\/api\/terminal\/groups(?:\?.*)?$/.test(new URL(res.url()).pathname) && res.request().method() === 'GET'
+  );
   await page.goto(TERMINAL_PATH, { waitUntil: 'domcontentloaded' });
+  await groupsGet;
   await expect(page.locator('[data-testid="terminal-session-list"]')).toBeVisible({ timeout: 15_000 });
   await expect(page.locator('[data-testid="terminal-session-row"]')).toHaveCount(2);
 }
@@ -168,6 +185,13 @@ test('rename and delete a group never touch tmux', async ({ page }) => {
 });
 
 test('groups, membership, and selected tab persist across reload', async ({ page }) => {
+  const puts: Array<{ groups: Array<{ id: string; name: string; sessions: string[] }>; activeGroup: string }> = [];
+  page.on('request', (req) => {
+    if (/\/api\/terminal\/groups/.test(req.url()) && req.method() === 'PUT') {
+      puts.push(JSON.parse(req.postData() || '{}'));
+    }
+  });
+
   await openTerminalList(page);
   await createGroup(page, 'north');
   await page.locator('[data-testid="terminal-group-tab"][data-group-id="all"]').click();
@@ -180,6 +204,10 @@ test('groups, membership, and selected tab persist across reload', async ({ page
   await page.locator('[data-testid="terminal-group-tab"]').filter({ hasText: 'north' }).click();
   await expect(page.locator('[data-testid="terminal-session-row"]')).toHaveCount(1);
   await expect.poll(() => page.evaluate(() => localStorage.getItem('agj_terminal_active_group'))).toBe(groupId);
+  await expect.poll(() => {
+    const last = puts[puts.length - 1];
+    return Boolean(last?.groups?.some((g) => g.id === groupId && g.sessions.includes(NORTH.name)) && last?.activeGroup === groupId);
+  }).toBeTruthy();
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-testid="terminal-group-tab"]').filter({ hasText: 'north' })).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 });
@@ -194,6 +222,34 @@ test('groups, membership, and selected tab persist across reload', async ({ page
   expect(stored.groups).toEqual([
     expect.objectContaining({ id: groupId, name: 'north', sessions: [NORTH.name] }),
   ]);
+});
+
+test('created groups are PUT to the server and reloaded from GET, not just localStorage', async ({ page }) => {
+  const puts: Array<{ groups: Array<{ id: string; name: string; sessions: string[] }>; activeGroup: string }> = [];
+  page.on('request', (req) => {
+    if (/\/api\/terminal\/groups/.test(req.url()) && req.method() === 'PUT') {
+      puts.push(JSON.parse(req.postData() || '{}'));
+    }
+  });
+
+  await openTerminalList(page);
+  await createGroup(page, 'north');
+  await expect.poll(() => puts.some((p) => p.groups.some((g) => g.name === 'north'))).toBeTruthy();
+
+  await page.evaluate(() => {
+    localStorage.removeItem('agj_terminal_groups');
+    localStorage.removeItem('agj_terminal_active_group');
+  });
+
+  const groupsGet = page.waitForResponse((res) =>
+    /\/api\/terminal\/groups/.test(res.url()) && res.request().method() === 'GET'
+  );
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const getRes = await groupsGet;
+  const payload = await getRes.json() as { groups: Array<{ name: string }>; activeGroup: string };
+  expect(payload.groups.some((g) => g.name === 'north')).toBe(true);
+
+  await expect(page.locator('[data-testid="terminal-group-tab"]').filter({ hasText: 'north' })).toBeVisible({ timeout: 15_000 });
 });
 
 test('tapping a row body still opens the chat', async ({ page }) => {

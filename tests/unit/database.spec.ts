@@ -37,6 +37,7 @@ describe("DatabaseService", () => {
     expect(tableNames).toContain("safety_patterns");
     expect(tableNames).toContain("audit_log");
     expect(tableNames).toContain("conversations");
+    expect(tableNames).toContain("terminal_groups");
 
     db.close();
   });
@@ -69,7 +70,7 @@ describe("DatabaseService", () => {
       .prepare("SELECT version FROM schema_version")
       .get() as { version: number };
 
-    expect(version.version).toBe(34);
+    expect(version.version).toBe(35);
     db.close();
   });
 
@@ -167,7 +168,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(34);
+    expect(version.version).toBe(35);
     const upgradedCols = upgraded.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     const upgradedColNames = upgradedCols.map((c) => c.name);
     expect(upgradedColNames).toContain("last_parent_update_at");
@@ -202,7 +203,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(34);
+    expect(version.version).toBe(35);
 
     const tableNames = (
       upgraded.raw
@@ -321,7 +322,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(34);
+    expect(version.version).toBe(35);
 
     const count = upgraded.prepare("SELECT COUNT(*) AS count FROM overmind_workflows").get() as { count: number };
     expect(count.count).toBe(2);

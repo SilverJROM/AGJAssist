@@ -2227,6 +2227,11 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [showRawChrome, setShowRawChrome] = useState(false);
   const menuRef = useRef(null);
   const sectionNavRef = useRef(null);
+  const terminalGroupsRef = useRef(terminalGroups);
+  const activeGroupTabRef = useRef(activeGroupTab);
+  const groupsHydratedRef = useRef(false);
+  const groupsDirtyRef = useRef(false);
+  const groupsSaveTimerRef = useRef(null);
   const webAppContext = window.Telegram?.WebApp;
   const isTgMiniAppContext = isTgMiniApp || Boolean(
     webAppContext?.initData
@@ -2307,21 +2312,97 @@ function TerminalTab({ projectId, projectName } = {}) {
     };
   }, [menuOpen]);
 
+  function cacheTerminalGroupsLocal(groups, active) {
+    writeTerminalGroups(groups);
+    writeActiveTerminalGroup(active);
+  }
+
+  function queueTerminalGroupsSave(immediate) {
+    if (!groupsHydratedRef.current) return;
+    const payload = {
+      groups: terminalGroupsRef.current,
+      activeGroup: activeGroupTabRef.current
+    };
+    cacheTerminalGroupsLocal(payload.groups, payload.activeGroup);
+    const send = () => {
+      api('/api/terminal/groups', { method: 'PUT', body: JSON.stringify(payload) }).catch(() => {});
+    };
+    if (groupsSaveTimerRef.current) {
+      clearTimeout(groupsSaveTimerRef.current);
+      groupsSaveTimerRef.current = null;
+    }
+    if (immediate) send();
+    else groupsSaveTimerRef.current = setTimeout(send, 500);
+  }
+
   function persistTerminalGroups(updater) {
     setTerminalGroups((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      terminalGroupsRef.current = next;
       writeTerminalGroups(next);
+      groupsDirtyRef.current = true;
+      queueTerminalGroupsSave(false);
       return next;
     });
   }
 
   function persistActiveGroupTab(id) {
     const next = id || 'all';
+    activeGroupTabRef.current = next;
     writeActiveTerminalGroup(next);
     setActiveGroupTab(next);
+    groupsDirtyRef.current = true;
+    queueTerminalGroupsSave(false);
   }
 
   useEffect(() => {
+    let cancelled = false;
+    api('/api/terminal/groups')
+      .then((data) => {
+        if (cancelled) return;
+        const server = {
+          groups: Array.isArray(data?.groups) ? data.groups.map(normalizeTerminalGroup).filter(Boolean) : [],
+          activeGroup: data?.activeGroup == null ? 'all' : String(data.activeGroup)
+        };
+        const localGroups = terminalGroupsRef.current || [];
+        const localActive = activeGroupTabRef.current || 'all';
+        // In-flight edits must not be overwritten by the GET, and the GET must not
+        // be clobbered by a pre-hydrate PUT of empty cache (queueTerminalGroupsSave
+        // no-ops until hydrated).
+        if (groupsDirtyRef.current) {
+          groupsHydratedRef.current = true;
+          queueTerminalGroupsSave(true);
+          return;
+        }
+        // Empty server + existing local cache: first-run promote (don't wipe PC groups on deploy).
+        const promoteLocal = server.groups.length === 0 && localGroups.length > 0;
+        const groups = promoteLocal ? localGroups : server.groups;
+        const activeCandidate = promoteLocal ? localActive : server.activeGroup;
+        const active = activeCandidate === 'all' || groups.some((group) => group.id === activeCandidate)
+          ? (activeCandidate || 'all')
+          : 'all';
+        terminalGroupsRef.current = groups;
+        activeGroupTabRef.current = active;
+        setTerminalGroups(groups);
+        setActiveGroupTab(active);
+        cacheTerminalGroupsLocal(groups, active);
+        groupsHydratedRef.current = true;
+        if (promoteLocal) queueTerminalGroupsSave(true);
+      })
+      .catch(() => {
+        if (!cancelled) groupsHydratedRef.current = true;
+      });
+    return () => {
+      cancelled = true;
+      if (groupsSaveTimerRef.current) {
+        clearTimeout(groupsSaveTimerRef.current);
+        groupsSaveTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!groupsHydratedRef.current) return;
     if (activeGroupTab !== 'all' && !terminalGroups.some((group) => group.id === activeGroupTab)) {
       persistActiveGroupTab('all');
     }

@@ -51,6 +51,8 @@ import { registerTgLoginRoutes } from "./routes/tg-login-routes.js";
 import { registerLokalaiLinkRoutes } from "./routes/lokalai-link-routes.js";
 import { registerTelegramWebhookRoutes } from "./routes/telegram-webhook-routes.js";
 import { registerGuardianRoutes } from "./routes/guardian-routes.js";
+import { registerTerminalGroupsRoutes } from "./routes/terminal-groups-routes.js";
+import { TerminalGroupsService } from "../services/terminal-groups-service.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -167,6 +169,11 @@ export async function createApiServer(
   }
 
   registerGuardianRoutes(app, config, services.telegramAssistant);
+  registerTerminalGroupsRoutes(
+    app,
+    services.authService,
+    new TerminalGroupsService(services.db)
+  );
 
   return app;
 }

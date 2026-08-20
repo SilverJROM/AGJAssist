@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 34;
+export const SCHEMA_VERSION = 35;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -431,6 +431,12 @@ CREATE INDEX IF NOT EXISTS idx_agent_wake_schedule_due
   ON agent_wake_schedule(due_at, fired_at);
 CREATE INDEX IF NOT EXISTS idx_agent_wake_schedule_run
   ON agent_wake_schedule(run_id, batch_id);
+
+CREATE TABLE IF NOT EXISTS terminal_groups (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  data TEXT NOT NULL DEFAULT '{"groups":[],"activeGroup":"all"}',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 export const DEFAULT_SAFETY_PATTERNS = [

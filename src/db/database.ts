@@ -680,6 +680,19 @@ export class DatabaseService {
         `);
       }
 
+      // Migration: v34 → v35 (repo) / through v38 (prod) → v39: per-user terminal
+      // session groups (account-level folders). Prod DBs already sit at 38 from
+      // out-of-tree upgrades, so the create is gated on < 39 and is IF NOT EXISTS.
+      if (current && current.version < 35) {
+        this.db.exec(`
+          CREATE TABLE IF NOT EXISTS terminal_groups (
+            user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            data TEXT NOT NULL DEFAULT '{"groups":[],"activeGroup":"all"}',
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+        `);
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);
