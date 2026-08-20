@@ -33,6 +33,37 @@ export interface SendCommandResult {
   blocked: boolean;
 }
 
+export const TMUX_NAMED_KEYS = new Set([
+  "Up",
+  "Down",
+  "Left",
+  "Right",
+  "Enter",
+  "Escape",
+  "Space",
+  "Tab",
+  "BTab",
+  "C-c",
+  "C-u",
+  "BSpace",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "0",
+  "y",
+  "n"
+]);
+
 export class TmuxService {
   private safetyService: SafetyService | null = null;
 
@@ -258,13 +289,8 @@ export class TmuxService {
     if (keys.length > 64) {
       throw new Error("too many keys");
     }
-    const allowed = new Set([
-      "Up", "Down", "Left", "Right", "Enter", "Escape", "Space", "Tab", "BTab",
-      "C-c", "C-u", "BSpace", "Home", "End", "PageUp", "PageDown",
-      "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "y", "n",
-    ]);
     for (const k of keys) {
-      if (!allowed.has(k)) {
+      if (!TMUX_NAMED_KEYS.has(k)) {
         throw new Error(`unsupported key: ${String(k).slice(0, 16)}`);
       }
     }

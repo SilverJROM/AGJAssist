@@ -3,7 +3,13 @@ import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { MCP_ERROR, MCP_TOOL_NAMES, type McpToolName } from "./mcp-constants.js";
 import type { McpBearerContext } from "./mcp-bearer-service.js";
-import { listSessions, readSession, type McpToolServices } from "./mcp-tools.js";
+import {
+  listSessions,
+  readSession,
+  sendKeys,
+  sendMessage,
+  type McpToolServices
+} from "./mcp-tools.js";
 
 const TOOL_DESCRIPTIONS: Readonly<Record<McpToolName, string>> = {
   list_sessions: "List the live terminal sessions available to this grant",
@@ -50,6 +56,35 @@ export function createMcpServerForRequest(
           }
         },
         async (args) => readSession(context, deps, args)
+      );
+      continue;
+    }
+    if (toolName === "send_message") {
+      server.registerTool(
+        toolName,
+        {
+          description: TOOL_DESCRIPTIONS[toolName],
+          inputSchema: {
+            session: z.string(),
+            text: z.string().min(1).max(8000),
+            press_enter: z.boolean().optional()
+          }
+        },
+        async (args) => sendMessage(context, deps, args)
+      );
+      continue;
+    }
+    if (toolName === "send_keys") {
+      server.registerTool(
+        toolName,
+        {
+          description: TOOL_DESCRIPTIONS[toolName],
+          inputSchema: {
+            session: z.string(),
+            keys: z.array(z.string()).min(1).max(64)
+          }
+        },
+        async (args) => sendKeys(context, deps, args)
       );
       continue;
     }

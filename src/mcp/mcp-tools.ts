@@ -1,7 +1,7 @@
 import { DatabaseService } from "../db/database.js";
 import { AuditService } from "../services/audit-service.js";
 import { paneLooksBusy } from "../tmux/tmux-busy.js";
-import { TmuxService } from "../tmux/tmux-service.js";
+import { TMUX_NAMED_KEYS, TmuxService } from "../tmux/tmux-service.js";
 import type { McpBearerContext } from "./mcp-bearer-service.js";
 import { MCP_ERROR } from "./mcp-constants.js";
 
@@ -160,4 +160,86 @@ export async function readSession(
     output,
     lines
   });
+}
+
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
+
+export async function sendMessage(
+  context: McpBearerContext,
+  services: McpToolServices,
+  args: { session?: unknown; text?: unknown; press_enter?: unknown }
+): Promise<McpToolResult> {
+  const scoped = requireInScope(services, context, "send_message", args.session);
+  if (!scoped) return mcpSessionNotFound();
+
+  const text = typeof args.text === "string" ? args.text.trim() : "";
+  if (!text || text.length > 8000 || CONTROL_CHARS.test(text)) {
+    return {
+      content: [{ type: "text", text: MCP_ERROR.toolDenied.text }],
+      isError: true,
+      structuredContent: { code: MCP_ERROR.toolDenied.code }
+    };
+  }
+  const pressEnter = args.press_enter !== false;
+
+  const auditId = services.audit.log({
+    userId: context.grant.grantedBy,
+    agentName: context.binding.clientName,
+    actionType: "mcp_send_message",
+    resourceType: "mcp_grant",
+    resourceId: String(context.grant.id),
+    details: { grant_id: context.grant.id, text_length: text.length },
+    tmuxTarget: scoped.target,
+    surface: "mcp"
+  });
+
+  const result = await services.tmux.sendCommand(scoped.target, text, pressEnter, false);
+  services.audit.completeAudit(auditId, {
+    blocked: result.blocked === true,
+    pattern: result.safetyCheck?.pattern?.pattern ?? null,
+    submitted: result.blocked !== true
+  });
+
+  if (result.blocked) {
+    const pattern = result.safetyCheck?.pattern?.pattern ?? "blocked";
+    return {
+      content: [{ type: "text", text: `Command blocked by safety pattern: ${pattern}` }],
+      isError: true,
+      structuredContent: { blocked: true, pattern }
+    };
+  }
+  return mcpToolOk({ submitted: true, message: result.message });
+}
+
+export async function sendKeys(
+  context: McpBearerContext,
+  services: McpToolServices,
+  args: { session?: unknown; keys?: unknown }
+): Promise<McpToolResult> {
+  const scoped = requireInScope(services, context, "send_keys", args.session);
+  if (!scoped) return mcpSessionNotFound();
+
+  const keys = Array.isArray(args.keys) ? args.keys.map(String) : [];
+  if (keys.length === 0 || keys.length > 64 || keys.some((key) => !TMUX_NAMED_KEYS.has(key))) {
+    return {
+      content: [{ type: "text", text: MCP_ERROR.toolDenied.text }],
+      isError: true,
+      structuredContent: { code: MCP_ERROR.toolDenied.code }
+    };
+  }
+
+  const auditId = services.audit.log({
+    userId: context.grant.grantedBy,
+    agentName: context.binding.clientName,
+    actionType: "mcp_send_keys",
+    resourceType: "mcp_grant",
+    resourceId: String(context.grant.id),
+    details: { grant_id: context.grant.id, keys },
+    tmuxTarget: scoped.target,
+    surface: "mcp"
+  });
+
+  const result = await services.tmux.sendNamedKeys(scoped.target, keys);
+  services.audit.completeAudit(auditId, { submitted: true, blocked: false });
+  return mcpToolOk({ message: result.message });
 }
