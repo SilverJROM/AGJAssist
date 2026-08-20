@@ -18,6 +18,8 @@ import {
 import { McpScopeService } from "../src/mcp/mcp-scope-service.js";
 import { McpTokenService } from "../src/mcp/mcp-token-service.js";
 import { AuditService } from "../src/services/audit-service.js";
+import { FileService } from "../src/services/file-service.js";
+import { ProjectService } from "../src/services/project-service.js";
 import { TerminalGroupsService } from "../src/services/terminal-groups-service.js";
 import { TmuxService } from "../src/tmux/tmux-service.js";
 
@@ -100,7 +102,9 @@ async function boot(options: {
     limiter: options.limiter ?? new McpRateLimiter(),
     audit,
     tmux,
-    db
+    db,
+    files: new FileService(),
+    projects: new ProjectService(db, path.join(tempDir, "projects"))
   });
   const address = new URL(await app.listen({ host: "127.0.0.1", port: 0 }));
   context = {

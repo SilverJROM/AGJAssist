@@ -5,9 +5,11 @@ import { MCP_ERROR, MCP_TOOL_NAMES, type McpToolName } from "./mcp-constants.js"
 import type { McpBearerContext } from "./mcp-bearer-service.js";
 import {
   listSessions,
+  readImage,
   readSession,
   sendKeys,
   sendMessage,
+  uploadImage,
   type McpToolServices
 } from "./mcp-tools.js";
 
@@ -85,6 +87,35 @@ export function createMcpServerForRequest(
           }
         },
         async (args) => sendKeys(context, deps, args)
+      );
+      continue;
+    }
+    if (toolName === "upload_image") {
+      server.registerTool(
+        toolName,
+        {
+          description: TOOL_DESCRIPTIONS[toolName],
+          inputSchema: {
+            session: z.string(),
+            filename: z.string(),
+            data_base64: z.string()
+          }
+        },
+        async (args) => uploadImage(context, deps, args)
+      );
+      continue;
+    }
+    if (toolName === "read_image") {
+      server.registerTool(
+        toolName,
+        {
+          description: TOOL_DESCRIPTIONS[toolName],
+          inputSchema: {
+            session: z.string(),
+            path: z.string()
+          }
+        },
+        async (args) => readImage(context, deps, args)
       );
       continue;
     }

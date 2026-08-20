@@ -14,7 +14,22 @@ export interface FileContent {
   language: string;
 }
 
+export interface BinaryFileContent {
+  bytes: Buffer;
+  mime: string;
+  size: number;
+}
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_BINARY_FILE_SIZE = 10 * 1024 * 1024; // 10MB — image tools (B18)
+
+const IMAGE_MIME: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp"
+};
 
 const IGNORED_DIRS = new Set([
   "node_modules", ".git", "dist", "build", ".next", ".nuxt",
@@ -175,6 +190,32 @@ export class FileService {
     }
 
     fs.writeFileSync(fullPath, content, "utf-8");
+  }
+
+  readBinaryFile(projectRoot: string, relativePath: string): BinaryFileContent {
+    const fullPath = this.safePath(projectRoot, relativePath);
+
+    if (!fs.existsSync(fullPath)) {
+      throw new FileNotFoundError("File not found");
+    }
+
+    const stat = fs.statSync(fullPath);
+    if (!stat.isFile()) {
+      throw new FileNotFoundError("File not found");
+    }
+
+    const ext = path.extname(fullPath).toLowerCase();
+    const mime = IMAGE_MIME[ext];
+    if (!mime) {
+      throw new FileNotFoundError("File not found");
+    }
+
+    if (stat.size > MAX_BINARY_FILE_SIZE) {
+      throw new FileTooLargeError(`File exceeds ${MAX_BINARY_FILE_SIZE / 1024 / 1024}MB limit`);
+    }
+
+    const bytes = fs.readFileSync(fullPath);
+    return { bytes, mime, size: bytes.length };
   }
 
   writeBinaryFile(projectRoot: string, relativePath: string, data: Buffer): void {

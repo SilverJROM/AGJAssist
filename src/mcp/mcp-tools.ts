@@ -1,15 +1,32 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import path from "node:path";
 import { DatabaseService } from "../db/database.js";
 import { AuditService } from "../services/audit-service.js";
+import {
+  FileService,
+  FileNotFoundError,
+  FileTooLargeError,
+  PathTraversalError
+} from "../services/file-service.js";
+import { ProjectService } from "../services/project-service.js";
 import { paneLooksBusy } from "../tmux/tmux-busy.js";
+import {
+  ATTACH_IMAGE_EXTS,
+  ATTACH_IMAGE_MAX_BYTES,
+  decodeAttachImageBase64,
+  sanitizeAttachImageBasename,
+  utcAttachStamp
+} from "../tmux/tmux-image-helpers.js";
 import { TMUX_NAMED_KEYS, TmuxService } from "../tmux/tmux-service.js";
 import type { McpBearerContext } from "./mcp-bearer-service.js";
-import { MCP_ERROR } from "./mcp-constants.js";
+import { MCP_ERROR, MCP_IMAGE_MIME } from "./mcp-constants.js";
 
 export interface McpToolServices {
   tmux: TmuxService;
   audit: AuditService;
   db: DatabaseService;
+  files: FileService;
+  projects: ProjectService;
 }
 
 export type McpToolResult = CallToolResult;
@@ -22,6 +39,14 @@ export function mcpSessionNotFound(): McpToolResult {
     content: [{ type: "text", text: MCP_ERROR.sessionNotFound.text }],
     isError: true,
     structuredContent: { code: MCP_ERROR.sessionNotFound.code }
+  };
+}
+
+export function mcpImageNotFound(): McpToolResult {
+  return {
+    content: [{ type: "text", text: MCP_ERROR.imageNotFound.text }],
+    isError: true,
+    structuredContent: { code: MCP_ERROR.imageNotFound.code }
   };
 }
 
@@ -239,4 +264,107 @@ export async function sendKeys(
   const result = await services.tmux.sendNamedKeys(scoped.target, keys);
   services.audit.completeAudit(auditId, { submitted: true, blocked: false });
   return mcpToolOk({ message: result.message });
+}
+
+function mappedProjectRoot(services: McpToolServices, sessionName: string): string | null {
+  const row = services.db
+    .prepare("SELECT project_id FROM tmux_sessions WHERE session_name = ? AND status = 'active'")
+    .get(sessionName) as { project_id: number | null } | undefined;
+  if (row?.project_id == null) return null;
+  const project = services.projects.getById(row.project_id);
+  if (!project || project.status !== "active") return null;
+  return services.projects.getFullPath(project);
+}
+
+export async function uploadImage(
+  context: McpBearerContext,
+  services: McpToolServices,
+  args: { session?: unknown; filename?: unknown; data_base64?: unknown }
+): Promise<McpToolResult> {
+  const scoped = requireInScope(services, context, "upload_image", args.session);
+  if (!scoped) return mcpSessionNotFound();
+
+  const filename = typeof args.filename === "string" ? args.filename : "";
+  const dataBase64 = typeof args.data_base64 === "string" ? args.data_base64 : "";
+  if (!filename || !dataBase64 || filename.includes("\0") || /[\\/]|\.\./.test(filename)) {
+    return mcpImageNotFound();
+  }
+  const sanitized = sanitizeAttachImageBasename(filename);
+  if (!sanitized) return mcpImageNotFound();
+
+  const buf = decodeAttachImageBase64(dataBase64);
+  if (!buf || buf.length > ATTACH_IMAGE_MAX_BYTES) return mcpImageNotFound();
+
+  const projectRoot = mappedProjectRoot(services, scoped.sessionName);
+  if (!projectRoot) return mcpImageNotFound();
+
+  const relativePath = `tmp/term-${utcAttachStamp()}-${sanitized}`;
+  const auditId = services.audit.log({
+    userId: context.grant.grantedBy,
+    agentName: context.binding.clientName,
+    actionType: "mcp_upload_image",
+    resourceType: "mcp_grant",
+    resourceId: String(context.grant.id),
+    details: { grant_id: context.grant.id, filename: sanitized, size: buf.length },
+    tmuxTarget: scoped.target,
+    surface: "mcp"
+  });
+  try {
+    services.files.writeBinaryFile(projectRoot, relativePath, buf);
+  } catch (err) {
+    if (err instanceof PathTraversalError) {
+      services.audit.completeAudit(auditId, { ok: false });
+      return mcpImageNotFound();
+    }
+    throw err;
+  }
+  services.audit.completeAudit(auditId, { ok: true, path: relativePath });
+  return mcpToolOk({ ok: true, path: relativePath });
+}
+
+export async function readImage(
+  context: McpBearerContext,
+  services: McpToolServices,
+  args: { session?: unknown; path?: unknown }
+): Promise<McpToolResult> {
+  const scoped = requireInScope(services, context, "read_image", args.session);
+  if (!scoped) return mcpSessionNotFound();
+
+  const relativePath = typeof args.path === "string" ? args.path : "";
+  if (!relativePath || relativePath.includes("\0")) return mcpImageNotFound();
+  const ext = path.extname(relativePath).slice(1).toLowerCase();
+  if (!ATTACH_IMAGE_EXTS.has(ext) || !(ext in MCP_IMAGE_MIME)) return mcpImageNotFound();
+
+  const projectRoot = mappedProjectRoot(services, scoped.sessionName);
+  if (!projectRoot) return mcpImageNotFound();
+
+  const auditId = services.audit.log({
+    userId: context.grant.grantedBy,
+    agentName: context.binding.clientName,
+    actionType: "mcp_read_image",
+    resourceType: "mcp_grant",
+    resourceId: String(context.grant.id),
+    details: { grant_id: context.grant.id, path: relativePath },
+    tmuxTarget: scoped.target,
+    surface: "mcp"
+  });
+  try {
+    const file = services.files.readBinaryFile(projectRoot, relativePath);
+    services.audit.completeAudit(auditId, { ok: true, size: file.size });
+    return mcpToolOk({
+      data_base64: file.bytes.toString("base64"),
+      mime: file.mime,
+      size: file.size
+    });
+  } catch (err) {
+    if (
+      err instanceof PathTraversalError ||
+      err instanceof FileNotFoundError ||
+      err instanceof FileTooLargeError
+    ) {
+      services.audit.completeAudit(auditId, { ok: false });
+      return mcpImageNotFound();
+    }
+    throw err;
+  }
 }

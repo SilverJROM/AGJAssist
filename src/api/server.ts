@@ -218,7 +218,9 @@ export async function createApiServer(
     limiter: new McpRateLimiter(),
     audit: services.auditService,
     tmux: services.tmuxService,
-    db: services.db
+    db: services.db,
+    files: services.fileService,
+    projects: services.projectService
   });
 
   return app;
