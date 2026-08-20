@@ -332,6 +332,26 @@ export class McpTokenService {
     return result.changes;
   }
 
+  /** RFC 7009: unknown/malformed tokens are a no-op (caller still returns 200). */
+  revokePresentedToken(rawToken: string): void {
+    if (typeof rawToken !== "string" || !OPAQUE_SECRET_PATTERN.test(rawToken)) return;
+    const presentedHash = hashMcpSecret(rawToken);
+    const found = this.findTokenByHash(presentedHash);
+    if (!found || !hashesMatch(presentedHash, found.token_hash)) return;
+    if (found.token_type === "refresh") {
+      this.revokeFamily(found.family_id, "rfc7009");
+      return;
+    }
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `UPDATE mcp_tokens
+         SET revoked = 1, revoked_at = COALESCE(revoked_at, ?)
+         WHERE id = ?`
+      )
+      .run(now, found.id);
+  }
+
   private requireActiveGrant(grantId: number, expectedClientId?: string): GrantRow {
     const grant = this.db
       .prepare(

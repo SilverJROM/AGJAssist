@@ -2,6 +2,8 @@ import Fastify, { FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
 import fastifyCors from "@fastify/cors";
 import fastifyWebsocket from "@fastify/websocket";
+import fastifyFormbody from "@fastify/formbody";
+import fastifyRateLimit from "@fastify/rate-limit";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AppConfig } from "../config/config.js";
@@ -53,6 +55,12 @@ import { registerTelegramWebhookRoutes } from "./routes/telegram-webhook-routes.
 import { registerGuardianRoutes } from "./routes/guardian-routes.js";
 import { registerTerminalGroupsRoutes } from "./routes/terminal-groups-routes.js";
 import { TerminalGroupsService } from "../services/terminal-groups-service.js";
+import { registerMcpOauthRoutes } from "./routes/mcp-oauth-routes.js";
+import { McpClientService } from "../mcp/mcp-client-service.js";
+import { McpCodeService } from "../mcp/mcp-code-service.js";
+import { McpTokenService } from "../mcp/mcp-token-service.js";
+import { McpGrantService } from "../mcp/mcp-grant-service.js";
+import { McpPoolService } from "../mcp/mcp-pool-service.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -94,6 +102,9 @@ export async function createApiServer(
     origin: true,
     credentials: true
   });
+
+  await app.register(fastifyFormbody);
+  await app.register(fastifyRateLimit, { global: false });
 
   await app.register(fastifyWebsocket);
 
@@ -169,11 +180,28 @@ export async function createApiServer(
   }
 
   registerGuardianRoutes(app, config, services.telegramAssistant);
+  const terminalGroupsService = new TerminalGroupsService(services.db);
   registerTerminalGroupsRoutes(
     app,
     services.authService,
-    new TerminalGroupsService(services.db)
+    terminalGroupsService
   );
+
+  const mcpClients = new McpClientService(services.db);
+  const mcpTokens = new McpTokenService(services.db, services.auditService);
+  const mcpCodes = new McpCodeService(services.db, mcpTokens);
+  const mcpGrants = new McpGrantService(services.db, mcpTokens, services.auditService);
+  const mcpPool = new McpPoolService(services.db, services.auditService);
+  registerMcpOauthRoutes(app, {
+    db: services.db,
+    authService: services.authService,
+    clients: mcpClients,
+    tokens: mcpTokens,
+    codes: mcpCodes,
+    grants: mcpGrants,
+    pool: mcpPool,
+    groups: terminalGroupsService
+  });
 
   return app;
 }
