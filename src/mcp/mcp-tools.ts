@@ -9,7 +9,7 @@ import {
   PathTraversalError
 } from "../services/file-service.js";
 import { ProjectService } from "../services/project-service.js";
-import { paneLooksBusy } from "../tmux/tmux-busy.js";
+import { getPaneBusyStates } from "../tmux/tmux-busy.js";
 import {
   ATTACH_IMAGE_EXTS,
   ATTACH_IMAGE_MAX_BYTES,
@@ -103,19 +103,16 @@ export async function listSessions(
     existing.push(pane);
     grouped.set(pane.session, existing);
   }
+  const scopedPanes = Array.from(grouped.values()).flat();
+  const busyByTarget = await getPaneBusyStates(scopedPanes, (target, lines) =>
+    services.tmux.peekPane(target, lines)
+  );
 
   const sessions = [];
   for (const name of context.effectiveScope) {
     const sessionPanes = grouped.get(name);
     if (!sessionPanes || sessionPanes.length === 0) continue;
-    let busy = false;
-    for (const pane of sessionPanes) {
-      try {
-        if (paneLooksBusy(await services.tmux.peekPane(pane.target, 40))) busy = true;
-      } catch {
-        /* idle if peek fails — same as the web sessions route */
-      }
-    }
+    const busy = sessionPanes.some((pane) => busyByTarget.get(pane.target) === true);
     const dbSession = services.db
       .prepare("SELECT project_id FROM tmux_sessions WHERE session_name = ? AND status = 'active'")
       .get(name) as { project_id: number | null } | undefined;

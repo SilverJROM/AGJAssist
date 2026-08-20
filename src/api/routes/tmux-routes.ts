@@ -8,7 +8,7 @@ import { AuditService } from "../../services/audit-service.js";
 import { SafetyService } from "../../services/safety-service.js";
 import { ProjectService } from "../../services/project-service.js";
 import { FileService, PathTraversalError } from "../../services/file-service.js";
-import { paneLooksBusy } from "../../tmux/tmux-busy.js";
+import { getPaneBusyStates } from "../../tmux/tmux-busy.js";
 import {
   ATTACH_IMAGE_MAX_BYTES,
   decodeAttachImageBase64,
@@ -45,18 +45,15 @@ export function registerTmuxRoutes(
     { preHandler: authMiddleware },
     async () => {
       const panes = await tmuxService.listPanes();
+      const busyByTarget = await getPaneBusyStates(panes, (target, lines) =>
+        tmuxService.peekPane(target, lines)
+      );
 
       // Group by session
       const sessions = new Map<string, Array<(typeof panes)[number] & { busy: boolean }>>();
       for (const pane of panes) {
         const existing = sessions.get(pane.session) || [];
-        let busy = false;
-        try {
-          busy = paneLooksBusy(await tmuxService.peekPane(pane.target, 40));
-        } catch {
-          busy = false;
-        }
-        existing.push({ ...pane, busy });
+        existing.push({ ...pane, busy: busyByTarget.get(pane.target) ?? false });
         sessions.set(pane.session, existing);
       }
 

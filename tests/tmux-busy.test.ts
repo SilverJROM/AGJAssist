@@ -1,13 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { paneLooksBusy, TMUX_BUSY_RE } from "../src/tmux/tmux-busy.js";
+import { getPaneBusyStates, paneLooksBusyFromSamples } from "../src/tmux/tmux-busy.js";
 
-describe("paneLooksBusy (B16 extract, behavior-identical to tmux-routes)", () => {
-  it("matches the previous inline regex and the esc-to-interrupt fallback", () => {
-    expect(TMUX_BUSY_RE.test("✻ Crafting… (esc to interrupt)")).toBe(true);
-    expect(paneLooksBusy("✻ Working for 3s")).toBe(true);
-    expect(paneLooksBusy("esc to interrupt")).toBe(true);
-    expect(paneLooksBusy("Esc to interrupt")).toBe(true);
-    expect(paneLooksBusy("idle composer ❯")).toBe(false);
-    expect(paneLooksBusy("")).toBe(false);
+describe("tmux busy detection", () => {
+  it("treats identical paired captures as idle, including stale busy-looking text", () => {
+    const stale = "✻ Worked for 14m\n⇣105k tokens\nnew task?";
+    expect(paneLooksBusyFromSamples(stale, stale)).toBe(false);
+    expect(paneLooksBusyFromSamples("esc to interrupt", "esc to interrupt")).toBe(false);
+  });
+
+  it("treats changed paired captures as busy", () => {
+    expect(paneLooksBusyFromSamples("✻ Working for 3s", "✳ Working for 3s")).toBe(true);
+    expect(paneLooksBusyFromSamples("Building\nline 1", "Building\nline 1\nline 2")).toBe(true);
+  });
+
+  it("ignores tiny non-spinner changes such as a one-second clock edge", () => {
+    expect(paneLooksBusyFromSamples("clock 12:34:55", "clock 12:34:56")).toBe(false);
+  });
+
+  it("captures all panes in two passes and returns idle/busy by target", async () => {
+    const samples = new Map([
+      ["IDLE:0.0", ["✻ Worked for 14m\nnew task?", "✻ Worked for 14m\nnew task?"]],
+      ["BUSY:0.0", ["✻ Working for 3s", "✳ Working for 3s"]]
+    ]);
+    const calls: string[] = [];
+
+    const busy = await getPaneBusyStates(
+      [{ target: "IDLE:0.0" }, { target: "BUSY:0.0" }],
+      async (target) => {
+        calls.push(target);
+        return samples.get(target)!.shift()!;
+      },
+      { delayMs: 0 }
+    );
+
+    expect(calls).toEqual(["IDLE:0.0", "BUSY:0.0", "IDLE:0.0", "BUSY:0.0"]);
+    expect(busy.get("IDLE:0.0")).toBe(false);
+    expect(busy.get("BUSY:0.0")).toBe(true);
   });
 });
