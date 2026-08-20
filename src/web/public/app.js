@@ -3454,6 +3454,22 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [unseenWhileUp, setUnseenWhileUp] = useState(0);
+  // Chat search + jump-between-my-messages (additive, read-only over `entries`).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchIdx, setSearchIdx] = useState(0);
+  const [myNavIdx, setMyNavIdx] = useState(-1);
+  const [flashId, setFlashId] = useState(null);
+  const searchInputRef = useRef(null);
+  const searchMatchIds = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return entries
+      .filter((e) => (e.role === 'user' || e.role === 'agent') && String(e.content ?? '').toLowerCase().includes(q))
+      .map((e) => e.id);
+  }, [entries, searchQuery]);
+  const searchMatchSet = useMemo(() => new Set(searchMatchIds), [searchMatchIds]);
+  const userTurnIds = useMemo(() => entries.filter((e) => e.role === 'user').map((e) => e.id), [entries]);
   const transcriptRef = useRef(null);
   const snapshotRef = useRef('');
   const sendingRef = useRef(false);
@@ -4181,6 +4197,46 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     setUnseenWhileUp(0);
   }
 
+  function scrollToTurn(id) {
+    if (id == null) return;
+    const node = transcriptRef.current;
+    if (!node) return;
+    const sel = '[data-turn-id="' + String(id).replace(/["\\]/g, '\\$&') + '"]';
+    const el = node.querySelector(sel);
+    if (!el) return;
+    pinToBottomRef.current = false;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setFlashId(id);
+    setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 700);
+  }
+  function gotoSearchMatch(idx) {
+    if (!searchMatchIds.length) return;
+    const n = ((idx % searchMatchIds.length) + searchMatchIds.length) % searchMatchIds.length;
+    setSearchIdx(n);
+    scrollToTurn(searchMatchIds[n]);
+  }
+  function closeSearch() {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchIdx(0);
+  }
+  function jumpMyMessage(dir) {
+    if (!userTurnIds.length) return;
+    let next = myNavIdx < 0 ? (dir > 0 ? 0 : userTurnIds.length - 1) : myNavIdx + dir;
+    if (next < 0) next = 0;
+    if (next > userTurnIds.length - 1) next = userTurnIds.length - 1;
+    setMyNavIdx(next);
+    scrollToTurn(userTurnIds[next]);
+  }
+  // When the query changes, reset to the first match and scroll to it.
+  useEffect(() => {
+    setSearchIdx(0);
+    if (searchOpen && searchQuery.trim() && searchMatchIds.length) {
+      const id = searchMatchIds[0];
+      requestAnimationFrame(() => scrollToTurn(id));
+    }
+  }, [searchQuery, searchOpen]);
+
   useEffect(() => {
     const node = transcriptRef.current;
     if (!node) return;
@@ -4209,6 +4265,30 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   return html`
     <div class="terminal-chat-view">
       <div class="terminal-chat-transcript-wrap">
+      ${searchOpen ? html`
+        <div class="terminal-search-bar" data-testid="terminal-search-bar">
+          <svg class="terminal-search-glass" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+          <input class="terminal-search-input" data-testid="terminal-search-input" ref=${searchInputRef}
+                 type="text" placeholder="Search this chat…" value=${searchQuery} autofocus
+                 oninput=${(e) => setSearchQuery(e.target.value)}
+                 onkeydown=${(e) => {
+                   if (e.key === 'Enter') { e.preventDefault(); gotoSearchMatch(searchIdx + (e.shiftKey ? -1 : 1)); }
+                   else if (e.key === 'Escape') { e.preventDefault(); closeSearch(); }
+                 }} />
+          <span class="terminal-search-count" data-testid="terminal-search-count">${searchMatchIds.length ? (searchIdx + 1) + '/' + searchMatchIds.length : '0/0'}</span>
+          <button type="button" class="terminal-search-btn" data-testid="terminal-search-prev" aria-label="Previous match"
+                  disabled=${!searchMatchIds.length} onclick=${() => gotoSearchMatch(searchIdx - 1)}>▲</button>
+          <button type="button" class="terminal-search-btn" data-testid="terminal-search-next" aria-label="Next match"
+                  disabled=${!searchMatchIds.length} onclick=${() => gotoSearchMatch(searchIdx + 1)}>▼</button>
+          <button type="button" class="terminal-search-btn terminal-search-close" data-testid="terminal-search-close" aria-label="Close search"
+                  onclick=${closeSearch}>✕</button>
+        </div>
+      ` : html`
+        <button type="button" class="terminal-search-toggle" data-testid="terminal-search-toggle" aria-label="Search chat"
+                onclick=${() => setSearchOpen(true)}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+        </button>
+      `}
       <div class="terminal-chat-transcript" data-testid="terminal-conversation" ref=${transcriptRef}>
         <div class="terminal-chat-daydiv">Today</div>
         ${rawChrome ? html`
@@ -4220,7 +4300,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
             const isUser = entry.role === 'user';
             return html`
               <div key=${entry.id}
-                   class=${'ovm-chat-row ' + (isUser ? 'ovm-chat-row-user' : 'ovm-chat-row-ovm') + ' terminal-chat-entry ' + (isUser ? 'terminal-chat-entry-user' : 'terminal-chat-entry-agent') + (isUser && entry.failed ? ' failed' : '')}
+                   class=${'ovm-chat-row ' + (isUser ? 'ovm-chat-row-user' : 'ovm-chat-row-ovm') + ' terminal-chat-entry ' + (isUser ? 'terminal-chat-entry-user' : 'terminal-chat-entry-agent') + (isUser && entry.failed ? ' failed' : '') + (searchMatchSet.has(entry.id) ? ' terminal-chat-hit' : '') + (searchMatchIds[searchIdx] === entry.id ? ' terminal-chat-hit-current' : '') + (flashId === entry.id ? ' terminal-chat-focus-flash' : '')}
                    data-testid=${isUser ? 'terminal-turn-user' : 'terminal-turn-agent'}
                    data-turn-id=${entry.id}>
                 <div class=${'terminal-chat-who' + (isUser ? ' user' : '')}>
@@ -4261,6 +4341,15 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
           </div>
         `}
       </div>
+      ${userTurnIds.length >= 2 ? html`
+        <div class="terminal-mynav" data-testid="terminal-mynav">
+          <button type="button" class="terminal-mynav-btn" data-testid="terminal-mynav-up" aria-label="Jump to my previous message"
+                  disabled=${myNavIdx === 0} onclick=${() => jumpMyMessage(-1)}>▲</button>
+          <span class="terminal-mynav-label">me</span>
+          <button type="button" class="terminal-mynav-btn" data-testid="terminal-mynav-down" aria-label="Jump to my next message"
+                  disabled=${myNavIdx === userTurnIds.length - 1} onclick=${() => jumpMyMessage(1)}>▼</button>
+        </div>
+      ` : ''}
       ${showScrollBottom ? html`
         <button type="button"
                 class="terminal-scroll-bottom"
