@@ -24,6 +24,12 @@ const CONSENT_HTML_PATH = path.join(path.dirname(fileURLToPath(import.meta.url))
 const PKCE_S256_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
 const STATE_MAX = 512;
 
+const OAUTH_REGISTER_RATE = { config: { rateLimit: { max: 10, timeWindow: "15 minutes" } } };
+const OAUTH_AUTHORIZE_RATE = { config: { rateLimit: { max: 60, timeWindow: "5 minutes" } } };
+const OAUTH_TOKEN_RATE = {
+  config: { rateLimit: { max: 30, timeWindow: "5 minutes", groupId: "oauth-token" } }
+};
+
 export interface McpOauthRouteDeps {
   db: DatabaseService;
   authService: AuthService;
@@ -156,7 +162,7 @@ export function registerMcpOauthRoutes(app: FastifyInstance, deps: McpOauthRoute
     return protectedResourceMetadata(origin);
   });
 
-  app.post("/oauth/register", async (request, reply) => {
+  app.post("/oauth/register", OAUTH_REGISTER_RATE, async (request, reply) => {
     const origin = requireOrigin(request, reply);
     if (!origin) return;
     noStoreJson(reply);
@@ -176,7 +182,7 @@ export function registerMcpOauthRoutes(app: FastifyInstance, deps: McpOauthRoute
     }
   });
 
-  app.post("/oauth/revoke", async (request, reply) => {
+  app.post("/oauth/revoke", OAUTH_TOKEN_RATE, async (request, reply) => {
     const origin = requireOrigin(request, reply);
     if (!origin) return;
     noStoreJson(reply);
@@ -186,7 +192,7 @@ export function registerMcpOauthRoutes(app: FastifyInstance, deps: McpOauthRoute
     return reply.code(200).send();
   });
 
-  app.post("/oauth/token", async (request, reply) => {
+  app.post("/oauth/token", OAUTH_TOKEN_RATE, async (request, reply) => {
     const origin = requireOrigin(request, reply);
     if (!origin) return;
     const contentType = String(request.headers["content-type"] ?? "")
@@ -251,7 +257,7 @@ export function registerMcpOauthRoutes(app: FastifyInstance, deps: McpOauthRoute
     }
   });
 
-  app.get("/oauth/authorize", async (request, reply) => {
+  app.get("/oauth/authorize", OAUTH_AUTHORIZE_RATE, async (request, reply) => {
     const origin = requireOrigin(request, reply);
     if (!origin) return;
     const query = (request.query ?? {}) as Record<string, unknown>;
