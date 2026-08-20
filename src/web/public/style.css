@@ -4427,3 +4427,83 @@ body.tg-miniapp {
   .agent-chat .composer { padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); position: sticky; bottom: 0; }
   .agent-chat .send { height: 38px; padding: 0 14px; }
 }
+
+/* MCP Access (B20) — mobile-first @390px */
+.mcp-access {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+  padding: 0 0 24px;
+}
+.mcp-access h2 { font-size: 18px; font-weight: 600; }
+.mcp-access-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.mcp-access-section h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mcp-access-hint, .mcp-access-empty { color: var(--text-secondary); font-size: 13px; margin-bottom: 8px; }
+.mcp-access-error { color: var(--danger); font-size: 12px; margin-top: 8px; }
+.mcp-pool-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.mcp-pool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 4px 8px 4px 10px;
+  font-size: 13px;
+  max-width: 100%;
+}
+.mcp-pool-chip span { overflow: hidden; text-overflow: ellipsis; }
+.mcp-pool-hint { font-size: 10px; color: var(--warning); }
+.mcp-pool-remove {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.mcp-pool-add-row { display: flex; gap: 8px; }
+.mcp-pool-add-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+.mcp-groups-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.mcp-group-row { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.mcp-group-row span { color: var(--text-secondary); word-break: break-word; }
+.mcp-audit-list { display: flex; flex-direction: column; gap: 8px; }
+.mcp-audit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+.mcp-audit-time { color: var(--text-secondary); }
+.mcp-audit-blocked.on { color: var(--danger); font-weight: 600; }
+@media (max-width: 420px) {
+  .mcp-access { max-width: 100%; }
+  .header { flex-wrap: wrap; gap: 8px; }
+  .header .nav-links { flex-wrap: wrap; gap: 6px; }
+}

@@ -744,6 +744,7 @@ function Header({ user }) {
           <a href="#/conversations" class=${route === '/conversations' ? 'active' : ''}>Chat</a>
           <a href="#/agent-os" class=${route === '/agent-os' ? 'active' : ''}>Agent OS</a>
           <a href="#/settings" class=${route === '/settings' ? 'active' : ''}>Settings</a>
+          ${user?.role === 'owner' && html`<a href="#/mcp-access" data-testid="mcp-nav-access" class=${route === '/mcp-access' ? 'active' : ''}>MCP Access</a>`}
         </nav>
       </div>
       <div class="user-info">
@@ -8317,7 +8318,7 @@ function TgApp() {
     const KNOWN_PREFIXES = ['/project/'];
     const KNOWN_EXACT = new Set([
       '/', '/projects', '/terminals', '/overmind', '/overmind-projects', '/tasks',
-      '/notes', '/conversations', '/settings', '/agent-os'
+      '/notes', '/conversations', '/settings', '/agent-os', '/mcp-access'
     ]);
     const isKnown =
       initialHash &&
@@ -8359,6 +8360,10 @@ function TgApp() {
     content = html`<${Settings} onEditBottomNav=${() => setEditingBottomNav(true)} />`;
   } else if (route === '/agent-os') {
     content = html`<${AgentOS} />`;
+  } else if (route === '/mcp-access') {
+    content = user?.role === 'owner'
+      ? html`<${McpAccessPage} />`
+      : html`<div class="empty-state">Owner role required</div>`;
   } else if (route.startsWith('/project/')) {
     const id = route.split('/')[2];
     content = html`<${ProjectDetail} id=${id} key=${id} />`;
@@ -8393,6 +8398,159 @@ function TgApp() {
   `;
 }
 
+const MCP_POOL_NAME_RE = /^[A-Za-z0-9_.-]{1,128}$/;
+const MCP_ORCH_HINT = /(?:^x-|_validator_|_planner_|_impl_|projcore)/i;
+const MCP_AUDIT_PAGE = 20;
+
+function mcpAuditBlocked(details) {
+  if (!details) return false;
+  try {
+    const parsed = typeof details === 'string' ? JSON.parse(details) : details;
+    return parsed && parsed.blocked === true;
+  } catch {
+    return false;
+  }
+}
+
+function McpAccessPage() {
+  const user = JSON.parse(localStorage.getItem('agj_user') || 'null');
+  const [pool, setPool] = useState([]);
+  const [poolDraft, setPoolDraft] = useState('');
+  const [poolError, setPoolError] = useState('');
+  const [groups, setGroups] = useState([]);
+  const [auditRows, setAuditRows] = useState([]);
+  const [auditOffset, setAuditOffset] = useState(0);
+  const [auditMore, setAuditMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  async function loadPool() {
+    const data = await api('/api/mcp/pool');
+    setPool(Array.isArray(data.sessions) ? data.sessions : []);
+  }
+
+  async function savePool(next) {
+    const data = await api('/api/mcp/pool', { method: 'PUT', body: JSON.stringify({ sessions: next }) });
+    setPool(Array.isArray(data.sessions) ? data.sessions : next);
+  }
+
+  async function loadAudit(offset) {
+    const data = await api(`/api/mcp/audit?limit=${MCP_AUDIT_PAGE}&offset=${offset}`);
+    const entries = Array.isArray(data.entries) ? data.entries : [];
+    setAuditRows((prev) => (offset === 0 ? entries : prev.concat(entries)));
+    setAuditOffset(offset + entries.length);
+    setAuditMore(entries.length >= MCP_AUDIT_PAGE);
+  }
+
+  useEffect(() => {
+    Promise.all([
+      loadPool().catch((e) => setPoolError(e.message || 'Failed to load pool')),
+      api('/api/terminal/groups').then((d) => setGroups(Array.isArray(d.groups) ? d.groups : [])).catch(() => setGroups([])),
+      loadAudit(0).catch(() => { setAuditRows([]); setAuditMore(false); })
+    ]).finally(() => setLoading(false));
+  }, []);
+
+  if (user?.role !== 'owner') {
+    return html`<div class="empty-state">Owner role required</div>`;
+  }
+
+  async function addToPool() {
+    const name = poolDraft.trim();
+    setPoolError('');
+    if (!MCP_POOL_NAME_RE.test(name)) {
+      setPoolError('Session names must be 1–128 letters, digits, _, ., or -');
+      return;
+    }
+    if (pool.includes(name)) {
+      setPoolDraft('');
+      return;
+    }
+    try {
+      await savePool(pool.concat(name));
+      setPoolDraft('');
+    } catch (e) {
+      setPoolError(e.message || 'Save failed');
+    }
+  }
+
+  async function removeFromPool(name) {
+    setPoolError('');
+    try {
+      await savePool(pool.filter((s) => s !== name));
+    } catch (e) {
+      setPoolError(e.message || 'Save failed');
+    }
+  }
+
+  return html`
+    <div class="mcp-access" data-testid="mcp-access-page">
+      <h2>MCP Access</h2>
+      ${loading ? html`<div class="loading">Loading...</div>` : ''}
+
+      <section class="mcp-access-section" data-testid="mcp-pool-manager">
+        <h3>Grantable pool</h3>
+        ${pool.length === 0
+          ? html`<p class="mcp-access-empty" data-testid="mcp-pool-empty">Pool is empty. Add session names before granting access.</p>`
+          : html`<div class="mcp-pool-chips">
+              ${pool.map((name) => html`
+                <span class=${'mcp-pool-chip' + (MCP_ORCH_HINT.test(name) ? ' mcp-pool-chip-hint' : '')} data-testid="mcp-pool-chip" data-session=${name}>
+                  <span>${name}</span>
+                  ${MCP_ORCH_HINT.test(name) ? html`<span class="mcp-pool-hint">orchestration</span>` : ''}
+                  <button type="button" class="mcp-pool-remove" data-testid="mcp-pool-remove" aria-label=${'Remove ' + name}
+                          onclick=${() => removeFromPool(name)}>×</button>
+                </span>
+              `)}
+            </div>`}
+        <div class="mcp-pool-add-row">
+          <input data-testid="mcp-pool-add-input" value=${poolDraft}
+                 placeholder="Session name"
+                 onInput=${(e) => setPoolDraft(e.target.value)}
+                 onKeyDown=${(e) => e.key === 'Enter' && addToPool()} />
+          <button type="button" class="btn btn-primary btn-sm" data-testid="mcp-pool-add" onclick=${addToPool}>Add</button>
+        </div>
+        ${poolError && html`<p class="mcp-access-error">${poolError}</p>`}
+      </section>
+
+      <section class="mcp-access-section" data-testid="mcp-server-groups">
+        <h3>Server groups</h3>
+        <p class="mcp-access-hint">Read-only. Group grants use these memberships.</p>
+        ${groups.length === 0
+          ? html`<p class="mcp-access-empty">No groups defined.</p>`
+          : html`<ul class="mcp-groups-list">
+              ${groups.map((g) => html`
+                <li class="mcp-group-row" data-testid="mcp-server-group" data-group-id=${g.id}>
+                  <strong>${g.name}</strong>
+                  <span>${(g.sessions || []).length ? (g.sessions || []).join(', ') : 'empty'}</span>
+                </li>
+              `)}
+            </ul>`}
+      </section>
+
+      <section class="mcp-access-section" data-testid="mcp-connected-agents">
+        <h3>Connected agents</h3>
+        <p class="mcp-access-hint">Active grants will appear here.</p>
+      </section>
+
+      <section class="mcp-access-section" data-testid="mcp-audit">
+        <h3>Audit</h3>
+        ${auditRows.length === 0
+          ? html`<p class="mcp-access-empty" data-testid="mcp-audit-empty">No MCP audit rows yet.</p>`
+          : html`<div class="mcp-audit-list">
+              ${auditRows.map((row) => html`
+                <div class="mcp-audit-row" data-testid="mcp-audit-row">
+                  <span class="mcp-audit-time">${row.timestamp || ''}</span>
+                  <span class="mcp-audit-agent">${row.agent_name || '—'}</span>
+                  <span class="mcp-audit-action">${row.action_type || ''}</span>
+                  <span class="mcp-audit-target">${row.tmux_target || '—'}</span>
+                  <span class=${'mcp-audit-blocked' + (mcpAuditBlocked(row.details) ? ' on' : '')}>${mcpAuditBlocked(row.details) ? 'blocked' : ''}</span>
+                </div>
+              `)}
+            </div>`}
+        ${auditMore && html`<button type="button" class="btn btn-sm" data-testid="mcp-audit-load-more" onclick=${() => loadAudit(auditOffset)}>Load more</button>`}
+      </section>
+    </div>
+  `;
+}
+
 // ========== Web App ==========
 
 function App() {
@@ -8422,6 +8580,10 @@ function App() {
     content = html`<${Settings} />`;
   } else if (route === '/agent-os') {
     content = html`<${AgentOS} />`;
+  } else if (route === '/mcp-access') {
+    content = user?.role === 'owner'
+      ? html`<${McpAccessPage} />`
+      : html`<div class="empty-state">Owner role required</div>`;
   } else if (route.startsWith('/project/')) {
     const id = route.split('/')[2];
     content = html`<${ProjectDetail} id=${id} key=${id} />`;
