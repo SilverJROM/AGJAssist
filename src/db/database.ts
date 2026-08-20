@@ -693,6 +693,163 @@ export class DatabaseService {
         `);
       }
 
+      // Migration: v35 → v36: MCP OAuth/grant persistence and dedicated audit surface.
+      // The table DDL mirrors the fresh schema. audit_log requires a rebuild because
+      // SQLite cannot widen a CHECK constraint in place.
+      if (current && current.version < 36) {
+        const auditDefinition = this.db
+          .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'audit_log'")
+          .get() as { sql: string | null } | undefined;
+        const auditAlreadySupportsMcp = Boolean(
+          auditDefinition?.sql &&
+          /surface\s+TEXT\s+CHECK\s*\(\s*surface\s+IN\s*\([^)]*'mcp'/i.test(auditDefinition.sql)
+        );
+
+        this.db.exec("PRAGMA foreign_keys = OFF");
+        try {
+          const migrateMcp = this.db.transaction(() => {
+            this.db.exec(`
+              CREATE TABLE IF NOT EXISTS mcp_clients (
+                id TEXT PRIMARY KEY,
+                client_name TEXT NOT NULL CHECK(length(client_name) BETWEEN 1 AND 80),
+                redirect_uris TEXT NOT NULL,
+                token_endpoint_auth_method TEXT NOT NULL DEFAULT 'none' CHECK(token_endpoint_auth_method='none'),
+                metadata TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                last_used_at TEXT
+              );
+
+              CREATE TABLE IF NOT EXISTS mcp_grantable_pool (
+                session_name TEXT PRIMARY KEY
+                  CHECK(length(session_name) BETWEEN 1 AND 128 AND session_name NOT GLOB '*[^A-Za-z0-9_.-]*'),
+                added_by INTEGER NOT NULL REFERENCES users(id),
+                added_at TEXT NOT NULL DEFAULT (datetime('now')),
+                note TEXT
+              );
+
+              CREATE TABLE IF NOT EXISTS mcp_grants (
+                id INTEGER PRIMARY KEY,
+                client_id TEXT NOT NULL REFERENCES mcp_clients(id),
+                scope_type TEXT NOT NULL CHECK(scope_type IN ('sessions','group')),
+                scope_ref TEXT NOT NULL,
+                permissions TEXT NOT NULL DEFAULT '[]',
+                lifetime INTEGER NOT NULL DEFAULT 0 CHECK(lifetime IN (0,1)),
+                token_ttl_days INTEGER NOT NULL DEFAULT 7 CHECK(token_ttl_days BETWEEN 7 AND 10),
+                granted_by INTEGER NOT NULL REFERENCES users(id),
+                status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','revoked')),
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                revoked_at TEXT,
+                last_used_at TEXT
+              );
+              CREATE INDEX IF NOT EXISTS idx_mcp_grants_client ON mcp_grants(client_id);
+              CREATE INDEX IF NOT EXISTS idx_mcp_grants_owner_status ON mcp_grants(granted_by, status);
+              CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_grants_one_active ON mcp_grants(client_id) WHERE status='active';
+
+              CREATE TABLE IF NOT EXISTS mcp_tokens (
+                id TEXT PRIMARY KEY,
+                grant_id INTEGER NOT NULL REFERENCES mcp_grants(id) ON DELETE CASCADE,
+                client_id TEXT NOT NULL REFERENCES mcp_clients(id),
+                token_hash TEXT NOT NULL UNIQUE CHECK(length(token_hash)=64),
+                token_type TEXT NOT NULL CHECK(token_type IN ('access','refresh')),
+                family_id TEXT NOT NULL,
+                rotated_from TEXT REFERENCES mcp_tokens(id),
+                audience TEXT NOT NULL,
+                expires_at TEXT,
+                revoked INTEGER NOT NULL DEFAULT 0 CHECK(revoked IN (0,1)),
+                revoked_at TEXT,
+                rotated_at TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                last_used_at TEXT
+              );
+              CREATE INDEX IF NOT EXISTS idx_mcp_tokens_grant ON mcp_tokens(grant_id);
+              CREATE INDEX IF NOT EXISTS idx_mcp_tokens_client_type ON mcp_tokens(client_id, token_type);
+              CREATE INDEX IF NOT EXISTS idx_mcp_tokens_family ON mcp_tokens(family_id);
+              CREATE INDEX IF NOT EXISTS idx_mcp_tokens_expiry ON mcp_tokens(expires_at);
+
+              CREATE TABLE IF NOT EXISTS mcp_authorization_codes (
+                id TEXT PRIMARY KEY,
+                code_hash TEXT NOT NULL UNIQUE CHECK(length(code_hash)=64),
+                grant_id INTEGER NOT NULL REFERENCES mcp_grants(id) ON DELETE CASCADE,
+                client_id TEXT NOT NULL REFERENCES mcp_clients(id),
+                redirect_uri TEXT NOT NULL,
+                code_challenge TEXT NOT NULL,
+                audience TEXT NOT NULL,
+                family_id TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                used_at TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+              );
+              CREATE INDEX IF NOT EXISTS idx_mcp_codes_grant ON mcp_authorization_codes(grant_id);
+              CREATE INDEX IF NOT EXISTS idx_mcp_codes_expiry ON mcp_authorization_codes(expires_at);
+            `);
+
+            if (!auditAlreadySupportsMcp) {
+              const before = this.db
+                .prepare("SELECT COUNT(*) AS count FROM audit_log")
+                .get() as { count: number };
+
+              this.db.exec(`
+                DROP TABLE IF EXISTS audit_log_new;
+                CREATE TABLE audit_log_new (
+                  id INTEGER PRIMARY KEY,
+                  timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+                  user_id INTEGER REFERENCES users(id),
+                  agent_name TEXT,
+                  action_type TEXT NOT NULL,
+                  resource_type TEXT,
+                  resource_id TEXT,
+                  details TEXT,
+                  tmux_target TEXT,
+                  surface TEXT CHECK(surface IN ('bot', 'miniapp', 'web', 'agent', 'mcp'))
+                );
+                INSERT INTO audit_log_new (
+                  id, timestamp, user_id, agent_name, action_type,
+                  resource_type, resource_id, details, tmux_target, surface
+                )
+                SELECT
+                  id, timestamp, user_id, agent_name, action_type,
+                  resource_type, resource_id, details, tmux_target, surface
+                FROM audit_log;
+              `);
+
+              const copied = this.db
+                .prepare("SELECT COUNT(*) AS count FROM audit_log_new")
+                .get() as { count: number };
+              if (copied.count !== before.count) {
+                throw new Error(`audit_log v36 rebuild copied ${copied.count} rows, expected ${before.count}`);
+              }
+
+              this.db.exec(`
+                DROP TABLE audit_log;
+                ALTER TABLE audit_log_new RENAME TO audit_log;
+                CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(timestamp);
+                CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
+                CREATE INDEX IF NOT EXISTS idx_audit_agent ON audit_log(agent_name);
+                CREATE INDEX IF NOT EXISTS idx_audit_type ON audit_log(action_type);
+              `);
+            }
+
+            const migratedAuditDefinition = this.db
+              .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'audit_log'")
+              .get() as { sql: string | null } | undefined;
+            if (
+              !migratedAuditDefinition?.sql ||
+              !/surface\s+TEXT\s+CHECK\s*\(\s*surface\s+IN\s*\([^)]*'mcp'/i.test(migratedAuditDefinition.sql)
+            ) {
+              throw new Error("audit_log v36 rebuild did not add the mcp surface");
+            }
+
+            const fkProblems = this.db.pragma("foreign_key_check") as unknown[];
+            if (fkProblems.length > 0) {
+              throw new Error(`MCP v36 migration foreign_key_check failed with ${fkProblems.length} violation(s)`);
+            }
+          });
+          migrateMcp();
+        } finally {
+          this.db.exec("PRAGMA foreign_keys = ON");
+        }
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);
