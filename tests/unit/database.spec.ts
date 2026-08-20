@@ -38,6 +38,11 @@ describe("DatabaseService", () => {
     expect(tableNames).toContain("audit_log");
     expect(tableNames).toContain("conversations");
     expect(tableNames).toContain("terminal_groups");
+    expect(tableNames).toContain("mcp_clients");
+    expect(tableNames).toContain("mcp_grants");
+    expect(tableNames).toContain("mcp_tokens");
+    expect(tableNames).toContain("mcp_authorization_codes");
+    expect(tableNames).toContain("mcp_grantable_pool");
 
     db.close();
   });
@@ -70,7 +75,23 @@ describe("DatabaseService", () => {
       .prepare("SELECT version FROM schema_version")
       .get() as { version: number };
 
-    expect(version.version).toBe(35);
+    expect(version.version).toBe(36);
+    db.close();
+  });
+
+  it("fresh DB accepts audit_log surface mcp and rejects an unknown surface", () => {
+    cleanup();
+    const db = new DatabaseService(TEST_DB);
+    db.prepare(
+      "INSERT INTO audit_log (action_type, surface) VALUES (?, ?)"
+    ).run("mcp_test", "mcp");
+    const row = db
+      .prepare("SELECT surface FROM audit_log WHERE action_type = ?")
+      .get("mcp_test") as { surface: string };
+    expect(row.surface).toBe("mcp");
+    expect(() =>
+      db.prepare("INSERT INTO audit_log (action_type, surface) VALUES (?, ?)").run("mcp_test_bad", "evil")
+    ).toThrow();
     db.close();
   });
 
@@ -168,7 +189,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(35);
+    expect(version.version).toBe(36);
     const upgradedCols = upgraded.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
     const upgradedColNames = upgradedCols.map((c) => c.name);
     expect(upgradedColNames).toContain("last_parent_update_at");
@@ -203,7 +224,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(35);
+    expect(version.version).toBe(36);
 
     const tableNames = (
       upgraded.raw
@@ -322,7 +343,7 @@ describe("DatabaseService", () => {
 
     const upgraded = new DatabaseService(TEST_DB);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(35);
+    expect(version.version).toBe(36);
 
     const count = upgraded.prepare("SELECT COUNT(*) AS count FROM overmind_workflows").get() as { count: number };
     expect(count.count).toBe(2);
