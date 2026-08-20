@@ -61,6 +61,10 @@ import { McpCodeService } from "../mcp/mcp-code-service.js";
 import { McpTokenService } from "../mcp/mcp-token-service.js";
 import { McpGrantService } from "../mcp/mcp-grant-service.js";
 import { McpPoolService } from "../mcp/mcp-pool-service.js";
+import { McpScopeService } from "../mcp/mcp-scope-service.js";
+import { McpBearerService } from "../mcp/mcp-bearer-service.js";
+import { McpRateLimiter } from "../mcp/mcp-rate-limit.js";
+import { registerMcpRoutes } from "./routes/mcp-routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -192,6 +196,13 @@ export async function createApiServer(
   const mcpCodes = new McpCodeService(services.db, mcpTokens);
   const mcpGrants = new McpGrantService(services.db, mcpTokens, services.auditService);
   const mcpPool = new McpPoolService(services.db, services.auditService);
+  const mcpScope = new McpScopeService(services.db, terminalGroupsService, mcpPool);
+  const mcpBearer = new McpBearerService(
+    mcpTokens,
+    mcpGrants,
+    mcpScope,
+    services.tmuxService
+  );
   registerMcpOauthRoutes(app, {
     db: services.db,
     authService: services.authService,
@@ -201,6 +212,11 @@ export async function createApiServer(
     grants: mcpGrants,
     pool: mcpPool,
     groups: terminalGroupsService
+  });
+  registerMcpRoutes(app, {
+    bearer: mcpBearer,
+    limiter: new McpRateLimiter(),
+    audit: services.auditService
   });
 
   return app;
