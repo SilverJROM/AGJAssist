@@ -94,6 +94,70 @@ function writeTerminalReplyLimit(value) {
   return n;
 }
 
+// Telegram-style session folder groups (client-only; never touches tmux).
+const TERMINAL_GROUPS_STORAGE_KEY = 'agj_terminal_groups';
+const TERMINAL_ACTIVE_GROUP_STORAGE_KEY = 'agj_terminal_active_group';
+
+function newTerminalGroupId() {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {}
+  return 'g_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+}
+
+function normalizeTerminalGroup(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id || '').trim();
+  const name = String(raw.name || '').trim();
+  if (!id || !name) return null;
+  const sessions = Array.isArray(raw.sessions)
+    ? Array.from(new Set(raw.sessions.map((s) => String(s)).filter(Boolean)))
+    : [];
+  return { id, name, sessions };
+}
+
+function readTerminalGroups() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TERMINAL_GROUPS_STORAGE_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeTerminalGroup).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function writeTerminalGroups(groups) {
+  try {
+    localStorage.setItem(TERMINAL_GROUPS_STORAGE_KEY, JSON.stringify(Array.isArray(groups) ? groups : []));
+  } catch {}
+}
+
+function readActiveTerminalGroup() {
+  try {
+    const value = localStorage.getItem(TERMINAL_ACTIVE_GROUP_STORAGE_KEY);
+    return value && String(value).trim() ? String(value) : 'all';
+  } catch {
+    return 'all';
+  }
+}
+
+function writeActiveTerminalGroup(id) {
+  try {
+    localStorage.setItem(TERMINAL_ACTIVE_GROUP_STORAGE_KEY, id || 'all');
+  } catch {}
+}
+
+function clampMenuPosition(top, left, width, height) {
+  const maxLeft = Math.max(8, window.innerWidth - width - 8);
+  const maxTop = Math.max(8, window.innerHeight - height - 8);
+  return {
+    top: Math.min(Math.max(8, top), maxTop),
+    left: Math.min(Math.max(8, left), maxLeft)
+  };
+}
+
 // Recent-message memory: the app remembers the last N exchanges (your message +
 // the reply after it) per session in localStorage, so they survive closing and
 // reopening the app and can be seeded back into the chat. Rolling — the oldest
@@ -2126,6 +2190,16 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [friendlyMode, setFriendlyMode] = useState(isTgMiniApp);
   const [fullScreen, setFullScreen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [terminalGroups, setTerminalGroups] = useState(() => readTerminalGroups());
+  const [activeGroupTab, setActiveGroupTab] = useState(() => {
+    const groups = readTerminalGroups();
+    const stored = readActiveTerminalGroup();
+    return stored === 'all' || groups.some((group) => group.id === stored) ? stored : 'all';
+  });
+  const [rowGroupMenu, setRowGroupMenu] = useState(null);
+  const [groupManageMenu, setGroupManageMenu] = useState(null);
+  const [groupNamePrompt, setGroupNamePrompt] = useState(null);
+  const [editingGroupId, setEditingGroupId] = useState(null);
   const [terminalFontSize, setTerminalFontSize] = useState(() => {
     try {
       const stored = Number(localStorage.getItem(TERMINAL_FONT_STORAGE_KEY));
@@ -2232,6 +2306,52 @@ function TerminalTab({ projectId, projectName } = {}) {
       window.removeEventListener('pointerdown', onOutsideClick);
     };
   }, [menuOpen]);
+
+  function persistTerminalGroups(updater) {
+    setTerminalGroups((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      writeTerminalGroups(next);
+      return next;
+    });
+  }
+
+  function persistActiveGroupTab(id) {
+    const next = id || 'all';
+    writeActiveTerminalGroup(next);
+    setActiveGroupTab(next);
+  }
+
+  useEffect(() => {
+    if (activeGroupTab !== 'all' && !terminalGroups.some((group) => group.id === activeGroupTab)) {
+      persistActiveGroupTab('all');
+    }
+  }, [activeGroupTab, terminalGroups]);
+
+  useEffect(() => {
+    if (viewMode === 'list' || !activeTarget) return undefined;
+    setRowGroupMenu(null);
+    setGroupManageMenu(null);
+    return undefined;
+  }, [viewMode, activeTarget]);
+
+  useEffect(() => {
+    if (!rowGroupMenu && !groupManageMenu && !groupNamePrompt && !editingGroupId) return undefined;
+    const onKey = (event) => {
+      if (event.key !== 'Escape') return;
+      if (groupNamePrompt) {
+        setGroupNamePrompt(null);
+        return;
+      }
+      if (editingGroupId) {
+        setEditingGroupId(null);
+        return;
+      }
+      setRowGroupMenu(null);
+      setGroupManageMenu(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [rowGroupMenu, groupManageMenu, groupNamePrompt, editingGroupId]);
 
   useEffect(() => {
     if (!isTgMiniAppContext) return;
@@ -2358,6 +2478,100 @@ function TerminalTab({ projectId, projectName } = {}) {
     setSectionNavOpen(false);
   }
 
+  function closeGroupPopovers() {
+    setRowGroupMenu(null);
+    setGroupManageMenu(null);
+  }
+
+  function selectGroupTab(id) {
+    persistActiveGroupTab(id || 'all');
+    closeGroupPopovers();
+  }
+
+  function openCreateGroupPrompt(sessionName) {
+    closeGroupPopovers();
+    setGroupNamePrompt({
+      mode: sessionName ? 'create-and-assign' : 'create',
+      sessionName: sessionName || null,
+      groupId: null,
+      draft: ''
+    });
+  }
+
+  function openRenameGroupPrompt(groupId) {
+    const group = terminalGroups.find((g) => g.id === groupId);
+    if (!group) return;
+    closeGroupPopovers();
+    setGroupNamePrompt({ mode: 'rename', groupId, sessionName: null, draft: group.name });
+  }
+
+  function submitGroupNamePrompt() {
+    const prompt = groupNamePrompt;
+    if (!prompt) return;
+    const name = String(prompt.draft || '').trim();
+    if (!name) return;
+    if (prompt.mode === 'rename' && prompt.groupId) {
+      persistTerminalGroups((prev) => prev.map((group) => (
+        group.id === prompt.groupId ? { ...group, name } : group
+      )));
+    } else {
+      const id = newTerminalGroupId();
+      const sessions = prompt.sessionName ? [prompt.sessionName] : [];
+      persistTerminalGroups((prev) => [...prev, { id, name, sessions }]);
+      if (prompt.mode === 'create') persistActiveGroupTab(id);
+    }
+    setGroupNamePrompt(null);
+  }
+
+  function deleteGroup(groupId) {
+    closeGroupPopovers();
+    setEditingGroupId((current) => (current === groupId ? null : current));
+    persistTerminalGroups((prev) => prev.filter((group) => group.id !== groupId));
+    if (activeGroupTab === groupId) persistActiveGroupTab('all');
+  }
+
+  function toggleSessionInGroup(groupId, sessionName, nextChecked) {
+    if (!groupId || !sessionName) return;
+    persistTerminalGroups((prev) => prev.map((group) => {
+      if (group.id !== groupId) return group;
+      const has = group.sessions.includes(sessionName);
+      if (nextChecked && !has) return { ...group, sessions: [...group.sessions, sessionName] };
+      if (!nextChecked && has) return { ...group, sessions: group.sessions.filter((name) => name !== sessionName) };
+      return group;
+    }));
+  }
+
+  function openRowGroupMenu(event, sessionName) {
+    event.stopPropagation();
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const pos = clampMenuPosition(rect.bottom + 4, rect.right - 220, 220, 240);
+    setGroupManageMenu(null);
+    setRowGroupMenu({ sessionName, top: pos.top, left: pos.left });
+  }
+
+  function openGroupManageMenu(event, groupId) {
+    event.stopPropagation();
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const pos = clampMenuPosition(rect.bottom + 4, rect.right - 180, 180, 160);
+    setRowGroupMenu(null);
+    setGroupManageMenu({ groupId, top: pos.top, left: pos.left });
+  }
+
+  function openGroupEdit(groupId) {
+    closeGroupPopovers();
+    if (!terminalGroups.some((group) => group.id === groupId)) return;
+    setEditingGroupId(groupId);
+  }
+
+  function openSessionFromRow(event, target) {
+    if (!target) return;
+    if (event?.target?.closest?.('[data-testid="terminal-row-groups"]')) return;
+    closeGroupPopovers();
+    switchActiveTarget(target);
+  }
+
   function getPrimarySessionPane(session) {
     const panes = Array.isArray(session?.panes) ? session.panes : [];
     return panes.find((p) => String(p.window) === '0' && String(p.pane) === '0')
@@ -2401,6 +2615,19 @@ function TerminalTab({ projectId, projectName } = {}) {
       connected: Boolean(primaryPane?.target)
     };
   }).sort((a, b) => b.activity - a.activity || String(a.session.session_name).localeCompare(String(b.session.session_name)));
+
+  const resolvedActiveGroupTab = activeGroupTab === 'all' || terminalGroups.some((group) => group.id === activeGroupTab)
+    ? activeGroupTab
+    : 'all';
+  const activeGroup = resolvedActiveGroupTab === 'all'
+    ? null
+    : terminalGroups.find((group) => group.id === resolvedActiveGroupTab) || null;
+  const visibleRows = resolvedActiveGroupTab === 'all'
+    ? sessionRows
+    : sessionRows.filter((row) => activeGroup?.sessions.includes(row.session.session_name));
+  const editingGroup = editingGroupId
+    ? terminalGroups.find((group) => group.id === editingGroupId) || null
+    : null;
 
   const updatedLabel = lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : '';
   const targetSubtitle = [
@@ -2639,27 +2866,93 @@ function TerminalTab({ projectId, projectName } = {}) {
         <div class=${'terminal-panel' + (friendlyMode ? ' terminal-panel-friendly' : '')}>
           ${isListView
             ? html`
-              <div class="terminal-list" data-testid="terminal-session-list">
-                ${sessionsError
-                  ? html`<div class="terminal-list-state error">${sessionsError} <button type="button" class="btn btn-sm" onclick=${loadSessions}>Retry</button></div>`
-                  : sessionRows.length === 0
-                    ? html`<div class="terminal-list-state">No active sessions</div>`
-                    : sessionRows.map((row) => html`
+              <div class="terminal-list-wrap">
+                <div class="terminal-list-tabs" data-testid="terminal-list-tabs" role="tablist" aria-label="Session groups">
+                  <div class=${'terminal-list-tab' + (resolvedActiveGroupTab === 'all' ? ' active' : '')}
+                       role="tab"
+                       tabindex="0"
+                       data-testid="terminal-group-tab"
+                       data-group-id="all"
+                       aria-selected=${resolvedActiveGroupTab === 'all'}
+                       onclick=${() => selectGroupTab('all')}
+                       onkeydown=${(event) => {
+                         if (event.key === 'Enter' || event.key === ' ') {
+                           event.preventDefault();
+                           selectGroupTab('all');
+                         }
+                       }}>
+                    <span class="terminal-list-tab-name">All</span>
+                  </div>
+                  ${terminalGroups.map((group) => html`
+                    <div key=${group.id}
+                         class=${'terminal-list-tab' + (resolvedActiveGroupTab === group.id ? ' active' : '')}
+                         role="tab"
+                         tabindex="0"
+                         data-testid="terminal-group-tab"
+                         data-group-id=${group.id}
+                         aria-selected=${resolvedActiveGroupTab === group.id}
+                         onclick=${() => selectGroupTab(group.id)}
+                         onkeydown=${(event) => {
+                           if (event.key === 'Enter' || event.key === ' ') {
+                             event.preventDefault();
+                             selectGroupTab(group.id);
+                           }
+                         }}>
+                      <span class="terminal-list-tab-name">${group.name}</span>
                       <button type="button"
-                              class=${'terminal-list-row' + (row.busy ? ' busy' : '')}
-                              data-testid="terminal-session-row"
-                              data-session-target=${row.primaryPane?.target || ''}
-                              onclick=${() => row.primaryPane?.target && switchActiveTarget(row.primaryPane.target)}>
-                        <span class=${'terminal-list-dot ' + (row.busy ? 'busy' : row.connected ? 'connected' : 'offline')} aria-hidden="true"></span>
-                        <span class="terminal-list-main">
-                          <span class="terminal-list-name">${row.session.session_name}</span>
-                          ${row.busy
-                            ? html`<span class="terminal-list-status">working…</span>`
-                            : html`<span class="terminal-list-status">${row.connected ? 'ready' : 'not connected'}</span>`}
-                        </span>
-                        <span class="terminal-list-time">${formatTerminalActivity(row.activity)}</span>
-                      </button>
-                    `)}
+                              class="terminal-list-tab-more"
+                              data-testid="terminal-group-manage"
+                              aria-label=${'Manage ' + group.name}
+                              onclick=${(event) => openGroupManageMenu(event, group.id)}>⋮</button>
+                    </div>
+                  `)}
+                  <button type="button"
+                          class="terminal-list-tab-create"
+                          data-testid="terminal-group-create"
+                          aria-label="Create group"
+                          onclick=${() => openCreateGroupPrompt(null)}>+</button>
+                </div>
+                <div class="terminal-list" data-testid="terminal-session-list">
+                  ${sessionsError
+                    ? html`<div class="terminal-list-state error">${sessionsError} <button type="button" class="btn btn-sm" onclick=${loadSessions}>Retry</button></div>`
+                    : resolvedActiveGroupTab !== 'all' && visibleRows.length === 0
+                      ? html`<div class="terminal-list-state" data-testid="terminal-group-empty">No sessions in this group yet — add them from All (📁) or the group's Edit screen.</div>`
+                      : visibleRows.length === 0
+                        ? html`<div class="terminal-list-state">No active sessions</div>`
+                        : visibleRows.map((row) => html`
+                          <div role="button"
+                               tabindex="0"
+                               key=${row.session.session_name}
+                               class=${'terminal-list-row' + (row.busy ? ' busy' : '')}
+                               data-testid="terminal-session-row"
+                               data-session-target=${row.primaryPane?.target || ''}
+                               onclick=${(event) => openSessionFromRow(event, row.primaryPane?.target)}
+                               onkeydown=${(event) => {
+                                 if (event.target !== event.currentTarget) return;
+                                 if (event.key === 'Enter' || event.key === ' ') {
+                                   event.preventDefault();
+                                   openSessionFromRow(event, row.primaryPane?.target);
+                                 }
+                               }}>
+                            <span class=${'terminal-list-dot ' + (row.busy ? 'busy' : row.connected ? 'connected' : 'offline')} aria-hidden="true"></span>
+                            <span class="terminal-list-main">
+                              <span class="terminal-list-name">${row.session.session_name}</span>
+                              ${row.busy
+                                ? html`<span class="terminal-list-status">working…</span>`
+                                : html`<span class="terminal-list-status">${row.connected ? 'ready' : 'not connected'}</span>`}
+                            </span>
+                            <span class="terminal-list-meta">
+                              <span class="terminal-list-time">${formatTerminalActivity(row.activity)}</span>
+                              <button type="button"
+                                      class="terminal-row-groups"
+                                      data-testid="terminal-row-groups"
+                                      aria-label=${'Assign ' + row.session.session_name + ' to groups'}
+                                      onclick=${(event) => openRowGroupMenu(event, row.session.session_name)}
+                                      onpointerdown=${(event) => event.stopPropagation()}>📁</button>
+                            </span>
+                          </div>
+                        `)}
+                </div>
               </div>`
             : hasTarget
             ? (friendlyMode
@@ -2711,6 +3004,90 @@ function TerminalTab({ projectId, projectName } = {}) {
             <button class="btn btn-primary" onclick=${createSession}>Create</button>
           </div>
         </div>
+      </div>
+    `}
+    ${groupNamePrompt && html`
+      <div class="modal-overlay terminal-group-overlay" data-testid="terminal-group-name-modal" onclick=${() => setGroupNamePrompt(null)}>
+        <div class="modal" style="max-width:400px" onclick=${(event) => event.stopPropagation()}>
+          <h3>${groupNamePrompt.mode === 'rename' ? 'Rename group' : 'New group'}</h3>
+          <div class="form-group">
+            <label>Group name</label>
+            <input data-testid="terminal-group-name-input"
+                   value=${groupNamePrompt.draft}
+                   onInput=${(event) => setGroupNamePrompt((current) => current ? { ...current, draft: event.target.value } : current)}
+                   onKeyDown=${(event) => event.key === 'Enter' && submitGroupNamePrompt()}
+                   placeholder="e.g. north" autofocus />
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn" onclick=${() => setGroupNamePrompt(null)}>Cancel</button>
+            <button type="button" class="btn btn-primary" data-testid="terminal-group-name-submit" onclick=${submitGroupNamePrompt}>
+              ${groupNamePrompt.mode === 'rename' ? 'Save' : 'Create'}
+            </button>
+          </div>
+        </div>
+      </div>
+    `}
+    ${editingGroup && html`
+      <div class="modal-overlay terminal-group-overlay" onclick=${() => setEditingGroupId(null)}>
+        <div class="modal terminal-group-edit" data-testid="terminal-group-edit" onclick=${(event) => event.stopPropagation()}>
+          <h3>${editingGroup.name}</h3>
+          <div class="terminal-group-edit-list">
+            ${sessionRows.length === 0
+              ? html`<div class="terminal-list-state">No active sessions</div>`
+              : sessionRows.map((row) => html`
+                <label key=${row.session.session_name} class="terminal-group-edit-row">
+                  <input type="checkbox"
+                         data-testid="terminal-group-edit-session"
+                         data-session-name=${row.session.session_name}
+                         checked=${editingGroup.sessions.includes(row.session.session_name)}
+                         onchange=${(event) => toggleSessionInGroup(editingGroup.id, row.session.session_name, event.target.checked)} />
+                  <span class=${'terminal-list-dot ' + (row.busy ? 'busy' : row.connected ? 'connected' : 'offline')} aria-hidden="true"></span>
+                  <span class="terminal-group-edit-main">
+                    <span class="terminal-list-name">${row.session.session_name}</span>
+                    <span class="terminal-list-status">${row.busy ? 'working…' : row.connected ? 'ready' : 'not connected'}</span>
+                  </span>
+                </label>
+              `)}
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-primary" data-testid="terminal-group-edit-done" onclick=${() => setEditingGroupId(null)}>Done</button>
+          </div>
+        </div>
+      </div>
+    `}
+    ${rowGroupMenu && html`
+      <div class="terminal-group-menu-backdrop" onclick=${closeGroupPopovers}></div>
+      <div class="terminal-group-menu" data-testid="terminal-group-menu" role="menu"
+           style=${'top:' + rowGroupMenu.top + 'px;left:' + rowGroupMenu.left + 'px'}>
+        ${terminalGroups.length === 0
+          ? html`<div class="terminal-group-menu-empty">No groups yet</div>`
+          : terminalGroups.map((group) => html`
+            <label key=${group.id} class="terminal-group-menu-item">
+              <input type="checkbox"
+                     data-testid="terminal-group-check"
+                     data-group-id=${group.id}
+                     checked=${group.sessions.includes(rowGroupMenu.sessionName)}
+                     onchange=${(event) => {
+                       event.stopPropagation();
+                       toggleSessionInGroup(group.id, rowGroupMenu.sessionName, event.target.checked);
+                     }} />
+              <span>${group.name}</span>
+            </label>
+          `)}
+        <button type="button" class="terminal-group-menu-new" data-testid="terminal-group-menu-new"
+                onclick=${() => openCreateGroupPrompt(rowGroupMenu.sessionName)}>New group…</button>
+      </div>
+    `}
+    ${groupManageMenu && html`
+      <div class="terminal-group-menu-backdrop" onclick=${closeGroupPopovers}></div>
+      <div class="terminal-group-menu terminal-group-manage-menu" data-testid="terminal-group-manage-menu" role="menu"
+           style=${'top:' + groupManageMenu.top + 'px;left:' + groupManageMenu.left + 'px'}>
+        <button type="button" class="terminal-group-menu-action" data-testid="terminal-group-action-rename"
+                onclick=${() => openRenameGroupPrompt(groupManageMenu.groupId)}>Rename</button>
+        <button type="button" class="terminal-group-menu-action" data-testid="terminal-group-action-edit"
+                onclick=${() => openGroupEdit(groupManageMenu.groupId)}>Edit</button>
+        <button type="button" class="terminal-group-menu-action danger" data-testid="terminal-group-action-delete"
+                onclick=${() => deleteGroup(groupManageMenu.groupId)}>Delete</button>
       </div>
     `}
     ${fullScreen && isTgMiniAppContext
