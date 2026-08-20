@@ -7,8 +7,13 @@ import {
   resolveMcpOrigin
 } from "../src/mcp/oauth-metadata.js";
 
-function req(host: string): FastifyRequest {
-  return { headers: { host } } as FastifyRequest;
+function req(host: string, forwardedHost?: string): FastifyRequest {
+  return {
+    headers: {
+      host,
+      ...(forwardedHost ? { "x-forwarded-host": forwardedHost } : {})
+    }
+  } as FastifyRequest;
 }
 
 describe("resolveMcpOrigin (AC-3)", () => {
@@ -23,6 +28,20 @@ describe("resolveMcpOrigin (AC-3)", () => {
     expect(resolveMcpOrigin(req("evil.example"))).toBeNull();
     expect(resolveMcpOrigin(req("localhost:9999"))).toBeNull();
     expect(resolveMcpOrigin(req(""))).toBeNull();
+  });
+
+  it("prefers X-Forwarded-Host over Host and maps the public tunnel to https", () => {
+    expect(
+      resolveMcpOrigin(req("localhost:3101", "agjasst.silverjrom.app"))
+    ).toBe("https://agjasst.silverjrom.app");
+    expect(mcpAudience(resolveMcpOrigin(req("localhost:3101", "agjasst.silverjrom.app"))!)).toBe(
+      "https://agjasst.silverjrom.app/mcp"
+    );
+    expect(
+      resolveMcpOrigin(req("localhost:3101", "agjasst.silverjrom.app, other.example"))
+    ).toBe("https://agjasst.silverjrom.app");
+    expect(resolveMcpOrigin(req("localhost:3101"))).toBe("http://localhost:3101");
+    expect(resolveMcpOrigin(req("localhost:3101", "evil.example"))).toBeNull();
   });
 });
 

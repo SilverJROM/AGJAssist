@@ -1,10 +1,15 @@
 import type { FastifyRequest } from "fastify";
 import { MCP_PUBLIC_HOST } from "./mcp-constants.js";
 
-export function hostFromRequest(request: FastifyRequest): string {
-  const raw = request.headers.host;
+function headerFirst(raw: string | string[] | undefined): string {
   const header = Array.isArray(raw) ? raw[0] : raw;
   return String(header || "").split(",")[0].trim().toLowerCase();
+}
+
+export function hostFromRequest(request: FastifyRequest): string {
+  const forwarded = headerFirst(request.headers["x-forwarded-host"]);
+  if (forwarded) return forwarded;
+  return headerFirst(request.headers.host);
 }
 
 /** Validate Host against the allowlist. Unknown/forged Host → null (caller 404s). */
