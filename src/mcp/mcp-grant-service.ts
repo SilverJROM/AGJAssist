@@ -232,6 +232,81 @@ export class McpGrantService {
     return this.require(grantId);
   }
 
+  listConnected(): Array<
+    McpGrantRow & {
+      clientName: string;
+      grantedAt: string;
+      lastUsedAt: string | null;
+      accessExpiresAt: string | null;
+    }
+  > {
+    const rows = this.db
+      .prepare(
+        `SELECT g.id, g.client_id, g.scope_type, g.scope_ref, g.permissions, g.lifetime,
+                g.token_ttl_days, g.granted_by, g.status, g.created_at, g.last_used_at, c.client_name,
+                (SELECT MIN(t.expires_at) FROM mcp_tokens t
+                  WHERE t.grant_id = g.id AND t.token_type = 'access' AND t.revoked = 0) AS access_expires_at
+         FROM mcp_grants g
+         JOIN mcp_clients c ON c.id = g.client_id
+         ORDER BY g.created_at DESC`
+      )
+      .all() as Array<{
+      id: number;
+      client_id: string;
+      scope_type: McpScopeType;
+      scope_ref: string;
+      permissions: string;
+      lifetime: number;
+      token_ttl_days: number;
+      granted_by: number;
+      status: "active" | "revoked";
+      created_at: string;
+      last_used_at: string | null;
+      client_name: string;
+      access_expires_at: string | null;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      clientId: row.client_id,
+      clientName: row.client_name,
+      scopeType: row.scope_type,
+      scopeRef: row.scope_ref,
+      permissions: parsePermissions(row.permissions),
+      lifetime: row.lifetime === 1,
+      tokenTtlDays: row.token_ttl_days,
+      grantedBy: row.granted_by,
+      status: row.status,
+      grantedAt: row.created_at,
+      lastUsedAt: row.last_used_at,
+      accessExpiresAt: row.access_expires_at
+    }));
+  }
+
+  revoke(grantId: number): McpGrantRow {
+    const grant = this.requireActive(grantId);
+    const now = new Date().toISOString();
+    this.db.transaction(() => {
+      const families = this.db
+        .prepare("SELECT DISTINCT family_id FROM mcp_tokens WHERE grant_id = ?")
+        .all(grant.id) as { family_id: string }[];
+      for (const fam of families) {
+        this.tokens.revokeFamily(fam.family_id, "owner_revoke");
+      }
+      this.db
+        .prepare("UPDATE mcp_grants SET status = 'revoked', revoked_at = ? WHERE id = ? AND status = 'active'")
+        .run(now, grant.id);
+      this.audit.log({
+        userId: grant.grantedBy,
+        actionType: "mcp_grant_revoked",
+        resourceType: "mcp_grant",
+        resourceId: String(grant.id),
+        details: { grant_id: grant.id, client_id: grant.clientId, reason: "owner_revoke" },
+        surface: "mcp"
+      });
+    });
+    return this.require(grantId);
+  }
+
   get(grantId: number): McpGrantRow | null {
     const row = this.db
       .prepare(

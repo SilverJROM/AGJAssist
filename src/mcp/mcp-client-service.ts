@@ -160,4 +160,20 @@ export class McpClientService {
       last_used_at: row.last_used_at
     };
   }
+
+  list(): McpClientRow[] {
+    const ids = this.db.prepare("SELECT id FROM mcp_clients ORDER BY created_at").all() as { id: string }[];
+    return ids.map((row) => this.get(row.id)).filter((row): row is McpClientRow => row != null);
+  }
+
+  /** Refuse delete when the client has grant history so audit rows stay anchored. */
+  remove(id: string): "missing" | "in_use" | "deleted" {
+    if (!this.get(id)) return "missing";
+    const n = (
+      this.db.prepare("SELECT COUNT(*) AS n FROM mcp_grants WHERE client_id = ?").get(id) as { n: number }
+    ).n;
+    if (n > 0) return "in_use";
+    this.db.prepare("DELETE FROM mcp_clients WHERE id = ?").run(id);
+    return "deleted";
+  }
 }

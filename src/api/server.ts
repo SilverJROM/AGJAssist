@@ -65,6 +65,7 @@ import { McpScopeService } from "../mcp/mcp-scope-service.js";
 import { McpBearerService } from "../mcp/mcp-bearer-service.js";
 import { McpRateLimiter } from "../mcp/mcp-rate-limit.js";
 import { registerMcpRoutes } from "./routes/mcp-routes.js";
+import { registerMcpManagementRoutes } from "./routes/mcp-management-routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -221,6 +222,14 @@ export async function createApiServer(
     db: services.db,
     files: services.fileService,
     projects: services.projectService
+  });
+  registerMcpManagementRoutes(app, {
+    db: services.db,
+    authService: services.authService,
+    pool: mcpPool,
+    grants: mcpGrants,
+    clients: mcpClients,
+    audit: services.auditService
   });
 
   return app;
