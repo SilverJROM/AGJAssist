@@ -67,13 +67,15 @@ describe("McpScopeService intersection logic (unit only; AC-9 e2e is B16/B17)", 
     expect(scope.resolve(restoredPool, live)).toEqual(["NORTH"]);
   });
 
-  it("does not prune group grants; pool re-add restores live group membership", () => {
+  it("group grant scopes to live group membership, independent of the pool (D7)", () => {
     const { ownerId, grok, grants, pool, groups, scope, live } = setup();
     groups.put(ownerId, {
       groups: [{ id: "g-north", name: "north", sessions: ["NORTH", "OTHER"] }],
       activeGroup: "g-north"
     });
-    pool.replaceSet(ownerId, ["NORTH", "OTHER"]);
+    // The pool intentionally does NOT contain the group's sessions — group
+    // grants are not pool-capped; the group membership is the curated scope.
+    pool.replaceSet(ownerId, ["UNRELATED"]);
     const grant = grants.create({
       clientId: grok.id,
       grantedBy: ownerId,
@@ -81,13 +83,14 @@ describe("McpScopeService intersection logic (unit only; AC-9 e2e is B16/B17)", 
       scopeRef: "g-north",
       permissions: ["list_sessions"]
     });
-    pool.replaceSet(ownerId, ["NORTH"]);
-    expect(grant.scopeRef).toBe("g-north");
     expect(grants.get(grant.id)?.scopeRef).toBe("g-north");
-    expect(scope.resolve(grants.get(grant.id)!, live)).toEqual(["NORTH"]);
-
-    pool.replaceSet(ownerId, ["NORTH", "OTHER"]);
+    // Both live members resolve even though neither is in the pool.
     expect(scope.resolve(grants.get(grant.id)!, live)).toEqual(["NORTH", "OTHER"]);
+    // Shrinking the pool to empty does not shrink a group grant.
+    pool.replaceSet(ownerId, []);
+    expect(scope.resolve(grants.get(grant.id)!, live)).toEqual(["NORTH", "OTHER"]);
+    // A member that is not currently live is excluded (membership ∩ live).
+    expect(scope.resolve(grants.get(grant.id)!, ["NORTH"])).toEqual(["NORTH"]);
   });
 
   it("isolates two grants' session sets", () => {

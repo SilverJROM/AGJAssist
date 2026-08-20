@@ -30,13 +30,20 @@ export class McpScopeService {
     private readonly pool: McpPoolService = new McpPoolService(db)
   ) {}
 
-  /** Effective session names: S ∩ P ∩ T ∩ validName. Corrupt/missing → empty (fail-closed). */
+  /**
+   * Effective session names, fail-closed (corrupt/missing → empty).
+   * - `sessions` (hand-picked list): S ∩ pool ∩ live ∩ validName — the pool is the cap.
+   * - `group`: the group's live membership IS the owner-curated scope (decision D7),
+   *   so it is NOT additionally gated by the pool: S ∩ live ∩ validName.
+   */
   resolve(grant: McpGrantRow | McpScopeGrant, liveSessionNames: Iterable<string>): string[] {
     const g = asGrant(grant);
     const S = this.sessionSet(g);
-    const P = new Set(this.pool.list());
     const T = new Set([...liveSessionNames].filter(validName));
-    return [...S].filter((name) => P.has(name) && T.has(name) && validName(name)).sort();
+    const P = g.scopeType === "sessions" ? new Set(this.pool.list()) : null;
+    return [...S]
+      .filter((name) => (P === null || P.has(name)) && T.has(name) && validName(name))
+      .sort();
   }
 
   private sessionSet(grant: McpScopeGrant): Set<string> {
