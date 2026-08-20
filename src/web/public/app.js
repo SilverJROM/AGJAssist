@@ -572,6 +572,36 @@ function taskDurationClass(task) {
 }
 
 // Auth
+const MCP_OAUTH_RETURN_KEY = 'mcp_oauth_return';
+
+function oauthAuthorizeReturnPath(raw) {
+  if (typeof raw !== 'string' || !raw) return null;
+  try {
+    const url = new URL(raw, location.origin);
+    if (url.origin !== location.origin) return null;
+    if (url.pathname !== '/oauth/authorize') return null;
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return null;
+  }
+}
+
+function finishWebLogin(data) {
+  authToken = data.token;
+  localStorage.setItem('agj_token', data.token);
+  localStorage.setItem('agj_user', JSON.stringify(data.user));
+  let returnTo = null;
+  try {
+    returnTo = oauthAuthorizeReturnPath(sessionStorage.getItem(MCP_OAUTH_RETURN_KEY));
+    sessionStorage.removeItem(MCP_OAUTH_RETURN_KEY);
+  } catch {}
+  if (returnTo) {
+    location.replace(returnTo);
+    return;
+  }
+  location.reload();
+}
+
 function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -607,10 +637,7 @@ function Login() {
         method: 'POST',
         body: JSON.stringify({ initData, surface })
       });
-      authToken = data.token;
-      localStorage.setItem('agj_token', data.token);
-      localStorage.setItem('agj_user', JSON.stringify(data.user));
-      location.reload();
+      finishWebLogin(data);
     } catch (e) {
       setError(e.message);
     }
@@ -649,10 +676,7 @@ function Login() {
         method: 'POST',
         body: JSON.stringify({ code: code.trim(), totp: totp.trim() || undefined })
       });
-      authToken = data.token;
-      localStorage.setItem('agj_token', data.token);
-      localStorage.setItem('agj_user', JSON.stringify(data.user));
-      location.reload();
+      finishWebLogin(data);
     } catch (e) {
       setError(e.message);
     }
