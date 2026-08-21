@@ -83,7 +83,7 @@ test('chat search finds matches, navigates prev/next, and closes', async ({ page
   await expect(page.locator('[data-testid="terminal-search-toggle"]')).toBeVisible();
 });
 
-test('jump-between-my-messages nav steps through YOU turns with boundary handling', async ({ page }) => {
+test('header ME nav steps through YOU turns and clamps at the ends', async ({ page }) => {
   test.setTimeout(60_000);
   await setup(page);
   await sendMessage(page, 'my first message');
@@ -91,21 +91,25 @@ test('jump-between-my-messages nav steps through YOU turns with boundary handlin
   await sendMessage(page, 'my third message');
   await expect(page.locator('[data-testid="terminal-turn-user"]')).toHaveCount(3);
 
-  // Control shows with >= 2 user turns
+  // The nav lives in the header (beside settings), not floating over the chat.
   await expect(page.locator('[data-testid="terminal-mynav"]')).toBeVisible();
   const up = page.locator('[data-testid="terminal-mynav-up"]');
   const down = page.locator('[data-testid="terminal-mynav-down"]');
+  const turns = page.locator('[data-testid="terminal-turn-user"]');
+  // Which YOU turn is currently targeted (carries the focus-flash right after a jump).
+  // The flash clears after ~700ms, so settle between jumps so only the current one flashes.
+  const flashed = () => turns.evaluateAll((els) => els.findIndex((e) => e.classList.contains('terminal-chat-focus-flash')));
+  const jump = async (btn: import('@playwright/test').Locator, expected: number) => {
+    await btn.click();
+    expect(await flashed()).toBe(expected);
+    await page.waitForTimeout(750); // let the flash clear before the next jump
+  };
 
-  // From the start, down steps to each next YOU turn; at the last one it disables.
-  await down.click(); // -> 1st
-  await down.click(); // -> 2nd
-  await expect(down).toBeEnabled();
-  await down.click(); // -> 3rd (last)
-  await expect(down).toBeDisabled();
-
-  // Up steps back and re-enables down.
-  await up.click(); // -> 2nd
-  await expect(down).toBeEnabled();
-  await up.click(); // -> 1st
-  await expect(up).toBeDisabled();
+  await jump(down, 0);
+  await jump(down, 1);
+  await jump(down, 2);
+  await jump(down, 2); // clamped at the last
+  await jump(up, 1);
+  await jump(up, 0);
+  await jump(up, 0); // clamped at the first
 });

@@ -237,31 +237,51 @@ if (isTgMiniApp) {
     wa.expand?.();
     wa.disableVerticalSwipes?.();
   } catch {}
-  const tp = window.Telegram.WebApp.themeParams || {};
   const root = document.documentElement.style;
-  // Force-apply TG theme params as CSS variables
-  if (tp.bg_color) root.setProperty('--tg-theme-bg-color', tp.bg_color);
-  if (tp.secondary_bg_color) root.setProperty('--tg-theme-secondary-bg-color', tp.secondary_bg_color);
-  if (tp.text_color) root.setProperty('--tg-theme-text-color', tp.text_color);
-  if (tp.hint_color) root.setProperty('--tg-theme-hint-color', tp.hint_color);
-  if (tp.button_color) root.setProperty('--tg-theme-button-color', tp.button_color);
-  if (tp.button_text_color) root.setProperty('--tg-theme-button-text-color', tp.button_text_color);
-  if (tp.section_bg_color) root.setProperty('--tg-theme-section-bg-color', tp.section_bg_color);
-  if (tp.section_separator_color) root.setProperty('--tg-theme-section-separator-color', tp.section_separator_color);
-  if (tp.accent_text_color) root.setProperty('--tg-theme-accent-text-color', tp.accent_text_color);
-  // Detect light/dark theme and set explicit fallback colors
-  const bgColor = tp.bg_color || '#0d1117';
-  const r = parseInt(bgColor.slice(1, 3), 16), g = parseInt(bgColor.slice(3, 5), 16), b = parseInt(bgColor.slice(5, 7), 16);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  if (brightness > 128) {
-    // Light theme — force dark text
-    document.body.classList.add('tg-light');
-    root.setProperty('--text', tp.text_color || '#1a1a1a');
-    root.setProperty('--text-secondary', tp.hint_color || '#666666');
-    root.setProperty('--bg', tp.bg_color || '#ffffff');
-    root.setProperty('--surface', tp.secondary_bg_color || tp.section_bg_color || '#f0f0f0');
-    root.setProperty('--border', tp.section_separator_color || '#d0d0d0');
+  // Vars we force in light mode — must be cleared when returning to dark so the
+  // base dark theme (:root / body.tg-miniapp → --tg-theme-*) takes back over.
+  const FORCED_LIGHT_VARS = ['--text', '--text-secondary', '--bg', '--surface', '--border'];
+  // Re-appliable so switching Telegram between light/dark updates the whole UI,
+  // not just at first load (previously it only ran once and never removed
+  // tg-light / the forced light vars, leaving a stale mixed theme on switch).
+  function applyTgTheme() {
+    const tp = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.themeParams) || {};
+    const tgVars = {
+      '--tg-theme-bg-color': tp.bg_color,
+      '--tg-theme-secondary-bg-color': tp.secondary_bg_color,
+      '--tg-theme-text-color': tp.text_color,
+      '--tg-theme-hint-color': tp.hint_color,
+      '--tg-theme-button-color': tp.button_color,
+      '--tg-theme-button-text-color': tp.button_text_color,
+      '--tg-theme-section-bg-color': tp.section_bg_color,
+      '--tg-theme-section-separator-color': tp.section_separator_color,
+      '--tg-theme-accent-text-color': tp.accent_text_color
+    };
+    // Set the vars TG provides; clear the rest so none go stale across a switch.
+    for (const key in tgVars) {
+      if (tgVars[key]) root.setProperty(key, tgVars[key]);
+      else root.removeProperty(key);
+    }
+    const bgColor = tp.bg_color || '#0d1117';
+    const r = parseInt(bgColor.slice(1, 3), 16), g = parseInt(bgColor.slice(3, 5), 16), b = parseInt(bgColor.slice(5, 7), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    if (Number.isFinite(brightness) && brightness > 128) {
+      // Light theme — force dark text + light surfaces.
+      document.body.classList.add('tg-light');
+      root.setProperty('--text', tp.text_color || '#1a1a1a');
+      root.setProperty('--text-secondary', tp.hint_color || '#666666');
+      root.setProperty('--bg', tp.bg_color || '#ffffff');
+      root.setProperty('--surface', tp.secondary_bg_color || tp.section_bg_color || '#f0f0f0');
+      root.setProperty('--border', tp.section_separator_color || '#d0d0d0');
+    } else {
+      // Dark theme — drop the light class + forced overrides so the dark theme applies.
+      document.body.classList.remove('tg-light');
+      for (const v of FORCED_LIGHT_VARS) root.removeProperty(v);
+    }
   }
+  applyTgTheme();
+  // Re-apply whenever the user flips Telegram's appearance.
+  try { window.Telegram.WebApp.onEvent?.('themeChanged', applyTgTheme); } catch {}
 }
 
 // API helper
@@ -2208,6 +2228,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [sessions, setSessions] = useState([]);
   const [sessionsError, setSessionsError] = useState(null);
   const [activeTarget, setActiveTarget] = useState(null);
+  const myMsgNavRef = useRef(-1); // header ▲/▼ cursor into the YOU turns
   const [viewMode, setViewMode] = useState('list');
   const [sectionNavOpen, setSectionNavOpen] = useState(false);
   const [showNewSession, setShowNewSession] = useState(false);
@@ -2575,6 +2596,7 @@ function TerminalTab({ projectId, projectName } = {}) {
     setActiveTarget(nextTarget || null);
     setViewMode(nextTarget ? 'chat' : 'list');
     setSectionNavOpen(false);
+    myMsgNavRef.current = -1;
   }
 
   function backToTerminalList() {
@@ -2582,6 +2604,23 @@ function TerminalTab({ projectId, projectName } = {}) {
     setActiveTarget(null);
     setMenuOpen(false);
     setSectionNavOpen(false);
+    myMsgNavRef.current = -1;
+  }
+
+  // Header ▲/▼ that jump between MY (YOU) messages. DOM-driven so it lives in the
+  // header (beside settings) without blocking the conversation. Clamps at the ends.
+  function jumpToMyMessage(dir) {
+    const wrap = document.querySelector('[data-testid="terminal-conversation"]');
+    if (!wrap) return;
+    const turns = Array.from(wrap.querySelectorAll('[data-testid="terminal-turn-user"]'));
+    if (!turns.length) return;
+    let next = myMsgNavRef.current < 0 ? (dir > 0 ? 0 : turns.length - 1) : myMsgNavRef.current + dir;
+    next = Math.max(0, Math.min(turns.length - 1, next));
+    myMsgNavRef.current = next;
+    const el = turns[next];
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.classList.add('terminal-chat-focus-flash');
+    setTimeout(() => el.classList.remove('terminal-chat-focus-flash'), 700);
   }
 
   function closeGroupPopovers() {
@@ -2787,6 +2826,13 @@ function TerminalTab({ projectId, projectName } = {}) {
               <button type="button" class="ap" data-testid="terminal-font-increase"
                       onclick=${() => updateConvFontSize(convFontSize + 1)}
                       disabled=${convFontSize >= TERMINAL_CONV_FONT_MAX}>A+</button>
+            </div>
+            <div class="terminal-mynav-header" data-testid="terminal-mynav" title="Jump between my messages">
+              <button type="button" class="terminal-mynav-hbtn" data-testid="terminal-mynav-up"
+                      aria-label="Jump to my previous message" onclick=${() => jumpToMyMessage(-1)}>▲</button>
+              <span class="terminal-mynav-hlabel">ME</span>
+              <button type="button" class="terminal-mynav-hbtn" data-testid="terminal-mynav-down"
+                      aria-label="Jump to my next message" onclick=${() => jumpToMyMessage(1)}>▼</button>
             </div>
             <button type="button" class="terminal-topbar-icon-btn terminal-settings-trigger"
                     data-term-menu data-testid="terminal-menu" aria-label="Terminal settings" aria-expanded=${menuOpen}
@@ -3458,7 +3504,6 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchIdx, setSearchIdx] = useState(0);
-  const [myNavIdx, setMyNavIdx] = useState(-1);
   const [flashId, setFlashId] = useState(null);
   const searchInputRef = useRef(null);
   const searchMatchIds = useMemo(() => {
@@ -3469,7 +3514,6 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       .map((e) => e.id);
   }, [entries, searchQuery]);
   const searchMatchSet = useMemo(() => new Set(searchMatchIds), [searchMatchIds]);
-  const userTurnIds = useMemo(() => entries.filter((e) => e.role === 'user').map((e) => e.id), [entries]);
   const transcriptRef = useRef(null);
   const snapshotRef = useRef('');
   const sendingRef = useRef(false);
@@ -4220,14 +4264,6 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     setSearchQuery('');
     setSearchIdx(0);
   }
-  function jumpMyMessage(dir) {
-    if (!userTurnIds.length) return;
-    let next = myNavIdx < 0 ? (dir > 0 ? 0 : userTurnIds.length - 1) : myNavIdx + dir;
-    if (next < 0) next = 0;
-    if (next > userTurnIds.length - 1) next = userTurnIds.length - 1;
-    setMyNavIdx(next);
-    scrollToTurn(userTurnIds[next]);
-  }
   // When the query changes, reset to the first match and scroll to it.
   useEffect(() => {
     setSearchIdx(0);
@@ -4341,15 +4377,6 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
           </div>
         `}
       </div>
-      ${userTurnIds.length >= 2 ? html`
-        <div class="terminal-mynav" data-testid="terminal-mynav">
-          <button type="button" class="terminal-mynav-btn" data-testid="terminal-mynav-up" aria-label="Jump to my previous message"
-                  disabled=${myNavIdx === 0} onclick=${() => jumpMyMessage(-1)}>▲</button>
-          <span class="terminal-mynav-label">me</span>
-          <button type="button" class="terminal-mynav-btn" data-testid="terminal-mynav-down" aria-label="Jump to my next message"
-                  disabled=${myNavIdx === userTurnIds.length - 1} onclick=${() => jumpMyMessage(1)}>▼</button>
-        </div>
-      ` : ''}
       ${showScrollBottom ? html`
         <button type="button"
                 class="terminal-scroll-bottom"

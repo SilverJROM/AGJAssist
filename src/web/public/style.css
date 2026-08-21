@@ -986,21 +986,22 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
 .terminal-search-btn:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
 .terminal-search-btn:disabled { opacity: 0.4; cursor: default; }
 .terminal-search-close { font-size: 13px; }
-.terminal-mynav {
-  position: absolute; right: 12px; bottom: 54px; z-index: 4;
-  display: flex; flex-direction: column; align-items: center;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); overflow: hidden;
+/* ME ▲/▼ nav — compact control in the chat header, beside the settings gear. */
+.terminal-mynav-header {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex: 0 0 auto; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--surface); overflow: hidden; align-self: stretch;
 }
-.terminal-mynav-btn {
-  width: 34px; height: 30px; border: none; background: transparent; color: var(--text-secondary);
-  cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; padding: 0;
+.terminal-mynav-hbtn {
+  border: none; background: transparent; color: var(--text-secondary);
+  cursor: pointer; font-size: 9px; line-height: 1; padding: 2px 8px;
+  display: flex; align-items: center; justify-content: center; flex: 1 1 0;
 }
-.terminal-mynav-btn:hover:not(:disabled) { color: var(--accent); }
-.terminal-mynav-btn:disabled { opacity: 0.35; cursor: default; }
-.terminal-mynav-label {
-  font-size: 8.5px; letter-spacing: 0.5px; text-transform: uppercase;
-  color: var(--text-secondary); opacity: 0.7; line-height: 1; padding: 1px 0;
+.terminal-mynav-hbtn:hover { color: var(--accent); }
+.terminal-mynav-hbtn:active { color: var(--accent); }
+.terminal-mynav-hlabel {
+  font-size: 7px; letter-spacing: 0.6px; color: var(--text-secondary);
+  opacity: 0.65; line-height: 1; pointer-events: none;
 }
 .terminal-chat-hit .terminal-chat-bubble { box-shadow: 0 0 0 1.5px var(--accent); }
 .terminal-chat-hit-current .terminal-chat-bubble { box-shadow: 0 0 0 2.5px var(--accent); }
