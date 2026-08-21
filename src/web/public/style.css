@@ -1003,6 +1003,24 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
   font-size: 7px; letter-spacing: 0.6px; color: var(--text-secondary);
   opacity: 0.65; line-height: 1; pointer-events: none;
 }
+/* Quick-switch tabs for the current group's other sessions — fills the header whitespace. */
+.terminal-header-tabs {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 6px;
+  overflow-x: auto; overflow-y: hidden;
+  padding: 0 2px; scrollbar-width: none; -ms-overflow-style: none;
+}
+.terminal-header-tabs::-webkit-scrollbar { display: none; }
+.terminal-header-tab {
+  flex: 0 0 auto; max-width: 130px;
+  padding: 4px 11px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text-secondary);
+  font-size: 11.5px; font-weight: 600; font-family: inherit;
+  cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.5;
+}
+.terminal-header-tab:hover { color: var(--text); border-color: var(--accent); }
+.terminal-header-tab:active { color: var(--accent); border-color: var(--accent); }
 .terminal-chat-hit .terminal-chat-bubble { box-shadow: 0 0 0 1.5px var(--accent); }
 .terminal-chat-hit-current .terminal-chat-bubble { box-shadow: 0 0 0 2.5px var(--accent); }
 .terminal-chat-focus-flash .terminal-chat-bubble { animation: terminalChatFlash 0.7s ease-out; }

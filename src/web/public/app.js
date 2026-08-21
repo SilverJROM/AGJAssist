@@ -2770,6 +2770,20 @@ function TerminalTab({ projectId, projectName } = {}) {
   const visibleRows = resolvedActiveGroupTab === 'all'
     ? sessionRows
     : sessionRows.filter((row) => activeGroup?.sessions.includes(row.session.session_name));
+  // Quick-switch chips for the OTHER live sessions in the current session's group,
+  // shown in the chat-header whitespace beside the session name.
+  const headerGroupSiblings = (() => {
+    const activeName = activePane?.session_name;
+    if (!activeName) return [];
+    const group = (resolvedActiveGroupTab !== 'all' && activeGroup)
+      || terminalGroups.find((g) => Array.isArray(g.sessions) && g.sessions.includes(activeName));
+    if (!group || !Array.isArray(group.sessions)) return [];
+    return group.sessions
+      .filter((name) => name !== activeName)
+      .map((name) => ({ name, session: sessions.find((s) => s.session_name === name) }))
+      .filter((x) => x.session && x.session.panes && x.session.panes.length && x.session.panes[0].target)
+      .map((x) => ({ name: x.name, target: x.session.panes[0].target }));
+  })();
   const editingGroup = editingGroupId
     ? terminalGroups.find((group) => group.id === editingGroupId) || null
     : null;
@@ -2810,7 +2824,7 @@ function TerminalTab({ projectId, projectName } = {}) {
           ` : html`
             <button class="terminal-topbar-icon-btn terminal-menu-trigger" data-testid="terminal-back-list"
                     aria-label="Back to terminal list" onclick=${backToTerminalList}>←</button>
-            <div class="terminal-topbar-target">
+            <div class="terminal-topbar-target" style=${headerGroupSiblings.length ? 'flex:0 1 auto' : ''}>
               <div class="terminal-topbar-name terminal-topbar-name-static" data-testid="terminal-session-name">
                 <span class=${'terminal-topbar-dot' + (hasTarget && (terminalStatus === 'connected' || terminalStatus === 'running') ? ' on' : '')}></span>
                 <span class="terminal-topbar-name-text">${activePane?.session_name || (friendlyMode ? 'Terminal Chat' : 'Raw Terminal')}</span>
@@ -2819,6 +2833,14 @@ function TerminalTab({ projectId, projectName } = {}) {
                 ${hasTarget ? (targetSubtitle || activeTarget) : 'Select a pane'}
               </div>
             </div>
+            ${headerGroupSiblings.length ? html`
+              <div class="terminal-header-tabs" data-testid="terminal-header-tabs">
+                ${headerGroupSiblings.map((sib) => html`
+                  <button type="button" class="terminal-header-tab" data-testid="terminal-header-tab"
+                          title=${'Switch to ' + sib.name} onclick=${() => switchActiveTarget(sib.target)}>${sib.name}</button>
+                `)}
+              </div>
+            ` : ''}
             <div class="terminal-fontpill" title="Text size">
               <button type="button" class="am" data-testid="terminal-font-decrease"
                       onclick=${() => updateConvFontSize(convFontSize - 1)}
