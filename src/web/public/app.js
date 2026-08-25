@@ -4417,7 +4417,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
         <div class=${'terminal-selection' + (selection.multi ? ' multi' : '')} data-testid="terminal-selection">
           <div class="terminal-selection-head">
             <span class="terminal-selection-dot"></span>
-            <span class="terminal-selection-title">${selection.title || 'Claude is asking'}</span>
+            <span class="terminal-selection-title" data-testid="terminal-selection-title">${selection.question || selection.title || 'Claude is asking'}</span>
           </div>
           <div class="terminal-selection-opts">
             ${selection.options.map((opt, i) => {
@@ -4425,14 +4425,20 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
               // or ☑/☐); show it as a checked pill and toggle on tap.
               const checked = /\[[x✓]\]|☑|☒|◉|●/u.test(opt.label);
               const label = selection.multi ? opt.label.replace(/^\s*(\[[ x✓]\]|☑|☒|☐|◉|○|●)\s*/u, '') : opt.label;
+              const isCurrent = !selection.multi && selection.selectedIndex === i;
+              const isType = /type\s+(something|a\b|your|here|it|in)|write\s+your\s+own|custom\s+answer|^other\b/i.test(label);
               return html`
-                <button type="button" class=${'terminal-selection-opt' + (selection.multi && checked ? ' checked' : '')}
+                <button type="button" class=${'terminal-selection-opt' + (selection.multi && checked ? ' checked' : '') + (isCurrent ? ' current' : '')}
                         data-testid="terminal-selection-opt"
                         onclick=${() => (selection.multi ? toggleSelectionOption(selection, i) : chooseSelectionOption(selection, i))}>
                   ${selection.multi
                     ? html`<span class="terminal-selection-check">${checked ? '☑' : '☐'}</span>`
                     : html`<span class="terminal-selection-num">${opt.n}</span>`}
-                  ${label}
+                  <span class="terminal-selection-optbody">
+                    <span class="terminal-selection-optlabel">${label}</span>
+                    ${opt.description ? html`<span class="terminal-selection-optdesc">${opt.description}</span>` : ''}
+                    ${isType ? html`<span class="terminal-selection-optdesc terminal-selection-typehint" data-testid="terminal-selection-typehint">Pick this, then type your reply in the box below and send — it goes to the agent as your answer.</span>` : ''}
+                  </span>
                 </button>
               `;
             })}

@@ -1213,24 +1213,65 @@ export function detectSelectionPrompt(rawSnapshot) {
   // cursor on an option. A bare numbered list in prose has neither → null.
   if (!hasFooter && !hasCursor) return null;
 
-  // Title: nearest question-ish line just above the first option.
+  const stripBox = (l) => l.replace(/^[\s│┃║╭╰─╮╯>]+/, "").replace(/[\s│┃║]+$/, "").trim();
+
+  // Title: nearest question-ish line just above the first option (kept for callers
+  // that want a one-line label).
   let title = "";
   for (let i = firstOptIdx - 1; i >= 0 && i >= firstOptIdx - 8; i--) {
     const l = tail[i];
     if (!l.trim()) continue;
     if (_SELECT_CHROME_RE.test(l)) break;
     if (_SELECT_QUESTION_RE.test(l) || /\?\s*$/.test(l)) {
-      title = l.replace(/^[\s│┃║╭╰─╮╯]+/, "").replace(/[\s│┃║]+$/, "").trim();
+      title = stripBox(l);
       break;
     }
   }
 
+  // Question/context: the block of meaningful text lines directly above the first
+  // option — this is what the user needs to understand the choice. Walk up
+  // collecting non-chrome lines (box borders stripped); stop at a blank gap, a
+  // ●/○ agent-bubble marker, chrome, or after ~7 lines.
+  const questionLines = [];
+  for (let i = firstOptIdx - 1; i >= 0 && questionLines.length < 7; i--) {
+    const raw = tail[i];
+    const l = stripBox(raw);
+    if (!l) { if (questionLines.length) break; continue; }
+    if (_SELECT_CHROME_RE.test(l)) break;
+    if (/^[●○]/.test(raw.trim())) { questionLines.push(l.replace(/^[●○]\s*/, "")); break; }
+    questionLines.push(l);
+  }
+  questionLines.reverse();
+  const question = questionLines.join("\n").trim() || title;
+
+  // Per-option descriptions: the indented continuation lines between one option and
+  // the next (or the footer) — the explanatory text under each choice.
+  for (let k = 0; k < options.length; k++) {
+    const start = optLineIdx[k] + 1;
+    const end = k + 1 < optLineIdx.length ? optLineIdx[k + 1] : (hasFooter ? footerIdx : lastOptIdx + 1);
+    const desc = [];
+    for (let i = start; i < end; i++) {
+      const l = stripBox(tail[i]);
+      if (!l || _SELECT_CHROME_RE.test(l)) continue;
+      desc.push(l);
+    }
+    if (desc.length) options[k].description = desc.join(" ");
+  }
+
+  // Multi vs single: only the option block + its footer decide this — NOT the whole
+  // 45-line tail (stale scrollback with a stray "[ ]" used to misread single-select
+  // prompts as multi, so taps toggled instead of selecting).
+  const blockEnd = Math.min(tail.length, (hasFooter ? footerIdx : lastOptIdx) + 2);
+  const selectionBlock = tail.slice(firstOptIdx, blockEnd).join("\n");
+  const multi = _SELECT_MULTI_RE.test(selectionBlock);
+
   return {
     active: true,
     title,
+    question,
     options,
     selectedIndex,
-    multi: _SELECT_MULTI_RE.test(tail.join("\n")),
+    multi,
   };
 }
 

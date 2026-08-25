@@ -1768,4 +1768,41 @@ describe("detectSelectionPrompt", () => {
     expect(sel!.options.map((o) => o.label)).toEqual(["Yes", "No"]);
     expect(sel!.selectedIndex).toBe(0);
   });
+
+  it("captures the multi-line question + per-option descriptions (single-select)", () => {
+    const pane = [
+      "● Clear. Let me settle this.",
+      "──────────────────────────────",
+      "The north-star says turn-based by design.",
+      "Streaming transcription contradicts that directly.",
+      "",
+      "❯ 1. Override it — duplex is the direction now",
+      "     Log the override and amend the north-star.",
+      "  2. Override for this effort only",
+      "     Streaming ships but the default stays turn-based.",
+      "  3. Type something.",
+      "Enter to select · ↑/↓ to navigate · Esc to cancel",
+    ].join("\n");
+    const sel = detectSelectionPrompt(pane);
+    expect(sel).not.toBeNull();
+    expect(sel!.multi).toBe(false);
+    expect(sel!.question).toContain("north-star says turn-based");
+    expect(sel!.question).toContain("contradicts that directly");
+    expect(sel!.options[0].description).toContain("amend the north-star");
+    expect(sel!.options[1].description).toContain("turn-based");
+  });
+
+  it("does not read single-select as multi from a stray checkbox in stale scrollback", () => {
+    const pane = [
+      "● earlier: [ ] a checkbox from a previous prompt",
+      "some more output here",
+      "Which one should we use?",
+      "❯ 1. Alpha",
+      "  2. Bravo",
+      "Enter to select · ↑/↓ to navigate · Esc to cancel",
+    ].join("\n");
+    const sel = detectSelectionPrompt(pane);
+    expect(sel).not.toBeNull();
+    expect(sel!.multi).toBe(false);
+  });
 });
