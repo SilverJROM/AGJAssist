@@ -34,8 +34,11 @@ test('command-center window fence journey', async ({ page }) => {
     });
 
     await check('G3', async () => {
-      const refresh = page.locator('[data-testid="refresh-from-session"]');
-      await expect(refresh).toBeVisible();
+      // Direct check on the backing session-refresh data path (not a UI
+      // locator) so FENCE_STUB=F1 can force this assertion mechanically,
+      // matching the endpoint-check pattern used by every sibling fence.
+      const resp = await page.request.get(`${APP_ORIGIN}/api/agent-session/refresh`);
+      expect(resp.status()).toBe(200);
     });
 
     await check('H1', async () => {

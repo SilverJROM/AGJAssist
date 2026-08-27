@@ -158,39 +158,6 @@ async function main(): Promise<void> {
     telegramAssistant
   });
 
-  // FENCE_STUB in-process preload: patch Fastify before route registration
-  if (process.env.FENCE_STUB) {
-    const stub = process.env.FENCE_STUB;
-    apiServer.addHook('preHandler', async (request, reply) => {
-      const url = request.url || '';
-      // B2: make overmind status return 200 for negative control
-      if (stub === 'B2' && url.startsWith('/api/overmind/status')) {
-        reply.code(200).type('application/json').send({ stubbed: true, contributor: 'B2' });
-        return reply;
-      }
-      // C3: make reminders active fail
-      if (stub === 'C3' && url.startsWith('/api/agent-reminders/active')) {
-        reply.code(500).type('application/json').send({ stubbed: true, contributor: 'C3' });
-        return reply;
-      }
-      // D3: make summary endpoints fail
-      if (stub === 'D3' && url.startsWith('/api/summary-endpoints')) {
-        reply.code(500).type('application/json').send({ stubbed: true, contributor: 'D3' });
-        return reply;
-      }
-      // E2: make wakeups fire fail
-      if (stub === 'E2' && url.startsWith('/api/agent-wakeups/fire')) {
-        reply.code(500).type('application/json').send({ stubbed: true, contributor: 'E2' });
-        return reply;
-      }
-      // F1: make agent group switcher fail
-      if (stub === 'F1' && url.startsWith('/api/agent-group-switcher')) {
-        reply.code(500).type('application/json').send({ stubbed: true, contributor: 'F1' });
-        return reply;
-      }
-    });
-  }
-
   await apiServer.listen({ port: config.api.port, host: config.api.host });
   console.log(`AGJAssist API server listening on ${config.api.host}:${config.api.port}`);
   overmindWatcher.start();
