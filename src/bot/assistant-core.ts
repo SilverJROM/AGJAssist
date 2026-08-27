@@ -125,13 +125,7 @@ export class AssistantCore {
           "/lokalai_link - generate a one-time code to link this Telegram account to lokalAI",
           "/app - open the web app",
           "/timeout [minutes] - show or set command timeout (default 60)",
-          "/overmind - show active Overmind workflows",
-          "/om_tasks <id> - show an Overmind workflow tasklist",
-          "/om_pause <id> - pause Overmind checks (no interrupts while you talk to it)",
-          "/om_resume <id> - resume Overmind checks",
-          "/om_drop <id> - drop an Overmind workflow",
-          "/ovm_start - enter OVM chat mode",
-          "/ovm_end - exit OVM chat mode",
+
           "",
           "Directory commands:",
           "cd <dir> - change directory (within /home/agjrom/websites/)",
@@ -193,26 +187,7 @@ export class AssistantCore {
         return `Timeout updated: ${this.timeoutMinutes} minutes`;
       }
 
-      case "/overmind":
-        return this.handleOvermindStatusCommand();
 
-      case "/om_tasks":
-        return this.handleOvermindTasksCommand(parts[1]);
-
-      case "/om_pause":
-        return this.handleOvermindPauseMutation(parts[1], true);
-
-      case "/om_resume":
-        return this.handleOvermindPauseMutation(parts[1], false);
-
-      case "/om_drop":
-        return this.handleOvermindDropCommand(parts[1]);
-
-      case "/ovm_start":
-        return this.handleOvmStartCommand(uid);
-
-      case "/ovm_end":
-        return this.handleOvmEndCommand(uid);
 
       case "/tmux_create": {
         const projectName = parts[1];

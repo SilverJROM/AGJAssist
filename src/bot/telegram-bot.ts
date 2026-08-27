@@ -86,11 +86,7 @@ export class TelegramAssistant {
         { command: "app", description: "Open the web app" },
         { command: "weblogin", description: "Get a web app login code" },
         { command: "lokalai_link", description: "Get a one-time lokalAI link code" },
-        { command: "overmind", description: "Active Overmind workflows" },
-        { command: "om_pause", description: "Pause Overmind checks for a workflow" },
-        { command: "om_resume", description: "Resume Overmind checks for a workflow" },
-        { command: "ovm_start", description: "Enter OVM chat mode" },
-        { command: "ovm_end", description: "Exit OVM chat mode" },
+
         { command: "jobs", description: "List tmux sessions" },
         { command: "tmux_send", description: "Send command to tmux pane" }
       ]);
