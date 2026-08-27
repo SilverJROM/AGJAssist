@@ -21,7 +21,14 @@ afterEach(() => {
 
 function normalizeSql(sql: string | null): string | null {
   if (sql === null) return null;
-  return sql.replace(/\s+/g, " ").replace(/\s*([(),=])\s*/g, "$1").trim();
+  return sql
+    .replace(
+      /^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[^\s(]+)/i,
+      "CREATE TABLE <table>"
+    )
+    .replace(/\s+/g, " ")
+    .replace(/\s*([(),=])\s*/g, "$1")
+    .trim();
 }
 
 function schemaFingerprint(db: Database.Database) {
@@ -29,6 +36,61 @@ function schemaFingerprint(db: Database.Database) {
     `SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table','index') ORDER BY type, name`
   ).all() as Array<{ type: string; name: string; tbl_name: string | null; sql: string | null }>;
   return rows.map(r => ({ ...r, sql: normalizeSql(r.sql) }));
+}
+
+function createLegacyV22Fixture(dbPath: string): void {
+  const raw = new Database(dbPath);
+  raw.exec(`
+    PRAGMA foreign_keys = ON;
+
+    CREATE TABLE schema_version (
+      version INTEGER NOT NULL
+    );
+    INSERT INTO schema_version (version) VALUES (22);
+
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY,
+      telegram_id INTEGER UNIQUE NOT NULL,
+      username TEXT,
+      display_name TEXT,
+      role TEXT NOT NULL DEFAULT 'viewer' CHECK(role IN ('owner', 'viewer')),
+      totp_secret TEXT,
+      totp_enabled INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE sessions (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      token_hash TEXT NOT NULL,
+      surface TEXT NOT NULL CHECK(surface IN ('bot', 'miniapp', 'web')),
+      expires_at TEXT NOT NULL,
+      last_activity TEXT NOT NULL DEFAULT (datetime('now')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_sessions_user ON sessions(user_id);
+    CREATE INDEX idx_sessions_expires ON sessions(expires_at);
+
+    CREATE TABLE audit_log (
+      id INTEGER PRIMARY KEY,
+      timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+      user_id INTEGER REFERENCES users(id),
+      agent_name TEXT,
+      action_type TEXT NOT NULL,
+      resource_type TEXT,
+      resource_id TEXT,
+      details TEXT,
+      tmux_target TEXT,
+      surface TEXT CHECK(surface IN ('bot', 'miniapp', 'web', 'agent'))
+    );
+    CREATE INDEX idx_audit_time ON audit_log(timestamp);
+    CREATE INDEX idx_audit_user ON audit_log(user_id);
+    CREATE INDEX idx_audit_agent ON audit_log(agent_name);
+    CREATE INDEX idx_audit_type ON audit_log(action_type);
+  `);
+  raw.close();
 }
 
 describe("command-center migration B7", () => {
@@ -106,43 +168,17 @@ describe("command-center migration B7", () => {
     db.close();
   });
 
-  it("fresh and upgraded DB converge to same schema fingerprint", () => {
+  it("fresh and genuine v22 DB without OVM tables converge to the same schema fingerprint", () => {
     const freshPath = tempDb("fresh.sqlite");
     const fresh = new DatabaseService(freshPath);
     const freshFp = schemaFingerprint(fresh.raw);
     fresh.close();
 
     const upgradePath = tempDb("upgrade.sqlite");
-    // Build a realistic v36 DB by creating a fresh DB then downgrading version and adding OVM tables
-    const tmp = new DatabaseService(upgradePath);
-    tmp.close();
-    const raw = new Database(upgradePath);
-    raw.pragma("journal_mode = WAL");
-    raw.exec("UPDATE schema_version SET version = 36");
-    raw.exec(`
-      CREATE TABLE IF NOT EXISTS overmind_projects (
-        id INTEGER PRIMARY KEY,
-        slug TEXT UNIQUE NOT NULL,
-        app_path TEXT UNIQUE NOT NULL,
-        parent_session TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS overmind_workflows (
-        id INTEGER PRIMARY KEY,
-        project_id INTEGER
-      );
-      CREATE TABLE IF NOT EXISTS overmind_task_history (
-        id INTEGER PRIMARY KEY,
-        coordinator_session TEXT NOT NULL
-      );
-    `);
-    raw.exec(`INSERT INTO overmind_projects VALUES (1, 'p1', '/a', 's1');`);
-    raw.exec(`INSERT INTO overmind_workflows VALUES (1, 1);`);
-    raw.exec(`INSERT INTO overmind_task_history VALUES (1, 's1');`);
-    // keep raw open for WAL realism, but we will close after upgrade
+    createLegacyV22Fixture(upgradePath);
     const upgraded = new DatabaseService(upgradePath);
     const upgradedFp = schemaFingerprint(upgraded.raw);
     upgraded.close();
-    raw.close();
 
     expect(upgradedFp).toEqual(freshFp);
   });

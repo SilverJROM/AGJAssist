@@ -176,7 +176,7 @@ export class DatabaseService {
       }
 
       // Migration: v9 → v10: make notes.project_id nullable (recreate table)
-      if (current && current.version < 10) {
+      if (current && current.version < 10 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         // Check if notes table has NOT NULL on project_id by trying an insert
         // Safer approach: recreate table without NOT NULL constraint
         this.db.exec("PRAGMA foreign_keys = OFF");
@@ -203,12 +203,12 @@ export class DatabaseService {
       }
 
       // Migration: v10 → v11: add overmind_workflows table
-      if (current && current.version < 11) {
+      if (current && current.version < 11 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         this.db.exec(SCHEMA_SQL);
       }
 
       // Migration: v11 → v12: add active-session attribution to overmind_workflows
-      if (current && current.version < 12) {
+      if (current && current.version < 12 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("active_session")) {
@@ -220,7 +220,7 @@ export class DatabaseService {
       }
 
       // Migration: v12 → v13: add workflow completion timestamp and task history log
-      if (current && current.version < 13) {
+      if (current && current.version < 13 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("ended_at")) {
@@ -232,7 +232,7 @@ export class DatabaseService {
       }
 
       // Migration: v13 → v14: persist once-per-transition overmind notifications
-      if (current && current.version < 14) {
+      if (current && current.version < 14 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("last_notified_transition")) {
@@ -241,7 +241,7 @@ export class DatabaseService {
       }
 
       // Migration: v14 → v15: track current overmind run start and accumulated elapsed time
-      if (current && current.version < 15) {
+      if (current && current.version < 15 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("run_started_at")) {
@@ -254,7 +254,7 @@ export class DatabaseService {
       }
 
       // Migration: v15 → v16: add user-controlled overmind workflow display name
-      if (current && current.version < 16) {
+      if (current && current.version < 16 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("display_name")) {
@@ -268,7 +268,7 @@ export class DatabaseService {
       }
 
       // Migration: v17 → v18: gate Sonnet completion-edge check once per all-done state
-      if (current && current.version < 18) {
+      if (current && current.version < 18 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("completion_check")) {
@@ -277,7 +277,7 @@ export class DatabaseService {
       }
 
       // Migration: v18 → v19: persist independent parent/child session statuses
-      if (current && current.version < 19) {
+      if (current && current.version < 19 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("parent_status")) {
@@ -289,7 +289,7 @@ export class DatabaseService {
       }
 
       // Migration: v19 → v20: per-child role labels (e.g. coder/tester) for multi-agent workflows
-      if (current && current.version < 20) {
+      if (current && current.version < 20 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("child_roles")) {
@@ -298,7 +298,7 @@ export class DatabaseService {
       }
 
       // Migration: v20 → v21: registration completeness badge (info_request) + dedupe signature (info_check)
-      if (current && current.version < 21) {
+      if (current && current.version < 21 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("info_request")) {
@@ -311,7 +311,7 @@ export class DatabaseService {
 
       // Migration: v21 → v22: JROM-initiated monitoring pause (suppresses all interrupts
       // while he talks to a coordinator) — flag is separate from status so the card stays visible.
-      if (current && current.version < 22) {
+      if (current && current.version < 22 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("monitoring_paused")) {
@@ -373,7 +373,7 @@ export class DatabaseService {
       }
 
       // Migration: v23 → v24: parent update timestamp + per-workflow ask-update cooldown override
-      if (current && current.version < 24) {
+      if (current && current.version < 24 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("last_parent_update_at")) {
@@ -390,7 +390,7 @@ export class DatabaseService {
       // the migration safely and downstream code can read from either column
       // during a deploy window. The OLD column is left in place (NOT dropped)
       // — preserves rollback safety + avoids a table rebuild.
-      if (current && current.version < 25) {
+      if (current && current.version < 25 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("evidence_idle_threshold_override_minutes")) {
@@ -418,7 +418,7 @@ export class DatabaseService {
       }
 
       // Migration: v26 → v27: project source-of-truth table and nullable workflow FK
-      if (current && current.version < 27) {
+      if (current && current.version < 27 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         this.db.exec(`
           CREATE TABLE IF NOT EXISTS overmind_projects (
             id INTEGER PRIMARY KEY,
@@ -446,7 +446,7 @@ export class DatabaseService {
       // Migration: v27 → v28: workflow identity no longer depends on session.
       // SQLite cannot relax NOT NULL/drop UNIQUE in place, so rebuild with an
       // explicit column copy. Only label/coordinator_session constraints change.
-      if (current && current.version < 28) {
+      if (current && current.version < 28 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const workflowColumns = [
           "id",
           "project_id",
@@ -568,7 +568,7 @@ export class DatabaseService {
       // Migration: v28 → v29: mark OVM runs whose parent coordinator and child
       // sessions are all gone. Kept as a flag so the future ERROR tab can own
       // display without changing the owner's completion path.
-      if (current && current.version < 29) {
+      if (current && current.version < 29 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("orphaned")) {
@@ -580,7 +580,7 @@ export class DatabaseService {
       // ladder (R3). Separate from nudge_count (which is the generic stuck/idle
       // ladder) so the two paths don't interfere and the counter survives across
       // ticks without being reset by unrelated code.
-      if (current && current.version < 30) {
+      if (current && current.version < 30 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("completion_nudge_count")) {
@@ -593,7 +593,7 @@ export class DatabaseService {
       // completion_nudge_last_at (persisted cooldown anchor so restarts don't spam).
       // Cleans up the old sign-convention hack where completion_nudge_count < 0 was
       // used as a working-accepts counter — reset any negative values to 0 on upgrade.
-      if (current && current.version < 31) {
+      if (current && current.version < 31 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
         const cols = this.db.pragma("table_info(overmind_workflows)") as { name: string }[];
         const colNames = new Set(cols.map((c) => c.name));
         if (!colNames.has("working_accepts")) {

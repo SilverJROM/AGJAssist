@@ -96,7 +96,7 @@ Rubric: `loop-escalation.md` §3. `token_budget: null`; `new_class_rounds_to_sta
 
 ## Release boundary
 
-F-OVM is fence-before-deploy: no live `pm2 restart agjassist` or live OVM-table drop before B8 is green, and G2 additionally requires every capability fence. On a live execute the pre-drop backup is `data/agjassist.db.pre-ovm-drop-<UTC>.bak`. Tests derive the backup as a sibling of the `DB_PATH` file under test. Rollback is attended: restore that backup and reset to the recorded pre-release commit.
+F-OVM is fence-before-deploy: no live `pm2 restart agjassist` or live OVM-table drop before B8 is green, and G2 additionally requires every capability fence. On a live execute the pre-drop backup is `data/agjassist.db.pre-ovm-drop-<UTC>-<PID>.bak`. Tests derive the backup as a sibling of the `DB_PATH` file under test. Rollback is attended: restore that backup and reset to the recorded pre-release commit.
 
 `--execute` is not a prose instruction. It is a guard in `scripts/release-command-center.mjs`: TTY + typed confirmation + absence of tiller/agent env. A tiller seat that passes `--execute` must be refused by that guard; G2's test proves it.
 
