@@ -479,7 +479,8 @@ CREATE TABLE IF NOT EXISTS summary_llm_endpoints (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_summary_llm_endpoints_default ON summary_llm_endpoints(is_default);
+INSERT OR IGNORE INTO summary_llm_endpoints (name, base_url, model, is_default, provenance) VALUES ('140', 'http://192.168.254.140:1234/v1', 'qwen2.5-14b-instruct', 1, 'system');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_summary_llm_endpoints_one_default ON summary_llm_endpoints(is_default) WHERE is_default = 1;
 
 CREATE TABLE IF NOT EXISTS agent_summaries (
   id INTEGER PRIMARY KEY,

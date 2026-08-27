@@ -65,6 +65,15 @@ describe("summary-schema D1", () => {
     expect(sumColNames).toContain("created_at");
     expect(sumColNames).toContain("updated_at");
 
+    // Seeded default endpoint
+    const defaults = db.prepare("SELECT * FROM summary_llm_endpoints WHERE is_default = 1").all() as any[];
+    expect(defaults).toHaveLength(1);
+    const def = defaults[0];
+    expect(def.name).toBe('140');
+    expect(def.base_url).toBe('http://192.168.254.140:1234/v1');
+    expect(def.model).toBe('qwen2.5-14b-instruct');
+    expect(def.provenance).toBe('system');
+
     db.close();
   });
 
@@ -79,6 +88,15 @@ describe("summary-schema D1", () => {
     const names = tables.map(t => t.name);
     expect(names).toContain("summary_llm_endpoints");
     expect(names).toContain("agent_summaries");
+
+    const defaults = upgraded.prepare("SELECT * FROM summary_llm_endpoints WHERE is_default = 1").all() as any[];
+    expect(defaults).toHaveLength(1);
+    const def = defaults[0];
+    expect(def.name).toBe('140');
+    expect(def.base_url).toBe('http://192.168.254.140:1234/v1');
+    expect(def.model).toBe('qwen2.5-14b-instruct');
+    expect(def.provenance).toBe('system');
+
     upgraded.close();
   });
 
@@ -86,17 +104,17 @@ describe("summary-schema D1", () => {
     const dbPath = tempDb("test.sqlite");
     const db = new DatabaseService(dbPath);
 
-    // Insert an endpoint with is_default = 1
+    // Insert an endpoint with is_default = 0 to avoid unique default conflict
     db.prepare(`
       INSERT INTO summary_llm_endpoints (name, base_url, model, is_default, provenance)
-      VALUES ('local-140', 'http://localhost:8080/v1', 'granite-3b', 1, 'seed')
+      VALUES ('local-140', 'http://localhost:8080/v1', 'granite-3b', 0, 'seed')
     `).run();
 
     const ep = db.prepare("SELECT * FROM summary_llm_endpoints WHERE name = ?").get('local-140') as any;
     expect(ep.name).toBe('local-140');
     expect(ep.base_url).toBe('http://localhost:8080/v1');
     expect(ep.model).toBe('granite-3b');
-    expect(ep.is_default).toBe(1);
+    expect(ep.is_default).toBe(0);
     expect(ep.provenance).toBe('seed');
     expect(ep.created_at).toBeTruthy();
     expect(ep.updated_at).toBeTruthy();
@@ -118,6 +136,31 @@ describe("summary-schema D1", () => {
     expect(sumRow.summary_text).toBe('short summary');
     expect(sumRow.provenance).toBe('system');
     expect(sumRow.created_at).toBeTruthy();
+
+    db.close();
+  });
+
+  it("unique default constraint rejects second default endpoint", () => {
+    const dbPath = tempDb("unique.sqlite");
+    const db = new DatabaseService(dbPath);
+
+    // Fresh DB already has one default
+    const defaultsBefore = db.prepare("SELECT COUNT(*) as c FROM summary_llm_endpoints WHERE is_default = 1").get() as { c: number };
+    expect(defaultsBefore.c).toBe(1);
+
+    // Attempt to insert a second default should fail with unique constraint
+    let threw = false;
+    try {
+      db.prepare(`
+        INSERT INTO summary_llm_endpoints (name, base_url, model, is_default, provenance)
+        VALUES ('other', 'http://example.com/v1', 'model-x', 1, 'user')
+      `).run();
+    } catch (e: any) {
+      threw = true;
+      // SQLite unique constraint violation
+      expect(e.message).toMatch(/UNIQUE constraint failed|unique/i);
+    }
+    expect(threw).toBe(true);
 
     db.close();
   });
