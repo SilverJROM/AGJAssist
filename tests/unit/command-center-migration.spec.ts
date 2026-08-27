@@ -22,10 +22,7 @@ afterEach(() => {
 function normalizeSql(sql: string | null): string | null {
   if (sql === null) return null;
   return sql
-    .replace(
-      /^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[^\s(]+)/i,
-      "CREATE TABLE <table>"
-    )
+    .replace(/^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?"([^"]+)"/i, "CREATE TABLE $1")
     .replace(/\s+/g, " ")
     .replace(/\s*([(),=])\s*/g, "$1")
     .trim();
@@ -89,6 +86,58 @@ function createLegacyV22Fixture(dbPath: string): void {
     CREATE INDEX idx_audit_user ON audit_log(user_id);
     CREATE INDEX idx_audit_agent ON audit_log(agent_name);
     CREATE INDEX idx_audit_type ON audit_log(action_type);
+  `);
+  raw.close();
+}
+
+function createLegacyV9Fixture(dbPath: string): void {
+  const raw = new Database(dbPath);
+  raw.exec(`
+    PRAGMA foreign_keys = ON;
+
+    CREATE TABLE schema_version (
+      version INTEGER NOT NULL
+    );
+    INSERT INTO schema_version (version) VALUES (9);
+
+    CREATE TABLE users (
+      id INTEGER PRIMARY KEY,
+      telegram_id INTEGER UNIQUE NOT NULL,
+      username TEXT,
+      display_name TEXT,
+      role TEXT NOT NULL DEFAULT 'viewer' CHECK(role IN ('owner', 'viewer')),
+      totp_secret TEXT,
+      totp_enabled INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE projects (
+      id INTEGER PRIMARY KEY,
+      directory_name TEXT UNIQUE NOT NULL,
+      display_name TEXT,
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'archived')),
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE notes (
+      id INTEGER PRIMARY KEY,
+      project_id INTEGER NOT NULL REFERENCES projects(id),
+      title TEXT,
+      body TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'promoted', 'archived')),
+      tags TEXT,
+      created_by INTEGER NOT NULL REFERENCES users(id),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    INSERT INTO users (id, telegram_id, role) VALUES (1, 1001, 'owner');
+    INSERT INTO projects (id, directory_name) VALUES (1, 'legacy-project');
+    INSERT INTO notes (id, project_id, body, created_by) VALUES (1, 1, 'legacy note', 1);
   `);
   raw.close();
 }
@@ -181,5 +230,21 @@ describe("command-center migration B7", () => {
     upgraded.close();
 
     expect(upgradedFp).toEqual(freshFp);
+  });
+
+  it("upgrade from v9 makes notes.project_id nullable", () => {
+    const dbPath = tempDb("v9.sqlite");
+    createLegacyV9Fixture(dbPath);
+
+    const upgraded = new DatabaseService(dbPath);
+    try {
+      const cols = upgraded.raw.pragma("table_info(notes)") as Array<{ name: string; notnull: number }>;
+      expect(cols.find(c => c.name === "project_id")!.notnull).toBe(0);
+      expect(() => upgraded.prepare(
+        "INSERT INTO notes (project_id, body, created_by) VALUES (NULL, 'x', 1)"
+      ).run()).not.toThrow();
+    } finally {
+      upgraded.close();
+    }
   });
 });

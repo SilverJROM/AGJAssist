@@ -176,7 +176,7 @@ export class DatabaseService {
       }
 
       // Migration: v9 → v10: make notes.project_id nullable (recreate table)
-      if (current && current.version < 10 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
+      if (current && current.version < 10) {
         // Check if notes table has NOT NULL on project_id by trying an insert
         // Safer approach: recreate table without NOT NULL constraint
         this.db.exec("PRAGMA foreign_keys = OFF");
@@ -203,7 +203,7 @@ export class DatabaseService {
       }
 
       // Migration: v10 → v11: add overmind_workflows table
-      if (current && current.version < 11 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
+      if (current && current.version < 11) {
         this.db.exec(SCHEMA_SQL);
       }
 
