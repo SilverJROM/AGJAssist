@@ -40,6 +40,17 @@ describe("guardian removal B6", () => {
     expect(existsSync(path)).toBe(false);
   });
 
+  it("guardian-routes.ts contains no guardian API if it exists", () => {
+    const path = new URL("../src/api/routes/guardian-routes.ts", import.meta.url);
+    if (existsSync(path)) {
+      const src = readFileSync(path, "utf8");
+      expect(src).not.toContain("isLoopbackAddress");
+      expect(src).not.toContain("buildGuardianEscalationNotification");
+      expect(src).not.toContain("registerGuardianRoutes");
+      expect(src).not.toContain("/api/guardian/escalate");
+    }
+  });
+
   it("server.ts no longer imports or calls registerGuardianRoutes", () => {
     const src = readFileSync(new URL("../src/api/server.ts", import.meta.url), "utf8");
     expect(src).not.toContain("registerGuardianRoutes");
