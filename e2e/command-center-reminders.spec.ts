@@ -90,16 +90,21 @@ test('C5 create reminder flow posts correct payload', async ({ page }) => {
   await page.locator('[data-testid="repeat-limit-mode-stop"]').click();
   await page.locator('[data-testid="repeat-limit-input"]').fill('3');
 
-  // Toggle include/skip recipients
-  await page.locator('[data-testid="include-recipients-toggle"]').uncheck();
-  await page.locator('[data-testid="skip-recipients-toggle"]').check();
+  // Set recipient agent name and include toggle
+  await page.locator('[data-testid="recipient-agent-name-input"]').fill('agent-b');
+  await page.locator('[data-testid="recipient-include-toggle"]').uncheck();
 
   await page.locator('[data-testid="agent-reminder-save"]').click();
 
   expect(postedBody).not.toBeNull();
   expect(postedBody.cadence_minutes).toBe(60);
   expect(postedBody.repeat_limit).toBe(3);
-  expect(postedBody.recipients).toEqual({ include: false, skip: true });
-  // folder_group is null for default 'all' tab
-  expect(postedBody.folder_group).toBeNull();
+  expect(Array.isArray(postedBody.recipients)).toBeTruthy();
+  expect(postedBody.recipients).toHaveLength(1);
+  expect(postedBody.recipients[0].agent_name).toBe('agent-b');
+  expect(postedBody.recipients[0].include).toBe(0);
+  // folder_group must be non-empty string per API contract
+  expect(postedBody.folder_group).not.toBeNull();
+  expect(typeof postedBody.folder_group).toBe('string');
+  expect(postedBody.folder_group.length).toBeGreaterThan(0);
 });

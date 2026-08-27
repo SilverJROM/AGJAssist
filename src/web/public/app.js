@@ -2270,8 +2270,8 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [cadenceCustom, setCadenceCustom] = useState('');
   const [repeatMode, setRepeatMode] = useState('unlimited');
   const [repeatLimit, setRepeatLimit] = useState('');
-  const [includeRecipients, setIncludeRecipients] = useState(true);
-  const [skipRecipients, setSkipRecipients] = useState(false);
+  const [recipientAgentName, setRecipientAgentName] = useState('agent-a');
+  const [recipientInclude, setRecipientInclude] = useState(true);
   const menuRef = useRef(null);
   const sectionNavRef = useRef(null);
   const terminalGroupsRef = useRef(terminalGroups);
@@ -2369,16 +2369,13 @@ function TerminalTab({ projectId, projectName } = {}) {
   }, [menuOpen]);
 
   const handleSaveReminder = async () => {
-    const folderGroup = resolvedActiveGroupTab === 'all' ? null : (activeGroup?.id || resolvedActiveGroupTab);
+    const folderGroup = resolvedActiveGroupTab === 'all' ? 'all' : (activeGroup?.id || resolvedActiveGroupTab);
     const minutes = cadenceCustom ? Number(cadenceCustom) : cadenceMinutes;
     const payload = {
       folder_group: folderGroup,
       cadence_minutes: minutes,
       repeat_limit: repeatMode === 'unlimited' ? null : Number(repeatLimit) || 0,
-      recipients: {
-        include: includeRecipients,
-        skip: skipRecipients
-      }
+      recipients: [{ agent_name: recipientAgentName || 'agent-a', include: recipientInclude ? 1 : 0 }]
     };
     try {
       await api('/api/agent-reminders', { method: 'POST', body: JSON.stringify(payload) });
@@ -2949,8 +2946,11 @@ function TerminalTab({ projectId, projectName } = {}) {
               </div>
             ` : ''}
             <div class="terminal-sheet-row">
-              <label><input type="checkbox" data-testid="include-recipients-toggle" checked=${includeRecipients} onchange=${e => setIncludeRecipients(e.target.checked)} /> Include</label>
-              <label><input type="checkbox" data-testid="skip-recipients-toggle" checked=${skipRecipients} onchange=${e => setSkipRecipients(e.target.checked)} /> Skip</label>
+              <div class="terminal-sheet-lbl">Recipient agent</div>
+              <input data-testid="recipient-agent-name-input" type="text" value=${recipientAgentName} oninput=${e => setRecipientAgentName(e.target.value)} />
+            </div>
+            <div class="terminal-sheet-row">
+              <label><input type="checkbox" data-testid="recipient-include-toggle" checked=${recipientInclude} onchange=${e => setRecipientInclude(e.target.checked)} /> Include</label>
             </div>
             <div class="terminal-sheet-row">
               <button type="button" data-testid="agent-reminder-save" onclick=${handleSaveReminder}>Save</button>
