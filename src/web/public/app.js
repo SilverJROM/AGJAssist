@@ -2303,6 +2303,18 @@ function TerminalTab({ projectId, projectName } = {}) {
       .catch(e => setSessionsError(e.message || 'Failed to load sessions'));
   }
 
+  async function reloadSessions({ refreshFriendly = true } = {}) {
+    const d = await api('/api/tmux/sessions');
+    const next = Array.isArray(d.sessions) ? d.sessions : [];
+    setSessions(prev => {
+      const sig = (arr) => JSON.stringify(
+        (arr || []).map(s => [s.session_name, (s.panes || []).map(p => [p.target, p.command, p.activity, p.busy].join(':')).join(',')])
+      );
+      return sig(prev) === sig(next) ? prev : next;
+    });
+    if (refreshFriendly) setFriendlyRefreshTick(t => t + 1);
+  }
+
   useEffect(() => { loadSessions(); }, []);
 
   // Keep the session list fresh so a newly-created tmux session shows in the
@@ -3225,6 +3237,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                       }
                     } : null}
                     onDisconnect=${backToTerminalList}
+                    onReloadSessions=${reloadSessions}
                   />`
                 : html`<${TerminalView} target=${activeTarget} key=${activeTarget} fontSize=${terminalFontSize} onDisconnect=${backToTerminalList} onStatusChange=${setTerminalStatus} onLastUpdated=${setLastUpdatedAt} />`)
             : html`<div class="terminal-empty-state">
@@ -3575,7 +3588,7 @@ function CollapsibleBubbleContent({ content, role, limit }) {
   `;
 }
 
-function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, showRawChrome = false, onStatusChange, onLastUpdated, projectId }) {
+function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, showRawChrome = false, onStatusChange, onLastUpdated, projectId, onReloadSessions }) {
   const [status, setStatus] = useState('loading');
   const [statusLine, setStatusLine] = useState('');
   const [entries, setEntries] = useState([]);
@@ -3605,6 +3618,9 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [unseenWhileUp, setUnseenWhileUp] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshDoneAt, setRefreshDoneAt] = useState(0);
+  const [refreshError, setRefreshError] = useState('');
   // Chat search + jump-between-my-messages (additive, read-only over `entries`).
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -3732,6 +3748,28 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     } catch {}
   }
   pollNowRef.current = pollNow;
+
+  async function refreshOutput() {
+    const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=${getCaptureLines()}&refresh=1`);
+    processSnapshot(normalizeTerminalOutput(data.output));
+  }
+
+  async function handleRefresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    setRefreshError('');
+    try {
+      await Promise.all([
+        onReloadSessions ? onReloadSessions({ refreshFriendly: false }) : Promise.resolve(),
+        refreshOutput()
+      ]);
+      setRefreshDoneAt(Date.now());
+    } catch (e) {
+      setRefreshError(e.message || 'Refresh failed');
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   // Send named control keys to the pane over plain REST (/keys). Works over the
   // tunnel like every other API call — no WebSocket dependency — then refresh so
@@ -4407,6 +4445,16 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     }
   }, [entries, sending, statusLine]);
 
+  function renderRefreshControl() {
+    const refreshStatus = refreshing ? 'Refreshing' : refreshError ? 'Error' : refreshDoneAt ? 'Updated' : '';
+    return html`
+      <button type="button" class="terminal-refresh-btn" data-testid="terminal-refresh" aria-label="Refresh terminal" aria-busy=${refreshing} disabled=${refreshing} onclick=${handleRefresh}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10"></path><path d="M1 14a9 9 0 0 0 14.13 3.36L23 14"></path></svg>
+      </button>
+      <span aria-live="polite" class="terminal-refresh-status" data-testid="terminal-refresh-status">${refreshStatus}</span>
+    `;
+  }
+
   return html`
     <div class="terminal-chat-view">
       <div class="terminal-chat-transcript-wrap">
@@ -4427,12 +4475,16 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                   disabled=${!searchMatchIds.length} onclick=${() => gotoSearchMatch(searchIdx + 1)}>▼</button>
           <button type="button" class="terminal-search-btn terminal-search-close" data-testid="terminal-search-close" aria-label="Close search"
                   onclick=${closeSearch}>✕</button>
+          ${renderRefreshControl()}
         </div>
       ` : html`
-        <button type="button" class="terminal-search-toggle" data-testid="terminal-search-toggle" aria-label="Search chat"
-                onclick=${() => setSearchOpen(true)}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
-        </button>
+        <div class="terminal-chat-topbar">
+          <button type="button" class="terminal-search-toggle" data-testid="terminal-search-toggle" aria-label="Search chat"
+                  onclick=${() => setSearchOpen(true)}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+          </button>
+          ${renderRefreshControl()}
+        </div>
       `}
       <div class="terminal-chat-transcript" data-testid="terminal-conversation" ref=${transcriptRef}>
         <div class="terminal-chat-daydiv">Today</div>
