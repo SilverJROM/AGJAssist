@@ -244,8 +244,8 @@ describe("MCP schema v36 migration parity", () => {
         );
       }
 
-      expect(schemaVersion(fresh)).toBe(36);
-      expect(schemaVersion(upgraded)).toBe(36);
+      expect(schemaVersion(fresh)).toBe(37);
+      expect(schemaVersion(upgraded)).toBe(37);
       expect(
         upgraded.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'terminal_groups'").get()
       ).toEqual({ name: "terminal_groups" });
@@ -293,7 +293,7 @@ describe("MCP schema v36 migration parity", () => {
 
     const reopened = new DatabaseService(dbPath);
     try {
-      expect(schemaVersion(reopened)).toBe(36);
+      expect(schemaVersion(reopened)).toBe(37);
       expect(relevantSchemaFingerprint(reopened.raw)).toEqual(before);
       expect(reopened.prepare("SELECT * FROM audit_log ORDER BY id").all()).toEqual(auditBefore);
       expect(reopened.raw.pragma("foreign_key_check")).toEqual([]);
@@ -312,7 +312,7 @@ describe("MCP schema v36 migration parity", () => {
         .prepare("SELECT sql, rootpage FROM sqlite_master WHERE type = 'table' AND name = 'audit_log'")
         .get() as { sql: string; rootpage: number };
 
-      expect(schemaVersion(upgraded)).toBe(36);
+      expect(schemaVersion(upgraded)).toBe(37);
       expect(auditEntry.sql).toBe(fixture.auditSql);
       expect(auditEntry.rootpage).toBe(fixture.auditRootPage);
       expect(upgraded.prepare("SELECT * FROM audit_log ORDER BY id").all()).toEqual(fixture.auditRows);

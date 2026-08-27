@@ -117,12 +117,12 @@ describe("DatabaseService", () => {
 
   it("is idempotent on re-open", () => {
     // cleanup removed; temp dirs handled by afterEach
-    const path = tempDb("test-db.sqlite");
-    const db1 = new DatabaseService(path);
+    const dbPath = tempDb("test-db.sqlite");
+    const db1 = new DatabaseService(dbPath);
     db1.ensureOwner(123);
     db1.close();
 
-    const db2 = new DatabaseService(path);
+    const db2 = new DatabaseService(dbPath);
     const users = db2.prepare("SELECT * FROM users").all();
     expect(users.length).toBe(1);
     db2.close();
@@ -152,8 +152,8 @@ describe("DatabaseService", () => {
 
   it("upgrades a v23 snapshot DB to current and drops overmind tables", () => {
     // cleanup removed; temp dirs handled by afterEach
-    const path = tempDb("test-db.sqlite");
-    const raw = new Database(path);
+    const dbPath = tempDb("test-db.sqlite");
+    const raw = new Database(dbPath);
     raw.exec(`
       CREATE TABLE schema_version (version INTEGER NOT NULL);
       INSERT INTO schema_version (version) VALUES (23);
@@ -195,7 +195,7 @@ describe("DatabaseService", () => {
     `);
     raw.close();
 
-    const upgraded = new DatabaseService(path);
+    const upgraded = new DatabaseService(dbPath);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
     expect(version.version).toBe(37);
     const tables = upgraded.raw.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[];
@@ -207,8 +207,8 @@ describe("DatabaseService", () => {
 
   it("upgrades a v31 DB to current with agent tables and leaves existing project rows intact", () => {
     // cleanup removed; temp dirs handled by afterEach
-    const path = tempDb("test-db.sqlite");
-    const raw = new Database(path);
+    const dbPath = tempDb("test-db.sqlite");
+    const raw = new Database(dbPath);
     raw.exec(`
       PRAGMA foreign_keys = ON;
       CREATE TABLE schema_version (version INTEGER NOT NULL);
@@ -227,7 +227,7 @@ describe("DatabaseService", () => {
     `);
     raw.close();
 
-    const upgraded = new DatabaseService(path);
+    const upgraded = new DatabaseService(dbPath);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
     expect(version.version).toBe(37);
 
@@ -263,8 +263,8 @@ describe("DatabaseService", () => {
 
   it("upgrades v27 DB and drops overmind tables", () => {
     // cleanup removed; temp dirs handled by afterEach
-    const path = tempDb("test-db.sqlite");
-    const raw = new Database(path);
+    const dbPath = tempDb("test-db.sqlite");
+    const raw = new Database(dbPath);
     raw.exec(`
       PRAGMA foreign_keys = ON;
       CREATE TABLE schema_version (version INTEGER NOT NULL);
@@ -347,7 +347,7 @@ describe("DatabaseService", () => {
     `);
     raw.close();
 
-    const upgraded = new DatabaseService(path);
+    const upgraded = new DatabaseService(dbPath);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
     expect(version.version).toBe(37);
 

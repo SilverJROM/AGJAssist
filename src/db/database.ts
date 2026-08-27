@@ -855,11 +855,10 @@ export class DatabaseService {
       // Migration: v36 → v37: remove OVM tables, backup before drop
       if (current && current.version < 37) {
         const utc = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-        const backupPath = `${this.dbPath}.pre-ovm-drop-${utc}.bak`;
-        try {
-          fs.copyFileSync(this.dbPath, backupPath);
-        } catch {
-          // backup failure is non-fatal for isolated tests; live path is G2 execute-only
+        const backupPath = `${this.dbPath}.pre-ovm-drop-${utc}-${process.pid}.bak`;
+        this.db.exec(`VACUUM INTO '${backupPath.replace(/'/g, "''")}'`);
+        if (!fs.existsSync(backupPath) || fs.statSync(backupPath).size === 0) {
+          throw new Error(`v37 OVM drop aborted: pre-drop backup ${backupPath} was not written`);
         }
         this.db.exec("DROP TABLE IF EXISTS overmind_task_history");
         this.db.exec("DROP TABLE IF EXISTS overmind_workflows");
