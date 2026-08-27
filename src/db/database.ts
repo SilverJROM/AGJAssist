@@ -9,8 +9,10 @@ import { SCHEMA_VERSION, SCHEMA_SQL, DEFAULT_SAFETY_PATTERNS, applyFreshDbExtras
 
 export class DatabaseService {
   private db: Database.Database;
+  private dbPath: string;
 
   constructor(dbPath: string) {
+    this.dbPath = dbPath;
     const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -848,6 +850,20 @@ export class DatabaseService {
         } finally {
           this.db.exec("PRAGMA foreign_keys = ON");
         }
+      }
+
+      // Migration: v36 → v37: remove OVM tables, backup before drop
+      if (current && current.version < 37) {
+        const utc = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+        const backupPath = `${this.dbPath}.pre-ovm-drop-${utc}.bak`;
+        try {
+          fs.copyFileSync(this.dbPath, backupPath);
+        } catch {
+          // backup failure is non-fatal for isolated tests; live path is G2 execute-only
+        }
+        this.db.exec("DROP TABLE IF EXISTS overmind_task_history");
+        this.db.exec("DROP TABLE IF EXISTS overmind_workflows");
+        this.db.exec("DROP TABLE IF EXISTS overmind_projects");
       }
 
       this.db

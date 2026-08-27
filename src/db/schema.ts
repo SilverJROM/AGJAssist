@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 36;
+export const SCHEMA_VERSION = 37;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -329,74 +329,6 @@ CREATE TABLE IF NOT EXISTS reminder_alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_ra_reminder ON reminder_alerts(reminder_id);
 
-CREATE TABLE IF NOT EXISTS overmind_projects (
-  id INTEGER PRIMARY KEY,
-  slug TEXT UNIQUE NOT NULL,
-  app_path TEXT UNIQUE NOT NULL,
-  parent_session TEXT NOT NULL,
-  notes TEXT,
-  created_by TEXT NOT NULL DEFAULT 'JROM',
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_overmind_projects_app_path ON overmind_projects(app_path);
-
-CREATE TABLE IF NOT EXISTS overmind_workflows (
-  id INTEGER PRIMARY KEY,
-  project_id INTEGER REFERENCES overmind_projects(id),
-  label TEXT,
-  display_name TEXT,
-  coordinator_session TEXT,
-  child_sessions TEXT NOT NULL DEFAULT '[]',
-  child_roles TEXT NOT NULL DEFAULT '[]',
-  run_dir TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'working', 'waiting_human', 'awaiting_decision', 'stuck', 'paused', 'completed', 'failed')),
-  current_task TEXT,
-  tasks TEXT NOT NULL DEFAULT '[]',
-  pending_decision TEXT,
-  active_session TEXT,
-  active_role TEXT CHECK(active_role IN ('parent', 'child') OR active_role IS NULL),
-  ended_at TEXT,
-  task_log TEXT NOT NULL DEFAULT '[]',
-  last_pane_hash TEXT,
-  last_activity_at TEXT NOT NULL DEFAULT (datetime('now')),
-  stuck_since TEXT,
-  nudge_count INTEGER NOT NULL DEFAULT 0,
-  tier INTEGER NOT NULL DEFAULT 0,
-  last_notified_transition TEXT,
-  run_started_at TEXT,
-  accumulated_ms INTEGER NOT NULL DEFAULT 0,
-  completion_check TEXT,
-  parent_status TEXT,
-  child_statuses TEXT NOT NULL DEFAULT '[]',
-  info_request TEXT,
-  info_check TEXT,
-  monitoring_paused INTEGER NOT NULL DEFAULT 0,
-  paused_at TEXT,
-  paused_by TEXT,
-  last_parent_update_at TEXT,
-  evidence_idle_threshold_override_minutes INTEGER,
-  orphaned INTEGER NOT NULL DEFAULT 0,
-  completion_nudge_count INTEGER NOT NULL DEFAULT 0,
-  working_accepts INTEGER NOT NULL DEFAULT 0,
-  completion_nudge_last_at TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_overmind_workflows_coordinator_session ON overmind_workflows(coordinator_session);
-CREATE INDEX IF NOT EXISTS idx_overmind_workflows_status ON overmind_workflows(status);
-
-CREATE TABLE IF NOT EXISTS overmind_task_history (
-  id INTEGER PRIMARY KEY,
-  coordinator_session TEXT NOT NULL,
-  name TEXT NOT NULL,
-  at TEXT NOT NULL,
-  current_task TEXT,
-  done INTEGER NOT NULL,
-  total INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_overmind_task_history_coordinator_session ON overmind_task_history(coordinator_session);
-
 CREATE TABLE IF NOT EXISTS agent_events (
   id INTEGER PRIMARY KEY,
   run_id TEXT NOT NULL,
@@ -536,7 +468,4 @@ export const DEFAULT_SAFETY_PATTERNS = [
 export function applyFreshDbExtras(db: Database.Database): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folder_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned)");
-  db.exec("CREATE INDEX IF NOT EXISTS idx_overmind_workflows_project_id ON overmind_workflows(project_id)");
-  db.exec("CREATE INDEX IF NOT EXISTS idx_overmind_workflows_project_status ON overmind_workflows(project_id, status)");
-  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_overmind_workflows_project_run_dir ON overmind_workflows(project_id, run_dir)");
 }
