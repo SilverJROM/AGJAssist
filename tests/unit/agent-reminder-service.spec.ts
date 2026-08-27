@@ -182,11 +182,41 @@ describe("AgentSolicitService C2", () => {
     // Simulate repeat exhausted
     db.prepare("UPDATE agent_solicit_reminders SET repeat_count = 1 WHERE id = ?").run(limited.id);
 
+    // Same-UTC-day lexical trap specimen
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const mo = now.getUTCMonth();
+    const d = now.getUTCDate();
+    const endUtc = Date.UTC(y, mo, d, 23, 59, 59);
+    let sameDay: { id: number } | null = null;
+    if (endUtc > now.getTime()) {
+      const sqliteEod = `${y}-${String(mo + 1).padStart(2, "0")}-${String(d).padStart(2, "0")} 23:59:59`;
+      sameDay = service.create({
+        user_id: userId,
+        folder_group: "sameday-sqlite-future",
+        cadence_minutes: 30,
+        next_fire: sqliteEod,
+        recipients: [{ agent_name: "a4" }],
+      });
+      const nowIso = now.toISOString();
+      const trap = db.prepare(
+        `SELECT
+            next_fire <= ? AS lex_due,
+            datetime(next_fire) <= datetime('now') AS dt_due
+         FROM agent_solicit_reminders WHERE id = ?`
+      ).get(nowIso, sameDay.id) as { lex_due: number; dt_due: number };
+      expect(trap.lex_due).toBe(1);
+      expect(trap.dt_due).toBe(0);
+    }
+
     const dueList = service.getDueReminders();
     const ids = dueList.map(r => r.id);
     expect(ids).toContain(due.id);
     expect(ids).not.toContain(notDue.id);
     expect(ids).not.toContain(limited.id);
+    if (sameDay) {
+      expect(ids).not.toContain(sameDay.id);
+    }
   });
 
   it("advanceReminder increments next_fire and repeat_count", () => {
