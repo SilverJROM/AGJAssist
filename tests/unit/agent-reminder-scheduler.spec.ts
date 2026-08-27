@@ -121,6 +121,12 @@ describe("AgentReminderScheduler fireDue", () => {
   });
 
   it("skips agent with no pane", async () => {
+    // Make agent-missing part of group sessions
+    groupsService.put(userId, {
+      groups: [{ id: "group-a", name: "group-a", sessions: ["agent-missing"] }],
+      activeGroup: "group-a"
+    });
+
     const reminder = solicitService.create({
       user_id: userId,
       folder_group: "group-a",
@@ -155,5 +161,77 @@ describe("AgentReminderScheduler fireDue", () => {
     expect(results[0].skipped).toHaveLength(1);
     expect(results[0].skipped[0].reason).toBe("safety blocked");
     expect(tmuxService.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it("restricts due reminders to caller user", async () => {
+    // Create second user
+    db.prepare("INSERT INTO users (telegram_id, role) VALUES (99999, 'owner')").run();
+    const userBId = (db.prepare("SELECT id FROM users WHERE telegram_id = 99999").get() as { id: number }).id;
+
+    // Reminder for user A
+    const reminderA = solicitService.create({
+      user_id: userId,
+      folder_group: "group-a",
+      cadence_minutes: 30,
+      solicit_message: "ping A",
+      next_fire: "2000-01-01 00:00:00",
+      recipients: [{ agent_name: "agent-a", include: 1 }]
+    });
+
+    // Reminder for user B
+    const reminderB = solicitService.create({
+      user_id: userBId,
+      folder_group: "group-a",
+      cadence_minutes: 30,
+      solicit_message: "ping B",
+      next_fire: "2000-01-01 00:00:00",
+      recipients: [{ agent_name: "agent-a", include: 1 }]
+    });
+
+    const results = await scheduler.fireDue(userId);
+    // Only user A's reminder should be processed
+    expect(results).toHaveLength(1);
+    expect(results[0].reminderId).toBe(reminderA.id);
+    expect(results[0].sent).toHaveLength(1);
+
+    const updatedA = solicitService.getById(reminderA.id);
+    const updatedB = solicitService.getById(reminderB.id);
+    expect(updatedA?.repeat_count).toBe(1);
+    expect(updatedB?.repeat_count).toBe(0);
+  });
+
+  it("skips recipients outside current group sessions", async () => {
+    // Group contains only agent-inside
+    groupsService.put(userId, {
+      groups: [{ id: "group-a", name: "group-a", sessions: ["agent-inside"] }],
+      activeGroup: "group-a"
+    });
+
+    // Mock panes for both inside and outside agents
+    tmuxService.listPanes.mockResolvedValue([
+      { target: "sess-in:0.0", session: "agent-inside", window: "0", pane: "0", command: "", title: "" },
+      { target: "sess-out:0.0", session: "agent-outside", window: "0", pane: "0", command: "", title: "" }
+    ]);
+
+    const reminder = solicitService.create({
+      user_id: userId,
+      folder_group: "group-a",
+      cadence_minutes: 30,
+      solicit_message: "ping",
+      next_fire: "2000-01-01 00:00:00",
+      recipients: [
+        { agent_name: "agent-inside", include: 1 },
+        { agent_name: "agent-outside", include: 1 }
+      ]
+    });
+
+    const results = await scheduler.fireDue(userId);
+    expect(results[0].sent).toHaveLength(1);
+    expect(results[0].sent[0].agentName).toBe("agent-inside");
+    expect(results[0].skipped).toHaveLength(1);
+    expect(results[0].skipped[0].agentName).toBe("agent-outside");
+    expect(results[0].skipped[0].reason).toBe("outside group");
+    expect(tmuxService.sendCommand).toHaveBeenCalledTimes(1);
+    expect(tmuxService.sendCommand).toHaveBeenCalledWith("sess-in:0.0", "ping");
   });
 });

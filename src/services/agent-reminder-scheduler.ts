@@ -24,7 +24,8 @@ export class AgentReminderScheduler {
 
   async fireDue(userId: number, folderGroup?: string): Promise<FireDueResult[]> {
     const due = this.solicitService.getDueReminders();
-    const filtered = folderGroup ? due.filter(r => r.folder_group === folderGroup) : due;
+    const userDue = due.filter(r => r.user_id === userId);
+    const filtered = folderGroup ? userDue.filter(r => r.folder_group === folderGroup) : userDue;
     const results: FireDueResult[] = [];
 
     for (const reminder of filtered) {
@@ -38,10 +39,11 @@ export class AgentReminderScheduler {
       // Resolve current group panes
       const group = this.groupsService.get(userId);
       const groupMeta = group.groups.find(g => g.id === reminder.folder_group || g.name === reminder.folder_group);
-      const sessionNames = groupMeta?.sessions ?? [];
+      const sessionNames = new Set(groupMeta?.sessions ?? []);
 
       const includedRecipients = reminder.recipients.filter(r => r.include === 1);
-      const panes = await this.tmuxService.listPanes();
+      const allPanes = await this.tmuxService.listPanes();
+      const panes = allPanes.filter(p => sessionNames.has(p.session));
       const solicitMessage = reminder.solicit_message || "give me a status update";
 
       // Safety check once per reminder
@@ -53,7 +55,12 @@ export class AgentReminderScheduler {
         }
       } else {
         for (const recipient of includedRecipients) {
-          // Find tmux target for agent via session name
+          // Only process recipients whose agent is in current group sessions
+          if (!sessionNames.has(recipient.agent_name)) {
+            result.skipped.push({ agentName: recipient.agent_name, reason: "outside group" });
+            continue;
+          }
+          // Find tmux target for agent via session name within group
           const matching = panes.find(p => p.session === recipient.agent_name);
           if (!matching) {
             result.skipped.push({ agentName: recipient.agent_name, reason: "no pane" });
