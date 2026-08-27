@@ -35,22 +35,55 @@ function writeReport(collected, passed, failed) {
 }
 
 function runPlaywright(testPath, env) {
-  const result = spawnSync('npx', ['playwright', 'test', testPath, '--project=cc', '--reporter=line'], {
+  // --config points at the dedicated cc config: TestProject has no webServer
+  // field, so a webServer nested under playwright.config.ts's 'cc' project
+  // entry is silently ignored there (see playwright.cc.config.ts).
+  const result = spawnSync('npx', ['playwright', 'test', testPath, '--project=cc', '--config=playwright.cc.config.ts', '--reporter=line'], {
     env,
     stdio: 'inherit',
   });
   return result.status ?? 1;
 }
 
+function readReport(reportFilePath) {
+  try {
+    return JSON.parse(fs.readFileSync(reportFilePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function hasAnyNamedAssert(report) {
+  return !!report && Array.isArray(report.failed) && report.failed.some((f) => f && f.id && f.kind === 'assert');
+}
+
+function hasFailure(report, id, kind) {
+  return !!report && Array.isArray(report.failed) && report.failed.some((f) => f && f.id === id && f.kind === kind);
+}
+
 if (harnessSmoke) {
   const testPath = fence.test_path;
-  const env1 = { ...process.env, FENCE_ID: fenceId };
-  runPlaywright(testPath, env1);
-  const env2 = { ...process.env, FENCE_ID: fenceId, FENCE_STUB: 'B2' };
-  runPlaywright(testPath, env2);
-  writeReport(fence.acceptance_ids, [], [{ id: 'A2', kind: 'assert' }]);
+  const posReportPath = path.resolve(process.cwd(), '.fence-harness-smoke-pos.json');
+  const negReportPath = path.resolve(process.cwd(), '.fence-harness-smoke-neg.json');
+  try { fs.unlinkSync(posReportPath); } catch {}
+  try { fs.unlinkSync(negReportPath); } catch {}
+
+  const posCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId, FENCE_REPORT_PATH: posReportPath });
+  const posReport = readReport(posReportPath);
+
+  const negCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId, FENCE_STUB: 'B2', FENCE_REPORT_PATH: negReportPath });
+  const negReport = readReport(negReportPath);
+
+  const posRed = posCode !== 0 && hasAnyNamedAssert(posReport);
+  const negRed = negCode !== 0 && hasFailure(negReport, 'A2', 'assert');
+
+  writeReport(fence.acceptance_ids, [], [
+    ...(posReport?.failed || []),
+    ...(negReport?.failed || []),
+  ]);
   console.log(verdictLine());
-  process.exit(0);
+  console.log(`[harness-smoke] current-HEAD red=${posRed} (exit=${posCode}); FENCE_STUB=B2 red-on-A2=${negRed} (exit=${negCode})`);
+  process.exit(posRed && negRed ? 0 : 1);
 }
 
 if (gate) {
@@ -66,7 +99,9 @@ if (gate) {
 }
 
 const testPath = fence.test_path;
-runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId });
-writeReport(fence.acceptance_ids, [], []);
-console.log(verdictLine());
-process.exit(0);
+const integrationCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId });
+const specReport = readReport(reportPath) || { schema: 'fence-report-v1', collected: fence.acceptance_ids, passed: [], failed: [] };
+specReport.verdict_line = verdictLine();
+fs.writeFileSync(reportPath, JSON.stringify(specReport, null, 2) + '\n');
+console.log(specReport.verdict_line);
+process.exit(integrationCode);
