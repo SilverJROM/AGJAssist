@@ -8,6 +8,8 @@ function isOpenAICompatibleBaseUrl(urlString: string): boolean {
   try {
     const url = new URL(urlString);
     if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    // Reject URLs with embedded credentials, query strings, or fragments
+    if (url.username || url.password || url.search || url.hash) return false;
     // OpenAI-compatible base URL must end with /v1 or /v1/
     const path = url.pathname;
     return path === "/v1" || path === "/v1/";

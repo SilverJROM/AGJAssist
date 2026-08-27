@@ -142,6 +142,74 @@ describe("summary-routes D4", () => {
     expect(patchRes.statusCode).toBe(400);
   });
 
+  it("POST rejects base URL with embedded credentials", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/summary-endpoints",
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: {
+        name: "cred-ep",
+        base_url: "https://token:supersecret@example.com/v1",
+        model: "m",
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    const body = res.body;
+    expect(body).not.toContain("supersecret");
+  });
+
+  it("POST rejects base URL with query string", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/summary-endpoints",
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: {
+        name: "query-ep",
+        base_url: "https://example.com/v1?api_key=leakme",
+        model: "m",
+      },
+    });
+    expect(res.statusCode).toBe(400);
+    const body = res.body;
+    expect(body).not.toContain("leakme");
+  });
+
+  it("PATCH rejects base URL with embedded credentials", async () => {
+    const createRes = await app.inject({
+      method: "POST",
+      url: "/api/summary-endpoints",
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { name: "patch-cred", base_url: "http://a/v1", model: "m1" },
+    });
+    const created = JSON.parse(createRes.body).endpoint;
+    const patchRes = await app.inject({
+      method: "PATCH",
+      url: `/api/summary-endpoints/${created.id}`,
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { base_url: "https://token:supersecret@example.com/v1" },
+    });
+    expect(patchRes.statusCode).toBe(400);
+    expect(patchRes.body).not.toContain("supersecret");
+  });
+
+  it("PATCH rejects base URL with query string", async () => {
+    const createRes = await app.inject({
+      method: "POST",
+      url: "/api/summary-endpoints",
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { name: "patch-query", base_url: "http://a/v1", model: "m1" },
+    });
+    const created = JSON.parse(createRes.body).endpoint;
+    const patchRes = await app.inject({
+      method: "PATCH",
+      url: `/api/summary-endpoints/${created.id}`,
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { base_url: "https://example.com/v1?api_key=leakme" },
+    });
+    expect(patchRes.statusCode).toBe(400);
+    expect(patchRes.body).not.toContain("leakme");
+  });
+
   it("POST /api/summary-endpoints/:id/default sets default", async () => {
     const createRes = await app.inject({
       method: "POST",
