@@ -2272,6 +2272,12 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [repeatLimit, setRepeatLimit] = useState('');
   const [recipientAgentName, setRecipientAgentName] = useState('agent-a');
   const [recipientInclude, setRecipientInclude] = useState(true);
+  const [summaryEndpoints, setSummaryEndpoints] = useState([]);
+  const [endpointName, setEndpointName] = useState('');
+  const [endpointBaseUrl, setEndpointBaseUrl] = useState('');
+  const [endpointModel, setEndpointModel] = useState('');
+  const [editingEndpointId, setEditingEndpointId] = useState(null);
+  const [defaultEndpointId, setDefaultEndpointId] = useState(null);
   const menuRef = useRef(null);
   const sectionNavRef = useRef(null);
   const terminalGroupsRef = useRef(terminalGroups);
@@ -2380,6 +2386,21 @@ function TerminalTab({ projectId, projectName } = {}) {
       .catch(() => setAgentReminders([]));
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    api('/api/summary-endpoints')
+      .then(data => {
+        const eps = Array.isArray(data?.endpoints) ? data.endpoints : [];
+        setSummaryEndpoints(eps);
+        const def = eps.find(e => e.is_default);
+        setDefaultEndpointId(def ? def.id : null);
+      })
+      .catch(() => {
+        setSummaryEndpoints([]);
+        setDefaultEndpointId(null);
+      });
+  }, [menuOpen]);
+
   const handleSaveReminder = async () => {
     const folderGroup = resolvedActiveGroupTab === 'all' ? 'all' : (activeGroup?.id || resolvedActiveGroupTab);
     const minutes = cadenceCustom ? Number(cadenceCustom) : cadenceMinutes;
@@ -2397,6 +2418,66 @@ function TerminalTab({ projectId, projectName } = {}) {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleSaveEndpoint = async () => {
+    if (!endpointName || !endpointBaseUrl || !endpointModel) return;
+    try {
+      if (editingEndpointId) {
+        await api(`/api/summary-endpoints/${editingEndpointId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name: endpointName, base_url: endpointBaseUrl, model: endpointModel })
+        });
+      } else {
+        await api('/api/summary-endpoints', {
+          method: 'POST',
+          body: JSON.stringify({ name: endpointName, base_url: endpointBaseUrl, model: endpointModel })
+        });
+      }
+      setEndpointName('');
+      setEndpointBaseUrl('');
+      setEndpointModel('');
+      setEditingEndpointId(null);
+      const data = await api('/api/summary-endpoints');
+      const eps = Array.isArray(data?.endpoints) ? data.endpoints : [];
+      setSummaryEndpoints(eps);
+      const def = eps.find(e => e.is_default);
+      setDefaultEndpointId(def ? def.id : null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteEndpoint = async (id) => {
+    try {
+      await api(`/api/summary-endpoints/${id}`, { method: 'DELETE' });
+      const data = await api('/api/summary-endpoints');
+      const eps = Array.isArray(data?.endpoints) ? data.endpoints : [];
+      setSummaryEndpoints(eps);
+      const def = eps.find(e => e.is_default);
+      setDefaultEndpointId(def ? def.id : null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSetDefault = async (id) => {
+    try {
+      await api(`/api/summary-endpoints/${id}/default`, { method: 'POST' });
+      const data = await api('/api/summary-endpoints');
+      const eps = Array.isArray(data?.endpoints) ? data.endpoints : [];
+      setSummaryEndpoints(eps);
+      setDefaultEndpointId(id);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const startEditEndpoint = (ep) => {
+    setEditingEndpointId(ep.id);
+    setEndpointName(ep.name || '');
+    setEndpointBaseUrl(ep.base_url || '');
+    setEndpointModel(ep.model || '');
   };
 
   function cacheTerminalGroupsLocal(groups, active) {
@@ -2968,6 +3049,41 @@ function TerminalTab({ projectId, projectName } = {}) {
             </div>
             <div class="terminal-sheet-row">
               <button type="button" data-testid="agent-reminder-save" onclick=${handleSaveReminder}>Save</button>
+            </div>
+          </div>
+          <div data-testid="summary-endpoint-sheet">
+            <div class="terminal-sheet-sect">Summary Endpoints</div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Existing endpoints</div>
+              <div>
+                ${summaryEndpoints.length === 0 ? html`<div>No endpoints</div>` : html`
+                  ${summaryEndpoints.map(ep => html`
+                    <div data-testid="endpoint-row" style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+                      <input type="radio" name="default-endpoint" data-testid="endpoint-default-radio" checked=${defaultEndpointId === ep.id} onchange=${() => handleSetDefault(ep.id)} />
+                      <span>${ep.name || ''} ${ep.model || ''}</span>
+                      <button type="button" data-testid="endpoint-edit" onclick=${() => startEditEndpoint(ep)}>Edit</button>
+                      <button type="button" data-testid="endpoint-delete" onclick=${() => handleDeleteEndpoint(ep.id)}>Del</button>
+                    </div>
+                  `)}
+                `}
+              </div>
+            </div>
+            <div class="terminal-sheet-sect">${editingEndpointId ? 'Edit endpoint' : 'New endpoint'}</div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Name</div>
+              <input data-testid="endpoint-name-input" type="text" placeholder="Name" value=${endpointName} oninput=${e => setEndpointName(e.target.value)} />
+            </div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Base URL</div>
+              <input data-testid="endpoint-baseurl-input" type="text" placeholder="https://.../v1" value=${endpointBaseUrl} oninput=${e => setEndpointBaseUrl(e.target.value)} />
+            </div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Model</div>
+              <input data-testid="endpoint-model-input" type="text" placeholder="Model" value=${endpointModel} oninput=${e => setEndpointModel(e.target.value)} />
+            </div>
+            <div class="terminal-sheet-row">
+              <button type="button" data-testid="endpoint-save" onclick=${handleSaveEndpoint}>${editingEndpointId ? 'Update' : 'Add'}</button>
+              ${editingEndpointId ? html`<button type="button" onclick=${() => { setEditingEndpointId(null); setEndpointName(''); setEndpointBaseUrl(''); setEndpointModel(''); }}>Cancel</button>` : ''}
             </div>
           </div>
           <div class="terminal-sheet-topbar">
