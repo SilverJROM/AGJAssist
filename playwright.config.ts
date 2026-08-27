@@ -2,7 +2,14 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: 'e2e',
   timeout: 30000,
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'cc',
+      use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:3210' },
+      webServer: { command: 'node scripts/cc-run-isolated.mjs --serve', url: 'http://localhost:3210/index.html', reuseExistingServer: false, timeout: 60000 },
+    },
+  ],
   use: { baseURL: 'http://localhost:3210' },
   // reuseExistingServer:false so the proof always boots OUR shipped-app static server (e2e/static-server.mjs)
   // and is never hijacked by a foreign dev server (e.g. `npx serve`, which 301-redirects /index.html and drops the
