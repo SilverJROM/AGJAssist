@@ -52,7 +52,6 @@ import type { TelegramAssistant } from "../bot/telegram-bot.js";
 import { registerTgLoginRoutes } from "./routes/tg-login-routes.js";
 import { registerLokalaiLinkRoutes } from "./routes/lokalai-link-routes.js";
 import { registerTelegramWebhookRoutes } from "./routes/telegram-webhook-routes.js";
-import { registerGuardianRoutes } from "./routes/guardian-routes.js";
 import { registerTerminalGroupsRoutes } from "./routes/terminal-groups-routes.js";
 import { TerminalGroupsService } from "../services/terminal-groups-service.js";
 import { registerMcpOauthRoutes } from "./routes/mcp-oauth-routes.js";
@@ -221,7 +220,6 @@ export async function createApiServer(
     registerAppSettingsRoutes(app, services.authService, services.appSettingsService);
   }
 
-  registerGuardianRoutes(app, config, services.telegramAssistant);
   const terminalGroupsService = new TerminalGroupsService(services.db);
   registerTerminalGroupsRoutes(
     app,
