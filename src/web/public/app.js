@@ -7,6 +7,15 @@ import {
   DEFAULT_BOTTOM_NAV_TAB_IDS,
   DEFAULT_LANDING_TAB,
   addBottomNavTab,
+  getBottomNavTabs,
+  moveBottomNavTab,
+  readBottomNavTabIds,
+  readLandingTab,
+  removeBottomNavTab,
+  writeBottomNavTabIds,
+  writeLandingTab
+} from './nav-helpers.js';
+import {
   buildOvermindWsUrl,
   buildTmuxWsUrl,
   completedWorkflowsMostRecent,
@@ -14,19 +23,12 @@ import {
   currentElapsedMs,
   formatElapsed,
   formatStuckDuration,
-  getBottomNavTabs,
   isActiveStatus,
-  moveBottomNavTab,
-  readBottomNavTabIds,
-  readLandingTab,
-  removeBottomNavTab,
   statusColor,
   statusIcon,
   summarizeWorkflows,
   taskGlyph,
-  totalElapsedMs,
-  writeBottomNavTabIds,
-  writeLandingTab
+  totalElapsedMs
 } from './overmind-helpers.js';
 
 const html = htm.bind(h);
@@ -757,11 +759,8 @@ function Header({ user }) {
           <a href="#/" class=${route === '/' ? 'active' : ''}>Dashboard</a>
           <a href="#/projects" class=${route === '/projects' || route.startsWith('/project/') ? 'active' : ''}>Projects</a>
           <a href="#/terminals" class=${route === '/terminals' ? 'active' : ''}>Terminals</a>
-          <a href="#/overmind" class=${route === '/overmind' ? 'active' : ''}>Workflows</a>
-          <a href="#/overmind-projects" class=${route === '/overmind-projects' ? 'active' : ''}>OVM Projects</a>
           <a href="#/tasks" class=${route === '/tasks' ? 'active' : ''}>Tasks</a>
           <a href="#/notes" class=${route === '/notes' ? 'active' : ''}>Notes</a>
-          <a href="#/conversations" class=${route === '/conversations' ? 'active' : ''}>Chat</a>
           <a href="#/agent-os" class=${route === '/agent-os' ? 'active' : ''}>Agent OS</a>
           <a href="#/settings" class=${route === '/settings' ? 'active' : ''}>Settings</a>
           ${user?.role === 'owner' && html`<a href="#/mcp-access" data-testid="mcp-nav-access" class=${route === '/mcp-access' ? 'active' : ''}>MCP Access</a>`}
@@ -783,7 +782,7 @@ function Header({ user }) {
 
 // Dashboard (hub with section cards)
 function Dashboard() {
-  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, notes: 0, workflows: 0, activeWorkflows: 0 });
+  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, notes: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -791,17 +790,13 @@ function Dashboard() {
       api('/api/projects').catch(() => ({ projects: [] })),
       api('/api/personal-tasks').catch(() => ({ tasks: [] })),
       api('/api/reminders').catch(() => ({ reminders: [] })),
-      api('/api/notes?status=open').catch(() => ({ notes: [] })),
-      api('/api/overmind/workflows').catch(() => ({ workflows: [] }))
-    ]).then(([p, t, r, n, w]) => {
-      const workflowSummary = summarizeWorkflows(w.workflows);
+      api('/api/notes?status=open').catch(() => ({ notes: [] }))
+    ]).then(([p, t, r, n]) => {
       setStats({
         projects: p.projects?.length || 0,
         tasks: t.tasks?.length || 0,
         reminders: r.reminders?.length || 0,
-        notes: n.notes?.length || 0,
-        workflows: workflowSummary.total,
-        activeWorkflows: workflowSummary.active
+        notes: n.notes?.length || 0
       });
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -812,7 +807,6 @@ function Dashboard() {
   const cards = [
     { label: 'Projects', count: stats.projects, route: '/projects', desc: 'Manage your development projects' },
     { label: 'Terminals', count: null, route: '/terminals', desc: 'Tmux terminal sessions' },
-    { label: 'Workflows', count: stats.workflows, route: '/overmind', desc: `${stats.workflows} workflows · ${stats.activeWorkflows} active` },
     { label: 'Tasks', count: stats.tasks, route: '/tasks', desc: 'Daily & weekly tasks, reminders' },
     { label: 'Notes', count: stats.notes, route: '/notes', desc: 'Quick notes, attach to any project' },
     { label: 'Settings', count: null, route: '/settings', desc: 'Templates, safety patterns, 2FA' }
@@ -7961,7 +7955,7 @@ function BottomNavEditor({ tabIds, onChange, onClose }) {
 }
 
 function TgDashboard({ onEditBottomNav }) {
-  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, notes: 0, workflows: 0, activeWorkflows: 0 });
+  const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, notes: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -7969,17 +7963,13 @@ function TgDashboard({ onEditBottomNav }) {
       api('/api/projects').catch(() => ({ projects: [] })),
       api('/api/personal-tasks').catch(() => ({ tasks: [] })),
       api('/api/reminders').catch(() => ({ reminders: [] })),
-      api('/api/notes?status=open').catch(() => ({ notes: [] })),
-      api('/api/overmind/workflows').catch(() => ({ workflows: [] }))
-    ]).then(([p, t, r, n, w]) => {
-      const workflowSummary = summarizeWorkflows(w.workflows);
+      api('/api/notes?status=open').catch(() => ({ notes: [] }))
+    ]).then(([p, t, r, n]) => {
       setStats({
         projects: p.projects?.length || 0,
         tasks: t.tasks?.length || 0,
         reminders: r.reminders?.length || 0,
-        notes: n.notes?.length || 0,
-        workflows: workflowSummary.total,
-        activeWorkflows: workflowSummary.active
+        notes: n.notes?.length || 0
       });
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -7991,7 +7981,6 @@ function TgDashboard({ onEditBottomNav }) {
     { icon: '\u{1F4CB}', label: 'Tasks', count: stats.tasks, route: '/tasks', desc: 'Daily & weekly' },
     { icon: '\u{1F4DD}', label: 'Notes', count: stats.notes, route: '/notes', desc: 'Quick notes' },
     { icon: '\u{1F5A5}', label: 'Terminals', count: null, route: '/terminals', desc: 'Tmux sessions' },
-    { icon: '\u{25B6}', label: 'Workflows', count: stats.workflows, route: '/overmind', desc: `${stats.workflows} workflows · ${stats.activeWorkflows} active` },
     { icon: '\u{1F4C1}', label: 'Projects', count: stats.projects, route: '/projects', desc: 'Dev projects' },
     { icon: '\u{23F0}', label: 'Reminders', count: stats.reminders, route: '/tasks', desc: 'Upcoming events' },
     { icon: '\u{2699}', label: 'Settings', count: null, route: '/settings', desc: 'Config & templates' }
@@ -8461,8 +8450,8 @@ function TgApp() {
     const initialHash = location.hash.slice(1);
     const KNOWN_PREFIXES = ['/project/'];
     const KNOWN_EXACT = new Set([
-      '/', '/projects', '/terminals', '/overmind', '/overmind-projects', '/tasks',
-      '/notes', '/conversations', '/settings', '/agent-os', '/mcp-access'
+      '/', '/projects', '/terminals', '/tasks',
+      '/notes', '/settings', '/agent-os', '/mcp-access'
     ]);
     const isKnown =
       initialHash &&
@@ -8490,16 +8479,10 @@ function TgApp() {
     content = html`<${Projects} />`;
   } else if (route === '/terminals') {
     content = html`<${Terminals} />`;
-  } else if (route === '/overmind') {
-    content = html`<${OvermindWorkflows} />`;
-  } else if (route === '/overmind-projects') {
-    content = html`<${OvermindProjects} />`;
   } else if (route === '/tasks') {
     content = html`<${TasksSection} />`;
   } else if (route === '/notes') {
     content = html`<${IosNotesPage} />`;
-  } else if (route === '/conversations') {
-    content = html`<${OvmConsole} />`;
   } else if (route === '/settings') {
     content = html`<${Settings} onEditBottomNav=${() => setEditingBottomNav(true)} />`;
   } else if (route === '/agent-os') {
@@ -8893,16 +8876,10 @@ function App() {
     content = html`<${Projects} />`;
   } else if (route === '/terminals') {
     content = html`<${Terminals} />`;
-  } else if (route === '/overmind') {
-    content = html`<${OvermindWorkflows} />`;
-  } else if (route === '/overmind-projects') {
-    content = html`<${OvermindProjects} />`;
   } else if (route === '/tasks') {
     content = html`<${TasksSection} />`;
   } else if (route === '/notes') {
     content = html`<${IosNotesPage} />`;
-  } else if (route === '/conversations') {
-    content = html`<${OvmConsole} />`;
   } else if (route === '/settings') {
     content = html`<${Settings} />`;
   } else if (route === '/agent-os') {
