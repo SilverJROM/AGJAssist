@@ -37,6 +37,7 @@ import { ReminderService } from "../services/reminder-service.js";
 import { registerReminderRoutes } from "./routes/reminder-routes.js";
 import { registerAgentRoutes } from "./routes/agent-routes.js";
 import { registerAgentReminderRoutes } from "./routes/agent-reminder-routes.js";
+import { registerAgentWakeupRoutes } from "./routes/agent-wakeup-routes.js";
 import { AgentAssignmentService } from "../services/agent-assignment-service.js";
 import { CoordinatorLaunchService } from "../services/coordinator-launch-service.js";
 import { AgentEventsStreamManager } from "./websocket/agent-events-stream-manager.js";
@@ -198,6 +199,7 @@ export async function createApiServer(
   registerReminderRoutes(app, services.authService, services.reminderService);
   registerAgentRoutes(app, services.authService, services.agentAssignmentService, services.coordinatorLaunchService, services.tmuxService, services.projectService, services.safetyService);
   registerAgentReminderRoutes(app, services.authService, services.db);
+  registerAgentWakeupRoutes(app, services.authService, services.db);
   registerSummaryRoutes(app, services.authService, services.db);
 
   if (services.agentEventsStreamManager) {
