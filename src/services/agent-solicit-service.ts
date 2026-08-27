@@ -142,8 +142,8 @@ export class AgentSolicitService {
 
     const folderGroup = updates.folder_group ?? existing.folder_group;
     const cadenceMinutes = updates.cadence_minutes ?? existing.cadence_minutes;
-    const repeatLimit = updates.repeat_limit ?? existing.repeat_limit;
-    const nextFire = updates.next_fire ?? existing.next_fire;
+    const repeatLimit = updates.repeat_limit !== undefined ? updates.repeat_limit : existing.repeat_limit;
+    const nextFire = updates.next_fire !== undefined ? updates.next_fire : existing.next_fire;
     const solicitMessage = updates.solicit_message ?? existing.solicit_message;
     const active = updates.active ?? existing.active;
 
@@ -184,14 +184,14 @@ export class AgentSolicitService {
   }
 
   getDueReminders(): AgentSolicitReminderWithRecipients[] {
-    const nowIso = new Date().toISOString();
     const reminders = this.db
       .prepare(
         `SELECT * FROM agent_solicit_reminders
-         WHERE active = 1 AND next_fire IS NOT NULL AND next_fire <= ?
+         WHERE active = 1 AND next_fire IS NOT NULL
+         AND datetime(next_fire) <= datetime('now')
          AND (repeat_limit IS NULL OR repeat_count < repeat_limit)`
       )
-      .all(nowIso) as AgentSolicitReminder[];
+      .all() as AgentSolicitReminder[];
 
     return reminders.map((r) => ({
       ...r,
