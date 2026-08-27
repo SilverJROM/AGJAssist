@@ -64,18 +64,19 @@ export class AgentWakeupService {
   async fire(id: number): Promise<boolean> {
     const nowIso = new Date().toISOString();
 
-    // Load pending and due row
-    const row = this.db
-      .prepare(
-        `SELECT * FROM agent_one_time_wakeups
-         WHERE id = ? AND status = 'pending' AND manual_fire_time <= ?`
-      )
-      .get(id, nowIso) as AgentWakeup | undefined;
+    // Claim the row atomically before any side effects
+    const claimStmt = this.db.prepare(
+      `UPDATE agent_one_time_wakeups
+       SET status = 'fired', updated_at = ?
+       WHERE id = ? AND status = 'pending' AND manual_fire_time <= ?
+       RETURNING *`
+    );
+    const row = claimStmt.get(nowIso, id, nowIso) as AgentWakeup | undefined;
     if (!row) {
       return false;
     }
 
-    // Safety check
+    // Safety check after claim
     if (this.safetyService) {
       const check = this.safetyService.checkCommand(row.action);
       if (check.blocked) {
@@ -117,14 +118,7 @@ export class AgentWakeupService {
       tmuxTarget: row.pane_target,
     });
 
-    // Atomically mark fired only if still pending
-    const update = this.db.prepare(
-      `UPDATE agent_one_time_wakeups
-       SET status = 'fired', updated_at = ?
-       WHERE id = ? AND status = 'pending'`
-    );
-    const res = update.run(nowIso, id);
-    return res.changes > 0;
+    return true;
   }
 
   async fireDue(): Promise<number> {

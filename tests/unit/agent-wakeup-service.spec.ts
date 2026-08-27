@@ -92,6 +92,22 @@ describe("AgentWakeupService", () => {
     expect(fetched!.status).toBe("fired");
   });
 
+  it("concurrent fire attempts result in exactly one send", async () => {
+    let sendCount = 0;
+    vi.spyOn(tmux, "sendCommand").mockImplementation(async () => {
+      sendCount++;
+      await new Promise(r => setTimeout(r, 20));
+      return { message: "sent", blocked: false };
+    });
+    const w = service.create({ paneTarget: "sess:0.0", manualFireTime: past, action: "echo concurrent" });
+    const p1 = service.fire(w.id);
+    const p2 = service.fire(w.id);
+    const results = await Promise.all([p1, p2]);
+    expect(results.filter(Boolean).length).toBe(1);
+    expect(sendCount).toBe(1);
+    expect(service.getById(w.id)!.status).toBe("fired");
+  });
+
   it("fire respects safety block", async () => {
     // Add a safety pattern that blocks rm -rf
     safety.addPattern("rm -rf", "test", false);
