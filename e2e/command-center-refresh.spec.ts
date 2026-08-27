@@ -37,6 +37,7 @@ test('command-center refresh control is always reachable and re-pulls output and
   let pendingRefreshOutput = null;
   let searchRefreshOutputServed = false;
   let nonRefreshOutput = 'initial output fixture';
+  let delayRefreshResponse = true;
   await page.route('**/api/tmux/panes/*/output*', async route => {
     outputCallCount++;
     const isExplicitRefresh = new URL(route.request().url()).searchParams.get('refresh') === '1';
@@ -61,7 +62,7 @@ test('command-center refresh control is always reachable and re-pulls output and
     pendingRefreshOutput = null;
     if (output === 'search refresh output fixture') searchRefreshOutputServed = true;
     // Keep the response pending long enough to observe the public busy state.
-    await new Promise(r => setTimeout(r, 1200));
+    if (delayRefreshResponse) await new Promise(r => setTimeout(r, 1200));
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -167,13 +168,14 @@ test('command-center refresh control is always reachable and re-pulls output and
   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('post refresh poll fixture', { timeout: 10000 });
 
   // Freeze prevention: refresh clicked WHILE the send is still capturing.
-  // captureCommandResult runs ~3.4s, so 400ms after the click the send is still in flight
-  // and openAgentAfterYouRef is still set — this is the only window that exercises the reset.
+  // This capture exits early (~1.15s) because the pane output changes right before send;
+  // the immediate refresh response lands while openAgentAfterYouRef is still set.
   nonRefreshOutput = 'initial output fixture';
   await composer.fill('midsend fixture');
   await sendBtn.click();
   await expect(page.locator('[data-testid="terminal-turn-user"]')).toHaveCount(2);
   await page.waitForTimeout(400);                       // NO settle wait — that is the point
+  delayRefreshResponse = false;   // land the rebuild INSIDE the send window
   pendingRefreshOutput = 'initial output fixture\nmidsend refresh body fixture';
   await refreshBtn.click();
   await expect(refreshStatus).toContainText('Updated', { timeout: 10000 });
