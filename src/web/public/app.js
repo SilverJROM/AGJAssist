@@ -2278,6 +2278,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [endpointModel, setEndpointModel] = useState('');
   const [editingEndpointId, setEditingEndpointId] = useState(null);
   const [defaultEndpointId, setDefaultEndpointId] = useState(null);
+  const [endpointError, setEndpointError] = useState('');
   const menuRef = useRef(null);
   const sectionNavRef = useRef(null);
   const terminalGroupsRef = useRef(terminalGroups);
@@ -2422,6 +2423,7 @@ function TerminalTab({ projectId, projectName } = {}) {
 
   const handleSaveEndpoint = async () => {
     if (!endpointName || !endpointBaseUrl || !endpointModel) return;
+    setEndpointError('');
     try {
       if (editingEndpointId) {
         await api(`/api/summary-endpoints/${editingEndpointId}`, {
@@ -2445,10 +2447,12 @@ function TerminalTab({ projectId, projectName } = {}) {
       setDefaultEndpointId(def ? def.id : null);
     } catch (e) {
       console.error(e);
+      setEndpointError(e.message || 'Endpoint error');
     }
   };
 
   const handleDeleteEndpoint = async (id) => {
+    setEndpointError('');
     try {
       await api(`/api/summary-endpoints/${id}`, { method: 'DELETE' });
       const data = await api('/api/summary-endpoints');
@@ -2458,10 +2462,12 @@ function TerminalTab({ projectId, projectName } = {}) {
       setDefaultEndpointId(def ? def.id : null);
     } catch (e) {
       console.error(e);
+      setEndpointError(e.message || 'Endpoint error');
     }
   };
 
   const handleSetDefault = async (id) => {
+    setEndpointError('');
     try {
       await api(`/api/summary-endpoints/${id}/default`, { method: 'POST' });
       const data = await api('/api/summary-endpoints');
@@ -2470,6 +2476,7 @@ function TerminalTab({ projectId, projectName } = {}) {
       setDefaultEndpointId(id);
     } catch (e) {
       console.error(e);
+      setEndpointError(e.message || 'Endpoint error');
     }
   };
 
@@ -3052,6 +3059,7 @@ function TerminalTab({ projectId, projectName } = {}) {
             </div>
           </div>
           <div data-testid="summary-endpoint-sheet">
+            ${endpointError ? html`<div data-testid="endpoint-error" role="alert">${endpointError}</div>` : ''}
             <div class="terminal-sheet-sect">Summary Endpoints</div>
             <div class="terminal-sheet-row">
               <div class="terminal-sheet-lbl">Existing endpoints</div>
