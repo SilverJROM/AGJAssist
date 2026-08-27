@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { createApiServer } from "../src/api/server.js";
 import { AppConfig } from "../src/config/config.js";
 
@@ -35,6 +35,11 @@ function minimalConfig(): AppConfig {
 }
 
 describe("guardian removal B6", () => {
+  it("guardian-routes.ts is removed", () => {
+    const path = new URL("../src/api/routes/guardian-routes.ts", import.meta.url);
+    expect(existsSync(path)).toBe(false);
+  });
+
   it("server.ts no longer imports or calls registerGuardianRoutes", () => {
     const src = readFileSync(new URL("../src/api/server.ts", import.meta.url), "utf8");
     expect(src).not.toContain("registerGuardianRoutes");
