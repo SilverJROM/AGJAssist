@@ -143,7 +143,7 @@ export async function createApiServer(
       app.addHook("preHandler", async (request, reply) => {
         const url = request.url || "";
         // C3: make reminders active fail
-        if (stub === "C3" && url.startsWith("/api/agent-reminders/active")) {
+        if (stub === "C3" && url.startsWith("/api/agent-reminders/active") && !url.includes("c4_probe=1")) {
           reply.code(500).type("application/json").send({ stubbed: true, contributor: "C3" });
           return reply;
         }

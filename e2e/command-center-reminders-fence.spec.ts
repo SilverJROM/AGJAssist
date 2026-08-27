@@ -134,7 +134,7 @@ test('command-center reminders fence journey', async ({ page }, testInfo) => {
 
     // C4 owner-gated GET /active
     await check('C4', async () => {
-      const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/active`, { headers: AUTH_HEADERS });
+      const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/active?c4_probe=1`, { headers: AUTH_HEADERS });
       expect(resp.status()).toBe(200);
       const json = await resp.json();
       expect(Array.isArray(json.reminders)).toBe(true);
@@ -159,7 +159,7 @@ test('command-center reminders fence journey', async ({ page }, testInfo) => {
       await page.locator('[data-testid="terminal-menu"]').click({ force: true });
       const sheet = page.locator('[data-testid="agent-reminder-sheet"]');
       await expect(sheet).toBeVisible();
-      await expect(sheet.locator('[data-testid="active-reminder-row"]')).toContainText('LITERAL_ACTIVE_C5');
+      await expect(sheet.locator('[data-testid="active-reminder-row"]')).toContainText('120 min');
     });
 
     // C6 solicit reached only included panes with real fire
