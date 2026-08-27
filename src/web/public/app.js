@@ -8472,6 +8472,12 @@ function TgApp() {
 
   const tabs = getBottomNavTabs(bottomNavTabIds);
 
+  useEffect(() => {
+    if (route === '/conversations' || route === '/overmind' || route.startsWith('/overmind')) {
+      navigate('/');
+    }
+  }, [route]);
+
   let content;
   if (route === '/' || route === '') {
     content = html`<${TgDashboard} onEditBottomNav=${() => setEditingBottomNav(true)} />`;
@@ -8868,6 +8874,12 @@ function App() {
   const user = JSON.parse(localStorage.getItem('agj_user') || 'null');
 
   if (!authToken || !user) return html`<${Login} />`;
+
+  useEffect(() => {
+    if (route === '/conversations' || route === '/overmind' || route.startsWith('/overmind')) {
+      navigate('/');
+    }
+  }, [route]);
 
   let content;
   if (route === '/' || route === '') {

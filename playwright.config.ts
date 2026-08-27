@@ -4,6 +4,7 @@ export default defineConfig({
   timeout: 30000,
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'cc', use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:3210' } },
     // The 'cc' project (command-center fence journeys) lives in its own config —
     // playwright.cc.config.ts — because TestProject has no webServer field (only
     // TestConfig does); a per-project webServer entry here is silently ignored and
