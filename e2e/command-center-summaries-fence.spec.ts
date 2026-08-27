@@ -20,41 +20,48 @@ test('command-center summaries fence journey', async ({ page }) => {
     }
   };
 
-  await page.goto(`${APP_ORIGIN}/index.html`, { waitUntil: 'domcontentloaded' });
+  try {
+    await page.goto(`${APP_ORIGIN}/index.html`, { waitUntil: 'domcontentloaded' });
 
-  await check('E1', async () => {
-    const resp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`);
-    expect(resp.status()).toBe(200);
-  });
+    await check('E1', async () => {
+      const resp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`);
+      expect(resp.status()).toBe(200);
+    });
 
-  await check('E2', async () => {
-    await page.goto(`${APP_ORIGIN}/index.html#/agents`, { waitUntil: 'domcontentloaded' });
-    const dropdown = page.locator('[data-testid="agent-summaries-dropdown"]');
-    await expect(dropdown).toBeVisible();
-  });
+    await check('E2', async () => {
+      await page.goto(`${APP_ORIGIN}/index.html#/agents`, { waitUntil: 'domcontentloaded' });
+      const dropdown = page.locator('[data-testid="agent-summaries-dropdown"]');
+      await expect(dropdown).toBeVisible();
+    });
 
-  await check('E3', async () => {
-    const resp = await page.request.get(`${APP_ORIGIN}/api/agent-summaries`);
-    expect(resp.status()).toBe(200);
-  });
+    await check('E3', async () => {
+      const resp = await page.request.get(`${APP_ORIGIN}/api/agent-summaries`);
+      expect(resp.status()).toBe(200);
+    });
 
-  await check('F1', async () => {
-    const resp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`);
-    const json = await resp.json().catch(() => ({}));
-    expect(json.endpoints?.some((e:any)=>e.label==='140')).toBe(true);
-  });
+    await check('F1', async () => {
+      const resp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`);
+      const json = await resp.json().catch(() => ({}));
+      expect(json.endpoints?.some((e:any)=>e.label==='140')).toBe(true);
+    });
 
-  await check('F2', async () => {
-    // Literal fixture check for endpoint config
-    const resp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints/default`);
-    expect(resp.status()).toBe(200);
-  });
+    await check('F2', async () => {
+      // Literal fixture check for endpoint config
+      const resp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints/default`);
+      expect(resp.status()).toBe(200);
+    });
 
-  await check('F3', async () => {
-    await page.goto(`${APP_ORIGIN}/index.html#/settings/summary`, { waitUntil: 'domcontentloaded' });
-    const settings = page.locator('[data-testid="summary-endpoint-settings"]');
-    await expect(settings).toBeVisible();
-  });
+    await check('F3', async () => {
+      await page.goto(`${APP_ORIGIN}/index.html#/settings/summary`, { waitUntil: 'domcontentloaded' });
+      const settings = page.locator('[data-testid="summary-endpoint-settings"]');
+      await expect(settings).toBeVisible();
+    });
+  } catch (error) {
+    const isNamedAssertion = error instanceof Error && error.message.startsWith('FENCE_ASSERT:');
+    if (!isNamedAssertion) throw error;
+  } finally {
+    fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
+  }
 
-  fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
+  expect(failed, `FENCE failures: ${JSON.stringify(failed)}`).toEqual([]);
 });

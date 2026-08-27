@@ -88,12 +88,22 @@ if (harnessSmoke) {
 
 if (gate) {
   const testPath = fence.test_path;
-  const posCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId });
+  const posReportPath = path.resolve(process.cwd(), '.fence-gate-pos.json');
+  const negReportPath = path.resolve(process.cwd(), '.fence-gate-neg.json');
+  try { fs.unlinkSync(posReportPath); } catch {}
+  try { fs.unlinkSync(negReportPath); } catch {}
+  const posCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId, FENCE_REPORT_PATH: posReportPath });
   const negStub = fence.negative_control_cmd.match(/FENCE_STUB=(\S+)/)?.[1] || '';
-  const negCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId, FENCE_STUB: negStub });
+  const negCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId, FENCE_STUB: negStub, FENCE_REPORT_PATH: negReportPath });
+  const posReport = readReport(posReportPath);
+  const negReport = readReport(negReportPath);
   const passed = posCode === 0;
-  const failedNeg = negCode !== 0;
-  writeReport(fence.acceptance_ids, passed ? fence.acceptance_ids : [], failedNeg ? [{ id: fence.expected_negative_fail_ids[0], kind: fence.expected_negative_kind }] : []);
+  const expectedNegIds = fence.expected_negative_fail_ids || [];
+  const expectedKind = fence.expected_negative_kind || 'assert';
+  const negFails = (negReport?.failed || []).filter(f => expectedNegIds.includes(f.id) && f.kind === expectedKind);
+  const failedNeg = negCode !== 0 && negFails.length === expectedNegIds.length;
+  const negFailedIds = negFails.map(f => ({ id: f.id, kind: f.kind }));
+  writeReport(fence.acceptance_ids, passed ? fence.acceptance_ids : [], failedNeg ? negFailedIds : []);
   console.log(verdictLine());
   process.exit(passed && failedNeg ? 0 : 1);
 }

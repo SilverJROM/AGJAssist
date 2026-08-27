@@ -40,6 +40,42 @@ const FENCE_STUB_HANDLERS = {
     }
     return false;
   },
+  C3: (req, res) => {
+    const pathname = (req.url || '').split('?')[0];
+    if (pathname === '/api/agent-reminders/active') {
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ stubbed: true, contributor: 'C3' }));
+      return true;
+    }
+    return false;
+  },
+  D3: (req, res) => {
+    const pathname = (req.url || '').split('?')[0];
+    if (pathname === '/api/summary-endpoints') {
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ stubbed: true, contributor: 'D3' }));
+      return true;
+    }
+    return false;
+  },
+  E2: (req, res) => {
+    const pathname = (req.url || '').split('?')[0];
+    if (pathname === '/api/agent-wakeups/fire') {
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ stubbed: true, contributor: 'E2' }));
+      return true;
+    }
+    return false;
+  },
+  F1: (req, res) => {
+    const pathname = (req.url || '').split('?')[0];
+    if (pathname === '/api/agent-group-switcher') {
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ stubbed: true, contributor: 'F1' }));
+      return true;
+    }
+    return false;
+  },
 };
 
 function startStubProxy(stub) {
@@ -79,6 +115,7 @@ function startStubProxy(stub) {
 if (serve) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-'));
   const tmpDb = ensureTmpDb(tmpDir);
+  const startSize = fs.statSync(tmpDb).size;
   const stub = process.env.FENCE_STUB || '';
   const port = stub ? UPSTREAM_PORT : PUBLIC_PORT;
   const env = {
@@ -95,6 +132,7 @@ if (serve) {
   const proxy = stub ? startStubProxy(stub) : null;
   const cleanup = () => {
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    console.log(`reclaimed_bytes=${startSize}`);
     if (proxy) proxy.close();
     server.kill();
   };

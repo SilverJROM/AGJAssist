@@ -20,41 +20,48 @@ test('command-center reminders fence journey', async ({ page }) => {
     }
   };
 
-  await page.goto(`${APP_ORIGIN}/index.html`, { waitUntil: 'domcontentloaded' });
+  try {
+    await page.goto(`${APP_ORIGIN}/index.html`, { waitUntil: 'domcontentloaded' });
 
-  await check('C1', async () => {
-    const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/schema`);
-    expect(resp.status()).toBe(200);
-  });
+    await check('C1', async () => {
+      const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/schema`);
+      expect(resp.status()).toBe(200);
+    });
 
-  await check('C2', async () => {
-    const resp = await page.request.post(`${APP_ORIGIN}/api/agent-reminders`, { data: { cadence: '30m' } });
-    expect(resp.status()).toBe(201);
-  });
+    await check('C2', async () => {
+      const resp = await page.request.post(`${APP_ORIGIN}/api/agent-reminders`, { data: { cadence: '30m' } });
+      expect(resp.status()).toBe(201);
+    });
 
-  await check('C3', async () => {
-    // Literal fixture: expect fireDue to process only included agents
-    const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/due`);
-    const json = await resp.json().catch(() => ({}));
-    expect(Array.isArray(json.due)).toBe(true);
-  });
+    await check('C3', async () => {
+      // Literal fixture: expect fireDue to process only included agents
+      const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/due`);
+      const json = await resp.json().catch(() => ({}));
+      expect(Array.isArray(json.due)).toBe(true);
+    });
 
-  await check('C4', async () => {
-    await page.goto(`${APP_ORIGIN}/index.html#/agents`, { waitUntil: 'domcontentloaded' });
-    const sheet = page.locator('[data-testid="agent-reminder-sheet"]');
-    await expect(sheet).toBeVisible();
-  });
+    await check('C4', async () => {
+      await page.goto(`${APP_ORIGIN}/index.html#/agents`, { waitUntil: 'domcontentloaded' });
+      const sheet = page.locator('[data-testid="agent-reminder-sheet"]');
+      await expect(sheet).toBeVisible();
+    });
 
-  await check('C5', async () => {
-    const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/active`);
-    expect(resp.status()).toBe(200);
-  });
+    await check('C5', async () => {
+      const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/active`);
+      expect(resp.status()).toBe(200);
+    });
 
-  await check('C6', async () => {
-    // Integration check: reminders fire into temp tmux pane
-    const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/fired`);
-    expect(resp.status()).toBe(200);
-  });
+    await check('C6', async () => {
+      // Integration check: reminders fire into temp tmux pane
+      const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/fired`);
+      expect(resp.status()).toBe(200);
+    });
+  } catch (error) {
+    const isNamedAssertion = error instanceof Error && error.message.startsWith('FENCE_ASSERT:');
+    if (!isNamedAssertion) throw error;
+  } finally {
+    fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
+  }
 
-  fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
+  expect(failed, `FENCE failures: ${JSON.stringify(failed)}`).toEqual([]);
 });

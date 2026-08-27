@@ -20,63 +20,70 @@ test('command-center window fence journey', async ({ page }) => {
     }
   };
 
-  await page.goto(`${APP_ORIGIN}/index.html#/agents`, { waitUntil: 'domcontentloaded' });
+  try {
+    await page.goto(`${APP_ORIGIN}/index.html#/agents`, { waitUntil: 'domcontentloaded' });
 
-  await check('G1', async () => {
-    const draft = page.locator('[data-testid="terminal-draft"]');
-    await expect(draft).toBeVisible();
-  });
+    await check('G1', async () => {
+      const draft = page.locator('[data-testid="terminal-draft"]');
+      await expect(draft).toBeVisible();
+    });
 
-  await check('G2', async () => {
-    const switcher = page.locator('[data-testid="agent-group-switcher"]');
-    await expect(switcher).toBeVisible();
-  });
+    await check('G2', async () => {
+      const switcher = page.locator('[data-testid="agent-group-switcher"]');
+      await expect(switcher).toBeVisible();
+    });
 
-  await check('G3', async () => {
-    const refresh = page.locator('[data-testid="refresh-from-session"]');
-    await expect(refresh).toBeVisible();
-  });
+    await check('G3', async () => {
+      const refresh = page.locator('[data-testid="refresh-from-session"]');
+      await expect(refresh).toBeVisible();
+    });
 
-  await check('H1', async () => {
-    const header = page.locator('[data-testid="terminal-header-v2"]');
-    await expect(header).toBeVisible();
-  });
+    await check('H1', async () => {
+      const header = page.locator('[data-testid="terminal-header-v2"]');
+      await expect(header).toBeVisible();
+    });
 
-  await check('H2', async () => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    const collapsed = await page.locator('[data-testid="command-center-header"]').evaluate(el => getComputedStyle(el).height);
-    expect(collapsed).toBeDefined();
-  });
+    await check('H2', async () => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      const collapsed = await page.locator('[data-testid="command-center-header"]').evaluate(el => getComputedStyle(el).height);
+      expect(collapsed).toBeDefined();
+    });
 
-  await check('H3', async () => {
-    const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-    expect(theme).toBeTruthy();
-  });
+    await check('H3', async () => {
+      const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+      expect(theme).toBeTruthy();
+    });
 
-  await check('I1', async () => {
-    const refreshBtn = page.locator('[data-testid="refresh-from-session"]');
-    await refreshBtn.click();
-    await expect(page.locator('[data-testid="terminal-turn-agent"]')).toBeVisible();
-  });
+    await check('I1', async () => {
+      const refreshBtn = page.locator('[data-testid="refresh-from-session"]');
+      await refreshBtn.click();
+      await expect(page.locator('[data-testid="terminal-turn-agent"]')).toBeVisible();
+    });
 
-  await check('I2', async () => {
-    const draftInput = page.locator('[data-testid="terminal-composer-input"]');
-    await draftInput.fill('test draft');
-    await page.reload();
-    await expect(draftInput).toHaveValue('test draft');
-  });
+    await check('I2', async () => {
+      const draftInput = page.locator('[data-testid="terminal-composer-input"]');
+      await draftInput.fill('test draft');
+      await page.reload();
+      await expect(draftInput).toHaveValue('test draft');
+    });
 
-  await check('J1', async () => {
-    await page.setViewportSize({ width: 1024, height: 800 });
-    const switcher = page.locator('[data-testid="agent-group-switcher"]');
-    await expect(switcher).toBeVisible();
-  });
+    await check('J1', async () => {
+      await page.setViewportSize({ width: 1024, height: 800 });
+      const switcher = page.locator('[data-testid="agent-group-switcher"]');
+      await expect(switcher).toBeVisible();
+    });
 
-  await check('J2', async () => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    const dropdown = page.locator('[data-testid="agent-group-switcher-dropdown"]');
-    await expect(dropdown).toBeVisible();
-  });
+    await check('J2', async () => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      const dropdown = page.locator('[data-testid="agent-group-switcher-dropdown"]');
+      await expect(dropdown).toBeVisible();
+    });
+  } catch (error) {
+    const isNamedAssertion = error instanceof Error && error.message.startsWith('FENCE_ASSERT:');
+    if (!isNamedAssertion) throw error;
+  } finally {
+    fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
+  }
 
-  fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
+  expect(failed, `FENCE failures: ${JSON.stringify(failed)}`).toEqual([]);
 });
