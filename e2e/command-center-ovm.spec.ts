@@ -13,14 +13,14 @@ test('B1 redirect overmind hashes to home', async ({ page }) => {
   const hashes = ['#/overmind', '#/overmind-projects', '#/conversations', '#/overmind-xyz'];
   for (const h of hashes) {
     await page.goto(`${BASE}/index.html${h}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(500);
-    const url = page.url();
-    expect(url).toBe(`${BASE}/index.html#/`);
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page).toHaveURL(`${BASE}/index.html#/`);
   }
 });
 
 test('B1 header and nav cleaned', async ({ page }) => {
   await page.goto(`${BASE}/index.html#/`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('nav.nav-links a').first()).toBeVisible({ timeout: 10000 });
   const texts = await page.locator('nav.nav-links a').allTextContents();
   expect(texts).not.toContain('Workflows');
   expect(texts).not.toContain('OVM Projects');
