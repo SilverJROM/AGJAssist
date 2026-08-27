@@ -62,6 +62,7 @@ import { McpBearerService } from "../mcp/mcp-bearer-service.js";
 import { McpRateLimiter } from "../mcp/mcp-rate-limit.js";
 import { registerMcpRoutes } from "./routes/mcp-routes.js";
 import { registerMcpManagementRoutes } from "./routes/mcp-management-routes.js";
+import { registerSummaryRoutes } from "./routes/summary-routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -197,6 +198,7 @@ export async function createApiServer(
   registerReminderRoutes(app, services.authService, services.reminderService);
   registerAgentRoutes(app, services.authService, services.agentAssignmentService, services.coordinatorLaunchService, services.tmuxService, services.projectService, services.safetyService);
   registerAgentReminderRoutes(app, services.authService, services.db);
+  registerSummaryRoutes(app, services.authService, services.db);
 
   if (services.agentEventsStreamManager) {
     registerAgentEventsRoutes(app, services.agentEventsStreamManager);
