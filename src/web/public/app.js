@@ -3714,9 +3714,14 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     setSnapshot(latest);
     setLastUpdatedAt(Date.now());
     setStatusLine(extractStatus(latest));
-    const seed = [];
-    const entriesNext = applyAgentPatch(seed, latest);
-    setEntries(entriesNext);
+    openAgentAfterYouRef.current = false;
+    sendBaselineRef.current = '';
+    setEntries(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      const lastUser = lastRoleIndex(list, 'user');
+      const kept = lastUser >= 0 ? list.slice(0, lastUser + 1) : [];
+      return applyAgentPatch(kept, latest);
+    });
   }
 
   // A note attached to a selection can only be delivered once the agent is idle

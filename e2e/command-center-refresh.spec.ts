@@ -36,6 +36,7 @@ test('command-center refresh control is always reachable and re-pulls output and
   let outputCallCount = 0;
   let pendingRefreshOutput = null;
   let searchRefreshOutputServed = false;
+  let nonRefreshOutput = 'initial output fixture';
   await page.route('**/api/tmux/panes/*/output*', async route => {
     outputCallCount++;
     const isExplicitRefresh = new URL(route.request().url()).searchParams.get('refresh') === '1';
@@ -43,7 +44,7 @@ test('command-center refresh control is always reachable and re-pulls output and
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ output: 'initial output fixture' })
+        body: JSON.stringify({ output: nonRefreshOutput })
       });
       return;
     }
@@ -69,7 +70,7 @@ test('command-center refresh control is always reachable and re-pulls output and
   });
 
   await page.route('**/api/tmux/panes/*/send*', async route => {
-    await route.fulfill({ status: 200, body: 'ok' });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
   });
 
   await page.goto('http://localhost:3210/index.html#/terminals', { waitUntil: 'domcontentloaded' });
@@ -147,4 +148,21 @@ test('command-center refresh control is always reachable and re-pulls output and
   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('search refresh output fixture', { timeout: 10000 });
   await expect(page.locator('[data-testid="terminal-conversation"]')).not.toContainText('initial output fixture');
   expect(searchRefreshOutputServed).toBe(true);
+
+  // History preservation: YOU turn must survive refresh
+  const sendBtn = page.locator('[data-testid="terminal-send-command"]');
+  await composer.fill('you-turn fixture');
+  await sendBtn.click();
+  await expect(page.locator('[data-testid="terminal-turn-user"]')).toHaveCount(1);
+  // Allow send to settle before refreshing
+  await page.waitForTimeout(3000);
+  pendingRefreshOutput = 'refreshed after you fixture';
+  await refreshBtn.click();
+  await expect(refreshStatus).toContainText('Updated', { timeout: 10000 });
+  await expect(page.locator('[data-testid="terminal-turn-user"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('you-turn fixture');
+
+  // Freeze prevention: background poll must still reach the transcript after refresh
+  nonRefreshOutput = 'refreshed after you fixture\npost refresh poll fixture';
+  await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('post refresh poll fixture', { timeout: 10000 });
 });
