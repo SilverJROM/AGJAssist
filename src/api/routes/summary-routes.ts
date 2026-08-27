@@ -88,16 +88,16 @@ export function registerSummaryRoutes(
     { preHandler: [authMiddleware, requireOwner] },
     async (request, reply) => {
       const id = Number(request.params.id);
-      const body = request.body;
-      if (body?.base_url) {
+      const body = request.body ?? {};
+      if (Object.prototype.hasOwnProperty.call(body, "base_url")) {
         if (typeof body.base_url !== "string" || !isOpenAICompatibleBaseUrl(body.base_url)) {
           return reply.code(400).send({ error: "base_url must be a valid http(s) URL ending with /v1" });
         }
       }
       const updated = endpointService.update(id, {
-        name: body?.name,
-        base_url: body?.base_url,
-        model: body?.model,
+        name: body.name,
+        base_url: Object.prototype.hasOwnProperty.call(body, "base_url") ? body.base_url : undefined,
+        model: body.model,
       });
       if (!updated) return reply.code(404).send({ error: "Endpoint not found" });
       return { endpoint: updated };

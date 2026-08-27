@@ -210,6 +210,33 @@ describe("summary-routes D4", () => {
     expect(patchRes.body).not.toContain("leakme");
   });
 
+  it("PATCH rejects empty base_url and preserves original", async () => {
+    const originalUrl = "http://original.example/v1";
+    const createRes = await app.inject({
+      method: "POST",
+      url: "/api/summary-endpoints",
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { name: "patch-empty", base_url: originalUrl, model: "m1" },
+    });
+    const created = JSON.parse(createRes.body).endpoint;
+    const patchRes = await app.inject({
+      method: "PATCH",
+      url: `/api/summary-endpoints/${created.id}`,
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { base_url: "" },
+    });
+    expect(patchRes.statusCode).toBe(400);
+    // Verify original base_url is preserved via GET
+    const getRes = await app.inject({
+      method: "GET",
+      url: `/api/summary-endpoints/${created.id}`,
+      headers: { authorization: `Bearer ${ownerToken}` },
+    });
+    expect(getRes.statusCode).toBe(200);
+    const body = JSON.parse(getRes.body);
+    expect(body.endpoint.base_url).toBe(originalUrl);
+  });
+
   it("POST /api/summary-endpoints/:id/default sets default", async () => {
     const createRes = await app.inject({
       method: "POST",
