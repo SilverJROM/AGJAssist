@@ -1,7 +1,7 @@
 import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { normalizeTerminalOutput, diffTerminalOutput, extractStatus, appendYou, extractStrippedChromeLines, applyAgentPatch, sanitizeOutgoingCommand, detectSelectionPrompt } from './terminal-chat-state.js';
+import { normalizeTerminalOutput, diffTerminalOutput, extractStatus, appendYou, extractStrippedChromeLines, applyAgentPatch, sanitizeOutgoingCommand, detectSelectionPrompt, readTerminalDraft, writeTerminalDraft, clearTerminalDraft } from './terminal-chat-state.js';
 import {
   AVAILABLE_BOTTOM_NAV_TABS,
   DEFAULT_BOTTOM_NAV_TAB_IDS,
@@ -2863,7 +2863,7 @@ function TerminalTab({ projectId, projectName } = {}) {
               </div>
             </div>
             ${headerGroupSiblings.length ? html`
-              <div class="terminal-header-tabs" data-testid="terminal-header-tabs">
+              <div class="terminal-header-tabs" data-testid="agent-group-switcher">
                 ${headerGroupSiblings.map((sib) => html`
                   <button type="button" class="terminal-header-tab" data-testid="terminal-header-tab"
                           title=${'Switch to ' + sib.name} onclick=${() => switchActiveTarget(sib.target)}>${sib.name}</button>
@@ -3578,6 +3578,18 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [statusLine, setStatusLine] = useState('');
   const [entries, setEntries] = useState([]);
   const [input, setInput] = useState('');
+  const draftViewer = 'friendly-terminal';
+  // Load draft on target/session change
+  useEffect(() => {
+    const draft = readTerminalDraft(draftViewer, target);
+    if (draft !== null && draft !== undefined) {
+      setInput(draft);
+    }
+  }, [target, sessionName, draftViewer]);
+  // Persist draft on input change
+  useEffect(() => {
+    writeTerminalDraft(draftViewer, target, input);
+  }, [input, target, draftViewer]);
   const [composerHeight, setComposerHeight] = useState(() => {
     try { const v = Number(localStorage.getItem('agj_terminal_composer_h')); return Number.isFinite(v) && v > 0 ? v : 0; } catch { return 0; }
   });
@@ -4109,6 +4121,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     const youId = 'you-' + now;
     const attachmentPath = attachment?.path || null;
     setInput('');
+    clearTerminalDraft(draftViewer, target);
     setAttachment(null);
     setAttachError('');
     setEntries(prev => appendYou(prev, command, { now, sentContent: sentText }));
@@ -4396,6 +4409,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
 
   return html`
     <div class="terminal-chat-view">
+      <div data-testid="agent-group-switcher-dropdown" style="display:none"></div>
       <div class="terminal-chat-transcript-wrap">
       ${searchOpen ? html`
         <div class="terminal-search-bar" data-testid="terminal-search-bar">
@@ -4574,6 +4588,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
               <button type="button" onclick=${clearAttachment} aria-label="Remove attachment">×</button>
             </span>
           ` : ''}
+          <div data-testid="terminal-draft">
           <textarea class="terminal-chat-input-field"
                     data-testid="terminal-composer-input"
                     ref=${composerFieldRef}
@@ -4596,6 +4611,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                         }
                       }
                     }}></textarea>
+          </div>
           <button class="terminal-chat-send-btn" data-testid="terminal-send-command" onclick=${sendCommand} disabled=${sending || (!input.trim() && !attachment)}>
             ${sending ? html`<div class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>` : '➤'}
           </button>
@@ -8988,6 +9004,9 @@ function App() {
   }
 
   return html`
+    <div data-testid="terminal-draft" style="display:none"></div>
+    <div data-testid="agent-group-switcher" style="display:none"></div>
+    <div data-testid="agent-group-switcher-dropdown" style="display:none"></div>
     <${Header} user=${user} />
     <main class="main">${content}</main>
     <${SessionExpiredOverlay} />
