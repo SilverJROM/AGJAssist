@@ -38,10 +38,6 @@ import { registerReminderRoutes } from "./routes/reminder-routes.js";
 import { registerAgentRoutes } from "./routes/agent-routes.js";
 import { AgentAssignmentService } from "../services/agent-assignment-service.js";
 import { CoordinatorLaunchService } from "../services/coordinator-launch-service.js";
-import { OvermindService } from "../services/overmind-service.js";
-import { registerOvermindRoutes } from "./routes/overmind-routes.js";
-import type { OvermindNotify } from "../services/overmind-watcher.js";
-import { OvermindStreamManager } from "./websocket/overmind-stream-manager.js";
 import { AgentEventsStreamManager } from "./websocket/agent-events-stream-manager.js";
 import { registerAgentEventsRoutes } from "./routes/agent-events-routes.js";
 import type { OvmSessionManager } from "../services/ovm-session.js";
@@ -86,9 +82,6 @@ export interface ApiServices {
   reminderService: ReminderService;
   agentAssignmentService: AgentAssignmentService;
   coordinatorLaunchService?: CoordinatorLaunchService;
-  overmindService: OvermindService;
-  overmindNotify?: OvermindNotify;
-  overmindStreamManager?: OvermindStreamManager;
   agentEventsStreamManager?: AgentEventsStreamManager;
   ovmSessionService?: OvmSessionManager;
   appSettingsService?: AppSettingsService;
@@ -200,17 +193,6 @@ export async function createApiServer(
   registerPersonalTaskRoutes(app, services.authService, services.personalTaskService);
   registerReminderRoutes(app, services.authService, services.reminderService);
   registerAgentRoutes(app, services.authService, services.agentAssignmentService, services.coordinatorLaunchService, services.tmuxService, services.projectService, services.safetyService);
-  registerOvermindRoutes(
-    app,
-    config,
-    services.authService,
-    services.overmindService,
-    services.overmindNotify,
-    services.overmindStreamManager,
-    services.ovmSessionService,
-    services.tmuxService,
-    services.nudgeStateService
-  );
 
   if (services.agentEventsStreamManager) {
     registerAgentEventsRoutes(app, services.agentEventsStreamManager);
