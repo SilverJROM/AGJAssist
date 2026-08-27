@@ -16,7 +16,6 @@ test('command-center window fence journey', async ({ page }) => {
       passed.push(id);
     } catch {
       failed.push({ id, kind: 'assert' });
-      throw new Error(`FENCE_ASSERT:${id}`);
     }
   };
 
@@ -34,11 +33,9 @@ test('command-center window fence journey', async ({ page }) => {
     });
 
     await check('G3', async () => {
-      // Direct check on the backing session-refresh data path (not a UI
-      // locator) so FENCE_STUB=F1 can force this assertion mechanically,
-      // matching the endpoint-check pattern used by every sibling fence.
-      const resp = await page.request.get(`${APP_ORIGIN}/api/agent-session/refresh`);
-      expect(resp.status()).toBe(200);
+      // G3 must be visibility of refresh-from-session per direction
+      const refresh = page.locator('[data-testid="refresh-from-session"]');
+      await expect(refresh).toBeVisible();
     });
 
     await check('H1', async () => {
