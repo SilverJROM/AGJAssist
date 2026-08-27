@@ -106,21 +106,21 @@ test('D5 edit endpoint sends PATCH with literal changes', async ({ page }) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user: { id: 1 } }) });
   });
   let patchBody = null;
-  await page.route('**/api/summary-endpoints', async route => {
+  let patched = false;
+  await page.route('**/api/summary-endpoints**', async route => {
     if (route.request().method() === 'PATCH') {
       patchBody = await route.request().postDataJSON();
+      patched = true;
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ endpoint: { id: 2 } }) });
     } else {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          endpoints: [
-            { id: 1, name: '140', base_url: 'http://192.168.254.140:1234/v1', model: 'llama3', is_default: true },
-            { id: 2, name: 'test-ep', base_url: 'https://api.test/v1', model: 'gpt-4', is_default: false }
-          ]
-        })
-      });
+      const endpoints = patched ? [
+        { id: 1, name: '140', base_url: 'http://192.168.254.140:1234/v1', model: 'llama3', is_default: true },
+        { id: 2, name: 'test-ep-edited', base_url: 'https://api.edited/v1', model: 'gpt-4-edited', is_default: false }
+      ] : [
+        { id: 1, name: '140', base_url: 'http://192.168.254.140:1234/v1', model: 'llama3', is_default: true },
+        { id: 2, name: 'test-ep', base_url: 'https://api.test/v1', model: 'gpt-4', is_default: false }
+      ];
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ endpoints }) });
     }
   });
   await page.route('**/api/tmux/sessions', async route => {
@@ -139,36 +139,36 @@ test('D5 edit endpoint sends PATCH with literal changes', async ({ page }) => {
   await page.locator('[data-testid="endpoint-name-input"]').fill('test-ep-edited');
   await page.locator('[data-testid="endpoint-baseurl-input"]').fill('https://api.edited/v1');
   await page.locator('[data-testid="endpoint-model-input"]').fill('gpt-4-edited');
-  let patchRequest = null;
   await Promise.all([
-    page.waitForRequest(req => {
-      if (req.url().includes('/api/summary-endpoints/') && req.method() === 'PATCH') {
-        patchRequest = req;
-        return true;
-      }
-      return false;
-    }),
+    page.waitForRequest(req => req.url().includes('/api/summary-endpoints/') && req.method() === 'PATCH'),
     page.locator('[data-testid="endpoint-save"]').click()
   ]);
   await page.waitForTimeout(500);
 
-  expect(patchRequest).not.toBeNull();
+  expect(patchBody).not.toBeNull();
+  expect(patchBody.name).toBe('test-ep-edited');
+  expect(patchBody.base_url).toBe('https://api.edited/v1');
+  expect(patchBody.model).toBe('gpt-4-edited');
+  await expect(page.locator('[data-testid="endpoint-row"]').nth(1)).toContainText('test-ep-edited');
 });
 
 test('D5 delete endpoint removes row after GET', async ({ page }) => {
   await page.route('**/api/auth/me', async route => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user: { id: 1 } }) });
   });
-  let deleteRequest = null;
-  await page.route('**/api/summary-endpoints*', async route => {
+  let deleted = false;
+  await page.route('**/api/summary-endpoints**', async route => {
     if (route.request().method() === 'DELETE') {
-      deleteRequest = route.request();
+      deleted = true;
       await route.fulfill({ status: 204 });
     } else {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ endpoints: [
+      const endpoints = deleted ? [
+        { id: 1, name: '140', base_url: 'http://192.168.254.140:1234/v1', model: 'llama3', is_default: true }
+      ] : [
         { id: 1, name: '140', base_url: 'http://192.168.254.140:1234/v1', model: 'llama3', is_default: true },
         { id: 2, name: 'test-ep', base_url: 'https://api.test/v1', model: 'gpt-4', is_default: false }
-      ] }) });
+      ];
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ endpoints }) });
     }
   });
   await page.route('**/api/tmux/sessions', async route => {
@@ -188,8 +188,8 @@ test('D5 delete endpoint removes row after GET', async ({ page }) => {
     page.waitForRequest(req => req.url().includes('/api/summary-endpoints/') && req.method() === 'DELETE'),
     page.locator('[data-testid="endpoint-delete"]').nth(1).click()
   ]);
-  // UI update verified via request; row count check is flaky in test env
-  // deleteRequest verification removed in favor of waitForRequest
+  await expect(page.locator('[data-testid="endpoint-row"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="summary-endpoint-sheet"]')).not.toContainText('test-ep');
 });
 
 test('D5 default radio selection posts default and updates checked', async ({ page }) => {
@@ -197,7 +197,7 @@ test('D5 default radio selection posts default and updates checked', async ({ pa
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user: { id: 1 } }) });
   });
   let defaultedId = null;
-  await page.route('**/api/summary-endpoints', async route => {
+  await page.route('**/api/summary-endpoints**', async route => {
     if (route.request().url().includes('/default') && route.request().method() === 'POST') {
       const url = new URL(route.request().url());
       defaultedId = url.pathname.split('/').slice(-2, -1)[0];
@@ -226,8 +226,13 @@ test('D5 default radio selection posts default and updates checked', async ({ pa
   await expect(page.locator('[data-testid="summary-endpoint-sheet"]')).toBeVisible();
   const radios = page.locator('[data-testid="endpoint-default-radio"]');
   await expect(radios.nth(0)).toBeChecked();
-  await radios.nth(1).click();
+  await Promise.all([
+    page.waitForRequest(req => req.url().endsWith('/api/summary-endpoints/2/default') && req.method() === 'POST'),
+    radios.nth(1).click()
+  ]);
+  expect(defaultedId).toBe('2');
   await expect(radios.nth(1)).toBeChecked();
+  await expect(radios.nth(0)).not.toBeChecked();
 });
 
 test('D5 owner error is surfaced on 403', async ({ page }) => {
