@@ -120,6 +120,21 @@ describe("AgentWakeupService", () => {
     expect(logs.length).toBeGreaterThan(0);
   });
 
+  it("fire respects tmux blocked result", async () => {
+    vi.spyOn(tmux, "sendCommand").mockResolvedValue({ message: "blocked by safety", blocked: true });
+    const w = service.create({ paneTarget: "sess:0.0", manualFireTime: past, action: "echo hi" });
+    const ok = await service.fire(w.id);
+    expect(ok).toBe(false);
+    const fetched = service.getById(w.id);
+    expect(fetched!.status).toBe("cancelled");
+    const firedLogs = audit.query({ actionType: "agent_wakeup_fired" });
+    const firedForId = firedLogs.filter(l => l.resource_id === String(w.id));
+    expect(firedForId.length).toBe(0);
+    const blockedLogs = audit.query({ actionType: "agent_wakeup_blocked" });
+    const blockedForId = blockedLogs.filter(l => l.resource_id === String(w.id));
+    expect(blockedForId.length).toBeGreaterThan(0);
+  });
+
   it("fireDue processes all due pending wakeups", async () => {
     const w1 = service.create({ paneTarget: "sess:0.0", manualFireTime: past, action: "echo 1" });
     const w2 = service.create({ paneTarget: "sess:0.0", manualFireTime: past, action: "echo 2" });

@@ -95,7 +95,18 @@ export class AgentWakeupService {
     // Send via tmux
     if (this.tmuxService) {
       try {
-        await this.tmuxService.sendCommand(row.pane_target, row.action, true, false);
+        const result = await this.tmuxService.sendCommand(row.pane_target, row.action, true, false);
+        if (result.blocked) {
+          this.auditService?.log({
+            actionType: "agent_wakeup_blocked",
+            resourceType: "agent_one_time_wakeup",
+            resourceId: String(id),
+            details: { paneTarget: row.pane_target, action: row.action, tmuxMessage: result.message },
+            tmuxTarget: row.pane_target,
+          });
+          this.db.prepare("UPDATE agent_one_time_wakeups SET status = 'cancelled', updated_at = ? WHERE id = ?").run(nowIso, id);
+          return false;
+        }
       } catch (err) {
         this.auditService?.log({
           actionType: "agent_wakeup_send_failed",
