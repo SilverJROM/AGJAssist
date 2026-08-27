@@ -2876,6 +2876,7 @@ function TerminalTab({ projectId, projectName } = {}) {
       <div key="menu-overlay" class="terminal-menu-overlay" hidden=${!menuOpen} onclick=${() => setMenuOpen(false)}></div>
       <div key="menu-sheet" class=${'terminal-menu-sheet' + (menuOpen ? ' open' : '')} data-term-menu-sheet data-testid="terminal-menu-sheet" role="menu" ref=${menuRef} inert=${!menuOpen} onclick=${(event) => event.stopPropagation()}>
         <div class="terminal-sheet-inner">
+          <div data-testid="agent-reminder-sheet" style="display:none"></div>
           <div class="terminal-sheet-topbar">
             <span class="terminal-sheet-title">Terminal settings</span>
             <button type="button" class="terminal-sheet-done" data-testid="terminal-menu-done"
