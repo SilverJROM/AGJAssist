@@ -3706,6 +3706,19 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     setStatusLine(extractStatus(latest));
   }
 
+  function processRefreshSnapshot(latest) {
+    if (!latest) return;
+    maybeFlushPendingNote(latest);
+    snapshotRef.current = latest;
+    previousSnapshotRef.current = latest;
+    setSnapshot(latest);
+    setLastUpdatedAt(Date.now());
+    setStatusLine(extractStatus(latest));
+    const seed = [];
+    const entriesNext = applyAgentPatch(seed, latest);
+    setEntries(entriesNext);
+  }
+
   // A note attached to a selection can only be delivered once the agent is idle
   // again (typing into a busy composer doesn't submit). Hold it until the prompt
   // is gone and the agent isn't generating — after we've seen it busy, or a
@@ -3751,7 +3764,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
 
   async function refreshOutput() {
     const data = await api(`/api/tmux/panes/${encodeURIComponent(target)}/output?lines=${getCaptureLines()}&refresh=1`);
-    processSnapshot(normalizeTerminalOutput(data.output));
+    processRefreshSnapshot(normalizeTerminalOutput(data.output));
   }
 
   async function handleRefresh() {

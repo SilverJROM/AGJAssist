@@ -39,7 +39,15 @@ test('command-center refresh control is always reachable and re-pulls output and
   await page.route('**/api/tmux/panes/*/output*', async route => {
     outputCallCount++;
     const isExplicitRefresh = new URL(route.request().url()).searchParams.get('refresh') === '1';
-    if (!isExplicitRefresh || !pendingRefreshOutput) {
+    if (!isExplicitRefresh) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ output: 'initial output fixture' })
+      });
+      return;
+    }
+    if (!pendingRefreshOutput) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -84,6 +92,9 @@ test('command-center refresh control is always reachable and re-pulls output and
 
   const refreshStatus = page.locator('[data-testid="terminal-refresh-status"]');
 
+  // Initial output fixture must be rendered
+  await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('initial output fixture', { timeout: 10000 });
+
   // The second literal output fixture belongs to the normal-topbar refresh.
   pendingRefreshOutput = 'refreshed output fixture';
 
@@ -109,6 +120,7 @@ test('command-center refresh control is always reachable and re-pulls output and
 
   // Verify UI reflects second fixtures: output appears in transcript
   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('refreshed output fixture', { timeout: 10000 });
+  await expect(page.locator('[data-testid="terminal-conversation"]')).not.toContainText('initial output fixture');
 
   // Search-open uses the same persistent refresh cluster, including live status.
   const searchToggle = page.locator('[data-testid="terminal-search-toggle"]');
@@ -131,5 +143,8 @@ test('command-center refresh control is always reachable and re-pulls output and
   await expect(refreshStatusInSearch).toContainText('Refreshing');
   await expect(refreshStatusInSearch).not.toContainText('Updated');
   await expect(refreshStatusInSearch).toContainText('Updated', { timeout: 10000 });
+  // Verify search-open refresh replaces transcript
+  await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('search refresh output fixture', { timeout: 10000 });
+  await expect(page.locator('[data-testid="terminal-conversation"]')).not.toContainText('initial output fixture');
   expect(searchRefreshOutputServed).toBe(true);
 });
