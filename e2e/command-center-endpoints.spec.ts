@@ -109,6 +109,7 @@ test('D5 edit endpoint sends PATCH with literal changes', async ({ page }) => {
   let patched = false;
   await page.route('**/api/summary-endpoints**', async route => {
     if (route.request().method() === 'PATCH') {
+      expect(new URL(route.request().url()).pathname).toBe('/api/summary-endpoints/2');
       patchBody = await route.request().postDataJSON();
       patched = true;
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ endpoint: { id: 2 } }) });
@@ -140,7 +141,7 @@ test('D5 edit endpoint sends PATCH with literal changes', async ({ page }) => {
   await page.locator('[data-testid="endpoint-baseurl-input"]').fill('https://api.edited/v1');
   await page.locator('[data-testid="endpoint-model-input"]').fill('gpt-4-edited');
   await Promise.all([
-    page.waitForRequest(req => req.url().includes('/api/summary-endpoints/') && req.method() === 'PATCH'),
+    page.waitForRequest(req => req.url().endsWith('/api/summary-endpoints/2') && req.method() === 'PATCH'),
     page.locator('[data-testid="endpoint-save"]').click()
   ]);
   await page.waitForTimeout(500);
@@ -159,6 +160,7 @@ test('D5 delete endpoint removes row after GET', async ({ page }) => {
   let deleted = false;
   await page.route('**/api/summary-endpoints**', async route => {
     if (route.request().method() === 'DELETE') {
+      expect(new URL(route.request().url()).pathname).toBe('/api/summary-endpoints/2');
       deleted = true;
       await route.fulfill({ status: 204 });
     } else {
@@ -185,7 +187,7 @@ test('D5 delete endpoint removes row after GET', async ({ page }) => {
   const rowsBefore = page.locator('[data-testid="endpoint-row"]');
   await expect(rowsBefore).toHaveCount(2);
   await Promise.all([
-    page.waitForRequest(req => req.url().includes('/api/summary-endpoints/') && req.method() === 'DELETE'),
+    page.waitForRequest(req => req.url().endsWith('/api/summary-endpoints/2') && req.method() === 'DELETE'),
     page.locator('[data-testid="endpoint-delete"]').nth(1).click()
   ]);
   await expect(page.locator('[data-testid="endpoint-row"]')).toHaveCount(1);
