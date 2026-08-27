@@ -165,4 +165,20 @@ test('command-center refresh control is always reachable and re-pulls output and
   // Freeze prevention: background poll must still reach the transcript after refresh
   nonRefreshOutput = 'refreshed after you fixture\npost refresh poll fixture';
   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('post refresh poll fixture', { timeout: 10000 });
+
+  // Freeze prevention: refresh clicked WHILE the send is still capturing.
+  // captureCommandResult runs ~3.4s, so 400ms after the click the send is still in flight
+  // and openAgentAfterYouRef is still set — this is the only window that exercises the reset.
+  nonRefreshOutput = 'initial output fixture';
+  await composer.fill('midsend fixture');
+  await sendBtn.click();
+  await expect(page.locator('[data-testid="terminal-turn-user"]')).toHaveCount(2);
+  await page.waitForTimeout(400);                       // NO settle wait — that is the point
+  pendingRefreshOutput = 'initial output fixture\nmidsend refresh body fixture';
+  await refreshBtn.click();
+  await expect(refreshStatus).toContainText('Updated', { timeout: 10000 });
+  await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('midsend refresh body fixture', { timeout: 10000 });
+  // The pane moves on; only the 1s background poll can deliver this literal.
+  nonRefreshOutput = 'initial output fixture\nmidsend refresh body fixture\nmidsend poll fixture';
+  await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('midsend poll fixture', { timeout: 10000 });
 });
