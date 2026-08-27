@@ -865,6 +865,12 @@ export class DatabaseService {
         this.db.exec("DROP TABLE IF EXISTS overmind_projects");
       }
 
+      // Migration: v37 → v38: agent solicit reminders schema
+      if (current && current.version < 38) {
+        // Tables agent_solicit_reminders and agent_solicit_recipients are created via SCHEMA_SQL
+        // after migrations; no data migration required for fresh-vs-upgrade parity.
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);

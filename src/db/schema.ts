@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 37;
+export const SCHEMA_VERSION = 38;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -442,6 +442,32 @@ CREATE TABLE IF NOT EXISTS mcp_authorization_codes (
 );
 CREATE INDEX IF NOT EXISTS idx_mcp_codes_grant ON mcp_authorization_codes(grant_id);
 CREATE INDEX IF NOT EXISTS idx_mcp_codes_expiry ON mcp_authorization_codes(expires_at);
+
+CREATE TABLE IF NOT EXISTS agent_solicit_reminders (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  folder_group TEXT NOT NULL,
+  cadence_minutes INTEGER NOT NULL CHECK(cadence_minutes > 0),
+  repeat_limit INTEGER,
+  repeat_count INTEGER NOT NULL DEFAULT 0,
+  next_fire TEXT,
+  solicit_message TEXT NOT NULL DEFAULT 'give me a status update',
+  active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_solicit_reminders_user_folder ON agent_solicit_reminders(user_id, folder_group);
+CREATE INDEX IF NOT EXISTS idx_agent_solicit_reminders_next_fire ON agent_solicit_reminders(next_fire);
+
+CREATE TABLE IF NOT EXISTS agent_solicit_recipients (
+  id INTEGER PRIMARY KEY,
+  reminder_id INTEGER NOT NULL REFERENCES agent_solicit_reminders(id) ON DELETE CASCADE,
+  agent_name TEXT NOT NULL,
+  include INTEGER NOT NULL DEFAULT 1 CHECK(include IN (0,1)),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_solicit_recipients_reminder ON agent_solicit_recipients(reminder_id);
+CREATE INDEX IF NOT EXISTS idx_agent_solicit_recipients_agent ON agent_solicit_recipients(agent_name);
 `;
 
 export const DEFAULT_SAFETY_PATTERNS = [
