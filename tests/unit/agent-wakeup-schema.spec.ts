@@ -102,4 +102,41 @@ describe("agent_one_time_wakeups schema E1", () => {
 
     db.close();
   });
+
+  it("agent_one_time_wakeups status enum discriminates pending default, cancelled, and rejects invalid", () => {
+    const dbPath = tempDb("status.sqlite");
+    const db = new DatabaseService(dbPath);
+
+    // default pending when status omitted
+    db.prepare(`
+      INSERT INTO agent_one_time_wakeups (pane_target, manual_fire_time, action)
+      VALUES (?, ?, ?)
+    `).run("pane-def", "2026-02-01 00:00:00", "do work");
+    const idDefault = db.prepare("SELECT last_insert_rowid() as id").get() as { id: number };
+    const rowDefault = db.prepare("SELECT status FROM agent_one_time_wakeups WHERE id = ?").get(idDefault.id) as { status: string };
+    expect(rowDefault.status).toBe("pending");
+
+    // cancelled value is accepted
+    db.prepare(`
+      INSERT INTO agent_one_time_wakeups (pane_target, manual_fire_time, action, status)
+      VALUES (?, ?, ?, ?)
+    `).run("pane-cancel", "2026-02-02 00:00:00", "do work", "cancelled");
+    const idCancelled = db.prepare("SELECT last_insert_rowid() as id").get() as { id: number };
+    const rowCancelled = db.prepare("SELECT status FROM agent_one_time_wakeups WHERE id = ?").get(idCancelled.id) as { status: string };
+    expect(rowCancelled.status).toBe("cancelled");
+
+    // invalid status must throw constraint error
+    let threw = false;
+    try {
+      db.prepare(`
+        INSERT INTO agent_one_time_wakeups (pane_target, manual_fire_time, action, status)
+        VALUES (?, ?, ?, ?)
+      `).run("pane-bad", "2026-02-03 00:00:00", "do work", "bogus");
+    } catch (e) {
+      threw = true;
+    }
+    expect(threw).toBe(true);
+
+    db.close();
+  });
 });
