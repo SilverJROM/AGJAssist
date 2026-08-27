@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 38;
+export const SCHEMA_VERSION = 39;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -468,6 +468,31 @@ CREATE TABLE IF NOT EXISTS agent_solicit_recipients (
 );
 CREATE INDEX IF NOT EXISTS idx_agent_solicit_recipients_reminder ON agent_solicit_recipients(reminder_id);
 CREATE INDEX IF NOT EXISTS idx_agent_solicit_recipients_agent ON agent_solicit_recipients(agent_name);
+
+CREATE TABLE IF NOT EXISTS summary_llm_endpoints (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  base_url TEXT NOT NULL,
+  model TEXT NOT NULL,
+  is_default INTEGER NOT NULL DEFAULT 0 CHECK(is_default IN (0,1)),
+  provenance TEXT NOT NULL DEFAULT 'user',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_summary_llm_endpoints_default ON summary_llm_endpoints(is_default);
+
+CREATE TABLE IF NOT EXISTS agent_summaries (
+  id INTEGER PRIMARY KEY,
+  agent_name TEXT NOT NULL,
+  endpoint_id INTEGER NOT NULL REFERENCES summary_llm_endpoints(id),
+  summary_text TEXT NOT NULL,
+  provenance TEXT NOT NULL DEFAULT 'system',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_summaries_agent ON agent_summaries(agent_name);
+CREATE INDEX IF NOT EXISTS idx_agent_summaries_endpoint ON agent_summaries(endpoint_id);
+CREATE INDEX IF NOT EXISTS idx_agent_summaries_created ON agent_summaries(created_at);
 `;
 
 export const DEFAULT_SAFETY_PATTERNS = [
