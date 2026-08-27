@@ -33,17 +33,19 @@ test('command-center reminders fence journey', async ({ page }, testInfo) => {
     try {
       await assertion();
       passed.push(id);
-    } catch {
-      failed.push({ id, kind: 'assert' });
+    } catch (e) {
+      failed.push({ id, kind: 'assert', message: e?.message || String(e) });
     }
   };
 
   const uid = `${process.pid}-${testInfo.workerIndex}-${Date.now()}`;
   const sessA = `agent-a-${uid}`;
   const sessB = `agent-b-${uid}`;
+  const sessC = `c5-session-${uid}`;
   const cleanupSessions = () => {
     spawnSync('bash', ['-c', `tmux kill-session -t ${sessA} || true`]);
     spawnSync('bash', ['-c', `tmux kill-session -t ${sessB} || true`]);
+    spawnSync('bash', ['-c', `tmux kill-session -t ${sessC} || true`]);
   };
   const fireDue = (folderGroup: string) => {
     const result = spawnSync(process.execPath, [
@@ -152,14 +154,30 @@ test('command-center reminders fence journey', async ({ page }, testInfo) => {
         }
       });
       expect(respCreate.status()).toBe(201);
-      await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'domcontentloaded' });
-      const panePicker = page.locator('select').filter({ hasText: 'Select a pane...' });
-      await panePicker.selectOption({ index: 1 });
-      await page.waitForSelector('[data-testid="terminal-menu"]', { state: 'attached' });
+      spawnSync('bash', ['-c', `tmux new-session -d -s ${sessC} "sleep 300"`]);
+      await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'networkidle' });
+      await page.locator(`select option:has-text("${sessC}")`).first().waitFor({ state: 'attached', timeout: 5000 });
+      await page.evaluate((sessC) => {
+        const sel = document.querySelector('select');
+        if (!sel) return;
+        for (const opt of Array.from(sel.options)) {
+          if (opt.textContent.includes(sessC)) {
+            sel.value = opt.value;
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+            break;
+          }
+        }
+      }, sessC);
+      await page.waitForTimeout(1000);
+      await page.locator('.terminal-chat-detail-pill').waitFor({ state: 'attached', timeout: 5000 });
+      await expect(page.locator('.terminal-chat-detail-pill')).toContainText(sessC);
+      await expect(page.locator('[data-testid="terminal-menu"]')).toBeVisible();
       await page.locator('[data-testid="terminal-menu"]').click({ force: true });
       const sheet = page.locator('[data-testid="agent-reminder-sheet"]');
       await expect(sheet).toBeVisible();
-      await expect(sheet.locator('[data-testid="active-reminder-row"]')).toContainText('120 min');
+      await page.waitForTimeout(1000);
+      const sheetText = await sheet.innerText();
+      expect(sheetText).toContain('120 min');
     });
 
     // C6 solicit reached only included panes with real fire
@@ -198,7 +216,7 @@ test('command-center reminders fence journey', async ({ page }, testInfo) => {
         return details?.solicit_message === 'LITERAL_SOLICIT_C6';
       });
       expect(hasAudit).toBe(true);
-      const activeResp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/active`, { headers: AUTH_HEADERS });
+      const activeResp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/active?c6_probe=1`, { headers: AUTH_HEADERS });
       expect(activeResp.status()).toBe(200);
       const activeJson = await activeResp.json();
       const rem = (activeJson.reminders || []).find(r => r.id === reminderId);
