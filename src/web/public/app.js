@@ -2265,6 +2265,13 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [convFontSize, setConvFontSize] = useState(() => applyTerminalConvFontSize(readTerminalConvFontSize()));
   const [replyLimit, setReplyLimit] = useState(() => readTerminalReplyLimit());
   const [showRawChrome, setShowRawChrome] = useState(false);
+  const [agentReminders, setAgentReminders] = useState([]);
+  const [cadenceMinutes, setCadenceMinutes] = useState(15);
+  const [cadenceCustom, setCadenceCustom] = useState('');
+  const [repeatMode, setRepeatMode] = useState('unlimited');
+  const [repeatLimit, setRepeatLimit] = useState('');
+  const [includeRecipients, setIncludeRecipients] = useState(true);
+  const [skipRecipients, setSkipRecipients] = useState(false);
   const menuRef = useRef(null);
   const sectionNavRef = useRef(null);
   const terminalGroupsRef = useRef(terminalGroups);
@@ -2351,6 +2358,37 @@ function TerminalTab({ projectId, projectName } = {}) {
       window.removeEventListener('pointerdown', onOutsideClick);
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    api('/api/agent-reminders/active')
+      .then(data => {
+        setAgentReminders(Array.isArray(data?.reminders) ? data.reminders : []);
+      })
+      .catch(() => setAgentReminders([]));
+  }, [menuOpen]);
+
+  const handleSaveReminder = async () => {
+    const folderGroup = resolvedActiveGroupTab === 'all' ? null : (activeGroup?.id || resolvedActiveGroupTab);
+    const minutes = cadenceCustom ? Number(cadenceCustom) : cadenceMinutes;
+    const payload = {
+      folder_group: folderGroup,
+      cadence_minutes: minutes,
+      repeat_limit: repeatMode === 'unlimited' ? null : Number(repeatLimit) || 0,
+      recipients: {
+        include: includeRecipients,
+        skip: skipRecipients
+      }
+    };
+    try {
+      await api('/api/agent-reminders', { method: 'POST', body: JSON.stringify(payload) });
+      api('/api/agent-reminders/active')
+        .then(data => setAgentReminders(Array.isArray(data?.reminders) ? data.reminders : []))
+        .catch(() => {});
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   function cacheTerminalGroupsLocal(groups, active) {
     writeTerminalGroups(groups);
@@ -2876,7 +2914,48 @@ function TerminalTab({ projectId, projectName } = {}) {
       <div key="menu-overlay" class="terminal-menu-overlay" hidden=${!menuOpen} onclick=${() => setMenuOpen(false)}></div>
       <div key="menu-sheet" class=${'terminal-menu-sheet' + (menuOpen ? ' open' : '')} data-term-menu-sheet data-testid="terminal-menu-sheet" role="menu" ref=${menuRef} inert=${!menuOpen} onclick=${(event) => event.stopPropagation()}>
         <div class="terminal-sheet-inner">
-          <div data-testid="agent-reminder-sheet" style="display:none"></div>
+          <div data-testid="agent-reminder-sheet">
+            <div class="terminal-sheet-sect">Agent Reminders</div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Active reminders</div>
+              <div>
+                ${agentReminders.length === 0 ? html`<div>No active reminders</div>` : html`
+                  ${agentReminders.map(r => html`<div data-testid="active-reminder-row">${r.id || ''} ${r.cadence_minutes || ''} min</div>`)}
+                `}
+              </div>
+            </div>
+            <div class="terminal-sheet-sect">New reminder</div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Cadence</div>
+              <div class="terminal-seg">
+                <button type="button" data-testid="cadence-preset-15" onclick=${() => { setCadenceMinutes(15); setCadenceCustom(''); }}>15m</button>
+                <button type="button" data-testid="cadence-preset-30" onclick=${() => { setCadenceMinutes(30); setCadenceCustom(''); }}>30m</button>
+                <button type="button" data-testid="cadence-preset-60" onclick=${() => { setCadenceMinutes(60); setCadenceCustom(''); }}>60m</button>
+              </div>
+            </div>
+            <div class="terminal-sheet-row">
+              <input data-testid="cadence-custom-input" type="number" placeholder="Custom minutes" value=${cadenceCustom} oninput=${e => setCadenceCustom(e.target.value)} />
+            </div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Repeat limit</div>
+              <div class="terminal-seg">
+                <button type="button" data-testid="repeat-limit-mode-unlimited" class=${repeatMode==='unlimited'?'sel':''} onclick=${() => setRepeatMode('unlimited')}>Unlimited</button>
+                <button type="button" data-testid="repeat-limit-mode-stop" class=${repeatMode==='stop'?'sel':''} onclick=${() => setRepeatMode('stop')}>Stop after N</button>
+              </div>
+            </div>
+            ${repeatMode==='stop' ? html`
+              <div class="terminal-sheet-row">
+                <input data-testid="repeat-limit-input" type="number" value=${repeatLimit} oninput=${e => setRepeatLimit(e.target.value)} />
+              </div>
+            ` : ''}
+            <div class="terminal-sheet-row">
+              <label><input type="checkbox" data-testid="include-recipients-toggle" checked=${includeRecipients} onchange=${e => setIncludeRecipients(e.target.checked)} /> Include</label>
+              <label><input type="checkbox" data-testid="skip-recipients-toggle" checked=${skipRecipients} onchange=${e => setSkipRecipients(e.target.checked)} /> Skip</label>
+            </div>
+            <div class="terminal-sheet-row">
+              <button type="button" data-testid="agent-reminder-save" onclick=${handleSaveReminder}>Save</button>
+            </div>
+          </div>
           <div class="terminal-sheet-topbar">
             <span class="terminal-sheet-title">Terminal settings</span>
             <button type="button" class="terminal-sheet-done" data-testid="terminal-menu-done"
