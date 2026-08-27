@@ -1,0 +1,16 @@
+I'll start by reading the brief in full and grounding in the current agent-window shell so the mockup can be a complete, buildable contract.The brief is a build contract, so I’ll match the live header, tab strip, composer, and theme tokens next—then implement every required interaction on that shell.I’ll pull the remaining shell CSS and any north-star notes so the new surfaces sit in the existing language instead of inventing a second one.I have the live shell tokens and interactions. Next I’ll write a single self-contained HTML file that adds every v2 surface on top of that existing agent window.I’m writing the mockup as one self-contained file: existing agent-window chrome first, then the v2 controls on top of it.The scrubber was re-rendering mid-drag (which would drop the pointer), and the selection prompt was wired into the wrong place. I’m fixing those so the required interactions actually work.JS parses. I’ll smoke the mockup in a real browser next and click through the required controls in both themes.The smoke test showed the sheet overlay covering the rail, and the sticky mock bar eating clicks. I’ll lift the rail above the overlay and re-run the clicks.The header was sitting under the mock toolbar on short viewports. I’m unsticking that bar and tightening the layout so the tab strip and rail stay visible.The header is crushing the agent name at 390px. I’ll put the tab strip on its own row when expanded so the name, scrubber, and chips all stay readable.The mockup is at:
+
+`/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/grok46/agent-window-v2.html`
+
+It is a single self-contained HTML file on the existing agent-window shell (same tokens, bubbles, key row, composer, search, ME-nav, font, attach, gear). Light/Dark and 390/720 toggles sit above the phone.
+
+**v2 additions (all clickable):**
+- Group tabs include every agent; collapse/expand; drag the pill scrubber through all six
+- Folder reminders on `projcore` — This agent / Folder views, include/skip, 15/30/45/60/90 + custom, unlimited or stop-after-N
+- One-time wakeup with an amber `Wake 08:00` chip that clears on **Fire now**
+- Timestamped summaries dropdown (`Σ`)
+- Summary LLM named endpoints; default labelled **140**
+- Draft-kept pip + line (switch to `lkAsst-0`)
+
+Rationale (decisions, tradeoffs, flags for builders):  
+`/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/grok46/rationale.md`

@@ -1,0 +1,26 @@
+You are grok46, rebuilding the AGENT-WINDOW v2 mockup for AGJAssist. The owner picked sonnet5's design as the direction; your job is to take THAT mockup as the base and add a resize capability. Do NOT redesign it.
+
+STEP 1 — Read the CHOSEN base mockup IN FULL and preserve its design, components, behavior, copy, and its 3-state theme (Light / System / Dark):
+/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/sonnet5/agent-window-v2.html
+
+STEP 2 — Also read the brief so you keep every required element intact:
+/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockup-brief.md
+
+STEP 3 — THE ONE NEW THING: make the preview frame DRAG-RESIZABLE so the owner can feel the experience across device sizes.
+- Add a visible drag handle on the RIGHT EDGE of the app frame (and a bottom-right CORNER handle for width+height) that the owner can drag with mouse/touch to continuously resize the frame from 390px (phone) up through tablet (~768-834px) to desktop (1280px+). Height draggable too.
+- Show a live "WIDTHxHEIGHT px" readout that updates as they drag, and label the current band (Phone / Tablet / Desktop).
+- KEEP sonnet5's preset width buttons and ADD tablet + desktop presets, e.g. 390 / 768 / 1024 / 1440. Clicking a preset snaps the draggable frame to that size.
+- Keep the Light / System / Dark theme controls.
+
+STEP 4 — CRITICAL: the inner agent-window surface must HOLD UP at tablet/desktop widths — this is the whole point of the exercise. As the frame widens:
+- Keep chat bubbles / transcript at a READABLE measure (do not let text lines stretch across a full 1440px — cap the readable column and center or use the extra space sensibly).
+- Header, collapsible tabs + scrubber, the utility chip row, sheets, and composer must all stay well-composed and usable at tablet + desktop, not just stretched phone chrome.
+- If you must add responsive rules to the app surface to make wide look good, DO — but the phone (390px) experience must remain visually identical to sonnet5's. Note every responsive change you make.
+
+CONSTRAINTS: ONE self-contained HTML file, inline CSS/JS, static placeholder data, no backend, no external deps (Google Fonts allowed). Every interaction from sonnet5's mockup must still work (reminders folder+per-agent flags+cadence+repeat, one-time wakeup + clearing pending chip, summaries dropdown, named endpoints w/ default "140", collapse/expand tabs, draggable agent scrubber, draft-kept, key row, send modes, font, ME-nav, search, image attach).
+
+STEP 5 — Write:
+- /home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/agent-window-v2.html
+- /home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/rationale.md  (short: what you kept from sonnet5, the resize mechanism, and every responsive rule you added for tablet/desktop)
+
+When done, print the HTML file path.

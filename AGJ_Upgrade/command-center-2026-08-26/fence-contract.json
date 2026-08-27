@@ -1,0 +1,66 @@
+{
+  "contract_version": 1,
+  "fences": {
+    "B8": {
+      "integration_cmd": "FENCE_ID=B8 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+      "negative_control_cmd": "FENCE_STUB=B2 FENCE_ID=B8 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+      "gate_cmd": "FENCE_ID=B8 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate",
+      "acceptance_ids": ["A1", "A2", "A3", "A4", "A5", "B1", "B2"],
+      "expected_negative_fail_ids": ["A2"],
+      "expected_negative_kind": "assert",
+      "test_path": "e2e/command-center-ovm-fence.spec.ts",
+      "authored_by": "coplanner:sol+grok46; rev2-projcore",
+      "contributors": ["B1", "B2", "B3", "B4", "B5", "B6", "B7"],
+      "seed_slice": "A0"
+    },
+    "C6": {
+      "integration_cmd": "FENCE_ID=C6 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+      "negative_control_cmd": "FENCE_STUB=C3 FENCE_ID=C6 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+      "gate_cmd": "FENCE_ID=C6 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate",
+      "acceptance_ids": ["C1", "C2", "C3", "C4", "C5", "C6"],
+      "expected_negative_fail_ids": ["C5"],
+      "expected_negative_kind": "assert",
+      "test_path": "e2e/command-center-reminders-fence.spec.ts",
+      "authored_by": "coplanner:sol+grok46; rev2-projcore",
+      "contributors": ["C1", "C2", "C3", "C4", "C5"],
+      "seed_slice": "A0"
+    },
+    "D7": {
+      "integration_cmd": "FENCE_ID=D7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+      "negative_control_cmd": "FENCE_STUB=D3 FENCE_ID=D7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+      "gate_cmd": "FENCE_ID=D7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate",
+      "acceptance_ids": ["E1", "E2", "E3", "F1", "F2", "F3"],
+      "expected_negative_fail_ids": ["E1"],
+      "expected_negative_kind": "assert",
+      "test_path": "e2e/command-center-summaries-fence.spec.ts",
+      "authored_by": "coplanner:sol+grok46; rev2-projcore",
+      "contributors": ["D1", "D2", "D3", "D4", "D5", "D6"],
+      "seed_slice": "A0",
+      "arrival_fixture": "closed-C6-solicit-reply-on-temp-pane; no INSERT agent_summaries; no faked reply body"
+    },
+    "E5": {
+      "integration_cmd": "FENCE_ID=E5 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+      "negative_control_cmd": "FENCE_STUB=E2 FENCE_ID=E5 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+      "gate_cmd": "FENCE_ID=E5 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate",
+      "acceptance_ids": ["D1", "D2", "D3"],
+      "expected_negative_fail_ids": ["D3"],
+      "expected_negative_kind": "assert",
+      "test_path": "e2e/command-center-wakeup-fence.spec.ts",
+      "authored_by": "coplanner:sol+grok46; rev2-projcore",
+      "contributors": ["E1", "E2", "E3", "E4"],
+      "seed_slice": "A0"
+    },
+    "F7": {
+      "integration_cmd": "FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+      "negative_control_cmd": "FENCE_STUB=F1 FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+      "gate_cmd": "FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate",
+      "acceptance_ids": ["G1", "G2", "G3", "H1", "H2", "H3", "I1", "I2", "J1", "J2"],
+      "expected_negative_fail_ids": ["G3"],
+      "expected_negative_kind": "assert",
+      "test_path": "e2e/command-center-window-fence.spec.ts",
+      "authored_by": "coplanner:sol+grok46; rev2-projcore",
+      "contributors": ["F1", "F2", "F3", "F4", "F5", "F6"],
+      "seed_slice": "A0"
+    }
+  }
+}

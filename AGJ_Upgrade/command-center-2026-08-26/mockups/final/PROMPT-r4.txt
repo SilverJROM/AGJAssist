@@ -1,0 +1,21 @@
+You are grok46 making ONE surgical, incremental change to the EXISTING agent-window v2 final mockup. Do NOT redesign or regress anything. Edit IN PLACE — do not rewrite from scratch.
+
+READ (the file you will MODIFY IN PLACE):
+/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/agent-window-v2.html
+
+OWNER REQUEST (verbatim): "the chat does not auto-update on the sessions details text when i sometimes go talk to the agent directly on the session it does not carry over to the change, can we also have on the chat a refresh button to basically repull all the details from the session into the chat?"
+
+CONTEXT: in the real app, the chat view can DRIFT from the live tmux session — if the user interacts with the agent directly on the session (outside the mini-app), the chat's transcript AND the session detail/status text do not update. The fix is a manual REFRESH that re-pulls the whole session state into the chat.
+
+Do this, and only this:
+1) Add a REFRESH control (a ↻ / circular-arrow icon button) reachable from the CHAT AREA — place it so it stays visible regardless of header collapse state (e.g. next to the existing search magnifier at the top-right of the transcript, or as a small pill in the transcript area). It must NOT clutter the single-row-collapsed header. Give it a clear title/aria-label like "Refresh from session".
+2) On tap (MOCK behavior, since there is no backend): simulate re-pulling the session — briefly show a spinning/refreshing state on the icon, then re-render the transcript and UPDATE the header detail/status text (the "zsh · updated ..." subtitle and the status dot) to reflect a fresh pull (e.g. set the "updated" time to now, and you may append or refresh the latest line to demonstrate that new activity from a direct session interaction is now reflected). Finish with a brief "Refreshed" toast. Keep it obviously a mock (no real network).
+3) Works across phone / tablet / desktop and light / dark; keyboard-focusable; respects the existing visual language.
+
+PRESERVE everything else exactly: drag-resize harness + tablet/desktop bands, 3-state theme, the one-row-collapsed header (tabs + util-icon + controls-tuck), the independent collapses and their defaults (tabs collapsed, reminders expanded), and every interaction (reminders/wakeup/summaries/endpoints/scrubber/draft-kept/keys/send modes/font/ME-nav/search/attach). The 390px phone must stay visually identical EXCEPT the added refresh control.
+
+Write back to the SAME path (overwrite):
+/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/agent-window-v2.html
+Append a short note to:
+/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/rationale.md
+When done, print the file path.

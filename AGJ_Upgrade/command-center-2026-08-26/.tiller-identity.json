@@ -1,0 +1,9 @@
+{
+  "run_id": "command-center-2026-08-26",
+  "session": "x-01_projcore_grok46_agjassist",
+  "minted_by": "tiller",
+  "source": "derived-from-run-dir",
+  "session_source": "launching-tmux-session",
+  "north_session": "agj-3767",
+  "north_session_source": "--north/TILLER_NORTH_SESSION"
+}

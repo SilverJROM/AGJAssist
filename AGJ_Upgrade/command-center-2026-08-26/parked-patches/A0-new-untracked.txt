@@ -1,0 +1,17 @@
+.fence-harness-smoke-neg.json
+.fence-harness-smoke-pos.json
+AGJ_Upgrade/command-center-2026-08-26/dispatch/north-status.md
+AGJ_Upgrade/command-center-2026-08-26/dispatch/plan-suspect/A0.json
+AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller-sessions.ledger
+AGJ_Upgrade/command-center-2026-08-26/findings/conductor-audit/0000.json
+AGJ_Upgrade/command-center-2026-08-26/findings/conductor-audit/0001.json
+AGJ_Upgrade/command-center-2026-08-26/findings/conductor-audit/0002.json
+AGJ_Upgrade/command-center-2026-08-26/prompts/drv-A0-impl-a1.md
+AGJ_Upgrade/command-center-2026-08-26/prompts/drv-A0-impl-a2.md
+AGJ_Upgrade/command-center-2026-08-26/prompts/drv-A0-impl-a3.md
+AGJ_Upgrade/command-center-2026-08-26/prompts/drv-A0-val-a1.md
+AGJ_Upgrade/command-center-2026-08-26/prompts/drv-A0-val-a2.md
+AGJ_Upgrade/command-center-2026-08-26/prompts/drv-A0-val-a3.md
+AGJ_Upgrade/command-center-2026-08-26/validation/A0-fix-a1.md
+AGJ_Upgrade/command-center-2026-08-26/validation/A0-fix-a2.md
+AGJ_Upgrade/command-center-2026-08-26/validation/A0-fix-a3.md

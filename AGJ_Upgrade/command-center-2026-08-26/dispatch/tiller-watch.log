@@ -1,0 +1,11 @@
+watch: status cadence = 30m
+watch: status cadence -> [tiller] STATUS 01:02 · command-center-2026-08-26 · NOMINAL
+watch: status cadence -> [tiller] STATUS 01:32 · command-center-2026-08-26 · NOMINAL
+watch: BACKSTOP — driver exited with 36 slice(s) still not DONE and no live driver (nag 1)
+watch: another watcher already owns this run — exiting
+watch: status cadence = 30m
+watch: status cadence -> [tiller] STATUS 01:51 · command-center-2026-08-26 · NOMINAL
+watch: status cadence -> [tiller] STATUS 02:21 · command-center-2026-08-26 · NOMINAL
+watch: status cadence = 30m
+watch: status cadence -> [tiller] STATUS 02:48 · command-center-2026-08-26 · NOMINAL
+watch: status cadence -> [tiller] STATUS 03:18 · command-center-2026-08-26 · NOMINAL

@@ -1,0 +1,9 @@
+I'll read the existing mockup and rationale first, then make a surgical in-place change so the group switcher is a dropdown under ~900px and the drag strip is restored above that.I'll search the mockup for the group switcher, drag scrubber, and resize-band logic so the change can sit on top of the current behavior.I'll check prior mockup rounds and the prompt so I can restore the scrubber the way it was meant to work, not invent a new one.I have the layout: dropdown below ~900px, strip plus a always-visible agent-scrubber at and above that. Next I’ll patch CSS, markup, and the switcher logic in place.Playwright is available. I'll run the three checks: dropdown at 390px, scrubber drag at 1280px, and a live swap as the frame crosses ~900px.All 24 checks passed. I'll look at the screenshots next to confirm the header still fits at 390px and the scrubber is actually visible at 1280px.The group agent switcher is now width-responsive. File:
+
+`/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/agent-window-v2.html`
+
+**Below ~900px** (phone + narrow tablet): compact dropdown — current agent (status dot + name + caret). Tap opens the group list (status, name, draft dot, current highlighted). Select or tap-outside closes. No drag strip.
+
+**At/above ~900px** (wide tablet + desktop): tab strip + collapse toggle, with the drag scrubber always visible when expanded. Dragging the thumb pages through the group via the same `switchAgent()`.
+
+Dragging the frame across ~900px swaps the control live. Verified with Playwright: dropdown at 390px opens and switches; scrubber at 1280px is visible and drags; crossing ~900px swaps both ways. Refresh ↻, one-row header, resize harness, and the rest of the surface are unchanged.

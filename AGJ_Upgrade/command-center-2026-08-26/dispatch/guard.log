@@ -1,0 +1,13 @@
+2026-08-27T00:24:00+00:00 SPAWNED x-01_projcore_grok46_agjassist role=coordinator batch=-
+2026-08-27T00:29:19+00:00 SPAWNED x-01_coplanner_grok46_agjassist role=coplanner batch=PLAN
+2026-08-27T00:29:19+00:00 SPAWNED x-01_coplanner_sol_agjassist role=coplanner batch=PLAN
+2026-08-27T00:29:44+00:00 ALLOW  op=send target=x-01_coplanner_grok46_agjassist
+2026-08-27T00:29:44+00:00 ALLOW  op=send target=x-01_coplanner_sol_agjassist
+2026-08-27T00:30:05+00:00 ALLOW  op=send target=x-01_coplanner_sol_agjassist
+2026-08-27T00:42:47+00:00 ALLOW  op=send target=x-01_coplanner_sol_agjassist
+2026-08-27T00:42:57+00:00 ALLOW  op=send target=x-01_coplanner_sol_agjassist
+2026-08-27T00:48:00+00:00 ALLOW  op=kill target=x-01_coplanner_grok46_agjassist
+2026-08-27T00:48:00+00:00 KILLED x-01_coplanner_grok46_agjassist reason=planning custody complete
+2026-08-27T00:48:00+00:00 ALLOW  op=kill target=x-01_coplanner_sol_agjassist
+2026-08-27T00:48:00+00:00 KILLED x-01_coplanner_sol_agjassist reason=planning custody complete
+2026-08-27T00:48:00+00:00 REFUSE op=send target=agj-3767 reason=strict policy: target does not use the reserved agent prefix 'x-'

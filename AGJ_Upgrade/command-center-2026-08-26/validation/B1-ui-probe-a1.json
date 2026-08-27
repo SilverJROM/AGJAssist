@@ -1,0 +1,98 @@
+[
+  {
+    "hash": "#/overmind",
+    "url": "http://127.0.0.1:3233/index.html#/",
+    "header": [
+      "Dashboard",
+      "Projects",
+      "Terminals",
+      "Tasks",
+      "Notes",
+      "Agent OS",
+      "Settings",
+      "MCP Access"
+    ],
+    "cards": [],
+    "overmindPage": 0
+  },
+  {
+    "hash": "#/overmind-projects",
+    "url": "http://127.0.0.1:3233/index.html#/",
+    "header": [
+      "Dashboard",
+      "Projects",
+      "Terminals",
+      "Tasks",
+      "Notes",
+      "Agent OS",
+      "Settings",
+      "MCP Access"
+    ],
+    "cards": [
+      "Projects",
+      "Terminals",
+      "Tasks",
+      "Notes",
+      "Settings"
+    ],
+    "overmindPage": 0
+  },
+  {
+    "hash": "#/conversations",
+    "url": "http://127.0.0.1:3233/index.html#/",
+    "header": [
+      "Dashboard",
+      "Projects",
+      "Terminals",
+      "Tasks",
+      "Notes",
+      "Agent OS",
+      "Settings",
+      "MCP Access"
+    ],
+    "cards": [
+      "Projects",
+      "Terminals",
+      "Tasks",
+      "Notes",
+      "Settings"
+    ],
+    "overmindPage": 0
+  },
+  {
+    "hash": "#/overmind-xyz",
+    "url": "http://127.0.0.1:3233/index.html#/",
+    "header": [
+      "Dashboard",
+      "Projects",
+      "Terminals",
+      "Tasks",
+      "Notes",
+      "Agent OS",
+      "Settings",
+      "MCP Access"
+    ],
+    "cards": [
+      "Projects",
+      "Terminals",
+      "Tasks",
+      "Notes",
+      "Settings"
+    ],
+    "overmindPage": 0
+  },
+  {
+    "hash": "#/",
+    "url": "http://127.0.0.1:3233/index.html#/",
+    "header": [
+      "Dashboard",
+      "Projects",
+      "Terminals",
+      "Tasks",
+      "Notes",
+      "Agent OS",
+      "Settings",
+      "MCP Access"
+    ]
+  }
+]

@@ -1,0 +1,26 @@
+independent handleCommand/handleText probe (tsx AssistantCore, dummy tmux)
+CMD "/overmind" => "Unknown command. Use /help."
+CMD "/OVERMIND" => "Unknown command. Use /help."
+CMD "/overmind@Bot" => "Unknown command. Use /help."
+CMD "/om_tasks" => "Unknown command. Use /help."
+CMD "/om_tasks 1" => "Unknown command. Use /help."
+CMD "/om_pause 1" => "Unknown command. Use /help."
+CMD "/om_resume 1" => "Unknown command. Use /help."
+CMD "/om_drop 1" => "Unknown command. Use /help."
+CMD "/ovm_start" => "Unknown command. Use /help."
+CMD "/ovm_end" => "Unknown command. Use /help."
+HELP_START "AGJAssist Commands:\n/jobs or /tmux - list tmux jobs and pane targets\n/peek <sess"
+HELP_HAS_JOBS true
+HELP_CONTAINS /overmind false
+HELP_CONTAINS /om_tasks false
+HELP_CONTAINS /om_pause false
+HELP_CONTAINS /om_resume false
+HELP_CONTAINS /om_drop false
+HELP_CONTAINS /ovm_start false
+HELP_CONTAINS /ovm_end false
+TEXT "Use /ovm_start to chat with OVM, or a slash command. /help for the list."
+OVM_MODE false
+
+leftover tests/telegram-commands.test.ts setMyCommands received:
+["help","app","weblogin","lokalai_link","jobs","tmux_send"]
+(failed expecting overmind/om_pause/om_resume/ovm_start/ovm_end — G1 stale spec)

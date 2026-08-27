@@ -1,0 +1,12 @@
+{
+  "type": "rollback-discarded",
+  "slice": "A0",
+  "commits": 3,
+  "shortstat": "9 files changed, 583 insertions(+), 1 deletion(-)",
+  "preserved_ref": "refs/tiller/command-center-2026-08-26/A0",
+  "shas": [
+    "d5571ac [A0] Boot real Fastify + fix harness exit codes and FENCE_STUB interception",
+    "a8e6977 [A0] Fix fence harness to run real Playwright journeys and isolate DB",
+    "4c2a82d [A0] Author command-center fence harness and five journeys"
+  ]
+}

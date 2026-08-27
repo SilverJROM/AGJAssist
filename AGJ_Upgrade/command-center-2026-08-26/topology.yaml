@@ -1,0 +1,91 @@
+# Team Topology Contract — AGJAssist "command-center" effort
+# Stamped by [north] 2026-08-27 from JROM's explicit roster (confirmed in chat).
+# Passes ~/.config/agent-protocols/lib/topology-validate.sh (contract rules 1-6).
+contract_version: 1
+
+effort: agjassist-command-center
+created: 2026-08-27
+repo: /home/agjrom/TGBOTS/AGJAssist
+run_dir: AGJ_Upgrade/command-center-2026-08-26
+execution_mode: tiller          # current canonical conductor (TILLER-USAGE.md 2026-08-26)
+
+# Ladder tuning — JROM 2026-08-27: glimmer gets at least 3 tries before escalation
+# ("3x so it has addtl details to correct its work"). The driver default is L1_ATTEMPTS=2, which is
+# why A0 escalated to sonnet5 after only 2 glimmer attempts. run.env now exports L1_ATTEMPTS=3, and every
+# per-slice budget is bumped +1 so escalation headroom is preserved (glimmer x3, THEN escalate — not
+# glimmer-only-then-park). Applied mid-run via a driver restart (driver reads L1_ATTEMPTS at import).
+ladder:
+  L1_ATTEMPTS: 3
+
+# ── Coordinator (projcore) — own tmux session, separate from the validator session ──
+coordinator:
+  persona: projcore
+  model: grok46
+  launch: "grok --always-approve --agent projcore -m grok-4.6"
+  fallback:                      # JROM 2026-08-27: grok46 healthy; sonnet5 backs it up if grok46 runs out of tokens
+    model: sonnet5
+    launch: "claude --dangerously-skip-permissions --model claude-sonnet-5"
+
+# ── Requirements: [north] alone, from the locked agent-window-v2 mockup contract ──
+requirements:
+  author: north
+  reviewers: []                  # req-review panel SKIPPED — the approved mockup IS the contract, low ambiguity. Logged in decisions/.
+  source_contract: AGJ_Upgrade/command-center-2026-08-26/mockups/final/agent-window-v2.html
+
+# ── Planners (co-author plan.md) — RULE 2: exactly 2 ──
+co_planners:
+  - { model: grok46, launch: "grok --always-approve -m grok-4.6" }
+  - { model: sol,    launch: "codex --dangerously-bypass-approvals-and-sandbox -m gpt-5.6-sol -c model_reasoning_effort=\"high\"" }
+
+# ── Plan approval gate (file-based PLAN-READY -> plan-approval.md) ──
+approval:
+  gate: [codex55, north]         # codex55 reviews alongside; [north] gates PLAN-READY on its findings + own read
+  codex55_launch: "codex -m gpt-5.5 --dangerously-bypass-approvals-and-sandbox"
+
+# ── Implementer ladder — RULE 3: L1/L2/L3 required (+optional L4) ──
+implementer:
+  L1: { model: glimmer, launch: "grok --always-approve --max-turns 40 -m glimmer-local" }
+  L2: { model: terra,   launch: "codex -m gpt-5.6-terra -c model_reasoning_effort=\"medium\" --dangerously-bypass-approvals-and-sandbox" }
+  L3: { model: sonnet5, launch: "claude --dangerously-skip-permissions --model claude-sonnet-5" }
+  L4: { model: sol,     launch: "codex --dangerously-bypass-approvals-and-sandbox -m gpt-5.6-sol -c model_reasoning_effort=\"high\"" }
+
+# ── Validator ladder — RULE 4: L1/L2/L3 required (+L4; L4 model must NOT be an implementer model).
+#    Runs in its OWN tmux session, separate from projcore (JROM: same grok46 model ok, session must differ). ──
+validator:
+  L1: { model: grok46,  launch: "grok --always-approve -m grok-4.6" }
+  L2: { model: grok46,  launch: "grok --always-approve -m grok-4.6" }
+  L3: { model: codex55, launch: "codex -m gpt-5.5 --dangerously-bypass-approvals-and-sandbox" }
+  L4: { model: opus5,   launch: "claude --dangerously-skip-permissions --model claude-opus-5" }   # opus5 NOT an implementer tier -> rule 4 ok
+
+# ── Integration / fence agent ──
+integration_agent:
+  selection_rule: "sonnet5 by default; opus5 for a fence spanning >2 slices, the OVM-teardown (destructive / high-blast-radius), or a cross-cutting invariant"
+  sonnet5_launch: "claude --dangerously-skip-permissions --model claude-sonnet-5"
+  opus5_launch:   "claude --dangerously-skip-permissions --model claude-opus-5"
+
+# ── Deliberation panel — RULE 5 ──
+deliberation_panel:
+  convergence: strict-unanimous
+  max_rounds: 3
+  settle: [opus5, sol]
+  panelists: [opus5, sol, sonnet5, grok45]
+
+# ── Red-team panel — RULE 6: all three tiers (budget/standard/elite) present ──
+redteam_panel:
+  convergence: majority
+  N: 3
+  tiers:
+    budget:   { count: 3, models: [grok45, codex55, sonnet5] }
+    standard: { count: 3, models: [grok45, codex55, sol] }
+    elite:    { count: 4, models: [opus5, codex55, sol, grok45] }
+
+rules:
+  verifier_ne_fixer: true                 # implementers = glimmer/terra/sonnet5/sol; none validate their own task
+  coordinator_ne_validator_session: true  # both may be grok46 model, but projcore session != validator session (JROM 2026-08-27)
+  independent_validation: true
+  ovm_teardown_attended: true             # high blast radius: tiller runs ATTENDED with a trusted validator; regression-test after
+
+pre_run_wiring:
+  - "Add gpt-5.6-sol / gpt-5.6-terra to src/config/providers.ts (registry currently only stamps gpt-5.5=codex55)."
+  - "Put this roster in <run-dir>/run.env — the tiller driver reads ONLY <run-dir>/run.env (a roster in .tiller/run.env never reaches the driver)."
+  - "Never run two local glimmer seats concurrently (lokalAI lease = 120s, no renewal)."

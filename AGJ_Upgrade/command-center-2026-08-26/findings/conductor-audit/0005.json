@@ -1,0 +1,6 @@
+{
+  "type": "repeated-failure-same-requirement",
+  "slice": "A0",
+  "attempt": 2,
+  "signature": "GAP_INTERCEPTION|HARNESS-SMOKE"
+}

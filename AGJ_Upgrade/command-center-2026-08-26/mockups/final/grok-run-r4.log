@@ -1,0 +1,9 @@
+I'll make one surgical in-place change to the existing agent-window v2 mockup: a chat-area refresh control that re-pulls session details. First I'll read the current HTML and rationale so nothing else shifts.The HTML is large; next I’ll read the transcript/search/header JS so the refresh control can sit next to the existing magnifier without touching other interactions.I have the placement and behavior: a ↻ control next to the existing search magnifier, spinning then re-pulling the transcript and header status. Applying that in place now.The rationale write collided; I’ll re-read the edited sections and finish the remaining note if it didn’t land.The mockup and rationale both landed. Next I’ll open the HTML in a browser and tap through refresh, search, and header collapse so the new control doesn’t regress the rest.Playwright is available, so I’ll drive the mockup: tap refresh, check header/transcript, then confirm search and header collapse still behave.All 22 interaction checks passed. I’ll glance at the phone screenshots next to confirm the ↻ sits beside search and doesn’t clutter the collapsed header.Added a chat-area **↻ Refresh from session** control to the existing agent-window v2 mockup. Nothing else was redesigned.
+
+**What changed**
+- Circular-arrow button sits next to the transcript search magnifier (not in the collapsed header), so it stays visible in the one-row header state.
+- Tap (mock, no network): icon spins, subtitle goes to `zsh · pulling session…`, status dot goes busy, then transcript re-renders with the latest on-session line, header returns to `updated just now` with a live green dot, and a **Refreshed** toast appears.
+- Same visual language as the magnifier; keyboard-focusable; works on phone / tablet / desktop and light / dark.
+
+**Path**
+`/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/agent-window-v2.html`

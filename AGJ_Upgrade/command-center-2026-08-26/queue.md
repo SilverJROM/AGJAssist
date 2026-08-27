@@ -1,0 +1,38 @@
+# queue — agjassist-command-center
+
+- [DONE] 1: A0 — Prove the fence harness smoke: named-red on HEAD and FENCE_STUB=B2 named-red on A2.  <!-- driver-advanced dc38330155 -->
+- [DONE] 2: B1 — Hide Overmind screens and nav without breaking the ordinary terminal chat.  <!-- driver-advanced 8a2ca9e767 -->
+- [DONE] 3: B2 — Remove every Overmind API and stream entry point.  <!-- driver-advanced 59fb99d5bb -->
+- [PENDING] 4: B3 — Remove the autonomous Overmind service subsystem instead of disabling it.
+- [PENDING] 5: B4 — Boot AGJAssist without constructing or starting any Overmind service.
+- [DONE] 6: B5 — Make every retired Overmind bot command follow the normal unknown-command path.  <!-- driver-advanced ccc0bdde52 -->
+- [DONE] 7: B6 — Remove guardian escalation without breaking ordinary reminder paging.  <!-- driver-advanced bc21bc78f4 -->
+- [PENDING] 8: B7 — Back up the database before the authorized OVM-table drop and preserve schema parity.
+- [PENDING] 9: B8 — Prove the OVM teardown composes safely before any attended release.
+- [PENDING] 10: C1 — Persist folder reminders and per-agent inclusion without overloading calendar reminders.
+- [PENDING] 11: C2 — Let the owner configure cadence, repeat limits, and included agents reliably.
+- [PENDING] 12: C3 — Fire due reminder solicits server-side through safety checks and audit.
+- [PENDING] 13: C4 — Expose owner-only reminder controls and active state through the API.
+- [PENDING] 14: C5 — Let the owner configure and inspect active folder reminders from an agent window.
+- [PENDING] 15: C6 — Prove a persisted reminder reaches only included agent panes while the app is closed.
+- [PENDING] 16: D1 — Persist summary endpoints and endpoint-attributed agent summaries safely.
+- [PENDING] 17: D2 — Let the owner manage named summary endpoints with 140 as the seeded default.
+- [PENDING] 18: D3 — Summarize a reminder reply without letting LLM failure break the solicit.
+- [PENDING] 19: D4 — Expose owner-only endpoint management and per-agent summary history.
+- [PENDING] 20: D5 — Let the owner add, edit, remove, and select summary endpoints in Settings.
+- [PENDING] 21: D6 — Show each agent's newest summaries in a useful scrollable dropdown.
+- [PENDING] 22: D7 — Prove an answered solicit becomes a stored local-LLM summary in the dropdown.
+- [PENDING] 23: E1 — Let the owner persist one-time wakeups independently of the retired OVM scheduler.
+- [PENDING] 24: E2 — Fire each due wakeup once through safety checks and audit, then clear it.
+- [PENDING] 25: E3 — Expose owner-only wakeup scheduling, pending state, and cancellation.
+- [PENDING] 26: E4 — Show and manage a one-time wakeup from expanded or collapsed agent headers.
+- [PENDING] 27: E5 — Prove a scheduled wakeup appears, fires once, sends its action, and clears.
+- [PENDING] 28: F1 — Keep unsent composer text isolated by viewer and agent across reloads.
+- [PENDING] 29: F2 — Restore drafts on agent switches and clear only the successfully sent draft.
+- [PENDING] 30: F3 — Refresh transcript and live session details without blocking the composer.
+- [PENDING] 31: F4 — Match the mockup's compact independently collapsible command-center header.
+- [PENDING] 32: F5 — Switch agents by dropdown on narrow screens and scrubber on wide screens.
+- [PENDING] 33: F6 — Keep the locked window readable and theme-adaptive from phone through desktop.
+- [PENDING] 34: F7 — Prove the complete agent window matches the mockup without terminal regressions.
+- [PENDING] 35: G1 — Remove dead OVM and mockup scratch artifacts while preserving the locked design record.
+- [PENDING] 36: G2 — Keep live backup and restart unreachable from tiller; only a confirmed human may execute.

@@ -1,0 +1,18 @@
+You are codex55 (gpt-5.5), the INDEPENDENT plan reviewer at the [north] plan-approval gate for the AGJAssist "command-center" effort. You did NOT author these — attack them. Read fully:
+- AGJ_Upgrade/command-center-2026-08-26/og-requirements.md
+- AGJ_Upgrade/command-center-2026-08-26/plan.md
+- AGJ_Upgrade/command-center-2026-08-26/fence-contract.json
+- AGJ_Upgrade/command-center-2026-08-26/north-star.md
+
+Verdict the plan on exactly these, terse and adversarial ("looks good" is a failure):
+1) COVERAGE: does EVERY og-requirement AC (A1-A5, B1-B2, C1-C6, D1-D3, E1-E3, F1-F3, G1-G3, H1-H3, I1-I2, J1-J2, PROMOTION CLEANUP) map to >=1 plan slice? Name any unmapped AC.
+2) ATOMICITY: does any slice hide two slices, or is any non-gateable?
+3) FENCES: do the 5 integration fences (B8,C6,D7,E5,F7) survive decomposition -- enumerated deps, negative control stubbing a REAL constituent, load the Mini App in a browser, non-vacuous both ways?
+4) SAFETY: is the destructive overmind-table drop backup-gated (B7) and is the live migration+deploy fully HUMAN-gated with NO tiller path to the live DB or pm2? Name any hole.
+5) SCOPE: any work JROM never asked for?
+6) VAL_TIER: any row under-validated for its risk?
+
+Output ONLY:
+VERDICT: APPROVE  (or) VERDICT: CHANGES-REQUESTED
+then a numbered list: [severity HIGH/MED/LOW] <row or AC> - <specific finding> - <fix>.
+Keep under 40 lines.

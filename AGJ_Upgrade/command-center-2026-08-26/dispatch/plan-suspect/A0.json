@@ -1,0 +1,13 @@
+{
+  "slice": "A0",
+  "first_seen_attempt": 3,
+  "signature": "GAP_INTERCEPTION|A5",
+  "requirements": "A5",
+  "defect_class": "INTERCEPTION_GAP",
+  "argument": "An acceptance criterion that no implementation can satisfy fails IDENTICALLY at every tier, so another attempt or a stronger seat buys more of the same failure at higher cost. This is the plan review, already written.",
+  "answer": "Product-green A5 is not satisfiable on A0 and is not this row's gate. A0 PASS is --harness-smoke exit 0: B8 journey named-red on HEAD plus FENCE_STUB=B2 named A2 kind=assert. Product A5 remains B8/G2. Repeats mixed that unsatisfiable mapping with a real INTERCEPTION_GAP (HTTP proxy instead of in-process stub; four specs not writing reports; --gate synthesizing ids). Plan row repaired; RETRY_WITH_DIRECTION to cherry-pick refs/tiller/command-center-2026-08-26/A0 and finish those five harness gaps. Not a change to what product A5 means.",
+  "how_to_answer": "Decompose or repair the criterion, OR write `answer` here saying why the row is sound and the repeats are coincidental. \"Noted and continued\" is not an answer.",
+  "raised_at": 1787794728,
+  "answered_at": "2026-08-27T01:40:00Z",
+  "answered_by": "projcore"
+}

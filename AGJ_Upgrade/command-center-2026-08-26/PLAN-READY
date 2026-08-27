@@ -1,0 +1,7 @@
+PLAN-READY agjassist-cc-2026-08-27 rev3
+HOLD: tiller will not start until plan-approval.md is APPROVED-BY-NORTH again (rev2 VOID)
+A0 acs: A5 → HARNESS-SMOKE (product A5 remains B8/G2)
+A0 tests: --harness-smoke (unchanged)
+FENCE_STUB: NOT yet in-process on recovered HEAD 3439337 — still HTTP proxy in scripts/cc-run-isolated.mjs startStubProxy (INTERCEPTION_GAP). A0 remaining work after re-approval.
+driver EXIT rc=143 was SIGTERM for this HOLD, not a drain finish
+coordinator: x-01_projcore_grok46_agjassist

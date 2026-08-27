@@ -1,0 +1,10 @@
+I'll read the current mockup and rationale first so the util-row collapse can mirror the existing tabs pattern without changing anything else.The tabs collapse lives in the later JS; I’ll read that next so the util-row toggle can copy it.I have the tabs collapse pattern. Next I’ll add an independent util-row toggle, default tabs collapsed and reminders expanded, and keep every other interaction as-is.Edits are in. I’ll sanity-check the collapse markup and JS, then open the mockup to confirm the two default states and independent toggles.No browser MCP here — I’ll drive Chromium locally to check default collapsed/expanded state and that the two toggles stay independent.Cancel-wakeup left the collapsed ⏰ hint stale until the 1s ticker. I’ll sync that hint immediately, then check the screenshots.Done. Surgical in-place edit only — no redesign.
+
+**What changed**
+1. Utility chip row (reminders / wakeup / summaries) now has the same collapse pattern as agent tabs: a ‹/› toggle plus a compact dashed pill. Collapsed, the chips hide; the pill stays in the header with a live hint (🔔 + warning dot if a reminder is active, ⏰ + count if a wakeup is pending).
+2. Default load is now **tabs collapsed**, **util/reminders expanded**.
+3. The two collapses are independent.
+
+Everything else is untouched (resize harness, tablet/desktop bands, theme, reminders/wakeup/summaries/endpoints, draft-kept, keys, send modes, font, ME-nav, search, attach).
+
+`/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/agent-window-v2.html`

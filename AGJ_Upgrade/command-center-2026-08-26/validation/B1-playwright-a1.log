@@ -1,0 +1,7 @@
+
+Running 2 tests using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-ovm.spec.ts:12:1 › B1 redirect overmind hashes to home (1.2s)
+  ✓  2 [cc] › e2e/command-center-ovm.spec.ts:21:1 › B1 header and nav cleaned (991ms)
+
+  2 passed (3.3s)

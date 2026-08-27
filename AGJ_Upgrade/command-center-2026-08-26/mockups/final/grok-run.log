@@ -1,0 +1,9 @@
+I'll start by reading sonnet5's mockup and the brief in full so the rebuild keeps that design and only adds the resize capability.The first half of the mockup is in; next I’ll read the rest of the HTML and JS so every interaction is preserved.Sonnet5’s mockup is the base. I’ll add drag-resize plus tablet/desktop composition rules, and leave the 390px phone look unchanged.Playwright is available — I’ll load the mockup and exercise resize plus the original interactions.Desktop at 1440px is too sparse with a 720px column. I’ll widen that column on desktop only and then re-check sheets.Sonnet5’s agent-window is the base; the only addition is a drag-resizable preview frame so the same UI can be felt from phone through desktop.
+
+`/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/agent-window-v2.html`
+
+What you get:
+
+- **Same app as sonnet5** — Light / System / Dark, every original interaction (reminders, wakeup chip, summaries, endpoints “140”, tabs + scrubber, draft-kept, keys, send modes, font, ME-nav, search, attach).
+- **Drag-resize** — right-edge handle (width) and bottom-right corner (width + height), 390px → 1440px+. Live `WIDTHxHEIGHT px` readout plus a Phone / Tablet / Desktop pill. Presets **390 / 768 / 1024 / 1440** snap the frame.
+- **Phone (390) is unchanged.** Tablet/desktop only cap a readable column, stop the key row from stretching, and keep sheets/popover at a usable width. Every one of those rules is listed in `rationale.md`.

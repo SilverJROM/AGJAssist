@@ -1,0 +1,16 @@
+{
+  "fence": "B8",
+  "fingerprint": "fp1:b4894359ac2b0950c863",
+  "open_failed_ids": [
+    "B2"
+  ],
+  "negative_control_open_executable": true,
+  "negative_control_open_shape": "assertion-red",
+  "collected": 7,
+  "test_path": "e2e/command-center-ovm-fence.spec.ts",
+  "test_hash": "sha256:0d5ec18d653e6918c124f64703a8019bbbc8950bd8ab365885ed834fbc380dde",
+  "negative_control": "FENCE_STUB=B2 FENCE_ID=B8 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+  "authored_by": "coplanner:sol+grok46; rev2-projcore",
+  "opened_at": 1787797088,
+  "driver_epoch": "1787795464-2444478"
+}

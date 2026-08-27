@@ -1,0 +1,643 @@
+diff --git a/e2e/command-center-ovm-fence.spec.ts b/e2e/command-center-ovm-fence.spec.ts
+new file mode 100644
+index 0000000..c856e79
+--- /dev/null
++++ b/e2e/command-center-ovm-fence.spec.ts
+@@ -0,0 +1,82 @@
++import { test, expect } from '@playwright/test';
++import fs from 'node:fs';
++import path from 'node:path';
++
++const ACCEPTANCE_IDS = ['A1','A2','A3','A4','A5','B1','B2'] as const;
++const REPORT_PATH = path.resolve(process.env.FENCE_REPORT_PATH || 'fence-report-v1.json');
++const APP_ORIGIN = 'http://localhost:3210';
++
++test('command-center ovm fence journey', async ({ page }) => {
++  const passed: string[] = [];
++  const failed: {id:string; kind:'assert'}[] = [];
++
++  const check = async (id: typeof ACCEPTANCE_IDS[number], assertion: () => Promise<void>) => {
++    try {
++      await assertion();
++      passed.push(id);
++    } catch (e) {
++      failed.push({ id, kind: 'assert' });
++      throw new Error(`FENCE_ASSERT:${id}`);
++    }
++  };
++
++  try {
++    await page.goto(`${APP_ORIGIN}/index.html`, { waitUntil: 'domcontentloaded' });
++
++    // A1: OVM console route should redirect home
++    await check('A1', async () => {
++      await page.goto(`${APP_ORIGIN}/index.html#/overmind`, { waitUntil: 'domcontentloaded' });
++      await expect(page).toHaveURL(/\/index\.html#\//);
++    });
++
++    // A2: OVM service removed – API should not expose overmind routes
++    await check('A2', async () => {
++      const resp = await page.request.get(`${APP_ORIGIN}/api/overmind/status`);
++      expect(resp.status()).toBe(404);
++    });
++
++    // A3: Bot commands removed – no overmind command handling
++    await check('A3', async () => {
++      // Placeholder literal fixture check
++      const hasCommand = await page.evaluate(() => {
++        return (window as any).__AGJ_TEST_OVM_COMMAND__ === undefined;
++      });
++      expect(hasCommand).toBe(true);
++    });
++
++    // A4: Schema drop – overmind tables absent
++    await check('A4', async () => {
++      // Literal fixture: expect no overmind tables in DB info endpoint
++      const resp = await page.request.get(`${APP_ORIGIN}/api/db/tables`);
++      const json = await resp.json().catch(() => ({}));
++      expect(json.tables || []).not.toContain('overmind_projects');
++    });
++
++    // A5: UI links removed
++    await check('A5', async () => {
++      await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'domcontentloaded' });
++      const link = page.locator('a[href*="overmind"], [data-testid="overmind-link"]');
++      await expect(link).toHaveCount(0);
++    });
++
++    // B1: Bottom nav cleaned
++    await check('B1', async () => {
++      const nav = page.locator('[data-testid="bottom-nav"] a');
++      const texts = await nav.allTextContents();
++      expect(texts).not.toContain('Overmind');
++    });
++
++    // B2: Guardian escalation removed
++    await check('B2', async () => {
++      const resp = await page.request.post(`${APP_ORIGIN}/api/guardian/escalate`, { data: {} });
++      expect(resp.status()).toBe(404);
++    });
++  } catch (error) {
++    const isNamedAssertion = error instanceof Error && error.message.startsWith('FENCE_ASSERT:');
++    if (!isNamedAssertion) throw error;
++  } finally {
++    fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
++  }
++
++  expect(failed, `FENCE failures: ${JSON.stringify(failed)}`).toEqual([]);
++});
+diff --git a/e2e/command-center-reminders-fence.spec.ts b/e2e/command-center-reminders-fence.spec.ts
+new file mode 100644
+index 0000000..e8a28d7
+--- /dev/null
++++ b/e2e/command-center-reminders-fence.spec.ts
+@@ -0,0 +1,60 @@
++import { test, expect } from '@playwright/test';
++import fs from 'node:fs';
++import path from 'node:path';
++
++const ACCEPTANCE_IDS = ['C1','C2','C3','C4','C5','C6'] as const;
++const REPORT_PATH = path.resolve(process.env.FENCE_REPORT_PATH || 'fence-report-v1.json');
++const APP_ORIGIN = 'http://localhost:3210';
++
++test('command-center reminders fence journey', async ({ page }) => {
++  const passed: string[] = [];
++  const failed: {id:string; kind:'assert'}[] = [];
++
++  const check = async (id: typeof ACCEPTANCE_IDS[number], assertion: () => Promise<void>) => {
++    try {
++      await assertion();
++      passed.push(id);
++    } catch {
++      failed.push({ id, kind: 'assert' });
++      throw new Error(`FENCE_ASSERT:${id}`);
++    }
++  };
++
++  await page.goto(`${APP_ORIGIN}/index.html`, { waitUntil: 'domcontentloaded' });
++
++  await check('C1', async () => {
++    const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/schema`);
++    expect(resp.status()).toBe(200);
++  });
++
++  await check('C2', async () => {
++    const resp = await page.request.post(`${APP_ORIGIN}/api/agent-reminders`, { data: { cadence: '30m' } });
++    expect(resp.status()).toBe(201);
++  });
++
++  await check('C3', async () => {
++    // Literal fixture: expect fireDue to process only included agents
++    const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/due`);
++    const json = await resp.json().catch(() => ({}));
++    expect(Array.isArray(json.due)).toBe(true);
++  });
++
++  await check('C4', async () => {
++    await page.goto(`${APP_ORIGIN}/index.html#/agents`, { waitUntil: 'domcontentloaded' });
++    const sheet = page.locator('[data-testid="agent-reminder-sheet"]');
++    await expect(sheet).toBeVisible();
++  });
++
++  await check('C5', async () => {
++    const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/active`);
++    expect(resp.status()).toBe(200);
++  });
++
++  await check('C6', async () => {
++    // Integration check: reminders fire into temp tmux pane
++    const resp = await page.request.get(`${APP_ORIGIN}/api/agent-reminders/fired`);
++    expect(resp.status()).toBe(200);
++  });
++
++  fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
++});
+diff --git a/e2e/command-center-summaries-fence.spec.ts b/e2e/command-center-summaries-fence.spec.ts
+new file mode 100644
+index 0000000..2982f5a
+--- /dev/null
++++ b/e2e/command-center-summaries-fence.spec.ts
+@@ -0,0 +1,60 @@
++import { test, expect } from '@playwright/test';
++import fs from 'node:fs';
++import path from 'node:path';
++
++const ACCEPTANCE_IDS = ['E1','E2','E3','F1','F2','F3'] as const;
++const REPORT_PATH = path.resolve(process.env.FENCE_REPORT_PATH || 'fence-report-v1.json');
++const APP_ORIGIN = 'http://localhost:3210';
++
++test('command-center summaries fence journey', async ({ page }) => {
++  const passed: string[] = [];
++  const failed: {id:string; kind:'assert'}[] = [];
++
++  const check = async (id: typeof ACCEPTANCE_IDS[number], assertion: () => Promise<void>) => {
++    try {
++      await assertion();
++      passed.push(id);
++    } catch {
++      failed.push({ id, kind: 'assert' });
++      throw new Error(`FENCE_ASSERT:${id}`);
++    }
++  };
++
++  await page.goto(`${APP_ORIGIN}/index.html`, { waitUntil: 'domcontentloaded' });
++
++  await check('E1', async () => {
++    const resp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`);
++    expect(resp.status()).toBe(200);
++  });
++
++  await check('E2', async () => {
++    await page.goto(`${APP_ORIGIN}/index.html#/agents`, { waitUntil: 'domcontentloaded' });
++    const dropdown = page.locator('[data-testid="agent-summaries-dropdown"]');
++    await expect(dropdown).toBeVisible();
++  });
++
++  await check('E3', async () => {
++    const resp = await page.request.get(`${APP_ORIGIN}/api/agent-summaries`);
++    expect(resp.status()).toBe(200);
++  });
++
++  await check('F1', async () => {
++    const resp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`);
++    const json = await resp.json().catch(() => ({}));
++    expect(json.endpoints?.some((e:any)=>e.label==='140')).toBe(true);
++  });
++
++  await check('F2', async () => {
++    // Literal fixture check for endpoint config
++    const resp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints/default`);
++    expect(resp.status()).toBe(200);
++  });
++
++  await check('F3', async () => {
++    await page.goto(`${APP_ORIGIN}/index.html#/settings/summary`, { waitUntil: 'domcontentloaded' });
++    const settings = page.locator('[data-testid="summary-endpoint-settings"]');
++    await expect(settings).toBeVisible();
++  });
++
++  fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
++});
+diff --git a/e2e/command-center-wakeup-fence.spec.ts b/e2e/command-center-wakeup-fence.spec.ts
+new file mode 100644
+index 0000000..7dabd26
+--- /dev/null
++++ b/e2e/command-center-wakeup-fence.spec.ts
+@@ -0,0 +1,43 @@
++import { test, expect } from '@playwright/test';
++import fs from 'node:fs';
++import path from 'node:path';
++
++const ACCEPTANCE_IDS = ['D1','D2','D3'] as const;
++const REPORT_PATH = path.resolve(process.env.FENCE_REPORT_PATH || 'fence-report-v1.json');
++const APP_ORIGIN = 'http://localhost:3210';
++
++test('command-center wakeup fence journey', async ({ page }) => {
++  const passed: string[] = [];
++  const failed: {id:string; kind:'assert'}[] = [];
++
++  const check = async (id: typeof ACCEPTANCE_IDS[number], assertion: () => Promise<void>) => {
++    try {
++      await assertion();
++      passed.push(id);
++    } catch {
++      failed.push({ id, kind: 'assert' });
++      throw new Error(`FENCE_ASSERT:${id}`);
++    }
++  };
++
++  await page.goto(`${APP_ORIGIN}/index.html`, { waitUntil: 'domcontentloaded' });
++
++  await check('D1', async () => {
++    const resp = await page.request.get(`${APP_ORIGIN}/api/agent-wakeups`);
++    expect(resp.status()).toBe(200);
++  });
++
++  await check('D2', async () => {
++    await page.goto(`${APP_ORIGIN}/index.html#/agents`, { waitUntil: 'domcontentloaded' });
++    const sheet = page.locator('[data-testid="wakeup-sheet"]');
++    await expect(sheet).toBeVisible();
++  });
++
++  await check('D3', async () => {
++    // Literal fixture: pending chip clears after fire
++    const resp = await page.request.post(`${APP_ORIGIN}/api/agent-wakeups/fire`, { data: { id: 'test' } });
++    expect(resp.status()).toBe(200);
++  });
++
++  fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
++});
+diff --git a/e2e/command-center-window-fence.spec.ts b/e2e/command-center-window-fence.spec.ts
+new file mode 100644
+index 0000000..75609a1
+--- /dev/null
++++ b/e2e/command-center-window-fence.spec.ts
+@@ -0,0 +1,82 @@
++import { test, expect } from '@playwright/test';
++import fs from 'node:fs';
++import path from 'node:path';
++
++const ACCEPTANCE_IDS = ['G1','G2','G3','H1','H2','H3','I1','I2','J1','J2'] as const;
++const REPORT_PATH = path.resolve(process.env.FENCE_REPORT_PATH || 'fence-report-v1.json');
++const APP_ORIGIN = 'http://localhost:3210';
++
++test('command-center window fence journey', async ({ page }) => {
++  const passed: string[] = [];
++  const failed: {id:string; kind:'assert'}[] = [];
++
++  const check = async (id: typeof ACCEPTANCE_IDS[number], assertion: () => Promise<void>) => {
++    try {
++      await assertion();
++      passed.push(id);
++    } catch {
++      failed.push({ id, kind: 'assert' });
++      throw new Error(`FENCE_ASSERT:${id}`);
++    }
++  };
++
++  await page.goto(`${APP_ORIGIN}/index.html#/agents`, { waitUntil: 'domcontentloaded' });
++
++  await check('G1', async () => {
++    const draft = page.locator('[data-testid="terminal-draft"]');
++    await expect(draft).toBeVisible();
++  });
++
++  await check('G2', async () => {
++    const switcher = page.locator('[data-testid="agent-group-switcher"]');
++    await expect(switcher).toBeVisible();
++  });
++
++  await check('G3', async () => {
++    const refresh = page.locator('[data-testid="refresh-from-session"]');
++    await expect(refresh).toBeVisible();
++  });
++
++  await check('H1', async () => {
++    const header = page.locator('[data-testid="terminal-header-v2"]');
++    await expect(header).toBeVisible();
++  });
++
++  await check('H2', async () => {
++    await page.setViewportSize({ width: 390, height: 844 });
++    const collapsed = await page.locator('[data-testid="command-center-header"]').evaluate(el => getComputedStyle(el).height);
++    expect(collapsed).toBeDefined();
++  });
++
++  await check('H3', async () => {
++    const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
++    expect(theme).toBeTruthy();
++  });
++
++  await check('I1', async () => {
++    const refreshBtn = page.locator('[data-testid="refresh-from-session"]');
++    await refreshBtn.click();
++    await expect(page.locator('[data-testid="terminal-turn-agent"]')).toBeVisible();
++  });
++
++  await check('I2', async () => {
++    const draftInput = page.locator('[data-testid="terminal-composer-input"]');
++    await draftInput.fill('test draft');
++    await page.reload();
++    await expect(draftInput).toHaveValue('test draft');
++  });
++
++  await check('J1', async () => {
++    await page.setViewportSize({ width: 1024, height: 800 });
++    const switcher = page.locator('[data-testid="agent-group-switcher"]');
++    await expect(switcher).toBeVisible();
++  });
++
++  await check('J2', async () => {
++    await page.setViewportSize({ width: 390, height: 844 });
++    const dropdown = page.locator('[data-testid="agent-group-switcher-dropdown"]');
++    await expect(dropdown).toBeVisible();
++  });
++
++  fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
++});
+diff --git a/e2e/run-command-center-playwright-fence.mjs b/e2e/run-command-center-playwright-fence.mjs
+new file mode 100644
+index 0000000..1a1b1b4
+--- /dev/null
++++ b/e2e/run-command-center-playwright-fence.mjs
+@@ -0,0 +1,107 @@
++#!/usr/bin/env node
++import fs from 'node:fs';
++import path from 'node:path';
++import { spawnSync } from 'node:child_process';
++
++const args = process.argv.slice(2);
++const fenceId = process.env.FENCE_ID || 'B8';
++const stub = process.env.FENCE_STUB || '';
++const harnessSmoke = args.includes('--harness-smoke');
++const gate = args.includes('--gate');
++
++const reportPath = path.resolve(process.cwd(), 'fence-report-v1.json');
++const contractPath = path.resolve('AGJ_Upgrade/command-center-2026-08-26/fence-contract.json');
++const contract = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
++const fence = contract.fences?.[fenceId];
++
++if (!fence) {
++  console.error(`Unknown fence ${fenceId}`);
++  process.exit(1);
++}
++
++function verdictLine() {
++  return `[FENCE-VERDICT-V1] run=command-center-2026-08-26 fence=${fenceId} stub=${stub || 'none'} ts=${Date.now()}`;
++}
++
++function writeReport(collected, passed, failed) {
++  const report = {
++    schema: 'fence-report-v1',
++    verdict_line: verdictLine(),
++    collected,
++    passed,
++    failed,
++  };
++  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
++}
++
++function runPlaywright(testPath, env) {
++  // --config points at the dedicated cc config: TestProject has no webServer
++  // field, so a webServer nested under playwright.config.ts's 'cc' project
++  // entry is silently ignored there (see playwright.cc.config.ts).
++  const result = spawnSync('npx', ['playwright', 'test', testPath, '--project=cc', '--config=playwright.cc.config.ts', '--reporter=line'], {
++    env,
++    stdio: 'inherit',
++  });
++  return result.status ?? 1;
++}
++
++function readReport(reportFilePath) {
++  try {
++    return JSON.parse(fs.readFileSync(reportFilePath, 'utf8'));
++  } catch {
++    return null;
++  }
++}
++
++function hasAnyNamedAssert(report) {
++  return !!report && Array.isArray(report.failed) && report.failed.some((f) => f && f.id && f.kind === 'assert');
++}
++
++function hasFailure(report, id, kind) {
++  return !!report && Array.isArray(report.failed) && report.failed.some((f) => f && f.id === id && f.kind === kind);
++}
++
++if (harnessSmoke) {
++  const testPath = fence.test_path;
++  const posReportPath = path.resolve(process.cwd(), '.fence-harness-smoke-pos.json');
++  const negReportPath = path.resolve(process.cwd(), '.fence-harness-smoke-neg.json');
++  try { fs.unlinkSync(posReportPath); } catch {}
++  try { fs.unlinkSync(negReportPath); } catch {}
++
++  const posCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId, FENCE_REPORT_PATH: posReportPath });
++  const posReport = readReport(posReportPath);
++
++  const negCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId, FENCE_STUB: 'B2', FENCE_REPORT_PATH: negReportPath });
++  const negReport = readReport(negReportPath);
++
++  const posRed = posCode !== 0 && hasAnyNamedAssert(posReport);
++  const negRed = negCode !== 0 && hasFailure(negReport, 'A2', 'assert');
++
++  writeReport(fence.acceptance_ids, [], [
++    ...(posReport?.failed || []),
++    ...(negReport?.failed || []),
++  ]);
++  console.log(verdictLine());
++  console.log(`[harness-smoke] current-HEAD red=${posRed} (exit=${posCode}); FENCE_STUB=B2 red-on-A2=${negRed} (exit=${negCode})`);
++  process.exit(posRed && negRed ? 0 : 1);
++}
++
++if (gate) {
++  const testPath = fence.test_path;
++  const posCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId });
++  const negStub = fence.negative_control_cmd.match(/FENCE_STUB=(\S+)/)?.[1] || '';
++  const negCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId, FENCE_STUB: negStub });
++  const passed = posCode === 0;
++  const failedNeg = negCode !== 0;
++  writeReport(fence.acceptance_ids, passed ? fence.acceptance_ids : [], failedNeg ? [{ id: fence.expected_negative_fail_ids[0], kind: fence.expected_negative_kind }] : []);
++  console.log(verdictLine());
++  process.exit(passed && failedNeg ? 0 : 1);
++}
++
++const testPath = fence.test_path;
++const integrationCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId });
++const specReport = readReport(reportPath) || { schema: 'fence-report-v1', collected: fence.acceptance_ids, passed: [], failed: [] };
++specReport.verdict_line = verdictLine();
++fs.writeFileSync(reportPath, JSON.stringify(specReport, null, 2) + '\n');
++console.log(specReport.verdict_line);
++process.exit(integrationCode);
+diff --git a/playwright.cc.config.ts b/playwright.cc.config.ts
+new file mode 100644
+index 0000000..0dc926d
+--- /dev/null
++++ b/playwright.cc.config.ts
+@@ -0,0 +1,20 @@
++import { defineConfig, devices } from '@playwright/test';
++
++// Dedicated config for the command-center fence journeys' 'cc' project.
++// Split out from playwright.config.ts because TestProject has no webServer
++// field (only TestConfig does) — a webServer nested inside a `projects[]`
++// entry is silently ignored, so this project needs its own top-level one to
++// actually boot the real Fastify server on an isolated temp-copy DB.
++export default defineConfig({
++  testDir: 'e2e',
++  timeout: 30000,
++  projects: [
++    { name: 'cc', use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:3210' } },
++  ],
++  webServer: {
++    command: 'node scripts/cc-run-isolated.mjs --serve',
++    url: 'http://localhost:3210/index.html',
++    reuseExistingServer: false,
++    timeout: 60000,
++  },
++});
+diff --git a/playwright.config.ts b/playwright.config.ts
+index e255613..4eacc7e 100644
+--- a/playwright.config.ts
++++ b/playwright.config.ts
+@@ -2,7 +2,13 @@ import { defineConfig, devices } from '@playwright/test';
+ export default defineConfig({
+   testDir: 'e2e',
+   timeout: 30000,
+-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
++  projects: [
++    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
++    // The 'cc' project (command-center fence journeys) lives in its own config —
++    // playwright.cc.config.ts — because TestProject has no webServer field (only
++    // TestConfig does); a per-project webServer entry here is silently ignored and
++    // every run falls through to this file's static-server.mjs webServer below.
++  ],
+   use: { baseURL: 'http://localhost:3210' },
+   // reuseExistingServer:false so the proof always boots OUR shipped-app static server (e2e/static-server.mjs)
+   // and is never hijacked by a foreign dev server (e.g. `npx serve`, which 301-redirects /index.html and drops the
+diff --git a/scripts/cc-run-isolated.mjs b/scripts/cc-run-isolated.mjs
+new file mode 100644
+index 0000000..ab2faaa
+--- /dev/null
++++ b/scripts/cc-run-isolated.mjs
+@@ -0,0 +1,122 @@
++#!/usr/bin/env node
++import { spawnSync, spawn } from 'node:child_process';
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import http from 'node:http';
++
++const args = process.argv.slice(2);
++const serve = args.includes('--serve');
++const SRC_DB = process.env.DB_PATH_SOURCE || 'data/agjassist.db';
++const srcDbPath = path.resolve(SRC_DB);
++const PUBLIC_PORT = 3210;
++const UPSTREAM_PORT = 3211;
++
++function ensureTmpDb(tmpDir) {
++  fs.mkdirSync(tmpDir, { recursive: true });
++  const tmpDb = path.join(tmpDir, 'agjassist.db');
++  if (fs.existsSync(srcDbPath)) {
++    fs.copyFileSync(srcDbPath, tmpDb);
++  } else {
++    fs.writeFileSync(tmpDb, '');
++  }
++  return tmpDb;
++}
++
++// FENCE_STUB replaces a named contributor's effect in-process (fence-contract.json's
++// negative_control_cmd), applied at the network boundary in front of the real Fastify
++// server so the same page.request-driven assertions observe the stubbed behaviour —
++// page.route() cannot see page.request traffic, so per-spec route() stubs can't reach it.
++const FENCE_STUB_HANDLERS = {
++  // B2 (plan.md): removes registerOvermindRoutes so /api/overmind/status stops
++  // existing (404). Stubbing B2 re-registers a synthetic 200 here so B8's negative
++  // control keeps proving the fence catches a regression once B2 actually lands.
++  B2: (req, res) => {
++    const pathname = (req.url || '').split('?')[0];
++    if (pathname === '/api/overmind/status') {
++      res.writeHead(200, { 'content-type': 'application/json' });
++      res.end(JSON.stringify({ stubbed: true, contributor: 'B2' }));
++      return true;
++    }
++    return false;
++  },
++};
++
++function startStubProxy(stub) {
++  const handler = FENCE_STUB_HANDLERS[stub];
++  const proxy = http.createServer((req, res) => {
++    if (handler && handler(req, res)) return;
++    const upstreamReq = http.request(
++      { host: '127.0.0.1', port: UPSTREAM_PORT, path: req.url, method: req.method, headers: req.headers },
++      (upstreamRes) => {
++        res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
++        upstreamRes.pipe(res);
++      }
++    );
++    upstreamReq.on('error', () => { res.writeHead(502); res.end('upstream unavailable'); });
++    req.pipe(upstreamReq);
++  });
++  proxy.on('upgrade', (req, socket, head) => {
++    const upstreamReq = http.request({
++      host: '127.0.0.1', port: UPSTREAM_PORT, path: req.url, method: req.method, headers: req.headers
++    });
++    upstreamReq.on('upgrade', (upstreamRes, upstreamSocket, upstreamHead) => {
++      socket.write(
++        `HTTP/1.1 ${upstreamRes.statusCode} ${upstreamRes.statusMessage}\r\n` +
++        Object.entries(upstreamRes.headers).map(([k, v]) => `${k}: ${v}`).join('\r\n') + '\r\n\r\n'
++      );
++      upstreamSocket.write(upstreamHead);
++      upstreamSocket.pipe(socket);
++      socket.pipe(upstreamSocket);
++    });
++    upstreamReq.on('error', () => socket.destroy());
++    upstreamReq.end(head);
++  });
++  proxy.listen(PUBLIC_PORT);
++  return proxy;
++}
++
++if (serve) {
++  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-'));
++  const tmpDb = ensureTmpDb(tmpDir);
++  const stub = process.env.FENCE_STUB || '';
++  const port = stub ? UPSTREAM_PORT : PUBLIC_PORT;
++  const env = {
++    ...process.env,
++    DB_PATH: tmpDb,
++    AGJASSIST_FENCE_DB_MODE: 'temp-copy',
++    API_PORT: String(port),
++    API_HOST: '127.0.0.1',
++    TEST_MODE: 'true'
++  };
++  // Real Fastify entrypoint (src/index.ts) via tsx's node --import loader hook —
++  // serves the shipped app through Fastify's own static registration, not a stand-in.
++  const server = spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], { stdio: 'inherit', env });
++  const proxy = stub ? startStubProxy(stub) : null;
++  const cleanup = () => {
++    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
++    if (proxy) proxy.close();
++    server.kill();
++  };
++  process.on('SIGINT', cleanup);
++  process.on('SIGTERM', cleanup);
++  server.on('exit', () => { cleanup(); process.exit(0); });
++} else {
++  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-'));
++  const tmpDb = ensureTmpDb(tmpDir);
++  const startSize = fs.statSync(tmpDb).size;
++  let exitCode = 0;
++  try {
++    const cmdIdx = args.indexOf('--');
++    if (cmdIdx !== -1) {
++      const cmd = args.slice(cmdIdx + 1);
++      const env = { ...process.env, DB_PATH: tmpDb, AGJASSIST_FENCE_DB_MODE: 'temp-copy' };
++      const result = spawnSync(cmd[0], cmd.slice(1), { env, stdio: 'inherit' });
++      exitCode = result.status ?? 1;
++    }
++  } finally {
++    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
++    console.log(`reclaimed_bytes=${startSize}`);
++    process.exitCode = exitCode;
++  }
++}

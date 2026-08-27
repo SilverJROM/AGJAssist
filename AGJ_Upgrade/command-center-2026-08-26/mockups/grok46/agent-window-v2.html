@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AGJAssist · agent-window v2 · grok46</title>
+<style>
+/* Tokens copied from src/web/public/style.css .terminal-shell (light defaults + dark overrides). */
+:root, html.theme-light {
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #eef1f4;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --text-secondary: #57606a;
+  --accent: #0969da;
+  --success: #1a7f37;
+  --warning: #9a6700;
+  --danger: #cf222e;
+  --terminal-fg: #1f2328;
+  --terminal-muted: #57606a;
+  --on-accent: #ffffff;
+  --pressed: #eaeef2;
+  --pressed-2: #e2e8ee;
+  --idle: #8c959f;
+  --grip: #c8d1da;
+  --grip-active: #9aa4ae;
+  --accent-hover: #0a5cc7;
+  --accent-pressed: #0550ae;
+  --accent-link-active: #0a4ea3;
+  --accent-soft: #ddf4ff;
+  --accent-row-hover: #f6faff;
+  --accent-selected: #f2f8ff;
+  --accent-chip: #ddf0ff;
+  --accent-chip-border: #c8e1ff;
+  --accent-soft-border: #b6e3ff;
+  --accent-tab-hover: #eaf2ff;
+  --success-soft: #e6f7ec;
+  --success-soft-2: #dafbe1;
+  --success-soft-border: #aadfbc;
+  --danger-soft: #fff5f5;
+  --danger-card: #ffebe9;
+  --danger-card-border: #ff8182;
+  --danger-alt: #d1242f;
+  --danger-hover: #b31d27;
+  --busy-dot: #bf8700;
+  --knob: #ffffff;
+  --accent-hover-fill: rgba(9, 105, 218, 0.08);
+  --page: #e8ecf0;
+  --bezel: #c8d0d8;
+  --overlay: rgba(31, 35, 40, 0.32);
+  --warn-soft: #fff8c5;
+  --warn-border: #d4a72c;
+  --terminal-conv-font: 17px;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+html.theme-dark {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-2: #1c232c;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-secondary: #8b949e;
+  --accent: #58a6ff;
+  --success: #3fb950;
+  --warning: #d29922;
+  --danger: #f85149;
+  --terminal-fg: #e6edf3;
+  --terminal-muted: #8b949e;
+  --on-accent: #ffffff;
+  --pressed: #21262d;
+  --pressed-2: #262c34;
+  --idle: #8b949e;
+  --grip: #484f58;
+  --grip-active: #6e7681;
+  --accent-hover: #79b8ff;
+  --accent-pressed: #388bfd;
+  --accent-link-active: #79b8ff;
+  --accent-soft: #12253d;
+  --accent-row-hover: #1c232c;
+  --accent-selected: #1f3347;
+  --accent-chip: #12253d;
+  --accent-chip-border: #1f6feb;
+  --accent-soft-border: #1f6feb;
+  --accent-tab-hover: #1f3347;
+  --success-soft: #12261e;
+  --success-soft-2: #12261e;
+  --success-soft-border: #238636;
+  --danger-soft: #3d1114;
+  --danger-card: #3d1114;
+  --danger-card-border: #f85149;
+  --danger-alt: #f85149;
+  --danger-hover: #ff7b72;
+  --busy-dot: #d29922;
+  --knob: #ffffff;
+  --accent-hover-fill: rgba(88, 166, 255, 0.12);
+  --page: #010409;
+  --bezel: #2a313a;
+  --overlay: rgba(1, 4, 9, 0.55);
+  --warn-soft: #3d2f0b;
+  --warn-border: #9a6700;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; }
+textarea { resize: none; }
+input, textarea, select { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-hover-fill); }
+[hidden] { display: none !important; }
+
+/* ===== Mockup chrome (not part of the app) ===== */
+.mock-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.mock-bar b { font-size: 13px; }
+.mock-bar .sub { color: var(--text-secondary); font-size: 12px; font-weight: 400; margin-left: 8px; }
+.mock-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.seg {
+  display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg);
+}
+.seg button {
+  min-width: 52px; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  border-left: 1px solid var(--border);
+}
+.seg button:first-child { border-left: 0; }
+.seg button.sel { background: var(--accent); color: var(--on-accent); }
+.mock-note {
+  max-width: 980px; margin: 8px auto 0; padding: 0 16px;
+  color: var(--text-secondary); font-size: 12px;
+}
+.mock-note details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+.mock-note summary { cursor: pointer; font-weight: 600; color: var(--text); }
+.mock-note ol { margin: 6px 0 0 18px; }
+.stage {
+  min-height: calc(100dvh - 52px);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 18px 16px 32px;
+}
+.frame {
+  width: 390px; height: min(844px, calc(100dvh - 96px));
+  background: var(--bg);
+  border: 1px solid var(--bezel);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  display: flex; flex-direction: column;
+  box-shadow: 0 18px 50px rgba(31, 35, 40, 0.16);
+}
+.frame.wide { width: 720px; }
+@media (max-width: 400px) {
+  .mock-note { display: none; }
+  .stage { padding: 0; }
+  .frame, .frame.wide {
+    width: 100%; height: calc(100dvh - 52px);
+    border: 0; border-radius: 0; box-shadow: none;
+  }
+}
+
+/* ===== App shell (mirrors .terminal-shell) ===== */
+.terminal-shell {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+  background: var(--bg); color: var(--text); position: relative;
+}
+.terminal-shell-header {
+  position: relative; z-index: 30;
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; flex-wrap: wrap; overflow: visible;
+  flex-shrink: 0; padding: 6px 10px; min-height: 46px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.terminal-topbar-main {
+  display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; min-width: 0; flex: 1;
+}
+.terminal-topbar-icon-btn {
+  width: 32px; height: 32px; flex: 0 0 auto;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  border-radius: 10px; font-size: 15px;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.terminal-topbar-icon-btn:active { transform: scale(0.94); }
+.terminal-topbar-target { flex: 1 1 auto; min-width: 0; max-width: none; }
+.terminal-topbar-name {
+  display: flex; align-items: center; gap: 7px;
+  font-weight: 600; font-size: 14px; line-height: 1.3;
+  min-width: 0; overflow: hidden; white-space: nowrap;
+}
+.terminal-topbar-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.terminal-topbar-dot {
+  width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--text-secondary);
+}
+.terminal-topbar-dot.on { background: var(--success); box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.18); }
+.terminal-topbar-dot.busy { background: var(--busy-dot); box-shadow: 0 0 0 3px rgba(191, 135, 0, 0.18); }
+.terminal-topbar-sub {
+  font-size: 10px; color: var(--text-secondary); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.terminal-fontpill {
+  display: flex; align-items: center; gap: 2px; flex: 0 0 auto;
+  border: 1px solid var(--border); background: var(--surface-2); border-radius: 10px; padding: 2px;
+}
+.terminal-fontpill button {
+  width: 28px; height: 28px; border: 0; background: transparent; color: var(--text);
+  border-radius: 8px; font-weight: 700; padding: 0;
+}
+.terminal-fontpill button:active { background: var(--pressed); }
+.terminal-fontpill button:disabled { opacity: 0.4; cursor: not-allowed; }
+.terminal-fontpill .am { font-size: 12px; }
+.terminal-fontpill .ap { font-size: 18px; }
+.terminal-mynav-header {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex: 0 0 auto; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--surface); overflow: hidden; align-self: stretch;
+}
+.terminal-mynav-hbtn {
+  border: none; background: transparent; color: var(--text-secondary);
+  cursor: pointer; font-size: 9px; line-height: 1; padding: 2px 8px;
+  display: flex; align-items: center; justify-content: center; flex: 1 1 0;
+}
+.terminal-mynav-hbtn:hover { color: var(--accent); }
+.terminal-mynav-hlabel {
+  font-size: 7px; letter-spacing: 0.6px; color: var(--text-secondary); opacity: 0.65; line-height: 1;
+}
+
+/* Group tabs + collapse + scrubber.
+   Expanded: full-width second header row so the name/font/ME/gear stay readable at 390px.
+   Collapsed: toggle + scrubber tuck into row 1 and reclaim the tab row. */
+.tab-cluster {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+}
+.tab-cluster-inline { flex: 0 0 auto; }
+.tab-row {
+  flex: 1 0 100%;
+  display: flex; align-items: center; gap: 6px;
+  min-width: 0; padding-top: 2px;
+}
+.tabs-toggle {
+  width: 26px; height: 26px; flex: 0 0 auto; flex-shrink: 0;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-secondary);
+  border-radius: 8px; font-size: 14px; font-weight: 700; line-height: 1; padding: 0;
+}
+.tabs-toggle:hover { color: var(--accent); border-color: var(--accent); }
+.tabs-toggle[aria-expanded="false"] { color: var(--accent); border-color: var(--accent); background: var(--accent-chip); }
+.terminal-header-tabs {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 6px;
+  overflow-x: auto; overflow-y: hidden;
+  padding: 0 2px; scrollbar-width: none; -ms-overflow-style: none;
+}
+.terminal-header-tab {
+  flex: 0 0 auto; max-width: 118px;
+  padding: 4px 10px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text-secondary);
+  font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.5;
+}
+.terminal-header-tab:hover { color: var(--text); border-color: var(--accent); }
+.terminal-header-tab.sel {
+  color: var(--accent); border-color: var(--accent); background: var(--accent-chip);
+}
+.terminal-header-tab.has-draft::after {
+  content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 5px;
+  border-radius: 50%; background: var(--warning); vertical-align: middle;
+}
+.tab-scrubber {
+  position: relative; flex: 0 0 auto; flex-shrink: 0;
+  width: 54px; height: 22px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px;
+  touch-action: none; cursor: ew-resize; user-select: none;
+}
+.tab-scrubber:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tab-scrubber-track {
+  position: absolute; left: 8px; right: 8px; top: 50%; height: 2px;
+  background: var(--grip); border-radius: 999px; transform: translateY(-50%); pointer-events: none;
+}
+.tab-scrubber-knob {
+  position: absolute; top: 2px; width: 16px; height: 16px; margin-left: -8px;
+  border-radius: 50%; background: var(--accent); border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent-chip-border); pointer-events: none;
+}
+.tab-scrubber.is-drag .tab-scrubber-knob { background: var(--accent-pressed); }
+.scrub-fly {
+  position: absolute; z-index: 40; top: 44px; left: 50%; transform: translateX(-50%);
+  background: var(--text); color: var(--bg); font-size: 11.5px; font-weight: 700;
+  padding: 4px 10px; border-radius: 8px; white-space: nowrap; pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+}
+.scrub-fly[hidden] { display: none; }
+
+/* Command-center rail (the only new chrome row) */
+.cc-rail {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px 7px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 31; /* keep chips tappable while a sheet is open (overlay is 24) */
+}
+.cc-chip {
+  flex: 0 1 auto; min-width: 0;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--text-secondary); font-size: 11.5px; font-weight: 600;
+  white-space: nowrap; max-width: 42%; overflow: hidden; text-overflow: ellipsis;
+}
+.cc-chip:hover { border-color: var(--accent); color: var(--text); }
+.cc-chip.active { color: var(--accent); border-color: var(--accent); background: var(--accent-chip); }
+.cc-chip.pending { color: var(--warning); border-color: var(--warn-border); background: var(--warn-soft); }
+.cc-chip.skipped { opacity: 0.7; }
+.cc-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.cc-spacer { flex: 1; }
+.frame.wide .cc-chip { max-width: none; }
+
+/* Sheets — same top-expand pattern as .terminal-menu-sheet */
+.sheet-overlay {
+  position: absolute; inset: 0; z-index: 24; background: var(--overlay);
+}
+.sheet-overlay[hidden] { display: none; }
+.terminal-menu-sheet {
+  position: relative; z-index: 25;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  overflow: hidden; max-height: 0; visibility: hidden; pointer-events: none;
+  transition: max-height 0.28s ease;
+  flex-shrink: 0;
+}
+.terminal-menu-sheet.open {
+  max-height: min(640px, 70vh); overflow-y: auto; visibility: visible; pointer-events: auto;
+}
+.terminal-sheet-inner { padding: 14px 14px 16px; }
+.terminal-sheet-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
+.terminal-sheet-title { font-size: 13px; font-weight: 700; }
+.terminal-sheet-sub { font-size: 11.5px; color: var(--text-secondary); font-weight: 400; margin-left: 6px; }
+.terminal-sheet-done {
+  padding: 5px 14px; font-size: 13px; font-weight: 600;
+  color: var(--on-accent); background: var(--accent); border: none; border-radius: 8px;
+}
+.terminal-sheet-done:hover { background: var(--accent-hover); }
+.terminal-sheet-back {
+  padding: 5px 10px; font-size: 13px; font-weight: 600;
+  color: var(--accent); background: var(--accent-chip); border: 1px solid var(--accent-chip-border); border-radius: 8px;
+}
+.terminal-sheet-sect {
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-secondary); margin: 4px 2px 8px;
+}
+.terminal-sheet-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+.terminal-sheet-lbl { flex: 1 1 auto; font-size: 14px; }
+.terminal-sheet-lbl small { display: block; color: var(--text-secondary); font-size: 11.5px; margin-top: 2px; }
+.terminal-sheet-stepper {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 4px;
+}
+.terminal-sheet-stepper button {
+  width: 34px; height: 32px; border: 0; background: transparent; color: var(--text); font-weight: 700; border-radius: 8px;
+}
+.terminal-sheet-stepper button:active { background: var(--pressed); }
+.terminal-sheet-stepper button:disabled { opacity: 0.4; cursor: not-allowed; }
+.terminal-sheet-stepper .val { min-width: 46px; text-align: center; font-variant-numeric: tabular-nums; font-size: 13px; }
+.terminal-sheet-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.terminal-sheet-chip {
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  border-radius: 999px; padding: 7px 12px; font-size: 13px;
+}
+.terminal-sheet-chip.sel { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,0.10); }
+.terminal-sheet-chip.danger { color: var(--danger); border-color: rgba(248,81,73,0.4); }
+.terminal-switch {
+  width: 42px; height: 24px; flex: 0 0 auto; border: 0; border-radius: 999px;
+  background: var(--idle); position: relative; transition: 0.2s; padding: 0;
+}
+.terminal-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
+  border-radius: 50%; background: var(--knob); transition: 0.2s;
+}
+.terminal-switch.on { background: var(--accent); }
+.terminal-switch.on::after { left: 20px; }
+.terminal-seg {
+  display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg);
+}
+.terminal-seg-btn {
+  min-width: 44px; padding: 6px 10px; font-size: 13px; font-weight: 600;
+  color: var(--text-secondary); background: transparent; border: none; border-left: 1px solid var(--border);
+}
+.terminal-seg-btn:first-child { border-left: none; }
+.terminal-seg-btn.sel { background: var(--accent); color: var(--on-accent); }
+
+/* Chat */
+.terminal-chat-view { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--bg); }
+.terminal-chat-transcript-wrap { flex: 1 1 auto; min-height: 0; min-width: 0; position: relative; display: flex; flex-direction: column; }
+.terminal-chat-transcript {
+  flex: 1 1 auto; overflow-y: auto; min-height: 0;
+  padding: 14px 12px 8px; display: flex; flex-direction: column; gap: 14px;
+  --terminal-conv-font: 17px;
+}
+.terminal-search-toggle {
+  position: absolute; top: 8px; right: 12px; z-index: 5;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
+  padding: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.12); opacity: 0.9;
+}
+.terminal-search-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 9px; z-index: 6; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.terminal-search-input {
+  flex: 1 1 auto; min-width: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-size: 14px; padding: 6px 9px; outline: none;
+}
+.terminal-search-count { flex: 0 0 auto; font-size: 12px; color: var(--text-secondary); min-width: 36px; text-align: center; font-variant-numeric: tabular-nums; }
+.terminal-search-btn {
+  flex: 0 0 auto; width: 28px; height: 28px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text-secondary);
+  font-size: 12px; display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.terminal-search-btn:disabled { opacity: 0.4; cursor: default; }
+.terminal-chat-daydiv {
+  align-self: center; font-size: 11px; color: var(--text-secondary);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px;
+}
+.ovm-chat-row { display: flex; flex-direction: column; width: 100%; max-width: 88%; }
+.ovm-chat-row-user { align-self: flex-end; align-items: flex-end; }
+.ovm-chat-row-ovm { align-self: flex-start; align-items: flex-start; }
+.ovm-chat-row-system { align-self: center; align-items: center; }
+.terminal-chat-who { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-secondary); margin-bottom: 5px; }
+.terminal-chat-who.user { justify-content: flex-end; }
+.terminal-chat-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.03em; padding: 1px 6px; border-radius: 5px; }
+.terminal-chat-entry-agent .terminal-chat-badge { background: var(--accent-soft); color: var(--accent); }
+.terminal-chat-entry-user .terminal-chat-badge { background: var(--success-soft-2); color: var(--success); }
+.ovm-chat-bubble {
+  max-width: 100%; padding: 12px 14px; border-radius: 14px;
+  word-break: break-word; white-space: pre-wrap; position: relative;
+  font-size: var(--terminal-conv-font); line-height: 1.55;
+}
+.ovm-chat-bubble-ovm {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-left: 3px solid var(--accent); border-bottom-left-radius: 4px;
+}
+.ovm-chat-bubble-user {
+  background: var(--accent-soft); color: var(--text);
+  border: 1px solid var(--accent-soft-border); border-bottom-right-radius: 4px;
+}
+.ovm-chat-pill {
+  font-size: 11.5px; color: var(--text-secondary);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px;
+}
+.terminal-chat-status {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 9px; max-width: 100%;
+  padding: 7px 13px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text); font-size: 12.5px;
+}
+.terminal-chat-status.empty { display: none; }
+.terminal-chat-pulse {
+  width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--warning);
+  animation: pulse 1.1s infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 0.35; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+.terminal-chat-hit .ovm-chat-bubble { box-shadow: 0 0 0 1.5px var(--accent); }
+.terminal-chat-hit-current .ovm-chat-bubble { box-shadow: 0 0 0 2.5px var(--accent); }
+.terminal-chat-focus-flash .ovm-chat-bubble { animation: flash 0.7s ease-out; }
+@keyframes flash { 0% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+mark.hit { background: #ffe566; color: inherit; padding: 0 1px; border-radius: 2px; }
+html.theme-dark mark.hit { background: #9a6700; color: var(--text); }
+
+.terminal-selection {
+  margin: 8px 10px 0; padding: 10px 12px;
+  border: 1px solid var(--accent-chip-border); background: var(--accent-selected); border-radius: 12px;
+}
+.terminal-selection-head { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+.terminal-selection-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.terminal-selection-opts { display: flex; flex-direction: column; gap: 6px; }
+.terminal-selection-opt {
+  display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left;
+  padding: 9px 11px; font-size: 14px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 9px;
+}
+.terminal-selection-opt.current { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.terminal-selection-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; flex: 0 0 auto; font-size: 12px; font-weight: 700;
+  color: var(--accent); background: var(--accent-chip); border-radius: 6px;
+}
+.terminal-selection-opt.current .terminal-selection-num { background: var(--accent); color: var(--on-accent); }
+
+.terminal-control-bar { display: flex; gap: 6px; padding: 8px 10px 0; overflow-x: auto; flex-shrink: 0; }
+.terminal-control-bar button {
+  flex: 1 1 auto; min-width: 42px; padding: 7px 6px; font-size: 13px; font-weight: 600;
+  color: var(--text-secondary); background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+}
+.terminal-control-bar button:hover { background: var(--surface); color: var(--text); border-color: var(--accent); }
+.terminal-key-flash {
+  align-self: center; flex: 0 0 auto; padding: 4px 8px; font-size: 11.5px; font-weight: 600;
+  color: var(--success); background: var(--success-soft); border: 1px solid var(--success-soft-border);
+  border-radius: 999px; white-space: nowrap;
+}
+
+.terminal-chat-composer {
+  position: sticky; bottom: 0; z-index: 5; flex-shrink: 0;
+  background: linear-gradient(180deg, transparent, var(--bg) 22%);
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column;
+}
+.terminal-composer-grip { display: flex; align-items: center; justify-content: center; height: 12px; margin: 0 auto 2px; cursor: ns-resize; touch-action: none; }
+.terminal-composer-grip-bar { width: 32px; height: 3px; border-radius: 999px; background: var(--grip); }
+.terminal-composer-grip:active .terminal-composer-grip-bar { background: var(--grip-active); }
+.terminal-chat-modebar { display: flex; gap: 6px; margin: 0 4px 7px; }
+.terminal-chat-modebar .terminal-size-toggle { margin-left: auto; }
+.terminal-chat-modebar button {
+  font-size: 11.5px; color: var(--text-secondary); background: transparent;
+  border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; line-height: 1.3;
+}
+.terminal-chat-modebar button.sel { color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,0.10); }
+.draft-kept {
+  margin: 0 6px 6px; font-size: 11px; color: var(--warning); font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
+}
+.draft-kept[hidden] { display: none; }
+.terminal-chat-composer-row {
+  display: flex; align-items: flex-end; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 6px;
+}
+.terminal-chat-composer-row:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
+.terminal-chat-attach-btn {
+  width: 36px; height: 36px; flex: 0 0 auto; border: none; background: transparent;
+  color: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.terminal-attach-pill { position: relative; flex: 0 0 auto; width: 34px; height: 34px; }
+.terminal-attach-pill img, .terminal-attach-pill .ph {
+  width: 34px; height: 34px; object-fit: cover; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface-2); display: block;
+}
+.terminal-attach-pill .ph { display: grid; place-items: center; font-size: 16px; }
+.terminal-attach-pill button {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border: none; border-radius: 50%;
+  background: var(--text-secondary); color: var(--on-accent); font-size: 12px; line-height: 1; padding: 0;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.terminal-chat-input-field {
+  flex: 1 1 auto; min-height: 36px; max-height: 60vh; background: transparent; border: 0;
+  padding: 8px 0; font-size: 16px; color: var(--text); line-height: 1.4; outline: none; overflow-y: auto; width: auto;
+}
+.terminal-chat-input-field::placeholder { color: var(--text-secondary); }
+.terminal-chat-send-btn {
+  width: 40px; height: 40px; flex: 0 0 auto; border-radius: 50%; border: none;
+  background: var(--accent); color: var(--on-accent);
+  display: flex; align-items: center; justify-content: center; font-size: 18px; padding: 0;
+}
+.terminal-chat-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.terminal-scroll-bottom {
+  position: absolute; right: 12px; bottom: 12px; z-index: 4;
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+
+/* v2 cards inside sheets */
+.card {
+  border: 1px solid var(--border); background: var(--bg); border-radius: 12px;
+  padding: 10px 12px; margin-bottom: 8px;
+}
+.card h4 { font-size: 13.5px; font-weight: 700; margin-bottom: 2px; }
+.card .meta { font-size: 12px; color: var(--text-secondary); }
+.card .row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.agent-flag {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 4px; border-bottom: 1px solid var(--border);
+}
+.agent-flag:last-child { border-bottom: 0; }
+.agent-flag .nm { flex: 1; font-size: 13.5px; font-weight: 600; }
+.agent-flag .sk { font-size: 11px; color: var(--text-secondary); }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.field label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.field input, .field textarea, .field select { padding: 8px 10px; width: 100%; }
+.field textarea { min-height: 72px; }
+.hint { font-size: 11.5px; color: var(--text-secondary); margin: -6px 0 12px; }
+.ep-card { position: relative; }
+.ep-card .star { position: absolute; top: 10px; right: 12px; font-size: 12px; color: var(--accent); font-weight: 700; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.btn {
+  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); font-size: 13px; font-weight: 600;
+}
+.btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn-danger { color: var(--danger); border-color: rgba(248,81,73,0.4); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Summaries dropdown */
+.sum-drop {
+  position: absolute; z-index: 28; top: calc(100% + 4px); left: 10px; right: 10px;
+  max-height: min(46vh, 360px); overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.18); padding: 8px;
+}
+.sum-drop[hidden] { display: none; }
+.sum-drop h4 { font-size: 12px; font-weight: 700; padding: 4px 8px 8px; color: var(--text-secondary); letter-spacing: 0.04em; text-transform: uppercase; }
+.sum-item {
+  display: block; width: 100%; text-align: left;
+  padding: 9px 10px; border-radius: 8px; margin-bottom: 4px;
+  border: 1px solid transparent;
+}
+.sum-item:hover, .sum-item.open { background: var(--accent-row-hover); border-color: var(--border); }
+.sum-item time { display: block; font-size: 11px; color: var(--text-secondary); font-variant-numeric: tabular-nums; margin-bottom: 2px; }
+.sum-item p { font-size: 13px; line-height: 1.45; color: var(--text); }
+.sum-foot { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px 2px; font-size: 12px; color: var(--text-secondary); }
+.sum-foot button { color: var(--accent); font-weight: 600; font-size: 12px; }
+
+.raw-chrome {
+  margin: 0 0 10px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+}
+</style>
+</head>
+<body>
+  <div class="mock-bar">
+    <div>
+      <b>AGJAssist · agent-window v2</b>
+      <span class="sub">grok46 mockup · build contract · not the live app</span>
+    </div>
+    <div class="mock-controls">
+      <div class="seg" role="group" aria-label="Theme preview">
+        <button type="button" id="btn-light" class="sel" data-act="theme" data-v="light">Light</button>
+        <button type="button" id="btn-dark" data-act="theme" data-v="dark">Dark</button>
+      </div>
+      <div class="seg" role="group" aria-label="Width preview">
+        <button type="button" id="btn-390" class="sel" data-act="width" data-v="390">390</button>
+        <button type="button" id="btn-720" data-act="width" data-v="720">720</button>
+      </div>
+    </div>
+  </div>
+  <div class="mock-note">
+    <details>
+      <summary>Contract checklist — every required control is clickable in the phone</summary>
+      <ol>
+        <li>Group tabs: collapse/expand chevron · drag the pill scrubber through all 6 agents (more than fit).</li>
+        <li>Reminders chip → folder reminder · This agent / Folder views · include/skip flags · 15/30/45/60/90 + custom · stop-after-N or unlimited.</li>
+        <li>Wake chip (pending 08:00) · edit time + action · Fire now clears the chip.</li>
+        <li>Summaries dropdown · timestamped, scrollable · per agent.</li>
+        <li>Gear → Summary LLM · named endpoints, default “140”.</li>
+        <li>Switch to lkAsst-0 to see draft-kept · send clears it. Existing keys / send-mode / font / ME / attach / search remain.</li>
+      </ol>
+    </details>
+  </div>
+  <div class="stage">
+    <div class="frame" id="frame"></div>
+  </div>
+
+<script>
+(function () {
+  const FOLDER = { id: "projcore", name: "projcore" };
+  const CADENCE = [15, 30, 45, 60, 90];
+  const FONT_MIN = 12, FONT_MAX = 26, FONT_DEF = 17;
+  const NOW = "14:18";
+
+  const AGENTS = [
+    { id: "hris-4430", name: "hris-4430", status: "running", last: "14:02" },
+    { id: "lkAsst-0", name: "lkAsst-0", status: "ready", last: "13:51" },
+    { id: "wflow-3762", name: "wflow-3762", status: "asking", last: "13:48" },
+    { id: "lokalAI2-465", name: "lokalAI2-465", status: "ready", last: "13:10" },
+    { id: "north-8821", name: "north-8821", status: "running", last: "14:11" },
+    { id: "coord-1104", name: "coord-1104", status: "ready", last: "12:40" }
+  ];
+
+  const state = {
+    theme: "light",
+    wide: false,
+    fontSize: FONT_DEF,
+    replyLimit: 50,
+    showRaw: false,
+    tabsCollapsed: false,
+    activeId: "hris-4430",
+    sendMode: "command",
+    composerH: 0,
+    searchOpen: false,
+    searchQ: "",
+    searchIdx: 0,
+    sheet: null,          // settings | reminders | reminder-form | wakeup | llm
+    reminderTab: "agent", // agent | folder
+    summariesOpen: false,
+    keyFlash: "",
+    attachment: false,
+    drafts: {
+      "lkAsst-0": "please check the leave-balance query against the 2025 schema"
+    },
+    composer: "",
+    draftHint: false,
+    meCursor: -1,
+    flashId: null,
+    selIndex: 0,
+    reminders: [
+      {
+        id: "r1",
+        folder: "projcore",
+        title: "Status ping",
+        solicit: "give me a status update",
+        cadenceMin: 30,
+        custom: false,
+        unlimited: true,
+        stopAfter: 8,
+        remaining: null,
+        nextFire: "14:32",
+        skipped: ["lokalAI2-465"],
+        paused: false
+      }
+    ],
+    reminderForm: null,
+    wakeups: {
+      "hris-4430": {
+        date: "2026-08-27",
+        time: "08:00",
+        action: "Weekly reset done. Start the HRIS leave-balance port. Read north-star first.",
+        pending: true
+      }
+    },
+    endpoints: [
+      { id: "140", name: "140", url: "http://192.168.254.140:8080/v1", model: "qwen2.5-32b-instruct" },
+      { id: "openrouter", name: "OpenRouter", url: "https://openrouter.ai/api/v1", model: "anthropic/claude-sonnet-4" }
+    ],
+    defaultEndpointId: "140",
+    epForm: { name: "", url: "", model: "" },
+    summaries: {
+      "hris-4430": [
+        { t: "14:02", text: "Leave-balance SQL still blocked on the 2025 schema confirm. Will retry the join once HRIS replies." },
+        { t: "13:32", text: "Scaffolded /leave routes and the mapper. Auth cookie name is the remaining unknown." },
+        { t: "13:02", text: "Started the HRIS port. Reading port-spec + north-star; no code yet." },
+        { t: "12:32", text: "Idle after last send. Confirmed tmux pane alive, waiting on the next solicit." }
+      ],
+      "lkAsst-0": [
+        { t: "13:45", text: "Leave-assist is waiting on the same schema confirm; no independent blocker." }
+      ],
+      "wflow-3762": [
+        { t: "13:18", text: "Flow chart PDF is blocked on the D2 binary path. Asking which install to use." }
+      ],
+      "lokalAI2-465": [],
+      "north-8821": [
+        { t: "14:00", text: "North-star draft is stable. Waiting on JROM’s go to hand to projcore." }
+      ],
+      "coord-1104": [
+        { t: "12:30", text: "Queue empty. Coord idle, no in-flight micro-fix." }
+      ]
+    },
+    openSumId: null,
+    messages: {
+      "hris-4430": [
+        { id: "h1", role: "agent", time: "13:04", text: "On the HRIS leave-balance port. Reading port-spec now — I’ll scaffold routes next." },
+        { id: "h2", role: "user", time: "13:31", text: "keep going. ping me when you’re blocked on schema." },
+        { id: "h3", role: "agent", time: "13:33", text: "Routes + mapper are in. Blocked on the auth cookie name and the 2025 leave-balance schema — that’s the join I can’t invent." },
+        { id: "h4", role: "system", time: "14:02", text: "Reminder · projcore · “give me a status update”" },
+        { id: "h5", role: "agent", time: "14:02", text: "Still on the schema confirm. No new files since 13:33. I’ll retry the join the moment HRIS answers." }
+      ],
+      "lkAsst-0": [
+        { id: "l1", role: "agent", time: "13:40", text: "Leave-assist is idle. Last task was the balance query — parked on schema, same as hris-4430." },
+        { id: "l2", role: "user", time: "13:50", text: "hold. I’ll send the schema notes in a minute." }
+      ],
+      "wflow-3762": [
+        { id: "w1", role: "agent", time: "13:44", text: "FlowMaster PDF needs a D2 binary. I can install the project-local one or use the shared path." }
+      ],
+      "lokalAI2-465": [
+        { id: "k1", role: "agent", time: "13:08", text: "lokalAI endpoint 140 is up. Qwen 32B answering on :8080/v1." },
+        { id: "k2", role: "system", time: "13:09", text: "Skipped from folder reminder “Status ping”" }
+      ],
+      "north-8821": [
+        { id: "n1", role: "agent", time: "14:09", text: "Command-center north-star is stamped. Ready to hand to projcore when you say go." }
+      ],
+      "coord-1104": [
+        { id: "c1", role: "agent", time: "12:38", text: "No issues in the coord queue. Idle." }
+      ]
+    }
+  };
+
+  const $ = (sel, el) => (el || document).querySelector(sel);
+  const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const agent = () => AGENTS.find((a) => a.id === state.activeId);
+  const agentIndex = () => AGENTS.findIndex((a) => a.id === state.activeId);
+  const wakeup = () => state.wakeups[state.activeId] || null;
+  const folderReminders = () => state.reminders.filter((r) => r.folder === FOLDER.id && !r.paused);
+  const includedIn = (r) => !r.skipped.includes(state.activeId);
+  const defaultEp = () => state.endpoints.find((e) => e.id === state.defaultEndpointId) || state.endpoints[0];
+
+  function remainingLabel(r) {
+    if (r.unlimited) return "unlimited";
+    const left = r.remaining == null ? r.stopAfter : r.remaining;
+    return left + " left · stop after " + r.stopAfter;
+  }
+
+  function highlight(text, q) {
+    const t = esc(text);
+    if (!q) return t;
+    const re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig");
+    return t.replace(re, "<mark class=\"hit\">$1</mark>");
+  }
+
+  function searchMatches() {
+    const q = state.searchQ.trim().toLowerCase();
+    if (!q) return [];
+    return (state.messages[state.activeId] || []).filter((m) => (m.text || "").toLowerCase().includes(q)).map((m) => m.id);
+  }
+
+  function saveDraftFromComposer() {
+    const text = state.composer;
+    if (text && text.trim()) state.drafts[state.activeId] = text;
+    else delete state.drafts[state.activeId];
+  }
+
+  function switchAgent(id) {
+    if (id === state.activeId) return;
+    saveDraftFromComposer();
+    state.activeId = id;
+    state.composer = state.drafts[id] || "";
+    state.draftHint = !!(state.drafts[id] && state.drafts[id].trim());
+    state.summariesOpen = false;
+    state.searchOpen = false;
+    state.searchQ = "";
+    state.meCursor = -1;
+    state.attachment = false;
+    if (state.sheet === "reminder-form") state.sheet = "reminders";
+    render({ pin: true });
+  }
+
+  function closeSheet() {
+    state.sheet = null;
+    state.reminderForm = null;
+    render();
+  }
+
+  function openSheet(name) {
+    state.summariesOpen = false;
+    state.sheet = state.sheet === name ? null : name;
+    render();
+  }
+
+  /* ---------- templates ---------- */
+  function tabsHtml() {
+    return AGENTS.map((a) => {
+      const cls = [
+        "terminal-header-tab",
+        a.id === state.activeId ? "sel" : "",
+        state.drafts[a.id] ? "has-draft" : ""
+      ].filter(Boolean).join(" ");
+      return `<button type="button" class="${cls}" data-testid="terminal-header-tab" data-act="tab" data-id="${esc(a.id)}" title="Switch to ${esc(a.name)}">${esc(a.name)}</button>`;
+    }).join("");
+  }
+
+  function scrubberHtml(i, knobPx) {
+    return `<div class="tab-scrubber" data-testid="tab-scrubber" role="slider" aria-valuemin="0" aria-valuemax="${AGENTS.length - 1}" aria-valuenow="${i}" aria-label="Scrub agents in ${esc(FOLDER.name)}" tabindex="0">
+      <span class="tab-scrubber-track"></span>
+      <span class="tab-scrubber-knob" style="left:${knobPx}px"></span>
+    </div>`;
+  }
+
+  function railHtml() {
+    const rs = folderReminders();
+    const mine = rs.filter(includedIn);
+    const skipped = rs.length && !mine.length;
+    let remLabel = "Remind";
+    let remCls = "cc-chip";
+    if (mine.length) {
+      remLabel = mine[0].cadenceMin + "m · " + mine[0].nextFire;
+      remCls += " active";
+    } else if (skipped) {
+      remLabel = "Remind · skip";
+      remCls += " skipped";
+    }
+    const w = wakeup();
+    let wakeLabel = "Wake";
+    let wakeCls = "cc-chip";
+    if (w && w.pending) {
+      wakeLabel = "Wake " + w.time;
+      wakeCls += " pending";
+    }
+    const sums = state.summaries[state.activeId] || [];
+    const sumCls = "cc-chip" + (state.summariesOpen ? " active" : "");
+    const sumLabel = "Σ " + sums.length;
+    return `
+      <div class="cc-rail" data-testid="cc-rail">
+        <button type="button" class="${remCls}" data-testid="reminder-chip" data-act="open" data-sheet="reminders" title="Folder reminders">⏱ ${esc(remLabel)}</button>
+        <button type="button" class="${wakeCls}" data-testid="wakeup-chip" data-act="open" data-sheet="wakeup" title="One-time wakeup">${w && w.pending ? "<span class=dot></span>" : ""}⏰ ${esc(wakeLabel)}</button>
+        <button type="button" class="${sumCls}" data-testid="summaries-toggle" data-act="summaries" title="Summaries">${esc(sumLabel)}</button>
+        <span class="cc-spacer"></span>
+        <span style="font-size:10.5px;color:var(--text-secondary);white-space:nowrap">${esc(FOLDER.name)}</span>
+        ${state.summariesOpen ? summariesDropHtml() : ""}
+      </div>`;
+  }
+
+  function summariesDropHtml() {
+    const items = state.summaries[state.activeId] || [];
+    const ep = defaultEp();
+    const body = items.length
+      ? items.map((s, i) => `
+          <button type="button" class="sum-item${state.openSumId === i ? " open" : ""}" data-act="sum-open" data-i="${i}">
+            <time datetime="">${esc(s.t)} · today</time>
+            <p>${esc(s.text)}</p>
+          </button>`).join("")
+      : `<div class="hint" style="padding:8px">No summaries yet. They appear here after a reminder solicit is answered.</div>`;
+    return `
+      <div class="sum-drop" data-testid="summaries-dropdown" role="listbox">
+        <h4>Summaries · ${esc(state.activeId)}</h4>
+        ${body}
+        <div class="sum-foot">
+          <span>via ${esc(ep.name)}</span>
+          <button type="button" data-act="open" data-sheet="llm">Configure LLM →</button>
+        </div>
+      </div>`;
+  }
+
+  function settingsHtml() {
+    return `
+      <div class="terminal-sheet-topbar">
+        <span class="terminal-sheet-title">Terminal settings</span>
+        <button type="button" class="terminal-sheet-done" data-act="close-sheet">Done</button>
+      </div>
+      <div class="terminal-sheet-sect">Text size</div>
+      <div class="terminal-sheet-row">
+        <div class="terminal-sheet-lbl">Conversation size<small>Also in Settings ▸ Appearance (syncs everywhere)</small></div>
+        <div class="terminal-sheet-stepper">
+          <button type="button" data-act="font" data-d="-1" ${state.fontSize <= FONT_MIN ? "disabled" : ""}>A−</button>
+          <span class="val">${state.fontSize}px</span>
+          <button type="button" data-act="font" data-d="1" ${state.fontSize >= FONT_MAX ? "disabled" : ""}>A＋</button>
+        </div>
+      </div>
+      <div class="terminal-sheet-row" style="margin-bottom:16px">
+        <div class="terminal-sheet-lbl">Reset to default</div>
+        <button type="button" class="terminal-sheet-chip" data-act="font-reset">Reset · ${FONT_DEF}px</button>
+      </div>
+      <div class="terminal-sheet-sect">Reply length</div>
+      <div class="terminal-sheet-row" style="margin-bottom:16px">
+        <div class="terminal-sheet-lbl">Minimize agent replies<small>Shows the most recent N lines · tap a reply to expand</small></div>
+        <div class="terminal-seg" role="group">
+          ${[10, 50, 0].map((n) => `<button type="button" class="terminal-seg-btn${state.replyLimit === n ? " sel" : ""}" data-act="reply" data-n="${n}">${n === 0 ? "Full" : n}</button>`).join("")}
+        </div>
+      </div>
+      <div class="terminal-sheet-sect">Output</div>
+      <div class="terminal-sheet-row">
+        <div class="terminal-sheet-lbl">Show raw terminal output<small>Reveals stripped CLI chrome</small></div>
+        <button type="button" class="terminal-switch${state.showRaw ? " on" : ""}" data-act="raw" role="switch" aria-checked="${state.showRaw}"></button>
+      </div>
+      <div class="terminal-sheet-sect">Summary LLM</div>
+      <div class="terminal-sheet-row" style="margin-bottom:16px">
+        <div class="terminal-sheet-lbl">Default endpoint<small>${esc(defaultEp().name)} · ${esc(defaultEp().model)}</small></div>
+        <button type="button" class="terminal-sheet-chip sel" data-act="open" data-sheet="llm">Manage</button>
+      </div>
+      <div class="terminal-sheet-sect">Session</div>
+      <div class="terminal-sheet-row">
+        <div class="terminal-sheet-lbl"><strong>Terminal Chat</strong><small>${esc(agent().name)} · ${esc(agent().status)}</small></div>
+      </div>`;
+  }
+
+  function remindersHtml() {
+    if (state.sheet === "reminder-form") return reminderFormHtml();
+    const a = agent();
+    const rs = state.reminders.filter((r) => r.folder === FOLDER.id);
+    const agentCards = rs.map((r) => {
+      const on = includedIn(r);
+      return `
+        <div class="card" data-testid="reminder-card">
+          <h4>${esc(r.title)}</h4>
+          <div class="meta">every ${r.cadenceMin}m · next ${esc(r.nextFire)} · ${esc(remainingLabel(r))}</div>
+          <div class="terminal-sheet-row" style="margin:10px 0 0">
+            <div class="terminal-sheet-lbl">${on ? "Included" : "Skipped"} on this agent<small>Folder reminder · ${esc(FOLDER.name)}</small></div>
+            <button type="button" class="terminal-switch${on ? " on" : ""}" data-testid="reminder-agent-flag" data-act="flag" data-rid="${r.id}" role="switch" aria-checked="${on}" title="Include this agent"></button>
+          </div>
+        </div>`;
+    }).join("") || `<div class="hint">No folder reminders apply to ${esc(a.name)}.</div>`;
+
+    const folderCards = rs.map((r) => `
+      <div class="card">
+        <h4>${esc(r.title)}</h4>
+        <div class="meta">every ${r.cadenceMin}m · next ${esc(r.nextFire)} · ${esc(remainingLabel(r))}</div>
+        <div class="meta" style="margin-top:4px">${AGENTS.length - r.skipped.length} of ${AGENTS.length} agents · solicit “${esc(r.solicit)}”</div>
+        <div class="row">
+          <button type="button" class="btn" data-act="edit-rem" data-rid="${r.id}">Edit</button>
+          <button type="button" class="btn" data-act="pause-rem" data-rid="${r.id}">${r.paused ? "Resume" : "Pause"}</button>
+          <button type="button" class="btn btn-danger" data-act="del-rem" data-rid="${r.id}">Delete</button>
+        </div>
+      </div>`).join("") || `<div class="hint">No reminders on this folder yet.</div>`;
+
+    return `
+      <div class="terminal-sheet-topbar">
+        <span class="terminal-sheet-title">Reminders <span class="terminal-sheet-sub">${esc(FOLDER.name)} folder</span></span>
+        <button type="button" class="terminal-sheet-done" data-act="close-sheet">Done</button>
+      </div>
+      <div class="terminal-sheet-row" style="margin-bottom:14px">
+        <div class="terminal-seg" role="tablist" aria-label="Reminder view">
+          <button type="button" class="terminal-seg-btn${state.reminderTab === "agent" ? " sel" : ""}" data-act="rtab" data-v="agent">This agent</button>
+          <button type="button" class="terminal-seg-btn${state.reminderTab === "folder" ? " sel" : ""}" data-act="rtab" data-v="folder">Folder</button>
+        </div>
+      </div>
+      ${state.reminderTab === "agent" ? `
+        <div class="terminal-sheet-sect">Active on ${esc(a.name)}</div>
+        ${agentCards}
+        <p class="hint">Flags here skip this agent only. Cadence lives on the folder.</p>
+      ` : `
+        <div class="terminal-sheet-sect">Active on folder</div>
+        ${folderCards}
+        <button type="button" class="btn btn-primary" data-act="new-rem">+ New folder reminder</button>
+      `}`;
+  }
+
+  function reminderFormHtml() {
+    const f = state.reminderForm;
+    const custom = !CADENCE.includes(Number(f.cadenceMin)) || f.custom;
+    return `
+      <div class="terminal-sheet-topbar">
+        <button type="button" class="terminal-sheet-back" data-act="back-rem">← List</button>
+        <span class="terminal-sheet-title">${f.id ? "Edit reminder" : "New reminder"}</span>
+        <button type="button" class="terminal-sheet-done" data-act="save-rem">Save</button>
+      </div>
+      <p class="hint">Applies to every agent in <b>${esc(FOLDER.name)}</b>, unless skipped below. Each fire auto-sends the solicit as a command.</p>
+      <div class="field">
+        <label>Title</label>
+        <input data-keep="rtitle" data-rf="title" value="${esc(f.title)}" placeholder="Status ping">
+      </div>
+      <div class="field">
+        <label>Solicit message</label>
+        <textarea data-keep="solicit" data-rf="solicit" placeholder="give me a status update">${esc(f.solicit)}</textarea>
+      </div>
+      <div class="terminal-sheet-sect">Cadence</div>
+      <div class="terminal-sheet-chips" style="margin-bottom:10px">
+        ${CADENCE.map((n) => `<button type="button" class="terminal-sheet-chip${!custom && Number(f.cadenceMin) === n ? " sel" : ""}" data-act="cadence" data-n="${n}">${n}m</button>`).join("")}
+        <button type="button" class="terminal-sheet-chip${custom ? " sel" : ""}" data-act="cadence-custom">Custom</button>
+      </div>
+      <div class="field" ${custom ? "" : "hidden"}>
+        <label for="cmin">Custom minutes</label>
+        <input id="cmin" data-keep="cmin" data-rf="cadenceMin" type="number" min="1" max="1440" value="${esc(f.cadenceMin)}">
+      </div>
+      <div class="terminal-sheet-sect">Repeat</div>
+      <div class="terminal-sheet-row">
+        <div class="terminal-sheet-lbl">Unlimited</div>
+        <button type="button" class="terminal-switch${f.unlimited ? " on" : ""}" data-act="unlim" role="switch" aria-checked="${f.unlimited}"></button>
+      </div>
+      <div class="field" ${f.unlimited ? "hidden" : ""}>
+        <label for="stopn">Stop after N fires</label>
+        <input id="stopn" data-keep="stopn" data-rf="stopAfter" type="number" min="1" max="999" value="${esc(f.stopAfter)}">
+      </div>
+      <div class="terminal-sheet-sect">Agents in ${esc(FOLDER.name)}</div>
+      ${AGENTS.map((a) => {
+        const on = !f.skipped.includes(a.id);
+        return `<div class="agent-flag">
+          <span class="nm">${esc(a.name)}</span>
+          <span class="sk">${on ? "include" : "skip"}</span>
+          <button type="button" class="terminal-switch${on ? " on" : ""}" data-testid="reminder-agent-flag" data-act="form-flag" data-id="${a.id}" role="switch" aria-checked="${on}"></button>
+        </div>`;
+      }).join("")}
+      <div class="btn-row">
+        <button type="button" class="btn" data-act="form-all" data-v="in">Include all</button>
+        <button type="button" class="btn" data-act="form-all" data-v="out">Skip all</button>
+      </div>`;
+  }
+
+  function wakeupHtml() {
+    const w = wakeup() || { date: "2026-08-27", time: "08:00", action: "", pending: false };
+    return `
+      <div class="terminal-sheet-topbar">
+        <span class="terminal-sheet-title">Wakeup <span class="terminal-sheet-sub">${esc(state.activeId)} · one-time</span></span>
+        <button type="button" class="terminal-sheet-done" data-act="close-sheet">Done</button>
+      </div>
+      <p class="hint">Fires once on this agent, then the pending chip clears. Action is sent as a command.</p>
+      ${w.pending ? `<div class="card" style="border-color:var(--warn-border);background:var(--warn-soft)">
+        <h4>Pending · ${esc(w.date)} ${esc(w.time)}</h4>
+        <div class="meta">${esc(w.action)}</div>
+      </div>` : `<div class="hint">No wakeup scheduled on this agent.</div>`}
+      <div class="field">
+        <label>Fire date</label>
+        <input data-keep="wdate" data-wf="date" type="date" value="${esc(w.date)}">
+      </div>
+      <div class="field">
+        <label>Fire time</label>
+        <input data-keep="wtime" data-wf="time" type="time" value="${esc(w.time)}">
+      </div>
+      <div class="field">
+        <label>Action (message / keys to send)</label>
+        <textarea data-keep="waction" data-wf="action" placeholder="Weekly reset done. Start working…">${esc(w.action)}</textarea>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" data-act="save-wake">Schedule wakeup</button>
+        <button type="button" class="btn" data-act="fire-wake" ${w.pending ? "" : "disabled"} title="Mock: fire immediately so the chip clears">Fire now</button>
+        <button type="button" class="btn btn-danger" data-act="cancel-wake" ${w.pending ? "" : "disabled"}>Cancel</button>
+      </div>
+      <p class="hint">“Fire now” is mock-only, so the pending chip can be demonstrated without waiting until ${esc(w.time)}.</p>`;
+  }
+
+  function llmHtml() {
+    const cards = state.endpoints.map((e) => `
+      <div class="card ep-card">
+        ${e.id === state.defaultEndpointId ? `<span class="star">default</span>` : ""}
+        <h4>${esc(e.name)}</h4>
+        <div class="meta">${esc(e.url)}</div>
+        <div class="meta">${esc(e.model)}</div>
+        <div class="row">
+          ${e.id === state.defaultEndpointId ? "" : `<button type="button" class="btn" data-act="ep-default" data-id="${e.id}">Set default</button>`}
+          <button type="button" class="btn" data-act="ep-load" data-id="${e.id}">Edit</button>
+          ${e.id === "140" && e.id === state.defaultEndpointId ? "" : `<button type="button" class="btn btn-danger" data-act="ep-del" data-id="${e.id}">Delete</button>`}
+        </div>
+      </div>`).join("");
+    const f = state.epForm;
+    return `
+      <div class="terminal-sheet-topbar">
+        <span class="terminal-sheet-title">Summary LLM</span>
+        <button type="button" class="terminal-sheet-done" data-act="close-sheet">Done</button>
+      </div>
+      <p class="hint">Named OpenAI-compatible endpoints (lokalAI / OpenRouter / any). Used to summarize the agent’s reply after a reminder solicit. Default today is the lokalAI box labelled <b>140</b>.</p>
+      <div class="terminal-sheet-sect">Endpoints</div>
+      ${cards}
+      <div class="terminal-sheet-sect">${f.id ? "Edit endpoint" : "Add endpoint"}</div>
+      <div class="field">
+        <label>Name</label>
+        <input data-keep="epname" data-ef="name" placeholder="e.g. 140" value="${esc(f.name)}">
+      </div>
+      <div class="field">
+        <label>Base URL</label>
+        <input data-keep="epurl" data-ef="url" placeholder="http://host:port/v1" value="${esc(f.url)}">
+      </div>
+      <div class="field">
+        <label>Model</label>
+        <input data-keep="epmodel" data-ef="model" placeholder="model-id" value="${esc(f.model)}">
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" data-act="ep-save">Save endpoint</button>
+        ${f.id ? `<button type="button" class="btn" data-act="ep-clear">Cancel edit</button>` : ""}
+      </div>`;
+  }
+
+  function sheetInner() {
+    if (state.sheet === "settings") return settingsHtml();
+    if (state.sheet === "reminders" || state.sheet === "reminder-form") return remindersHtml();
+    if (state.sheet === "wakeup") return wakeupHtml();
+    if (state.sheet === "llm") return llmHtml();
+    return "";
+  }
+
+  function transcriptHtml() {
+    const msgs = state.messages[state.activeId] || [];
+    const matches = searchMatches();
+    const q = state.searchQ.trim();
+    const a = agent();
+    const bubbles = msgs.map((m) => {
+      if (m.role === "system") {
+        return `<div class="ovm-chat-row ovm-chat-row-system terminal-chat-entry" data-turn-id="${m.id}"><div class="ovm-chat-pill">${highlight(m.text, q)}</div></div>`;
+      }
+      const isUser = m.role === "user";
+      const hit = matches.includes(m.id);
+      const cur = hit && matches[state.searchIdx] === m.id;
+      const flash = state.flashId === m.id;
+      const cls = [
+        "ovm-chat-row",
+        isUser ? "ovm-chat-row-user terminal-chat-entry-user" : "ovm-chat-row-ovm terminal-chat-entry-agent",
+        "terminal-chat-entry",
+        hit ? "terminal-chat-hit" : "",
+        cur ? "terminal-chat-hit-current" : "",
+        flash ? "terminal-chat-focus-flash" : ""
+      ].filter(Boolean).join(" ");
+      const who = isUser
+        ? `<div class="terminal-chat-who user"><span>${esc(m.time)}</span><span class="terminal-chat-badge">YOU</span></div>`
+        : `<div class="terminal-chat-who"><span class="terminal-chat-badge">AGENT</span><span>${esc(a.name)} · ${esc(m.time)}</span></div>`;
+      return `<div class="${cls}" data-turn-id="${m.id}" data-testid="${isUser ? "terminal-turn-user" : "terminal-turn-agent"}">
+        ${who}
+        <div class="ovm-chat-bubble ${isUser ? "ovm-chat-bubble-user" : "ovm-chat-bubble-ovm"}">${highlight(m.text, q)}</div>
+      </div>`;
+    }).join("");
+
+    const busy = a.status === "running";
+    const status = a.status === "asking"
+      ? "Claude is asking"
+      : busy ? "working…" : "";
+    return `
+      <div class="terminal-chat-daydiv">Today</div>
+      ${state.showRaw ? `<div class="raw-chrome" data-testid="terminal-raw-chrome">claude --dangerously-skip-permissions
+▌ status?  enter to send</div>` : ""}
+      ${bubbles}
+      <div class="terminal-chat-status${status ? (busy ? " busy" : "") : " empty"}" data-testid="terminal-status">
+        ${busy ? `<span class="terminal-chat-pulse"></span>` : ""}${esc(status)}
+      </div>`;
+  }
+
+  function selectionHtml() {
+    if (agent().id !== "wflow-3762") return "";
+    const opts = [
+      { n: "1", label: "Install project-local D2 at flm/_tools/d2" },
+      { n: "2", label: "Use the shared ~/.local/bin/d2" },
+      { n: "3", label: "Stop and wait for JROM" }
+    ];
+    return `
+      <div class="terminal-selection" data-testid="terminal-selection">
+        <div class="terminal-selection-head">
+          <span class="terminal-selection-dot"></span>
+          <span class="terminal-selection-title">Which D2 should I use for the FlowMaster PDF?</span>
+        </div>
+        <div class="terminal-selection-opts">
+          ${opts.map((o, i) => `
+            <button type="button" class="terminal-selection-opt${state.selIndex === i ? " current" : ""}" data-testid="terminal-selection-opt" data-act="sel" data-i="${i}">
+              <span class="terminal-selection-num">${o.n}</span>
+              <span class="terminal-selection-optlabel">${esc(o.label)}</span>
+            </button>`).join("")}
+        </div>
+      </div>`;
+  }
+
+  function searchHtml() {
+    if (state.searchOpen) {
+      const m = searchMatches();
+      return `
+        <div class="terminal-search-bar" data-testid="terminal-search-bar">
+          <input class="terminal-search-input" data-testid="terminal-search-input" data-keep="search" type="text" placeholder="Search this chat…" value="${esc(state.searchQ)}">
+          <span class="terminal-search-count">${m.length ? (state.searchIdx + 1) + "/" + m.length : "0/0"}</span>
+          <button type="button" class="terminal-search-btn" data-act="sprev" ${m.length ? "" : "disabled"}>▲</button>
+          <button type="button" class="terminal-search-btn" data-act="snext" ${m.length ? "" : "disabled"}>▼</button>
+          <button type="button" class="terminal-search-btn" data-act="sclose">✕</button>
+        </div>`;
+    }
+    return `<button type="button" class="terminal-search-toggle" data-testid="terminal-search-toggle" data-act="sopen" aria-label="Search chat">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+    </button>`;
+  }
+
+  function frameHtml() {
+    const a = agent();
+    const i = agentIndex();
+    const t = AGENTS.length <= 1 ? 0 : i / (AGENTS.length - 1);
+    const knobPx = (2 + t * (54 - 4 - 16));
+    const collapsed = state.tabsCollapsed;
+    const w = wakeup();
+    const draftOn = !!(state.composer && state.composer.trim()) || state.draftHint;
+    const canSend = !!(state.composer && state.composer.trim()) || state.attachment;
+    const dotCls = a.status === "running" ? "on" : a.status === "asking" ? "busy" : "";
+    return `
+      <div class="terminal-shell${collapsed ? " tabs-collapsed" : ""}">
+        <div class="terminal-shell-header" data-term-topbar>
+          <div class="terminal-topbar-main">
+            <button class="terminal-topbar-icon-btn" data-testid="terminal-back-list" aria-label="Back to terminal list" title="Back (list not in this mockup)">←</button>
+            <div class="terminal-topbar-target">
+              <div class="terminal-topbar-name" data-testid="terminal-session-name">
+                <span class="terminal-topbar-dot ${dotCls}"></span>
+                <span class="terminal-topbar-name-text">${esc(a.name)}</span>
+              </div>
+              <div class="terminal-topbar-sub">${esc(FOLDER.name)} · ${esc(a.last)}${w && w.pending ? " · wake " + esc(w.time) : ""}</div>
+            </div>
+            ${collapsed ? `
+            <div class="tab-cluster tab-cluster-inline">
+              <button type="button" class="tabs-toggle" data-testid="tabs-collapse" data-act="collapse" aria-expanded="false" aria-label="Expand group tabs" title="Expand tabs">›</button>
+              ${scrubberHtml(i, knobPx)}
+            </div>` : ""}
+            <div class="terminal-fontpill" title="Text size">
+              <button type="button" class="am" data-testid="terminal-font-decrease" data-act="font" data-d="-1" ${state.fontSize <= FONT_MIN ? "disabled" : ""}>A−</button>
+              <button type="button" class="ap" data-testid="terminal-font-increase" data-act="font" data-d="1" ${state.fontSize >= FONT_MAX ? "disabled" : ""}>A+</button>
+            </div>
+            <div class="terminal-mynav-header" data-testid="terminal-mynav" title="Jump between my messages">
+              <button type="button" class="terminal-mynav-hbtn" data-testid="terminal-mynav-up" data-act="me" data-d="-1" aria-label="Jump to my previous message">▲</button>
+              <span class="terminal-mynav-hlabel">ME</span>
+              <button type="button" class="terminal-mynav-hbtn" data-testid="terminal-mynav-down" data-act="me" data-d="1" aria-label="Jump to my next message">▼</button>
+            </div>
+            <button type="button" class="terminal-topbar-icon-btn" data-testid="terminal-menu" data-act="open" data-sheet="settings" aria-label="Terminal settings" aria-expanded="${state.sheet === "settings"}">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </button>
+          </div>
+          ${collapsed ? "" : `
+          <div class="tab-row" data-testid="tab-row">
+            <button type="button" class="tabs-toggle" data-testid="tabs-collapse" data-act="collapse" aria-expanded="true" aria-label="Collapse group tabs" title="Collapse tabs">‹</button>
+            <div class="terminal-header-tabs" data-testid="terminal-header-tabs">${tabsHtml()}</div>
+            ${scrubberHtml(i, knobPx)}
+          </div>`}
+        </div>
+        <div class="scrub-fly" id="scrub-fly" hidden></div>
+        ${railHtml()}
+        <div class="sheet-overlay" ${state.sheet ? "" : "hidden"} data-act="close-sheet"></div>
+        <div class="terminal-menu-sheet${state.sheet ? " open" : ""}" data-testid="terminal-menu-sheet">
+          <div class="terminal-sheet-inner">${sheetInner()}</div>
+        </div>
+        <div class="terminal-chat-view">
+          <div class="terminal-chat-transcript-wrap">
+            ${searchHtml()}
+            <div class="terminal-chat-transcript" data-testid="terminal-conversation" style="--terminal-conv-font:${state.fontSize}px">
+              ${transcriptHtml()}
+            </div>
+          </div>
+          ${selectionHtml()}
+          <div class="terminal-control-bar" data-testid="terminal-control-bar" role="group" aria-label="Terminal keys">
+            <button type="button" data-act="key" data-k="⏎" title="Enter">⏎</button>
+            <button type="button" data-act="key" data-k="Esc" title="Esc / interrupt">Esc</button>
+            <button type="button" data-act="key" data-k="^C" title="Ctrl-C / cancel">^C</button>
+            <button type="button" data-act="key" data-k="⇧⇥" title="Shift-Tab / cycle mode">⇧⇥</button>
+            <button type="button" data-act="key" data-k="↑" title="Up">↑</button>
+            <button type="button" data-act="key" data-k="↓" title="Down">↓</button>
+            ${state.keyFlash ? `<span class="terminal-key-flash">${esc(state.keyFlash)}</span>` : ""}
+          </div>
+          <div class="terminal-chat-composer">
+            <div class="terminal-composer-grip" data-testid="terminal-composer-grip" title="Drag to resize · double-tap to reset">
+              <span class="terminal-composer-grip-bar"></span>
+            </div>
+            <div class="terminal-chat-modebar">
+              <button type="button" class="${state.sendMode === "command" ? "sel" : ""}" data-act="mode" data-v="command">Send as command</button>
+              <button type="button" class="${state.sendMode === "raw" ? "sel" : ""}" data-act="mode" data-v="raw">Send raw keys</button>
+              <button type="button" class="terminal-size-toggle${state.composerH ? " sel" : ""}" data-act="large">${state.composerH ? "▾ Small input" : "▴ Large input"}</button>
+            </div>
+            <div class="draft-kept" data-testid="draft-kept" ${draftOn && state.drafts[state.activeId] && state.composer === state.drafts[state.activeId] ? "" : "hidden"}>draft kept · ${esc(state.activeId)}</div>
+            <div class="terminal-chat-composer-row">
+              <button type="button" class="terminal-chat-attach-btn" data-testid="terminal-attach-image" data-act="attach" aria-label="Attach image">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="8.5" cy="10" r="1.5"></circle><path d="M21 16l-5-5-11 8"></path></svg>
+              </button>
+              ${state.attachment ? `<span class="terminal-attach-pill" data-testid="terminal-attachment-chip"><span class="ph">🖼</span><button type="button" data-act="unattach" aria-label="Remove attachment">×</button></span>` : ""}
+              <textarea class="terminal-chat-input-field" data-testid="terminal-composer-input" data-keep="composer" rows="1" placeholder="Message the agent..." style="${state.composerH ? "height:" + state.composerH + "px" : ""}">${esc(state.composer)}</textarea>
+              <button class="terminal-chat-send-btn" data-testid="terminal-send-command" data-act="send" ${canSend ? "" : "disabled"}>➤</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  /* ---------- render ---------- */
+  const frame = document.getElementById("frame");
+  let flashTimer = 0;
+  let keyTimer = 0;
+
+  function render(opts) {
+    opts = opts || {};
+    const active = document.activeElement;
+    const keep = active && active.getAttribute && active.getAttribute("data-keep");
+    const start = active && typeof active.selectionStart === "number" ? active.selectionStart : null;
+    const end = active && typeof active.selectionEnd === "number" ? active.selectionEnd : null;
+    const tr = frame.querySelector('[data-testid="terminal-conversation"]');
+    const pin = opts.pin || (tr ? (tr.scrollHeight - tr.scrollTop - tr.clientHeight < 56) : true);
+    const scroll = tr ? tr.scrollTop : 0;
+
+    frame.innerHTML = frameHtml();
+    bindScrubber();
+    bindGrip();
+
+    const tr2 = frame.querySelector('[data-testid="terminal-conversation"]');
+    if (tr2) tr2.scrollTop = pin ? tr2.scrollHeight : scroll;
+    if (keep) {
+      const el = frame.querySelector('[data-keep="' + keep + '"]');
+      if (el) {
+        el.focus();
+        if (start != null && el.setSelectionRange) {
+          try { el.setSelectionRange(start, end); } catch (e) {}
+        }
+      }
+    }
+  }
+
+  function bindScrubber() {
+    const el = frame.querySelector(".tab-scrubber");
+    if (!el) return;
+    const fly = frame.querySelector("#scrub-fly");
+    /* Do not re-render while the pointer is down — that would drop capture. */
+    const visual = (clientX) => {
+      const rect = el.getBoundingClientRect();
+      const t = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(1, rect.width)));
+      const idx = Math.round(t * (AGENTS.length - 1));
+      const a = AGENTS[idx];
+      const knob = el.querySelector(".tab-scrubber-knob");
+      if (knob) knob.style.left = (2 + t * (54 - 4 - 16)) + "px";
+      if (fly) {
+        fly.hidden = false;
+        fly.textContent = a.name;
+      }
+      frame.querySelectorAll("[data-testid=terminal-header-tab]").forEach((tab) => {
+        tab.classList.toggle("sel", tab.getAttribute("data-id") === a.id);
+      });
+      const name = frame.querySelector(".terminal-topbar-name-text");
+      if (name) name.textContent = a.name;
+      return a.id;
+    };
+    el.addEventListener("pointerdown", (e) => {
+      el.classList.add("is-drag");
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+      visual(e.clientX);
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (!el.classList.contains("is-drag")) return;
+      visual(e.clientX);
+    });
+    const end = (e) => {
+      if (!el.classList.contains("is-drag")) return;
+      el.classList.remove("is-drag");
+      const id = visual(e.clientX);
+      if (fly) fly.hidden = true;
+      if (id !== state.activeId) switchAgent(id);
+      else render();
+    };
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", end);
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        const d = e.key === "ArrowRight" ? 1 : -1;
+        const n = Math.max(0, Math.min(AGENTS.length - 1, agentIndex() + d));
+        switchAgent(AGENTS[n].id);
+      }
+    });
+  }
+
+  function bindGrip() {
+    const grip = frame.querySelector(".terminal-composer-grip");
+    const ta = frame.querySelector('[data-testid="terminal-composer-input"]');
+    if (!grip || !ta) return;
+    grip.addEventListener("dblclick", () => { state.composerH = 0; render(); });
+    grip.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startH = ta.clientHeight;
+      const move = (ev) => {
+        const next = Math.max(36, Math.min(window.innerHeight * 0.5, startH + (startY - ev.clientY)));
+        state.composerH = next;
+        ta.style.height = next + "px";
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    });
+  }
+
+  function sendMessage() {
+    const text = (state.composer || "").trim();
+    if (!text && !state.attachment) return;
+    const id = "m" + Date.now();
+    const body = (state.attachment ? "🖼 image attached\n" : "") + (text || "");
+    state.messages[state.activeId].push({ id, role: "user", time: NOW, text: body });
+    state.composer = "";
+    delete state.drafts[state.activeId];
+    state.draftHint = false;
+    state.attachment = false;
+    render({ pin: true });
+  }
+
+  function jumpMe(dir) {
+    const mine = (state.messages[state.activeId] || []).filter((m) => m.role === "user");
+    if (!mine.length) return;
+    let idx = state.meCursor;
+    if (idx < 0) idx = dir < 0 ? mine.length : -1;
+    idx += dir;
+    if (idx < 0) idx = 0;
+    if (idx >= mine.length) idx = mine.length - 1;
+    state.meCursor = idx;
+    state.flashId = mine[idx].id;
+    render();
+    const el = frame.querySelector('[data-turn-id="' + mine[idx].id + '"]');
+    if (el) el.scrollIntoView({ block: "center" });
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { state.flashId = null; render(); }, 700);
+  }
+
+  function newReminderForm(existing) {
+    if (existing) {
+      state.reminderForm = JSON.parse(JSON.stringify(existing));
+      state.reminderForm.custom = !CADENCE.includes(Number(existing.cadenceMin));
+    } else {
+      state.reminderForm = {
+        id: "",
+        folder: FOLDER.id,
+        title: "Status ping",
+        solicit: "give me a status update",
+        cadenceMin: 30,
+        custom: false,
+        unlimited: true,
+        stopAfter: 8,
+        remaining: null,
+        nextFire: "14:48",
+        skipped: [],
+        paused: false
+      };
+    }
+    state.sheet = "reminder-form";
+    render();
+  }
+
+  function readFormFields() {
+    const f = state.reminderForm;
+    if (!f) return;
+    $$("[data-rf]", frame).forEach((el) => {
+      const k = el.getAttribute("data-rf");
+      if (el.type === "number") f[k] = Number(el.value);
+      else f[k] = el.value;
+    });
+  }
+
+  function readWakeFields() {
+    const cur = wakeup() || { date: "2026-08-27", time: "08:00", action: "", pending: false };
+    $$("[data-wf]", frame).forEach((el) => { cur[el.getAttribute("data-wf")] = el.value; });
+    return cur;
+  }
+
+  function readEpFields() {
+    $$("[data-ef]", frame).forEach((el) => { state.epForm[el.getAttribute("data-ef")] = el.value; });
+  }
+
+  /* ---------- events ---------- */
+  document.getElementById("btn-light").addEventListener("click", () => setTheme("light"));
+  document.getElementById("btn-dark").addEventListener("click", () => setTheme("dark"));
+  document.getElementById("btn-390").addEventListener("click", () => setWide(false));
+  document.getElementById("btn-720").addEventListener("click", () => setWide(true));
+
+  function setTheme(t) {
+    state.theme = t;
+    document.documentElement.className = "theme-" + t;
+    document.getElementById("btn-light").classList.toggle("sel", t === "light");
+    document.getElementById("btn-dark").classList.toggle("sel", t === "dark");
+  }
+  function setWide(w) {
+    state.wide = w;
+    frame.classList.toggle("wide", w);
+    document.getElementById("btn-390").classList.toggle("sel", !w);
+    document.getElementById("btn-720").classList.toggle("sel", w);
+  }
+
+  frame.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-act]");
+    if (!btn) {
+      if (state.summariesOpen && !e.target.closest(".sum-drop") && !e.target.closest("[data-act=summaries]")) {
+        state.summariesOpen = false;
+        render();
+      }
+      return;
+    }
+    const act = btn.getAttribute("data-act");
+    if (act === "theme" || act === "width") return;
+
+    if (act === "tab") { switchAgent(btn.getAttribute("data-id")); return; }
+    if (act === "collapse") { state.tabsCollapsed = !state.tabsCollapsed; render(); return; }
+    if (act === "font") {
+      state.fontSize = Math.max(FONT_MIN, Math.min(FONT_MAX, state.fontSize + Number(btn.getAttribute("data-d"))));
+      render(); return;
+    }
+    if (act === "font-reset") { state.fontSize = FONT_DEF; render(); return; }
+    if (act === "open") {
+      const sh = btn.getAttribute("data-sheet");
+      if (sh === "llm" && state.sheet === "settings") { state.sheet = "llm"; render(); return; }
+      openSheet(sh);
+      return;
+    }
+    if (act === "close-sheet") { closeSheet(); return; }
+    if (act === "summaries") { state.sheet = null; state.summariesOpen = !state.summariesOpen; render(); return; }
+    if (act === "sum-open") { state.openSumId = Number(btn.getAttribute("data-i")); render(); return; }
+    if (act === "mode") { state.sendMode = btn.getAttribute("data-v"); render(); return; }
+    if (act === "large") { state.composerH = state.composerH ? 0 : 140; render(); return; }
+    if (act === "attach") { state.attachment = true; render(); return; }
+    if (act === "unattach") { state.attachment = false; render(); return; }
+    if (act === "send") { sendMessage(); return; }
+    if (act === "key") {
+      state.keyFlash = "sent ✓ " + btn.getAttribute("data-k");
+      render();
+      clearTimeout(keyTimer);
+      keyTimer = setTimeout(() => { state.keyFlash = ""; render(); }, 900);
+      return;
+    }
+    if (act === "me") { jumpMe(Number(btn.getAttribute("data-d"))); return; }
+    if (act === "sopen") { state.searchOpen = true; render(); const i = frame.querySelector("[data-keep=search]"); if (i) i.focus(); return; }
+    if (act === "sclose") { state.searchOpen = false; state.searchQ = ""; render(); return; }
+    if (act === "snext" || act === "sprev") {
+      const m = searchMatches();
+      if (!m.length) return;
+      state.searchIdx = (state.searchIdx + (act === "snext" ? 1 : -1) + m.length) % m.length;
+      render();
+      const el = frame.querySelector('[data-turn-id="' + m[state.searchIdx] + '"]');
+      if (el) el.scrollIntoView({ block: "center" });
+      return;
+    }
+    if (act === "sel") { state.selIndex = Number(btn.getAttribute("data-i")); render(); return; }
+    if (act === "raw") { state.showRaw = !state.showRaw; render(); return; }
+    if (act === "reply") { state.replyLimit = Number(btn.getAttribute("data-n")); render(); return; }
+
+    if (act === "rtab") { state.reminderTab = btn.getAttribute("data-v"); render(); return; }
+    if (act === "flag") {
+      const r = state.reminders.find((x) => x.id === btn.getAttribute("data-rid"));
+      if (!r) return;
+      const id = state.activeId;
+      if (r.skipped.includes(id)) r.skipped = r.skipped.filter((x) => x !== id);
+      else r.skipped.push(id);
+      render(); return;
+    }
+    if (act === "new-rem") { newReminderForm(null); return; }
+    if (act === "edit-rem") {
+      const r = state.reminders.find((x) => x.id === btn.getAttribute("data-rid"));
+      newReminderForm(r); return;
+    }
+    if (act === "pause-rem") {
+      const r = state.reminders.find((x) => x.id === btn.getAttribute("data-rid"));
+      if (r) r.paused = !r.paused;
+      render(); return;
+    }
+    if (act === "del-rem") {
+      state.reminders = state.reminders.filter((x) => x.id !== btn.getAttribute("data-rid"));
+      render(); return;
+    }
+    if (act === "back-rem") { readFormFields(); state.sheet = "reminders"; render(); return; }
+    if (act === "cadence") {
+      readFormFields();
+      state.reminderForm.cadenceMin = Number(btn.getAttribute("data-n"));
+      state.reminderForm.custom = false;
+      render(); return;
+    }
+    if (act === "cadence-custom") {
+      readFormFields();
+      state.reminderForm.custom = true;
+      render(); return;
+    }
+    if (act === "unlim") {
+      readFormFields();
+      state.reminderForm.unlimited = !state.reminderForm.unlimited;
+      if (!state.reminderForm.unlimited) state.reminderForm.remaining = Number(state.reminderForm.stopAfter) || 8;
+      render(); return;
+    }
+    if (act === "form-flag") {
+      readFormFields();
+      const id = btn.getAttribute("data-id");
+      const sk = state.reminderForm.skipped;
+      if (sk.includes(id)) state.reminderForm.skipped = sk.filter((x) => x !== id);
+      else state.reminderForm.skipped.push(id);
+      render(); return;
+    }
+    if (act === "form-all") {
+      readFormFields();
+      state.reminderForm.skipped = btn.getAttribute("data-v") === "out" ? AGENTS.map((a) => a.id) : [];
+      render(); return;
+    }
+    if (act === "save-rem") {
+      readFormFields();
+      const f = state.reminderForm;
+      f.cadenceMin = Number(f.cadenceMin) || 30;
+      f.stopAfter = Number(f.stopAfter) || 8;
+      if (!f.unlimited) f.remaining = f.stopAfter;
+      else f.remaining = null;
+      if (!f.id) f.id = "r" + Date.now();
+      const idx = state.reminders.findIndex((x) => x.id === f.id);
+      if (idx >= 0) state.reminders[idx] = f;
+      else state.reminders.push(f);
+      state.reminderForm = null;
+      state.sheet = "reminders";
+      state.reminderTab = "folder";
+      render(); return;
+    }
+
+    if (act === "save-wake") {
+      const cur = readWakeFields();
+      cur.pending = true;
+      state.wakeups[state.activeId] = cur;
+      render(); return;
+    }
+    if (act === "cancel-wake") {
+      delete state.wakeups[state.activeId];
+      render(); return;
+    }
+    if (act === "fire-wake") {
+      const w = wakeup();
+      if (!w || !w.pending) return;
+      state.messages[state.activeId].push({
+        id: "wake" + Date.now(),
+        role: "system",
+        time: NOW,
+        text: "Wakeup fired · sent as command: “" + w.action + "”"
+      });
+      w.pending = false;
+      render({ pin: true });
+      return;
+    }
+
+    if (act === "ep-default") { state.defaultEndpointId = btn.getAttribute("data-id"); render(); return; }
+    if (act === "ep-load") {
+      const ep = state.endpoints.find((x) => x.id === btn.getAttribute("data-id"));
+      state.epForm = { ...ep };
+      render(); return;
+    }
+    if (act === "ep-del") {
+      const id = btn.getAttribute("data-id");
+      state.endpoints = state.endpoints.filter((x) => x.id !== id);
+      if (state.defaultEndpointId === id) state.defaultEndpointId = (state.endpoints[0] && state.endpoints[0].id) || "140";
+      render(); return;
+    }
+    if (act === "ep-clear") { state.epForm = { name: "", url: "", model: "" }; render(); return; }
+    if (act === "ep-save") {
+      readEpFields();
+      const f = state.epForm;
+      if (!f.name.trim() || !f.url.trim() || !f.model.trim()) return;
+      if (f.id) {
+        const i = state.endpoints.findIndex((x) => x.id === f.id);
+        if (i >= 0) state.endpoints[i] = { ...f };
+      } else {
+        state.endpoints.push({ id: "ep" + Date.now(), name: f.name.trim(), url: f.url.trim(), model: f.model.trim() });
+      }
+      state.epForm = { name: "", url: "", model: "" };
+      render(); return;
+    }
+  });
+
+  frame.addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.matches("[data-keep=composer]")) {
+      state.composer = t.value;
+      const hint = frame.querySelector("[data-testid=draft-kept]");
+      if (hint) {
+        const kept = !!(state.drafts[state.activeId] && t.value === state.drafts[state.activeId] && t.value.trim());
+        hint.hidden = !kept;
+      }
+      const send = frame.querySelector("[data-act=send]");
+      if (send) send.disabled = !(t.value.trim() || state.attachment);
+      return;
+    }
+    if (t.matches("[data-keep=search]")) {
+      state.searchQ = t.value;
+      state.searchIdx = 0;
+      render();
+      return;
+    }
+    if (t.hasAttribute("data-rf")) {
+      const k = t.getAttribute("data-rf");
+      state.reminderForm[k] = t.type === "number" ? Number(t.value) : t.value;
+      return;
+    }
+    if (t.hasAttribute("data-wf")) return;
+    if (t.hasAttribute("data-ef")) {
+      state.epForm[t.getAttribute("data-ef")] = t.value;
+    }
+  });
+
+  frame.addEventListener("keydown", (e) => {
+    if (e.target.matches("[data-keep=composer]") && e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      state.composer = e.target.value;
+      sendMessage();
+    }
+    if (e.key === "Escape") {
+      if (state.summariesOpen) { state.summariesOpen = false; render(); }
+      else if (state.sheet) closeSheet();
+      else if (state.searchOpen) { state.searchOpen = false; state.searchQ = ""; render(); }
+    }
+  });
+
+  render({ pin: true });
+})();
+</script>
+</body>
+</html>

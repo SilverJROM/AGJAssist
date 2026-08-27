@@ -1,0 +1,41 @@
+commit=e94ef39a35c3646927e9955b1ddd08c00fd50eff
+spec_exists=False
+app.js count 'href="#/overmind"': 0
+app.js count 'href="#/overmind-projects"': 0
+app.js count 'href="#/conversations"': 0
+app.js count 'OvermindWorkflows': 1
+app.js count 'OvermindProjects': 1
+app.js count 'OvmConsole': 2
+app.js count 'FriendlyTerminalView': 2
+app.js count 'Page not found': 3
+app.js count 'KNOWN_EXACT': 2
+app.js count 'summarizeWorkflows': 1
+--- nav-helpers AVAILABLE_BOTTOM_NAV_TABS block ---
+export const AVAILABLE_BOTTOM_NAV_TABS = [
+  { id: '/', icon: '\u{1F3E0}', label: 'Home' },
+  { id: '/tasks', icon: '\u{2705}', label: 'Tasks' },
+  { id: '/notes', icon: '\u{1F4DD}', label: 'Notes' },
+  { id: '/terminals', icon: '\u{1F5A5}', label: 'Terminal' },
+  { id: '/settings', icon: '\u{2699}', label: 'Settings' }
+];
+
+
+--- overmind-helpers AVAILABLE_BOTTOM_NAV_TABS block ---
+export const AVAILABLE_BOTTOM_NAV_TABS = [
+  { id: '/', icon: '\u{1F3E0}', label: 'Home' },
+  { id: '/tasks', icon: '\u{2705}', label: 'Tasks' },
+  { id: '/notes', icon: '\u{1F4DD}', label: 'Notes' },
+  { id: '/terminals', icon: '\u{1F5A5}', label: 'Terminal' },
+  { id: '/conversations', icon: '\u{1F4AC}', label: 'Chat' },
+  { id: '/settings', icon: '\u{2699}', label: 'Settings' },
+  { id: '/overmind', icon: '\u{25B6}', label: 'Workflows' },
+  { id: '/overmind-projects', icon: '\u{25A3}', label: 'OVM Projects' }
+];
+
+
+--- App() route branches containing overmind/conversations ---
+App has /overmind branch: False
+App has /conversations branch: False
+TgApp KNOWN_EXACT contains /overmind: False
+TgApp KNOWN_EXACT contains /conversations: False
+TgApp has route === '/overmind': False

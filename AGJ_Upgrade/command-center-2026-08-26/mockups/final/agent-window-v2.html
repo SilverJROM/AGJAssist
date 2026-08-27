@@ -1,0 +1,1947 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>AGJAssist — Agent Window v2 (final · sonnet5 + resize)</title>
+<style>
+/* =========================================================================
+   AGJAssist — Agent Window v2 — final (sonnet5 base + drag-resize)
+   Self-contained single-file mockup. No backend, no external deps.
+   Reuses the REAL app's class names (terminal-shell, terminal-chat-*, ovm-chat-*,
+   terminal-sheet-*, terminal-header-tab, terminal-control-bar, badge, toast, …)
+   verbatim wherever the element already exists in src/web/public/{style.css,app.js},
+   so this file doubles as a literal CSS/markup reference for the port.
+   New v2 surfaces use a `cc-` (command-center) prefix so a builder can tell at a
+   glance what's existing-contract vs. new-in-this-mockup.
+   ========================================================================= */
+
+/* ---------- harness chrome (NOT part of the app contract — reviewer tool) ---------- */
+:root {
+  --harness-bg: #05070a;
+  --harness-fg: #cdd6e0;
+  --harness-border: #263041;
+  --harness-accent: #58a6ff;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "JetBrains Mono", monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; background: var(--harness-bg); color: var(--harness-fg);
+  font-family: var(--sans); -webkit-tap-highlight-color: transparent;
+}
+.cc-harness-bar {
+  position: sticky; top: 0; z-index: 500;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: #0a0e16; border-bottom: 1px solid var(--harness-border);
+}
+.cc-harness-title { font-size: 13px; font-weight: 700; color: #fff; margin-right: auto; white-space: nowrap; }
+.cc-harness-title small { display: block; font-weight: 400; color: #7f8ea3; font-size: 10.5px; margin-top: 1px; }
+.cc-harness-group { display: inline-flex; align-items: center; gap: 4px; background: #10151f; border: 1px solid var(--harness-border); border-radius: 999px; padding: 3px; }
+.cc-harness-group span.lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #6b7686; padding: 0 8px 0 4px; }
+.cc-harness-btn {
+  border: 0; background: transparent; color: #9fb0c3; font-size: 12px; font-weight: 600;
+  padding: 6px 11px; border-radius: 999px; cursor: pointer; font-family: inherit;
+}
+.cc-harness-btn.sel { background: var(--harness-accent); color: #05070a; }
+.cc-harness-btn:not(.sel):hover { color: #fff; }
+.cc-stage { display: flex; justify-content: center; padding: 34px 28px 80px; }
+.cc-phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 100%; }
+.cc-phone-label { font-size: 11px; color: #6b7686; font-family: var(--mono); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.cc-band-pill {
+  display: inline-flex; align-items: center; font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px;
+  background: #10151f; border: 1px solid var(--harness-border); color: #9fb0c3;
+}
+.cc-band-pill[data-band="Phone"] { color: #7ee787; border-color: #238636; }
+.cc-band-pill[data-band="Tablet"] { color: #d2a8ff; border-color: #8957e5; }
+.cc-band-pill[data-band="Desktop"] { color: var(--harness-accent); border-color: #1f6feb; }
+.cc-resize-hint { font-family: var(--sans); font-size: 10.5px; color: #5b6778; }
+.cc-frame-shell {
+  position: relative;
+  width: var(--frame-w, 390px);
+  height: var(--frame-h, 780px);
+  max-width: calc(100vw - 56px);
+  max-height: calc(100vh - 180px);
+  flex: 0 0 auto;
+}
+.cc-frame-shell.anim { transition: width .25s ease, height .25s ease; }
+.cc-phone {
+  width: 100%; height: 100%;
+  border-radius: 20px; overflow: hidden; position: relative;
+  box-shadow: 0 30px 70px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04);
+}
+.cc-resize-e {
+  position: absolute; top: 18px; bottom: 28px; right: -12px; width: 16px;
+  cursor: ew-resize; touch-action: none; z-index: 20;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; padding: 0;
+  appearance: none; -webkit-appearance: none;
+}
+.cc-resize-e-bar {
+  width: 6px; height: 56px; border-radius: 999px; pointer-events: none;
+  background: #2b3a4d; border: 1px solid var(--harness-accent);
+  box-shadow: 0 0 0 3px rgba(88,166,255,0.16);
+}
+.cc-resize-e:hover .cc-resize-e-bar,
+.cc-frame-shell.is-resizing-x .cc-resize-e-bar { background: var(--harness-accent); }
+.cc-resize-se {
+  position: absolute; right: -6px; bottom: -6px; width: 24px; height: 24px;
+  cursor: nwse-resize; touch-action: none; z-index: 21;
+  border-radius: 6px; background: #0a0e16; border: 1px solid var(--harness-accent);
+  color: var(--harness-accent); display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4); padding: 0;
+  appearance: none; -webkit-appearance: none;
+}
+.cc-resize-se:hover,
+.cc-frame-shell.is-resizing-xy .cc-resize-se { background: var(--harness-accent); color: #05070a; }
+.cc-live-size {
+  position: absolute; right: 18px; bottom: 18px; z-index: 22;
+  background: #0a0e16; color: #fff; border: 1px solid var(--harness-accent);
+  font-family: var(--mono); font-size: 11px; padding: 5px 8px; border-radius: 8px;
+  pointer-events: none; display: none; white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
+.cc-frame-shell.is-resizing .cc-live-size { display: block; }
+.cc-notes {
+  width: min(700px, calc(100vw - 24px));
+  background: #10151f; border: 1px solid var(--harness-border); border-radius: 12px;
+  color: #b9c4d3; font-size: 12.5px; line-height: 1.6;
+}
+.cc-notes summary { cursor: pointer; padding: 11px 14px; font-weight: 700; color: #fff; list-style: none; display: flex; align-items: center; gap: 8px; }
+.cc-notes summary::-webkit-details-marker { display: none; }
+.cc-notes summary::before { content: '▸'; color: var(--harness-accent); transition: transform .15s; }
+.cc-notes[open] summary::before { transform: rotate(90deg); }
+.cc-notes-body { padding: 0 16px 14px; }
+.cc-notes-body b { color: #fff; }
+.cc-notes-body ul { margin: 6px 0 12px 18px; padding: 0; }
+.cc-notes-body li { margin-bottom: 4px; }
+
+/* ============================= APP CONTRACT ============================= */
+/* Everything below `.cc-phone` down to the endpoints sheet is the buildable
+   agent-window-v2 surface. Light tokens are the base; dark + system react
+   via [data-theme] exactly like the real app's terminal-shell gating. */
+.cc-phone {
+  --bg: #f6f8fa; --surface: #ffffff; --surface-2: #eef1f4; --border: #d0d7de;
+  --text: #1f2328; --text-secondary: #57606a; --accent: #0969da;
+  --success: #1a7f37; --warning: #9a6700; --danger: #cf222e;
+  --on-accent: #ffffff; --pressed: #eaeef2; --pressed-2: #e2e8ee; --idle: #8c959f;
+  --grip: #c8d1da; --grip-active: #9aa4ae;
+  --accent-hover: #0a5cc7; --accent-pressed: #0550ae;
+  --accent-soft: #ddf4ff; --accent-row-hover: #f6faff; --accent-selected: #f2f8ff;
+  --accent-chip: #ddf0ff; --accent-chip-border: #c8e1ff; --accent-soft-border: #b6e3ff;
+  --accent-tab-hover: #eaf2ff;
+  --success-soft: #e6f7ec; --success-soft-2: #dafbe1; --success-soft-border: #aadfbc;
+  --danger-soft: #fff5f5; --danger-alt: #d1242f; --danger-hover: #b31d27;
+  --busy-dot: #bf8700; --knob: #ffffff; --radius: 8px;
+  background: var(--bg); color: var(--text);
+  font-family: var(--sans); font-size: 14px;
+  display: flex; flex-direction: column;
+}
+.cc-phone[data-theme="dark"] {
+  --bg: #0d1117; --surface: #161b22; --surface-2: #1c232c; --border: #30363d;
+  --text: #e6edf3; --text-secondary: #8b949e; --accent: #58a6ff;
+  --success: #3fb950; --warning: #d29922; --danger: #f85149;
+  --on-accent: #ffffff; --pressed: #21262d; --pressed-2: #262c34; --idle: #8b949e;
+  --grip: #484f58; --grip-active: #6e7681;
+  --accent-hover: #79b8ff; --accent-pressed: #388bfd;
+  --accent-soft: #12253d; --accent-row-hover: #1c232c; --accent-selected: #1f3347;
+  --accent-chip: #12253d; --accent-chip-border: #1f6feb; --accent-soft-border: #1f6feb;
+  --accent-tab-hover: #1f3347;
+  --success-soft: #12261e; --success-soft-2: #12261e; --success-soft-border: #238636;
+  --danger-soft: #3d1114; --danger-alt: #f85149; --danger-hover: #ff7b72;
+  --busy-dot: #d29922; --knob: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  .cc-phone[data-theme="system"] {
+    --bg: #0d1117; --surface: #161b22; --surface-2: #1c232c; --border: #30363d;
+    --text: #e6edf3; --text-secondary: #8b949e; --accent: #58a6ff;
+    --success: #3fb950; --warning: #d29922; --danger: #f85149;
+    --on-accent: #ffffff; --pressed: #21262d; --pressed-2: #262c34; --idle: #8b949e;
+    --grip: #484f58; --grip-active: #6e7681;
+    --accent-hover: #79b8ff; --accent-pressed: #388bfd;
+    --accent-soft: #12253d; --accent-row-hover: #1c232c; --accent-selected: #1f3347;
+    --accent-chip: #12253d; --accent-chip-border: #1f6feb; --accent-soft-border: #1f6feb;
+    --accent-tab-hover: #1f3347;
+    --success-soft: #12261e; --success-soft-2: #12261e; --success-soft-border: #238636;
+    --danger-soft: #3d1114; --danger-alt: #f85149; --danger-hover: #ff7b72;
+    --busy-dot: #d29922; --knob: #ffffff;
+  }
+}
+
+/* ---- shell / header (verbatim class names from the real app) ---- */
+.terminal-shell { display: flex; flex-direction: column; min-height: 0; height: 100%; background: var(--bg); color: var(--text); }
+.terminal-shell-header {
+  position: sticky; top: 0; z-index: 30; display: flex; flex-direction: column; gap: 0;
+  flex-shrink: 0; padding: 10px 12px 0; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.terminal-topbar-main { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; min-width: 0; padding-bottom: 8px; }
+.terminal-topbar-icon-btn {
+  width: 28px; height: 28px; flex: 0 0 auto; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text); border-radius: 8px; font-size: 14px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0;
+}
+.terminal-topbar-icon-btn:active { transform: scale(0.94); }
+.terminal-topbar-target { flex: 1 1 92px; min-width: 64px; max-width: 46%; position: relative; }
+.terminal-topbar-name {
+  font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 7px; min-width: 0; max-width: 100%;
+  overflow: hidden; white-space: nowrap; line-height: 1.3;
+}
+.terminal-topbar-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.terminal-topbar-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--text-secondary); }
+.terminal-topbar-dot.on { background: var(--success); box-shadow: 0 0 0 3px rgba(63,185,80,0.18); }
+.terminal-topbar-dot.busy { background: var(--busy-dot); box-shadow: 0 0 0 3px rgba(191,135,0,0.18); }
+.terminal-topbar-sub { font-size: 11.5px; color: var(--text-secondary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.terminal-fontpill { display: flex; align-items: center; gap: 0; border: 1px solid var(--border); background: var(--surface-2); border-radius: 8px; padding: 1px; flex: 0 0 auto; }
+.terminal-fontpill button { width: 22px; height: 24px; border: 0; background: transparent; color: var(--text); border-radius: 6px; cursor: pointer; font-weight: 700; padding: 0; }
+.terminal-fontpill button:active { background: var(--pressed); }
+.terminal-fontpill .am { font-size: 9.5px; } .terminal-fontpill .ap { font-size: 13px; }
+.terminal-mynav-header { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0 0 auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; height: 28px; width: 26px; }
+.terminal-mynav-hbtn { border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 7px; line-height: 1; padding: 0; display: flex; align-items: center; justify-content: center; flex: 1 1 0; }
+.terminal-mynav-hbtn:hover { color: var(--accent); }
+.terminal-mynav-hlabel { font-size: 6px; letter-spacing: 0.4px; color: var(--text-secondary); opacity: 0.65; line-height: 1; pointer-events: none; }
+
+/* Optional: tuck font / ME / gear behind one overflow entry so a fully collapsed header is one row. Default = expanded. */
+.cc-ctrlcluster { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; min-width: 0; }
+.cc-ctrl-toggle {
+  flex: 0 0 auto; width: 20px; height: 20px; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-secondary); border-radius: 6px; cursor: pointer; font-size: 11px;
+  display: none; align-items: center; justify-content: center; padding: 0;
+}
+.cc-ctrl-toggle:hover { color: var(--text); border-color: var(--accent); }
+.cc-ctrl-items { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
+.cc-ctrlcluster.collapsed .cc-ctrl-items { display: none; }
+.cc-ctrlcluster.collapsed .cc-ctrl-toggle { width: 28px; height: 28px; border-radius: 8px; font-size: 16px; }
+/* Tuck handle only when the one-row state is in play (util collapsed) or already tucked. */
+.terminal-shell-header.util-collapsed .cc-ctrl-toggle,
+.cc-ctrlcluster.collapsed .cc-ctrl-toggle { display: flex; }
+
+/* ---- NEW v2: collapsible sibling-tab strip + draggable scrubber ---- */
+.cc-tabsarea { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 40px; }
+.cc-tabs-toggle {
+  flex: 0 0 auto; width: 24px; height: 24px; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-secondary); border-radius: 7px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.cc-tabs-toggle:hover { color: var(--text); border-color: var(--accent); }
+.cc-tabs-scroll { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.terminal-header-tabs { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 0 1px; scrollbar-width: none; -ms-overflow-style: none; }
+.terminal-header-tabs::-webkit-scrollbar { display: none; }
+.terminal-header-tab {
+  flex: 0 0 auto; max-width: 108px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text-secondary); font-size: 11.5px; font-weight: 600; font-family: inherit;
+  cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.5; position: relative;
+}
+.terminal-header-tab:hover { color: var(--text); border-color: var(--accent); }
+.terminal-header-tab .cc-tab-dot { position: absolute; top: -2px; right: -2px; width: 7px; height: 7px; border-radius: 50%; background: var(--warning); border: 1.5px solid var(--surface); }
+.cc-scrubber-track {
+  height: 8px; border-radius: 999px; background: var(--surface-2); position: relative;
+  cursor: pointer; touch-action: none; flex: 0 0 auto; visibility: visible;
+}
+.cc-scrubber-thumb {
+  position: absolute; top: 0; left: 0; height: 100%; min-width: 28px; border-radius: 999px;
+  background: var(--grip); cursor: grab; touch-action: none; box-shadow: 0 0 0 1px var(--border);
+}
+.cc-scrubber-thumb:active { background: var(--grip-active); cursor: grabbing; }
+.terminal-header-tab.is-current {
+  color: var(--accent); border-color: var(--accent); background: var(--accent-soft);
+}
+.cc-tabs-collapsed-pill {
+  display: none; align-items: center; gap: 5px; flex: 0 0 auto; padding: 4px 10px; border: 1px dashed var(--border);
+  border-radius: 999px; background: var(--surface-2); color: var(--text-secondary); font-size: 11.5px; font-weight: 600; cursor: pointer;
+}
+.cc-tabsarea.collapsed .cc-tabs-scroll { display: none; }
+.cc-tabsarea.collapsed .cc-tabs-collapsed-pill { display: inline-flex; }
+.cc-tabsarea.collapsed .cc-tabs-toggle { transform: rotate(180deg); }
+.cc-tabsarea.collapsed { min-width: min-content; }
+
+/* ---- group switcher: dropdown <900px frame, strip+scrubber ≥900px (data-switcher) ---- */
+.cc-agent-dd { display: none; position: relative; flex: 1 1 auto; min-width: 0; max-width: 100%; }
+.cc-agent-dd-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; width: 100%;
+  padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface-2); color: var(--text); font-size: 11.5px; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+}
+.cc-agent-dd-btn:hover { border-color: var(--accent); color: var(--text); }
+.cc-agent-dd-btn .terminal-topbar-dot { width: 7px; height: 7px; }
+.cc-agent-dd-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-agent-dd-caret { flex: 0 0 auto; font-size: 9px; color: var(--text-secondary); line-height: 1; }
+.cc-agent-dd.open .cc-agent-dd-caret { transform: rotate(180deg); }
+.cc-agent-dd-menu {
+  display: none; position: absolute; z-index: 40; top: calc(100% + 4px); left: 0;
+  min-width: 100%; width: max(180px, 100%); max-width: min(260px, 72vw);
+  max-height: 280px; overflow-y: auto; padding: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.22);
+}
+.cc-agent-dd.open .cc-agent-dd-menu { display: block; }
+.cc-agent-dd-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 10px; border: 0; background: transparent; color: var(--text);
+  font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer;
+  border-radius: 8px; text-align: left;
+}
+.cc-agent-dd-item:hover { background: var(--accent-row-hover); }
+.cc-agent-dd-item.current { background: var(--accent-selected); color: var(--accent); }
+.cc-agent-dd-item .terminal-topbar-dot { width: 7px; height: 7px; }
+.cc-agent-dd-item-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-agent-dd-item .cc-tab-dot { position: static; margin-left: auto; flex: 0 0 auto; width: 6px; height: 6px; border: 0; top: auto; right: auto; }
+
+.cc-phone[data-switcher="dropdown"] .cc-agent-dd { display: flex; }
+.cc-phone[data-switcher="dropdown"] .cc-tabsarea { flex: 0 1 150px; min-width: 0; max-width: 46%; }
+.cc-phone[data-switcher="dropdown"] .cc-tabs-toggle,
+.cc-phone[data-switcher="dropdown"] .cc-tabs-collapsed-pill,
+.cc-phone[data-switcher="dropdown"] .cc-tabs-scroll { display: none !important; }
+
+.cc-phone[data-switcher="strip"] .cc-agent-dd { display: none; }
+
+/* ---- NEW v2: utility chip row (reminders / wakeup / summaries) ---- */
+.cc-utilarea { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0 0 9px; }
+.cc-util-toggle {
+  flex: 0 0 auto; width: 24px; height: 24px; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-secondary); border-radius: 7px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.cc-util-toggle:hover { color: var(--text); border-color: var(--accent); }
+/* Collapsed util = one compact icon on row 1 (not a second-row pill). */
+.cc-util-icon {
+  display: none; position: relative; width: 28px; height: 28px; flex: 0 0 auto;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-secondary);
+  border-radius: 8px; cursor: pointer; padding: 0; align-items: center; justify-content: center;
+}
+.cc-util-icon:hover { color: var(--text); border-color: var(--accent); }
+.cc-util-icon:active { transform: scale(0.94); }
+.cc-util-icon-dot {
+  position: absolute; top: 2px; right: 2px; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--warning); border: 1.5px solid var(--surface); display: none; pointer-events: none;
+}
+.cc-util-icon.has-reminder .cc-util-icon-dot { display: block; }
+.cc-util-icon-count {
+  position: absolute; bottom: -3px; right: -3px; min-width: 12px; height: 12px; padding: 0 3px;
+  border-radius: 999px; background: var(--accent); color: var(--on-accent);
+  font-size: 8px; font-weight: 700; line-height: 12px; display: none; align-items: center; justify-content: center;
+  border: 1.5px solid var(--surface); font-variant-numeric: tabular-nums; pointer-events: none;
+}
+.cc-util-icon.has-wakeup .cc-util-icon-count { display: flex; }
+.terminal-shell-header.util-collapsed .cc-util-icon { display: flex; }
+.terminal-shell-header.util-collapsed .cc-utilarea { display: none; }
+.cc-util-row { display: flex; align-items: center; gap: 6px; overflow-x: auto; flex: 1 1 auto; min-width: 0; scrollbar-width: none; }
+.cc-util-row::-webkit-scrollbar { display: none; }
+.cc-util-chip {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px 5px 8px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--text-secondary);
+  font-size: 11.5px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.cc-util-chip:hover { color: var(--text); border-color: var(--accent); }
+.cc-util-chip svg { flex: 0 0 auto; opacity: 0.85; }
+.cc-util-chip.active-on { color: var(--accent); border-color: var(--accent-soft-border); background: var(--accent-soft); }
+.cc-util-chip.active-on svg { opacity: 1; }
+.cc-util-chip.ghost { border-style: dashed; }
+.cc-util-chip .cc-chip-x {
+  flex: 0 0 auto; width: 16px; height: 16px; border-radius: 50%; border: 0; background: rgba(0,0,0,0.12);
+  color: inherit; font-size: 10px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; margin-left: 1px;
+}
+.cc-util-chip .cc-chip-x:hover { background: var(--danger); color: #fff; }
+.cc-util-chip .cc-badge-count {
+  background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; border-radius: 999px;
+  min-width: 15px; height: 15px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px;
+}
+
+/* ---- transcript / bubbles (verbatim) ---- */
+.terminal-chat-view { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.terminal-chat-transcript-wrap { flex: 1 1 auto; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.terminal-chat-transcript { flex: 1 1 auto; overflow-y: auto; min-height: 0; padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 12px; background: var(--bg); }
+.terminal-chat-daydiv { align-self: center; font-size: 11px; color: var(--text-secondary); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
+.cc-transcript-tools {
+  position: absolute; top: 8px; right: 12px; z-index: 5;
+  display: flex; align-items: center; gap: 6px;
+}
+.terminal-chat-transcript-wrap.search-open .cc-transcript-tools { top: 52px; }
+.terminal-search-toggle,
+.cc-refresh-toggle {
+  width: 30px; height: 30px; flex: 0 0 auto; border-radius: 50%; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-secondary); display: flex; align-items: center;
+  justify-content: center; cursor: pointer; padding: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.12); opacity: .92;
+}
+.terminal-search-toggle:hover,
+.cc-refresh-toggle:hover { color: var(--text); opacity: 1; }
+.cc-refresh-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cc-refresh-toggle:disabled { cursor: default; opacity: .85; }
+.cc-refresh-toggle svg { display: block; }
+@keyframes ccRefreshSpin { to { transform: rotate(360deg); } }
+.cc-refresh-toggle.spinning svg { animation: ccRefreshSpin .6s linear infinite; }
+.terminal-search-bar { display: flex; align-items: center; gap: 6px; padding: 7px 9px; z-index: 6; background: var(--surface); border-bottom: 1px solid var(--border); }
+.terminal-search-glass { color: var(--text-secondary); flex: 0 0 auto; }
+.terminal-search-input { flex: 1 1 auto; min-width: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13.5px; padding: 6px 9px; outline: none; font-family: inherit; }
+.terminal-search-input:focus { border-color: var(--accent); }
+.terminal-search-count { flex: 0 0 auto; font-size: 12px; color: var(--text-secondary); min-width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
+.terminal-search-btn { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg); color: var(--text-secondary); cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; padding: 0; }
+.terminal-search-btn:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.terminal-search-btn:disabled { opacity: .4; cursor: default; }
+.ovm-chat-row { display: flex; align-items: flex-end; max-width: 88%; }
+.ovm-chat-row-user { align-self: flex-end; justify-content: flex-end; }
+.ovm-chat-row-ovm { align-self: flex-start; justify-content: flex-start; }
+.ovm-chat-row-system { align-self: center; justify-content: center; max-width: 92%; }
+.terminal-chat-who { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+.terminal-chat-who.user { justify-content: flex-end; }
+.terminal-chat-badge { font-size: 10px; font-weight: 700; letter-spacing: .03em; padding: 1px 6px; border-radius: 5px; }
+.terminal-chat-entry-agent .terminal-chat-badge { background: var(--accent-soft); color: var(--accent); }
+.terminal-chat-entry-user .terminal-chat-badge { background: var(--success-soft-2); color: var(--success); }
+.terminal-chat-entry { display: flex; flex-direction: column; }
+.terminal-chat-entry-user { align-items: flex-end; }
+.terminal-chat-entry-agent { align-items: flex-start; }
+.ovm-chat-bubble { max-width: 100%; padding: 10px 13px; border-radius: 14px; font-size: var(--terminal-conv-font, 15px); line-height: 1.5; word-break: break-word; white-space: pre-wrap; position: relative; }
+.ovm-chat-bubble-ovm { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-bottom-left-radius: 4px; }
+.ovm-chat-bubble-user { background: var(--accent-soft); color: var(--text); border: 1px solid var(--accent-soft-border); border-bottom-right-radius: 4px; }
+.ovm-chat-pill { display: inline-block; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-secondary); font-size: 11.5px; padding: 4px 12px; border-radius: 999px; max-width: 100%; text-align: center; word-break: break-word; }
+.terminal-chat-hit .ovm-chat-bubble { box-shadow: 0 0 0 1.5px var(--accent); }
+.terminal-chat-hit-current .ovm-chat-bubble { box-shadow: 0 0 0 2.5px var(--accent); }
+.terminal-chat-focus-flash .ovm-chat-bubble { animation: ccFlash .7s ease-out; }
+@keyframes ccFlash { 0% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+/* ---- NEW v2: draft-kept affordance ---- */
+.cc-draft-badge {
+  align-self: center; font-size: 11px; font-weight: 600; color: var(--text-secondary); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 999px; padding: 3px 11px; opacity: 0; transform: translateY(-4px);
+  transition: opacity .25s ease, transform .25s ease; pointer-events: none; margin-bottom: -4px;
+}
+.cc-draft-badge.show { opacity: 1; transform: translateY(0); }
+
+/* ---- key row + composer (verbatim) ---- */
+.terminal-control-bar { display: flex; gap: 6px; padding: 8px 10px 0; overflow-x: auto; }
+.terminal-control-bar button { flex: 1 1 auto; min-width: 40px; padding: 7px 6px; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.terminal-control-bar button:hover { background: var(--surface); color: var(--text); border-color: var(--accent); }
+.terminal-key-flash { align-self: center; flex: 0 0 auto; padding: 4px 8px; font-size: 11.5px; font-weight: 600; color: var(--success); background: var(--success-soft); border: 1px solid var(--success-soft-border); border-radius: 999px; white-space: nowrap; }
+.terminal-chat-composer { flex-shrink: 0; background: linear-gradient(180deg, transparent, var(--bg) 22%); padding: 8px 12px calc(10px + env(safe-area-inset-bottom,0px)); display: flex; flex-direction: column; gap: 0; }
+.terminal-composer-grip { display: flex; align-items: center; justify-content: center; height: 12px; margin: 0 auto 2px; cursor: ns-resize; touch-action: none; user-select: none; }
+.terminal-composer-grip-bar { width: 32px; height: 3px; border-radius: 999px; background: var(--grip); }
+.terminal-chat-modebar { display: flex; gap: 6px; margin: 0 4px 7px; align-items: center; }
+.terminal-chat-modebar button { font-size: 11.5px; color: var(--text-secondary); background: transparent; border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; cursor: pointer; font-family: inherit; }
+.terminal-chat-modebar button.sel { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.terminal-chat-modebar .terminal-size-toggle { margin-left: auto; }
+.terminal-chat-composer-row { display: flex; align-items: flex-end; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 6px; }
+.terminal-chat-composer-row:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.terminal-chat-attach-btn { width: 34px; height: 34px; flex: 0 0 auto; border: none; background: transparent; color: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.terminal-chat-attach-btn:hover { background: var(--accent-soft); }
+.terminal-attach-pill { position: relative; flex: 0 0 auto; width: 32px; height: 32px; }
+.terminal-attach-pill img { width: 32px; height: 32px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); display: block; }
+.terminal-attach-pill button { position: absolute; top: -6px; right: -6px; width: 17px; height: 17px; border: none; border-radius: 50%; background: var(--text-secondary); color: var(--on-accent); font-size: 11px; line-height: 1; padding: 0; cursor: pointer; box-shadow: 0 0 0 2px var(--bg); }
+.terminal-chat-input-field { flex: 1 1 auto; min-height: 34px; max-height: 45vh; resize: none; background: transparent; border: 0; padding: 7px 0; font-family: var(--sans); font-size: 16px; color: var(--text); line-height: 1.4; outline: none; overflow-y: auto; width: auto !important; }
+.terminal-chat-input-field.cc-lg { min-height: 110px; }
+.terminal-chat-input-field::placeholder { color: var(--text-secondary); }
+.terminal-chat-send-btn { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 50%; border: none; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 17px; padding: 0; transition: transform .1s, opacity .1s; }
+.terminal-chat-send-btn:active:not(:disabled) { transform: scale(0.92); }
+.terminal-chat-send-btn:disabled { opacity: .4; cursor: not-allowed; }
+.typing-dots { display: inline-flex; align-items: center; gap: 4px; height: 16px; }
+.typing-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: ccTypingBounce 1.4s ease-in-out infinite; }
+.typing-dot:nth-child(2) { animation-delay: .2s; } .typing-dot:nth-child(3) { animation-delay: .4s; }
+@keyframes ccTypingBounce { 0%, 60%, 100% { transform: translateY(0); opacity: .4; } 30% { transform: translateY(-5px); opacity: 1; } }
+
+/* ---- bottom sheets (verbatim `.terminal-menu-sheet` pattern, reused for
+   Settings / Reminders / Wakeup / Endpoints — each an independent instance) ---- */
+.terminal-menu-overlay { position: absolute; inset: 0; z-index: 240; background: rgba(0,0,0,0.28); opacity: 0; visibility: hidden; transition: opacity .2s; }
+.terminal-menu-overlay.open { opacity: 1; visibility: visible; }
+.terminal-menu-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 241; background: var(--surface); border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; overflow: hidden; max-height: 0; transition: max-height .28s ease; visibility: hidden; }
+.terminal-menu-sheet.open { max-height: 88%; overflow-y: auto; visibility: visible; }
+.terminal-sheet-inner { padding: 14px 14px 20px; }
+.terminal-sheet-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; position: sticky; top: 0; background: var(--surface); padding-top: 2px; }
+.terminal-sheet-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.terminal-sheet-done { padding: 5px 14px; font-size: 13px; font-weight: 600; color: var(--on-accent); background: var(--accent); border: none; border-radius: 8px; cursor: pointer; }
+.terminal-sheet-done:hover { background: var(--accent-hover); }
+.terminal-sheet-sect { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); margin: 14px 2px 8px; }
+.terminal-sheet-sect:first-of-type { margin-top: 4px; }
+.terminal-sheet-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.terminal-sheet-lbl { flex: 1 1 auto; font-size: 14px; }
+.terminal-sheet-lbl small { display: block; color: var(--text-secondary); font-size: 11.5px; margin-top: 2px; }
+.terminal-sheet-stepper { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+.terminal-sheet-stepper button { width: 30px; height: 28px; border: 0; background: transparent; color: var(--text); font-weight: 700; cursor: pointer; border-radius: 8px; }
+.terminal-sheet-stepper button:active { background: var(--pressed); }
+.terminal-sheet-stepper button:disabled { opacity: .4; cursor: not-allowed; }
+.terminal-sheet-stepper .val { min-width: 60px; text-align: center; font-variant-numeric: tabular-nums; font-size: 13px; }
+.terminal-sheet-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.terminal-sheet-chip { border: 1px solid var(--border); background: var(--surface-2); color: var(--text); border-radius: 999px; padding: 7px 12px; font-size: 13px; cursor: pointer; font-family: inherit; }
+.terminal-sheet-chip.sel { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.terminal-switch { width: 40px; height: 23px; flex: 0 0 auto; border: 0; border-radius: 999px; background: var(--idle); position: relative; cursor: pointer; transition: .2s; padding: 0; }
+.terminal-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 19px; height: 19px; border-radius: 50%; background: var(--knob); transition: .2s; }
+.terminal-switch.on { background: var(--accent); }
+.terminal-switch.on::after { left: 19px; }
+.terminal-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg); }
+.terminal-seg-btn { min-width: 44px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); background: transparent; border: none; border-left: 1px solid var(--border); cursor: pointer; font-family: inherit; }
+.terminal-seg-btn:first-child { border-left: none; }
+.terminal-seg-btn.sel { background: var(--accent); color: var(--on-accent); }
+.terminal-sheet-inline-input { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; padding: 7px 10px; font-family: inherit; width: 84px; }
+.terminal-sheet-inline-input:focus { outline: none; border-color: var(--accent); }
+.cc-sheet-empty { padding: 18px 4px; text-align: center; color: var(--text-secondary); font-size: 13px; }
+
+/* per-agent reminder row */
+.cc-agentrow { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); margin-bottom: 7px; }
+.cc-agentrow.current { border-color: var(--accent-soft-border); background: var(--accent-selected); }
+.cc-agentrow-main { flex: 1 1 auto; min-width: 0; }
+.cc-agentrow-name { font-size: 13.5px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.cc-agentrow-name .you { font-size: 9.5px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 1px 5px; }
+.cc-agentrow-sub { font-size: 11.5px; color: var(--text-secondary); margin-top: 1px; }
+
+/* active-reminders summary card */
+.cc-folder-card { border: 1px solid var(--accent-soft-border); background: var(--accent-selected); border-radius: 12px; padding: 12px 13px; margin-bottom: 14px; }
+.cc-folder-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.cc-folder-card-name { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.cc-folder-card-stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+.cc-folder-card-stats b { color: var(--text); font-variant-numeric: tabular-nums; }
+.cc-demo-btn { font-size: 11.5px; font-weight: 600; color: var(--accent); background: transparent; border: 1px dashed var(--accent-soft-border); border-radius: 999px; padding: 4px 10px; cursor: pointer; font-family: inherit; }
+.cc-demo-btn:hover { background: var(--accent-soft); }
+
+/* wakeup quick-picks + pending state */
+.cc-datetime-row { display: flex; gap: 8px; }
+.cc-datetime-row input { flex: 1 1 0; }
+.cc-pending-card { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--warning); background: var(--success-soft, var(--surface-2)); background: color-mix(in srgb, var(--warning) 12%, var(--surface)); border-radius: 10px; padding: 11px 12px; margin-bottom: 14px; }
+.cc-pending-card b { color: var(--text); }
+.cc-pending-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); margin-top: 5px; flex: 0 0 auto; animation: ccPulse 1.4s infinite; }
+@keyframes ccPulse { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+
+/* summaries popover */
+.cc-popover-overlay { position: absolute; inset: 0; z-index: 260; background: transparent; display: none; }
+.cc-popover-overlay.open { display: block; }
+.cc-popover {
+  position: absolute; z-index: 261; left: 12px; right: 12px; top: 96px;
+  max-height: min(60vh, 460px); overflow-y: auto; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,0.28); padding: 6px;
+}
+.cc-popover-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 6px; }
+.cc-popover-head span { font-size: 12.5px; font-weight: 700; color: var(--text); }
+.cc-popover-head button { border: 0; background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer; padding: 4px; }
+.cc-summary-card { padding: 9px 10px; border-radius: 10px; margin: 0 2px 6px; background: var(--bg); border: 1px solid var(--border); cursor: pointer; }
+.cc-summary-card:hover { border-color: var(--accent); }
+.cc-summary-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; gap: 8px; }
+.cc-summary-time { font-size: 11px; color: var(--text-secondary); font-family: var(--mono); }
+.cc-summary-tag { font-size: 9.5px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+.cc-summary-text { font-size: 12.5px; color: var(--text); line-height: 1.45; }
+.cc-summary-text.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* endpoints */
+.cc-endpoint-row { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); margin-bottom: 8px; }
+.cc-endpoint-radio { width: 19px; height: 19px; border-radius: 50%; border: 2px solid var(--border); flex: 0 0 auto; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--surface); }
+.cc-endpoint-radio.sel { border-color: var(--accent); }
+.cc-endpoint-radio.sel::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.cc-endpoint-main { flex: 1 1 auto; min-width: 0; }
+.cc-endpoint-name-row { display: flex; align-items: center; gap: 6px; }
+.cc-endpoint-name { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.cc-endpoint-default-badge { font-size: 9px; font-weight: 700; color: var(--success); background: var(--success-soft); border-radius: 4px; padding: 1px 5px; text-transform: uppercase; letter-spacing: .04em; }
+.cc-endpoint-url { font-size: 11px; color: var(--text-secondary); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+.cc-endpoint-model { display: inline-block; margin-top: 4px; font-size: 10.5px; color: var(--text-secondary); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
+.cc-endpoint-del { flex: 0 0 auto; width: 26px; height: 26px; border: 0; background: transparent; color: var(--text-secondary); font-size: 15px; cursor: pointer; border-radius: 50%; }
+.cc-endpoint-del:hover { background: var(--danger-soft); color: var(--danger-alt); }
+.cc-add-endpoint-btn { width: 100%; padding: 10px; border: 1px dashed var(--border); border-radius: 10px; background: transparent; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.cc-add-endpoint-btn:hover { background: var(--accent-soft); }
+.cc-endpoint-form { border: 1px solid var(--accent-soft-border); background: var(--accent-selected); border-radius: 10px; padding: 12px; margin-top: 10px; }
+.cc-endpoint-form .form-group { margin-bottom: 10px; }
+.cc-endpoint-form label { display: block; font-size: 11.5px; color: var(--text-secondary); margin-bottom: 4px; }
+.cc-endpoint-form input { width: 100%; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: 13.5px; font-family: inherit; }
+.cc-endpoint-form input:focus { outline: none; border-color: var(--accent); }
+.cc-form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.cc-btn { padding: 7px 14px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 12.5px; font-weight: 600; font-family: inherit; }
+.cc-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.cc-btn.primary:hover { background: var(--accent-hover); }
+.cc-btn:not(.primary):hover { border-color: var(--accent); color: var(--accent); }
+.cc-hint { font-size: 11.5px; color: var(--text-secondary); line-height: 1.5; margin: 2px 2px 12px; }
+
+/* toast */
+.cc-toast { position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(10px); z-index: 400;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 9px 16px;
+  font-size: 12.5px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,0.22); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; white-space: nowrap; max-width: 90%; overflow: hidden; text-overflow: ellipsis; }
+.cc-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* =========================================================================
+   TABLET / DESKTOP composition — gated so 390px stays identical to sonnet5.
+   Bands are set on .cc-phone[data-band] by the resize harness:
+     phone   < 768
+     tablet  768–1023
+     desktop >= 1024
+   Every rule below is a listed exception. Phone band has ZERO of these.
+   ========================================================================= */
+.cc-phone:is([data-band="tablet"], [data-band="desktop"]) .terminal-topbar-target {
+  max-width: 220px; flex: 0 1 220px;
+}
+.cc-phone:is([data-band="tablet"], [data-band="desktop"]) .terminal-header-tab {
+  max-width: 140px;
+}
+.cc-phone:is([data-band="tablet"], [data-band="desktop"]) .terminal-chat-transcript {
+  padding-left: max(16px, calc((100% - 720px) / 2));
+  padding-right: max(16px, calc((100% - 720px) / 2));
+}
+.cc-phone:is([data-band="tablet"], [data-band="desktop"]) .cc-transcript-tools {
+  right: max(12px, calc((100% - 720px) / 2));
+}
+.cc-phone:is([data-band="tablet"], [data-band="desktop"]) .terminal-search-bar {
+  margin-left: max(0px, calc((100% - 720px) / 2));
+  margin-right: max(0px, calc((100% - 720px) / 2));
+  border-radius: 0 0 10px 10px;
+}
+.cc-phone:is([data-band="tablet"], [data-band="desktop"]) .terminal-control-bar {
+  justify-content: center;
+  padding-left: max(10px, calc((100% - 720px) / 2));
+  padding-right: max(10px, calc((100% - 720px) / 2));
+}
+.cc-phone:is([data-band="tablet"], [data-band="desktop"]) .terminal-control-bar button {
+  flex: 0 1 72px; max-width: 88px;
+}
+.cc-phone:is([data-band="tablet"], [data-band="desktop"]) .terminal-chat-composer {
+  padding-left: max(16px, calc((100% - 720px) / 2));
+  padding-right: max(16px, calc((100% - 720px) / 2));
+}
+.cc-phone:is([data-band="tablet"], [data-band="desktop"]) .terminal-menu-sheet {
+  left: 50%; right: auto; width: min(520px, 100%); transform: translateX(-50%);
+}
+.cc-phone:is([data-band="tablet"], [data-band="desktop"]) .cc-popover {
+  left: 12px; right: auto; width: min(440px, calc(100% - 24px));
+}
+
+.cc-phone[data-band="desktop"] .terminal-topbar-target {
+  max-width: 260px; flex: 0 1 260px;
+}
+.cc-phone[data-band="desktop"] .terminal-header-tab { max-width: 160px; }
+.cc-phone[data-band="desktop"] .terminal-shell-header { padding-left: 16px; padding-right: 16px; }
+.cc-phone[data-band="desktop"] .cc-util-row { gap: 8px; }
+.cc-phone[data-band="desktop"] .terminal-menu-sheet { width: min(560px, 100%); }
+.cc-phone[data-band="desktop"] .terminal-chat-transcript {
+  padding-left: max(24px, calc((100% - 880px) / 2));
+  padding-right: max(24px, calc((100% - 880px) / 2));
+}
+.cc-phone[data-band="desktop"] .cc-transcript-tools {
+  right: max(16px, calc((100% - 880px) / 2));
+}
+.cc-phone[data-band="desktop"] .terminal-search-bar {
+  margin-left: max(0px, calc((100% - 880px) / 2));
+  margin-right: max(0px, calc((100% - 880px) / 2));
+}
+.cc-phone[data-band="desktop"] .terminal-control-bar {
+  padding-left: max(16px, calc((100% - 880px) / 2));
+  padding-right: max(16px, calc((100% - 880px) / 2));
+}
+.cc-phone[data-band="desktop"] .terminal-chat-composer {
+  padding-left: max(24px, calc((100% - 880px) / 2));
+  padding-right: max(24px, calc((100% - 880px) / 2));
+}
+</style>
+</head>
+<body>
+
+<div class="cc-harness-bar">
+  <div class="cc-harness-title">Agent Window v2 <small>final · sonnet5 base + drag-resize · click through it</small></div>
+  <div class="cc-harness-group">
+    <span class="lbl">Theme</span>
+    <button class="cc-harness-btn" data-theme-btn="light">Light</button>
+    <button class="cc-harness-btn sel" data-theme-btn="system">System</button>
+    <button class="cc-harness-btn" data-theme-btn="dark">Dark</button>
+  </div>
+  <div class="cc-harness-group">
+    <span class="lbl">Width</span>
+    <button class="cc-harness-btn sel" data-width-btn="390" title="Phone">390</button>
+    <button class="cc-harness-btn" data-width-btn="768" title="Tablet">768</button>
+    <button class="cc-harness-btn" data-width-btn="1024" title="Desktop">1024</button>
+    <button class="cc-harness-btn" data-width-btn="1440" title="Desktop wide">1440</button>
+  </div>
+</div>
+
+<div class="cc-stage">
+  <div class="cc-phone-wrap">
+    <div class="cc-phone-label">
+      <span id="sizeReadout">390×780 px</span>
+      <span class="cc-band-pill" id="bandLabel" data-band="Phone">Phone</span>
+      <span class="cc-resize-hint">drag right edge or corner</span>
+    </div>
+    <div class="cc-frame-shell" id="ccFrameShell">
+    <div class="cc-phone" id="ccPhone" data-theme="system" data-band="phone" data-switcher="dropdown">
+
+      <div class="terminal-shell">
+        <div class="terminal-shell-header" id="shellHeader">
+          <div class="terminal-topbar-main">
+            <button class="terminal-topbar-icon-btn" title="Back to terminal list">←</button>
+            <div class="terminal-topbar-target">
+              <div class="terminal-topbar-name">
+                <span class="terminal-topbar-dot on" id="hdrDot"></span>
+                <span class="terminal-topbar-name-text" id="hdrName">hris-4430</span>
+              </div>
+              <div class="terminal-topbar-sub" id="hdrSub">zsh · updated just now</div>
+            </div>
+
+            <div class="cc-tabsarea collapsed" id="tabsArea">
+              <button class="cc-tabs-toggle" id="tabsToggle" title="Collapse agent tabs">›</button>
+              <div class="cc-tabs-collapsed-pill" id="tabsCollapsedPill">🗂 <span id="collapsedCount">5</span> ›</div>
+              <div class="cc-tabs-scroll" id="tabsScroll">
+                <div class="terminal-header-tabs" id="headerTabs" data-testid="terminal-header-tabs"></div>
+                <div class="cc-scrubber-track" id="scrubTrack" data-testid="agent-scrubber" title="Drag to swipe through the group">
+                  <div class="cc-scrubber-thumb" id="scrubThumb"></div>
+                </div>
+              </div>
+              <div class="cc-agent-dd" id="agentDd" data-testid="agent-switcher-dropdown">
+                <button type="button" class="cc-agent-dd-btn" id="agentDdBtn" aria-haspopup="listbox" aria-expanded="false" title="Switch agent in this group">
+                  <span class="terminal-topbar-dot on" id="agentDdDot"></span>
+                  <span class="cc-agent-dd-name" id="agentDdName">hris-4430</span>
+                  <span class="cc-agent-dd-caret" aria-hidden="true">▾</span>
+                </button>
+                <div class="cc-agent-dd-menu" id="agentDdMenu" role="listbox"></div>
+              </div>
+            </div>
+
+            <button type="button" class="cc-util-icon" id="utilCollapsedIcon" title="Show reminders">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+              <span class="cc-util-icon-dot" id="utilHintRemDot"></span>
+              <span class="cc-util-icon-count" id="utilHintWakeCount">0</span>
+            </button>
+
+            <div class="cc-ctrlcluster" id="ctrlCluster">
+              <div class="cc-ctrl-items" id="ctrlItems">
+                <div class="terminal-fontpill" title="Text size">
+                  <button type="button" class="am" id="fontDec">A−</button>
+                  <button type="button" class="ap" id="fontInc">A+</button>
+                </div>
+                <div class="terminal-mynav-header" title="Jump between my messages">
+                  <button type="button" class="terminal-mynav-hbtn" id="meUp">▲</button>
+                  <span class="terminal-mynav-hlabel">ME</span>
+                  <button type="button" class="terminal-mynav-hbtn" id="meDown">▼</button>
+                </div>
+                <button type="button" class="terminal-topbar-icon-btn" id="settingsBtn" title="Terminal settings">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </button>
+              </div>
+              <button type="button" class="cc-ctrl-toggle" id="ctrlToggle" title="Collapse controls">‹</button>
+            </div>
+          </div>
+
+          <div class="cc-utilarea" id="utilArea">
+            <button class="cc-util-toggle" id="utilToggle" title="Collapse reminders">‹</button>
+            <div class="cc-util-row" id="utilRow">
+              <button class="cc-util-chip" id="chipReminders">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                <span id="chipRemindersLbl">Reminders off</span>
+              </button>
+              <button class="cc-util-chip ghost" id="chipWakeup">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l3 2"></path><path d="M5 3 2 6M22 6l-3-3"></path></svg>
+                <span id="chipWakeupLbl">+ Wakeup</span>
+                <button type="button" class="cc-chip-x" id="chipWakeupX" style="display:none" title="Cancel wakeup">✕</button>
+              </button>
+              <button class="cc-util-chip" id="chipSummaries">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H8l-4 4V4z"></path><path d="M8 9h8M8 13h5"></path></svg>
+                Summaries <span class="cc-badge-count" id="summCount">0</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="cc-popover-overlay" id="summOverlay">
+          <div class="cc-popover" id="summPopover">
+            <div class="cc-popover-head"><span>Summaries — <span id="summAgentName">hris-4430</span></span><button id="summClose">✕</button></div>
+            <div id="summList"></div>
+          </div>
+        </div>
+
+        <div class="terminal-chat-view">
+          <div class="terminal-chat-transcript-wrap" id="transcriptWrap">
+            <div class="terminal-search-bar" id="searchBar" style="display:none">
+              <svg class="terminal-search-glass" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+              <input class="terminal-search-input" id="searchInput" type="text" placeholder="Search this chat…" />
+              <span class="terminal-search-count" id="searchCount">0/0</span>
+              <button type="button" class="terminal-search-btn" id="searchPrev">▲</button>
+              <button type="button" class="terminal-search-btn" id="searchNext">▼</button>
+              <button type="button" class="terminal-search-btn" id="searchClose">✕</button>
+            </div>
+            <div class="cc-transcript-tools" id="transcriptTools">
+              <button type="button" class="cc-refresh-toggle" id="refreshToggle" title="Refresh from session" aria-label="Refresh from session">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+              </button>
+              <button type="button" class="terminal-search-toggle" id="searchToggle" title="Search chat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+              </button>
+            </div>
+            <div class="terminal-chat-transcript" id="transcript"></div>
+          </div>
+
+          <div class="cc-draft-badge" id="draftBadge">✎ Draft kept</div>
+
+          <div class="terminal-control-bar" role="group" aria-label="Terminal keys">
+            <button type="button" data-key="⏎" title="Enter">⏎</button>
+            <button type="button" data-key="Esc" title="Esc / interrupt">Esc</button>
+            <button type="button" data-key="^C" title="Ctrl-C / cancel">^C</button>
+            <button type="button" data-key="⇧⇥" title="Shift-Tab / cycle mode">⇧⇥</button>
+            <button type="button" data-key="↑" title="Up">↑</button>
+            <button type="button" data-key="↓" title="Down">↓</button>
+            <span class="terminal-key-flash" id="keyFlash" style="display:none">sent ✓</span>
+          </div>
+
+          <div class="terminal-chat-composer">
+            <div class="terminal-composer-grip" title="Drag to resize · double-tap to reset"><span class="terminal-composer-grip-bar"></span></div>
+            <div class="terminal-chat-modebar">
+              <button type="button" class="sel" id="modeCommand">Send as command</button>
+              <button type="button" id="modeRaw">Send raw keys</button>
+              <button type="button" class="terminal-size-toggle" id="sizeToggle">▴ Large input</button>
+            </div>
+            <div class="terminal-chat-composer-row">
+              <button type="button" class="terminal-chat-attach-btn" id="attachBtn" title="Attach image">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="8.5" cy="10" r="1.5"></circle><path d="M21 16l-5-5-11 8"></path></svg>
+              </button>
+              <input type="file" accept="image/*" hidden id="fileInput" />
+              <span id="attachPill" style="display:none"></span>
+              <textarea class="terminal-chat-input-field" id="composerInput" rows="1" placeholder="Message the agent…"></textarea>
+              <button class="terminal-chat-send-btn" id="sendBtn" disabled>➤</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========= SETTINGS SHEET (existing + v2 additions) ========= -->
+      <div class="terminal-menu-overlay" id="ovSettings"></div>
+      <div class="terminal-menu-sheet" id="sheetSettings">
+        <div class="terminal-sheet-inner">
+          <div class="terminal-sheet-topbar"><span class="terminal-sheet-title">Terminal settings</span><button class="terminal-sheet-done" data-close="sheetSettings">Done</button></div>
+
+          <div class="terminal-sheet-sect">Text size</div>
+          <div class="terminal-sheet-row">
+            <div class="terminal-sheet-lbl">Conversation size<small>Also in Settings ▸ Appearance</small></div>
+            <div class="terminal-sheet-stepper"><button id="fsDec2">A−</button><span class="val" id="fsVal">15px</span><button id="fsInc2">A＋</button></div>
+          </div>
+
+          <div class="terminal-sheet-sect">Reply length</div>
+          <div class="terminal-sheet-row" style="margin-bottom:18px">
+            <div class="terminal-sheet-lbl">Minimize agent replies</div>
+            <div class="terminal-seg"><button class="terminal-seg-btn sel">10</button><button class="terminal-seg-btn">50</button><button class="terminal-seg-btn">Full</button></div>
+          </div>
+
+          <div class="terminal-sheet-sect">Command center <span style="opacity:.55;text-transform:none;letter-spacing:0">— new in v2</span></div>
+          <div class="terminal-sheet-row" style="cursor:pointer" data-open="sheetReminders">
+            <div class="terminal-sheet-lbl">🔔 Folder reminders<small>Recurring auto-solicit for everyone in this group</small></div>
+            <span style="color:var(--text-secondary)">›</span>
+          </div>
+          <div class="terminal-sheet-row" style="cursor:pointer" data-open="sheetWakeup">
+            <div class="terminal-sheet-lbl">⏰ One-time wakeup<small>Fire a single message at a set time on this agent</small></div>
+            <span style="color:var(--text-secondary)">›</span>
+          </div>
+          <div class="terminal-sheet-row" style="cursor:pointer" data-open="sheetEndpoints">
+            <div class="terminal-sheet-lbl">🧠 Summary-LLM endpoints<small>Who summarizes replies after a solicit</small></div>
+            <span style="color:var(--text-secondary)">›</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========= REMINDERS SHEET ========= -->
+      <div class="terminal-menu-overlay" id="ovReminders"></div>
+      <div class="terminal-menu-sheet" id="sheetReminders">
+        <div class="terminal-sheet-inner">
+          <div class="terminal-sheet-topbar"><span class="terminal-sheet-title">Folder reminders — Work</span><button class="terminal-sheet-done" data-close="sheetReminders">Done</button></div>
+
+          <div class="terminal-seg" style="margin-bottom:16px;width:100%">
+            <button class="terminal-seg-btn sel" style="flex:1" data-remtab="configure">Configure</button>
+            <button class="terminal-seg-btn" style="flex:1" data-remtab="active">Active reminders</button>
+          </div>
+
+          <div id="remConfigure">
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Active for this folder<small>Applies to every included agent below</small></div>
+              <button class="terminal-switch on" id="remActiveSwitch"></button>
+            </div>
+
+            <div class="terminal-sheet-sect">Cadence</div>
+            <div class="terminal-sheet-chips" id="remCadenceChips" style="margin-bottom:10px">
+              <button class="terminal-sheet-chip" data-cad="15">15m</button>
+              <button class="terminal-sheet-chip sel" data-cad="30">30m</button>
+              <button class="terminal-sheet-chip" data-cad="45">45m</button>
+              <button class="terminal-sheet-chip" data-cad="60">60m</button>
+              <button class="terminal-sheet-chip" data-cad="90">90m</button>
+              <button class="terminal-sheet-chip" data-cad="custom">Custom…</button>
+            </div>
+            <div class="terminal-sheet-row" id="remCustomRow" style="display:none">
+              <div class="terminal-sheet-lbl">Custom interval</div>
+              <input type="number" min="1" max="1440" class="terminal-sheet-inline-input" id="remCustomInput" value="20" /> <span style="font-size:12px;color:var(--text-secondary)">min</span>
+            </div>
+
+            <div class="terminal-sheet-sect">Repeat</div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-seg"><button class="terminal-seg-btn sel" id="remStopBtn">Stop after N</button><button class="terminal-seg-btn" id="remUnlimBtn">Unlimited</button></div>
+            </div>
+            <div class="terminal-sheet-row" id="remStopNRow">
+              <div class="terminal-sheet-lbl">Stop after<small>fires, then auto-deactivates</small></div>
+              <div class="terminal-sheet-stepper"><button id="remNDec">−</button><span class="val" id="remNVal">10</span><button id="remNInc">+</button></div>
+            </div>
+
+            <div class="terminal-sheet-sect">Solicit message</div>
+            <div class="terminal-sheet-row" style="align-items:flex-start">
+              <textarea class="terminal-sheet-inline-input" id="remMessage" style="width:100%;min-height:52px;font-size:13px;resize:vertical">Give me a status update.</textarea>
+            </div>
+
+            <div class="terminal-sheet-sect">Per-agent include / skip</div>
+            <div id="remAgentList"></div>
+
+            <div class="cc-form-actions" style="margin-top:6px">
+              <button class="cc-btn primary" id="remSave">Save reminder</button>
+            </div>
+          </div>
+
+          <div id="remActive" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- ========= WAKEUP SHEET ========= -->
+      <div class="terminal-menu-overlay" id="ovWakeup"></div>
+      <div class="terminal-menu-sheet" id="sheetWakeup">
+        <div class="terminal-sheet-inner">
+          <div class="terminal-sheet-topbar"><span class="terminal-sheet-title">One-time wakeup — <span id="wakeAgentName">hris-4430</span></span><button class="terminal-sheet-done" data-close="sheetWakeup">Done</button></div>
+
+          <div id="wakePendingCard" style="display:none"></div>
+
+          <div class="terminal-sheet-sect">Quick pick</div>
+          <div class="terminal-sheet-chips" style="margin-bottom:14px">
+            <button class="terminal-sheet-chip" data-quickwake="30">in 30s (demo)</button>
+            <button class="terminal-sheet-chip" data-quickwake="120">in 2m (demo)</button>
+            <button class="terminal-sheet-chip" data-quickwake="tomorrow7">tomorrow 07:00</button>
+          </div>
+
+          <div class="terminal-sheet-sect">Fire time (manual)</div>
+          <div class="cc-datetime-row" style="margin-bottom:14px">
+            <input type="date" class="terminal-sheet-inline-input" id="wakeDate" style="width:auto" />
+            <input type="time" class="terminal-sheet-inline-input" id="wakeTime" style="width:auto" />
+          </div>
+
+          <div class="terminal-sheet-sect">Action to send</div>
+          <textarea class="terminal-sheet-inline-input" id="wakeAction" style="width:100%;min-height:64px;font-size:13px;resize:vertical;margin-bottom:6px">Wake up — start today's queued tasks and report status.</textarea>
+          <div class="cc-hint">Fires once. A pending chip shows on the agent window until it fires (or is cancelled) — then it clears automatically.</div>
+
+          <div class="cc-form-actions">
+            <button class="cc-btn" id="wakeCancelExisting" style="display:none;color:var(--danger-alt);border-color:var(--danger-alt)">Cancel wakeup</button>
+            <button class="cc-btn primary" id="wakeSave">Schedule wakeup</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========= ENDPOINTS SHEET ========= -->
+      <div class="terminal-menu-overlay" id="ovEndpoints"></div>
+      <div class="terminal-menu-sheet" id="sheetEndpoints">
+        <div class="terminal-sheet-inner">
+          <div class="terminal-sheet-topbar"><span class="terminal-sheet-title">Summary-LLM endpoints</span><button class="terminal-sheet-done" data-close="sheetEndpoints">Done</button></div>
+          <div class="cc-hint">OpenAI-compatible chat endpoints used to summarize an agent's reply after a reminder solicit. Pick one as default — today that's <b style="color:var(--text)">140</b>.</div>
+          <div id="endpointList"></div>
+          <button class="cc-add-endpoint-btn" id="addEndpointBtn">+ Add endpoint</button>
+          <div class="cc-endpoint-form" id="endpointForm" style="display:none">
+            <div class="form-group"><label>Name</label><input id="epName" placeholder="e.g. OpenRouter — fast" /></div>
+            <div class="form-group"><label>Base URL</label><input id="epUrl" placeholder="https://…/v1" /></div>
+            <div class="form-group"><label>Model</label><input id="epModel" placeholder="e.g. gpt-4o-mini" /></div>
+            <div class="cc-form-actions">
+              <button class="cc-btn" id="epCancel">Cancel</button>
+              <button class="cc-btn primary" id="epSaveNew">Add endpoint</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cc-toast" id="toast"></div>
+    </div>
+
+    <button type="button" class="cc-resize-e" id="resizeE" aria-label="Resize width" title="Drag to resize width">
+      <span class="cc-resize-e-bar"></span>
+    </button>
+    <button type="button" class="cc-resize-se" id="resizeSE" aria-label="Resize width and height" title="Drag to resize width and height">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <path d="M9 3L3 9M11 6L6 11M11 9L9 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <div class="cc-live-size" id="liveSizeBadge">390×780 px · Phone</div>
+    </div>
+
+    <details class="cc-notes">
+      <summary>What's new in v2 (reviewer notes)</summary>
+      <div class="cc-notes-body">
+        <b>All 6 required surfaces, all clickable:</b>
+        <ul>
+          <li><b>Group tabs</b> — below ~900px the group switcher is a compact dropdown (current agent + caret). At/above 900px: the ‹ button collapses the sibling strip into a "🗂 N ›" pill; when expanded, drag the bar under the tabs to swipe through all agents in the group.</li>
+          <li><b>Reminders</b> — gear ▸ Folder reminders, or the 🔔 chip. Configure tab: cadence chips (15/30/45/60/90/custom), Stop-after-N vs Unlimited, per-agent include/skip. Active tab: folder card + per-agent breakdown with live next-fire countdown, plus a "Fire now (demo)" button so you don't have to wait real minutes.</li>
+          <li><b>Wakeups</b> — ⏰ chip on the header. Quick-picks include real short demo timers (30s/2m actually fire) plus manual date+time. Pending chip clears the moment it fires and drops a message into the transcript.</li>
+          <li><b>Summaries</b> — Σ chip opens a scrollable, timestamped dropdown per agent. A reminder fire auto-appends a new one.</li>
+          <li><b>Summary-LLM endpoints</b> — gear ▸ Summary-LLM endpoints. Named endpoints (name/base URL/model), radio-select default, "140" pre-set as default; add/remove more.</li>
+          <li><b>Draft kept</b> — type in the composer, switch agents via a tab or the scrubber, switch back: your text is restored and a small "✎ Draft kept" pill fades in. Tabs with an unsent draft also carry a small dot.</li>
+        </ul>
+        <b>Kept from v1 (untouched, just extended):</b> key row (⏎/Esc/^C/⇧⇥/↑/↓), Send-as-command / Send-raw-keys / Large-input, image attach, ME ▲/▼ nav, chat search.
+        <b>This pass (resize):</b> drag the right-edge handle (width) or the bottom-right corner (width+height). Live <code>W×H px</code> readout + Phone / Tablet / Desktop band. Presets 390 / 768 / 1024 / 1440 snap the frame. Phone (390) is the original sonnet5 surface; tablet/desktop only add a capped readable column, unstretched keys, and constrained sheets/popover.
+        <b>This pass (header density):</b> collapsing reminders removes the second row and leaves a single bell icon on row 1 (dot if a reminder is active, count if a wakeup is pending). Gear / ME / A−A+ are ~28px; they can tuck behind ⋯. Tabs collapsed + util collapsed = one header row. Default load still shows the reminders row.
+        <b>This pass (group switcher):</b> frame width &lt; 900px → dropdown (no drag strip). ≥ 900px → tab strip + visible drag scrubber. Resize across 900px swaps live. Both call the same switchAgent().
+        <b>Assumption to flag:</b> "folder" is modeled here as the sibling-tab group (the same set shown in the header strip) — the brief's folder concept isn't otherwise represented in the app today; confirm folder≡group before build.
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------------------------- harness controls ---------------------------- */
+  var phone = document.getElementById('ccPhone');
+  var shell = document.getElementById('ccFrameShell');
+  var MIN_W = 390, MAX_W = 1920, MIN_H = 520;
+  var SWITCHER_BP = 900; /* dropdown below; strip+scrubber at/above */
+  var frameW = 390, frameH = 780;
+  var animTimer = null;
+
+  function bandFor(w) {
+    if (w < 768) return 'Phone';
+    if (w < 1024) return 'Tablet';
+    return 'Desktop';
+  }
+  function maxFrameW() { return Math.max(MIN_W, Math.min(MAX_W, window.innerWidth - 56)); }
+  function maxFrameH() { return Math.max(MIN_H, window.innerHeight - 180); }
+  function applyFrameSize(w, h, opts) {
+    opts = opts || {};
+    var maxW = maxFrameW(), maxH = maxFrameH();
+    w = Math.round(Math.max(MIN_W, Math.min(maxW, w)));
+    h = Math.round(Math.max(MIN_H, Math.min(maxH, h)));
+    frameW = w; frameH = h;
+    if (opts.animate) {
+      shell.classList.add('anim');
+      clearTimeout(animTimer);
+      animTimer = setTimeout(function () { shell.classList.remove('anim'); }, 280);
+    } else {
+      shell.classList.remove('anim');
+    }
+    shell.style.setProperty('--frame-w', w + 'px');
+    shell.style.setProperty('--frame-h', h + 'px');
+    var band = bandFor(w);
+    phone.setAttribute('data-band', band.toLowerCase());
+    phone.setAttribute('data-switcher', w < SWITCHER_BP ? 'dropdown' : 'strip');
+    var readout = w + '\u00d7' + h + ' px';
+    document.getElementById('sizeReadout').textContent = readout;
+    var bandEl = document.getElementById('bandLabel');
+    bandEl.textContent = band;
+    bandEl.setAttribute('data-band', band);
+    document.getElementById('liveSizeBadge').textContent = readout + ' \u00b7 ' + band;
+    document.querySelectorAll('[data-width-btn]').forEach(function (b) {
+      b.classList.toggle('sel', Number(b.dataset.widthBtn) === w);
+    });
+    requestAnimationFrame(function () {
+      if (typeof syncAgentSwitcher === 'function') syncAgentSwitcher(w);
+      if (typeof updateScrubber === 'function') updateScrubber();
+    });
+  }
+
+  document.querySelectorAll('[data-theme-btn]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('[data-theme-btn]').forEach(function (b) { b.classList.remove('sel'); });
+      btn.classList.add('sel');
+      phone.dataset.theme = btn.dataset.themeBtn;
+    });
+  });
+  document.querySelectorAll('[data-width-btn]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      applyFrameSize(Number(btn.dataset.widthBtn), frameH, { animate: true });
+    });
+  });
+
+  function bindResizeHandle(el, mode) {
+    el.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      var startX = e.clientX, startY = e.clientY;
+      var startW = frameW, startH = frameH;
+      shell.classList.add('is-resizing');
+      shell.classList.add(mode === 'xy' ? 'is-resizing-xy' : 'is-resizing-x');
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = mode === 'xy' ? 'nwse-resize' : 'ew-resize';
+      function onMove(ev) {
+        var nw = startW + (ev.clientX - startX);
+        var nh = mode === 'xy' ? startH + (ev.clientY - startY) : startH;
+        applyFrameSize(nw, nh);
+      }
+      function onUp() {
+        shell.classList.remove('is-resizing', 'is-resizing-x', 'is-resizing-xy');
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        el.removeEventListener('pointermove', onMove);
+        el.removeEventListener('pointerup', onUp);
+        el.removeEventListener('pointercancel', onUp);
+      }
+      el.addEventListener('pointermove', onMove);
+      el.addEventListener('pointerup', onUp);
+      el.addEventListener('pointercancel', onUp);
+    });
+  }
+  bindResizeHandle(document.getElementById('resizeE'), 'x');
+  bindResizeHandle(document.getElementById('resizeSE'), 'xy');
+  window.addEventListener('resize', function () { applyFrameSize(frameW, frameH); });
+
+  /* ---------------------------------- data ----------------------------------- */
+  var AGENTS = [
+    { id: 'hris-4430',   sub: 'zsh · updated just now',  status: 'on',   includeReminders: true },
+    { id: 'lkAsst-0',    sub: 'node · updated 2m ago',    status: 'on',   includeReminders: true },
+    { id: 'wflow-3762',  sub: 'python · updated 4m ago',  status: 'busy', includeReminders: false },
+    { id: 'lokalAI2-465',sub: 'bash · updated 12m ago',   status: 'off',  includeReminders: true },
+    { id: 'docsBot-12',  sub: 'node · updated 20m ago',   status: 'off',  includeReminders: true },
+    { id: 'qaRunner-7',  sub: 'zsh · updated 1m ago',     status: 'on',   includeReminders: false }
+  ];
+  var current = 'hris-4430';
+  var drafts = {};
+  var fontSize = 15;
+  var sendMode = 'command';
+  var attachment = null;
+
+  var entries = {
+    'hris-4430': [
+      { role: 'agent', text: 'HRIS sync finished. 212 records updated, 0 conflicts.', time: '09:41' },
+      { role: 'user', text: 'Nice — kick off the weekly export too.', time: '09:42' },
+      { role: 'agent', text: 'Weekly export queued. ETA ~6 min.', time: '09:42' }
+    ],
+    'lkAsst-0': [
+      { role: 'agent', text: 'lokalAI assistant idle, waiting on next ticket.', time: '09:10' }
+    ],
+    'wflow-3762': [
+      { role: 'agent', text: 'Running workflow migration step 3/7…', time: '09:38' },
+      { role: 'system', text: 'busy · long-running task detected' }
+    ],
+    'lokalAI2-465': [
+      { role: 'user', text: 'Pause until I say go.', time: 'yesterday' },
+      { role: 'agent', text: 'Paused.', time: 'yesterday' }
+    ],
+    'docsBot-12': [
+      { role: 'agent', text: 'Docs build green. 0 broken links.', time: 'yesterday' }
+    ],
+    'qaRunner-7': [
+      { role: 'agent', text: 'Suite 4/9 passing, retrying flaky test.', time: '09:30' }
+    ]
+  };
+
+  var summaries = {
+    'hris-4430': [
+      { time: 'Today 09:15', text: 'HRIS agent confirmed the nightly sync completed with zero conflicts and is idle, waiting for the next scheduled job.', endpoint: '140' },
+      { time: 'Today 08:45', text: 'Agent reported the weekly export is queued and will finish in about six minutes; no blockers noted.', endpoint: '140' },
+      { time: 'Yesterday 18:02', text: 'Status check: agent had stalled on an npm install network error, self-retried, and recovered without intervention.', endpoint: '140' }
+    ],
+    'lkAsst-0': [], 'wflow-3762': [], 'lokalAI2-465': [], 'docsBot-12': [], 'qaRunner-7': []
+  };
+
+  var wakeups = {
+    'hris-4430': { fireAt: Date.now() + 45 * 60 * 1000, action: "Wake up — start today's queued tasks and report status." }
+  };
+
+  var reminder = {
+    active: true, cadence: 30, custom: 20, repeat: 'stop', stopN: 10, fired: 3,
+    message: 'Give me a status update.',
+    nextFireAt: Date.now() + 12 * 60 * 1000
+  };
+
+  var endpoints = [
+    { id: '140', name: '140', url: 'http://192.168.254.140:1234/v1', model: 'qwen2.5-14b-instruct', isDefault: true },
+    { id: 'openrouter', name: 'OpenRouter — mini', url: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini', isDefault: false },
+    { id: 'ollama', name: 'Local Ollama', url: 'http://localhost:11434/v1', model: 'llama3.1:8b', isDefault: false }
+  ];
+
+  function agentById(id) { return AGENTS.find(function (a) { return a.id === id; }); }
+  function fmtMMSS(ms) {
+    if (ms <= 0) return 'now';
+    var s = Math.floor(ms / 1000);
+    var m = Math.floor(s / 60); s = s % 60;
+    if (m >= 60) { var h = Math.floor(m / 60); m = m % 60; return h + 'h ' + m + 'm'; }
+    return m > 0 ? (m + 'm ' + s + 's') : (s + 's');
+  }
+  function defaultEndpoint() { return endpoints.find(function (e) { return e.isDefault; }) || endpoints[0]; }
+
+  /* ---------------------------------- toast ----------------------------------- */
+  var toastEl = document.getElementById('toast');
+  var toastTimer = null;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
+  }
+
+  /* --------------------------------- header ------------------------------------ */
+  function renderHeader() {
+    var a = agentById(current);
+    document.getElementById('hdrName').textContent = a.id;
+    document.getElementById('hdrSub').textContent = a.sub;
+    var dot = document.getElementById('hdrDot');
+    dot.className = 'terminal-topbar-dot' + (a.status === 'on' ? ' on' : a.status === 'busy' ? ' busy' : '');
+    document.getElementById('wakeAgentName').textContent = a.id;
+  }
+
+  /* ------------------------------- sibling tabs --------------------------------- */
+  var tabsCollapsed = true;
+  function renderTabs() {
+    var siblings = AGENTS.filter(function (a) { return a.id !== current; });
+    var wrap = document.getElementById('headerTabs');
+    wrap.innerHTML = AGENTS.map(function (a) {
+      var dot = drafts[a.id] ? '<span class="cc-tab-dot" title="Unsent draft"></span>' : '';
+      var cur = a.id === current ? ' is-current' : '';
+      return '<button type="button" class="terminal-header-tab' + cur + '" data-tab="' + a.id + '">' + a.id + dot + '</button>';
+    }).join('');
+    wrap.querySelectorAll('[data-tab]').forEach(function (btn) {
+      btn.addEventListener('click', function () { switchAgent(btn.dataset.tab); });
+    });
+    document.getElementById('collapsedCount').textContent = siblings.length;
+    renderAgentDropdown();
+    requestAnimationFrame(function () {
+      updateScrubber();
+      var curTab = tabsScroll && tabsScroll.querySelector('.terminal-header-tab.is-current');
+      if (curTab && curTab.scrollIntoView) curTab.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    });
+  }
+
+  var tabsToggle = document.getElementById('tabsToggle');
+  var tabsArea = document.getElementById('tabsArea');
+  var tabsCollapsedPill = document.getElementById('tabsCollapsedPill');
+  function setCollapsed(v) {
+    tabsCollapsed = v;
+    tabsArea.classList.toggle('collapsed', v);
+    tabsToggle.textContent = v ? '›' : '‹';
+    if (!v) requestAnimationFrame(updateScrubber);
+  }
+  tabsToggle.addEventListener('click', function () { setCollapsed(!tabsCollapsed); });
+  tabsCollapsedPill.addEventListener('click', function () { setCollapsed(false); });
+
+  /* --- compact dropdown (phone / narrow tablet, frame < 900px) --- */
+  var agentDd = document.getElementById('agentDd');
+  var agentDdBtn = document.getElementById('agentDdBtn');
+  var agentDdMenu = document.getElementById('agentDdMenu');
+  function closeAgentDd() {
+    agentDd.classList.remove('open');
+    agentDdBtn.setAttribute('aria-expanded', 'false');
+  }
+  function renderAgentDropdown() {
+    var a = agentById(current);
+    document.getElementById('agentDdName').textContent = a.id;
+    document.getElementById('agentDdDot').className = 'terminal-topbar-dot' + (a.status === 'on' ? ' on' : a.status === 'busy' ? ' busy' : '');
+    agentDdMenu.innerHTML = AGENTS.map(function (ag) {
+      var st = ag.status === 'on' ? ' on' : ag.status === 'busy' ? ' busy' : '';
+      var cur = ag.id === current ? ' current' : '';
+      var draft = drafts[ag.id] ? '<span class="cc-tab-dot" title="Unsent draft"></span>' : '';
+      return '<button type="button" class="cc-agent-dd-item' + cur + '" role="option" data-agent="' + ag.id + '" aria-selected="' + (ag.id === current) + '">' +
+        '<span class="terminal-topbar-dot' + st + '"></span>' +
+        '<span class="cc-agent-dd-item-name">' + ag.id + '</span>' +
+        draft +
+      '</button>';
+    }).join('');
+    agentDdMenu.querySelectorAll('[data-agent]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        switchAgent(btn.dataset.agent);
+        closeAgentDd();
+      });
+    });
+  }
+  agentDdBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var open = !agentDd.classList.contains('open');
+    agentDd.classList.toggle('open', open);
+    agentDdBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.addEventListener('pointerdown', function (e) {
+    if (agentDd.classList.contains('open') && !agentDd.contains(e.target)) closeAgentDd();
+  });
+
+  function syncAgentSwitcher(w) {
+    phone.setAttribute('data-switcher', w < SWITCHER_BP ? 'dropdown' : 'strip');
+    closeAgentDd();
+  }
+
+  /* --- independent collapse for the util/reminders row ---
+     Collapsed = hide the second row entirely; a compact bell icon on row 1 restores it. */
+  var utilCollapsed = false;
+  var utilToggle = document.getElementById('utilToggle');
+  var utilArea = document.getElementById('utilArea');
+  var utilCollapsedIcon = document.getElementById('utilCollapsedIcon');
+  var shellHeader = document.getElementById('shellHeader');
+  function setUtilCollapsed(v) {
+    utilCollapsed = v;
+    utilArea.classList.toggle('collapsed', v);
+    shellHeader.classList.toggle('util-collapsed', v);
+    utilToggle.textContent = v ? '›' : '‹';
+  }
+  utilToggle.addEventListener('click', function () { setUtilCollapsed(!utilCollapsed); });
+  utilCollapsedIcon.addEventListener('click', function () { setUtilCollapsed(false); });
+
+  /* --- optional: tuck font / ME / gear (default expanded) --- */
+  var ctrlCollapsed = false;
+  var ctrlCluster = document.getElementById('ctrlCluster');
+  var ctrlToggle = document.getElementById('ctrlToggle');
+  function setCtrlCollapsed(v) {
+    ctrlCollapsed = v;
+    ctrlCluster.classList.toggle('collapsed', v);
+    ctrlToggle.textContent = v ? '⋯' : '‹';
+    ctrlToggle.title = v ? 'Show controls' : 'Collapse controls';
+  }
+  ctrlToggle.addEventListener('click', function () { setCtrlCollapsed(!ctrlCollapsed); });
+
+  /* --- draggable scrubber: pages through the group (strip mode ≥900px only) --- */
+  var tabsScroll = document.getElementById('headerTabs');
+  var scrubTrack = document.getElementById('scrubTrack');
+  var scrubThumb = document.getElementById('scrubThumb');
+  function currentAgentIndex() {
+    var i = AGENTS.findIndex(function (a) { return a.id === current; });
+    return i < 0 ? 0 : i;
+  }
+  function agentIndexAtClientX(clientX, trackRect) {
+    var n = AGENTS.length;
+    var w = trackRect.width || 1;
+    var idx = Math.floor(((clientX - trackRect.left) / w) * n);
+    return Math.max(0, Math.min(n - 1, idx));
+  }
+  function updateScrubber() {
+    if (phone.getAttribute('data-switcher') !== 'strip' || tabsCollapsed) return;
+    var n = AGENTS.length;
+    var trackW = scrubTrack.clientWidth;
+    if (n < 2 || trackW < 8) { scrubTrack.style.visibility = 'hidden'; return; }
+    scrubTrack.style.visibility = 'visible';
+    var thumbW = Math.max(28, trackW / n);
+    var maxThumbX = Math.max(0, trackW - thumbW);
+    var x = n > 1 ? (currentAgentIndex() / (n - 1)) * maxThumbX : 0;
+    scrubThumb.style.width = thumbW + 'px';
+    scrubThumb.style.left = x + 'px';
+  }
+  window.addEventListener('resize', updateScrubber);
+
+  function dragScrubber() {
+    var trackRect = scrubTrack.getBoundingClientRect();
+    function moveTo(clientX) {
+      var idx = agentIndexAtClientX(clientX, trackRect);
+      var id = AGENTS[idx].id;
+      if (id !== current) switchAgent(id);
+      else updateScrubber();
+    }
+    return moveTo;
+  }
+  var activeDrag = null;
+  scrubThumb.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    activeDrag = dragScrubber();
+    scrubThumb.setPointerCapture(e.pointerId);
+  });
+  scrubThumb.addEventListener('pointermove', function (e) { if (activeDrag) activeDrag(e.clientX); });
+  scrubThumb.addEventListener('pointerup', function () { activeDrag = null; });
+  scrubThumb.addEventListener('pointercancel', function () { activeDrag = null; });
+  scrubTrack.addEventListener('pointerdown', function (e) {
+    if (e.target === scrubThumb) return;
+    dragScrubber()(e.clientX);
+  });
+
+  /* -------------------------------- transcript --------------------------------- */
+  var transcriptEl = document.getElementById('transcript');
+  function escapeHtml(s) { return s.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+  function renderEntryHtml(e, idx) {
+    if (e.role === 'system') {
+      return '<div class="ovm-chat-row ovm-chat-row-system" data-idx="' + idx + '"><div class="ovm-chat-pill">' + escapeHtml(e.text) + '</div></div>';
+    }
+    var isUser = e.role === 'user';
+    return (
+      '<div class="ovm-chat-row ' + (isUser ? 'ovm-chat-row-user' : 'ovm-chat-row-ovm') + ' terminal-chat-entry ' +
+      (isUser ? 'terminal-chat-entry-user' : 'terminal-chat-entry-agent') + '" data-idx="' + idx + '" data-role="' + e.role + '">' +
+      '<div class="terminal-chat-who' + (isUser ? ' user' : '') + '">' +
+        (isUser ? '<span>' + e.time + '</span><span class="terminal-chat-badge">YOU</span>' : '<span class="terminal-chat-badge">AGENT</span><span>' + current + ' · ' + e.time + '</span>') +
+      '</div>' +
+      '<div class="ovm-chat-bubble ' + (isUser ? 'ovm-chat-bubble-user' : 'ovm-chat-bubble-ovm') + '">' + escapeHtml(e.text) + '</div>' +
+      '</div>'
+    );
+  }
+  function renderTranscript() {
+    var list = entries[current] || [];
+    transcriptEl.innerHTML = '<div class="terminal-chat-daydiv">Today</div>' + list.map(renderEntryHtml).join('');
+    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    clearSearchHighlights();
+  }
+  function appendEntry(agentId, entry) {
+    if (!entries[agentId]) entries[agentId] = [];
+    entries[agentId].push(entry);
+    if (agentId === current) renderTranscript();
+  }
+
+  /* ------------------------------ draft persistence ------------------------------ */
+  var composerInput = document.getElementById('composerInput');
+  var sendBtn = document.getElementById('sendBtn');
+  var draftBadge = document.getElementById('draftBadge');
+  composerInput.addEventListener('input', function () {
+    if (composerInput.value.trim()) drafts[current] = composerInput.value; else delete drafts[current];
+    sendBtn.disabled = !composerInput.value.trim() && !attachment;
+  });
+  function flashDraftBadge() {
+    draftBadge.classList.add('show');
+    setTimeout(function () { draftBadge.classList.remove('show'); }, 2200);
+  }
+
+  /* ---------------------------------- switching --------------------------------- */
+  function switchAgent(id) {
+    if (id === current) return;
+    if (composerInput.value.trim()) drafts[current] = composerInput.value; else delete drafts[current];
+    current = id;
+    renderHeader();
+    renderTabs();
+    renderTranscript();
+    var d = drafts[current] || '';
+    composerInput.value = d;
+    sendBtn.disabled = !d.trim() && !attachment;
+    if (d.trim()) flashDraftBadge();
+    renderWakeupChip();
+    renderSummCount();
+    clearAttachment();
+  }
+
+  /* ------------------------------------ send ------------------------------------- */
+  function sendCommand() {
+    var text = composerInput.value.trim();
+    if (!text && !attachment) return;
+    var stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    appendEntry(current, { role: 'user', text: attachment ? (text || '[image attached]') : text, time: stamp });
+    composerInput.value = '';
+    delete drafts[current];
+    clearAttachment();
+    sendBtn.disabled = true;
+    renderTabs();
+    setTimeout(function () {
+      appendEntry(current, { role: 'agent', text: 'Got it — on it.', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+    }, 850);
+  }
+  sendBtn.addEventListener('click', sendCommand);
+  composerInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendCommand(); }
+  });
+
+  /* --------------------------------- modebar / size ------------------------------- */
+  var modeCommand = document.getElementById('modeCommand');
+  var modeRaw = document.getElementById('modeRaw');
+  modeCommand.addEventListener('click', function () { sendMode = 'command'; modeCommand.classList.add('sel'); modeRaw.classList.remove('sel'); });
+  modeRaw.addEventListener('click', function () { sendMode = 'raw'; modeRaw.classList.add('sel'); modeCommand.classList.remove('sel'); flashKey('⏎'); });
+  var sizeToggle = document.getElementById('sizeToggle');
+  var largeOn = false;
+  sizeToggle.addEventListener('click', function () {
+    largeOn = !largeOn;
+    composerInput.classList.toggle('cc-lg', largeOn);
+    sizeToggle.classList.toggle('sel', largeOn);
+    sizeToggle.textContent = largeOn ? '▾ Small input' : '▴ Large input';
+  });
+
+  /* ---------------------------------- attach image --------------------------------- */
+  var attachBtn = document.getElementById('attachBtn');
+  var fileInput = document.getElementById('fileInput');
+  var attachPill = document.getElementById('attachPill');
+  attachBtn.addEventListener('click', function () { fileInput.click(); });
+  fileInput.addEventListener('change', function () {
+    var f = fileInput.files && fileInput.files[0];
+    if (!f) return;
+    var url = URL.createObjectURL(f);
+    attachment = { url: url, name: f.name };
+    attachPill.style.display = 'inline-block';
+    attachPill.innerHTML = '<span class="terminal-attach-pill"><img src="' + url + '" alt="" /><button type="button" id="attachRemove">×</button></span>';
+    document.getElementById('attachRemove').addEventListener('click', clearAttachment);
+    sendBtn.disabled = false;
+  });
+  function clearAttachment() {
+    if (attachment) URL.revokeObjectURL(attachment.url);
+    attachment = null;
+    attachPill.style.display = 'none';
+    attachPill.innerHTML = '';
+    fileInput.value = '';
+    sendBtn.disabled = !composerInput.value.trim();
+  }
+
+  /* ------------------------------------ key row ------------------------------------ */
+  var keyFlash = document.getElementById('keyFlash');
+  var keyFlashTimer = null;
+  function flashKey(label) {
+    keyFlash.textContent = 'sent ' + label + ' ✓';
+    keyFlash.style.display = 'inline-flex';
+    clearTimeout(keyFlashTimer);
+    keyFlashTimer = setTimeout(function () { keyFlash.style.display = 'none'; }, 1000);
+  }
+  document.querySelectorAll('.terminal-control-bar [data-key]').forEach(function (btn) {
+    btn.addEventListener('click', function () { flashKey(btn.dataset.key); });
+  });
+
+  /* ------------------------------------ font size ----------------------------------- */
+  function applyFont() {
+    phone.style.setProperty('--terminal-conv-font', fontSize + 'px');
+    document.getElementById('fsVal').textContent = fontSize + 'px';
+  }
+  function setFont(v) { fontSize = Math.max(12, Math.min(22, v)); applyFont(); }
+  document.getElementById('fontDec').addEventListener('click', function () { setFont(fontSize - 1); });
+  document.getElementById('fontInc').addEventListener('click', function () { setFont(fontSize + 1); });
+  document.getElementById('fsDec2').addEventListener('click', function () { setFont(fontSize - 1); });
+  document.getElementById('fsInc2').addEventListener('click', function () { setFont(fontSize + 1); });
+  applyFont();
+
+  /* ------------------------------------ ME nav -------------------------------------- */
+  function safeScrollIntoView(node) {
+    if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  var meIdx = -1;
+  function userNodes() { return Array.prototype.slice.call(transcriptEl.querySelectorAll('[data-role="user"]')); }
+  function jumpMe(dir) {
+    var nodes = userNodes();
+    if (!nodes.length) return;
+    meIdx = (meIdx < 0) ? (dir > 0 ? 0 : nodes.length - 1) : Math.max(0, Math.min(nodes.length - 1, meIdx + dir));
+    var node = nodes[meIdx];
+    safeScrollIntoView(node);
+    node.classList.add('terminal-chat-focus-flash');
+    setTimeout(function () { node.classList.remove('terminal-chat-focus-flash'); }, 700);
+  }
+  document.getElementById('meUp').addEventListener('click', function () { jumpMe(-1); });
+  document.getElementById('meDown').addEventListener('click', function () { jumpMe(1); });
+
+  /* ------------------------------------- search -------------------------------------- */
+  var searchToggle = document.getElementById('searchToggle');
+  var searchBar = document.getElementById('searchBar');
+  var searchInput = document.getElementById('searchInput');
+  var searchCount = document.getElementById('searchCount');
+  var searchMatches = []; var searchIdx = -1;
+  function clearSearchHighlights() {
+    transcriptEl.querySelectorAll('.terminal-chat-hit, .terminal-chat-hit-current').forEach(function (n) {
+      n.classList.remove('terminal-chat-hit', 'terminal-chat-hit-current');
+    });
+  }
+  function runSearch() {
+    clearSearchHighlights();
+    var q = searchInput.value.trim().toLowerCase();
+    searchMatches = []; searchIdx = -1;
+    if (!q) { searchCount.textContent = '0/0'; return; }
+    transcriptEl.querySelectorAll('[data-role]').forEach(function (node) {
+      var bubble = node.querySelector('.ovm-chat-bubble');
+      if (bubble && bubble.textContent.toLowerCase().indexOf(q) !== -1) {
+        node.classList.add('terminal-chat-hit');
+        searchMatches.push(node);
+      }
+    });
+    searchCount.textContent = (searchMatches.length ? 1 : 0) + '/' + searchMatches.length;
+    if (searchMatches.length) gotoMatch(0);
+  }
+  function gotoMatch(i) {
+    if (!searchMatches.length) return;
+    if (searchIdx >= 0 && searchMatches[searchIdx]) searchMatches[searchIdx].classList.remove('terminal-chat-hit-current');
+    searchIdx = (i + searchMatches.length) % searchMatches.length;
+    var node = searchMatches[searchIdx];
+    node.classList.add('terminal-chat-hit-current');
+    safeScrollIntoView(node);
+    searchCount.textContent = (searchIdx + 1) + '/' + searchMatches.length;
+  }
+  var transcriptWrap = document.getElementById('transcriptWrap');
+  searchToggle.addEventListener('click', function () { searchBar.style.display = 'flex'; searchToggle.style.display = 'none'; transcriptWrap.classList.add('search-open'); searchInput.focus(); });
+  document.getElementById('searchClose').addEventListener('click', function () { searchBar.style.display = 'none'; searchToggle.style.display = 'flex'; transcriptWrap.classList.remove('search-open'); searchInput.value = ''; clearSearchHighlights(); });
+  searchInput.addEventListener('input', runSearch);
+  document.getElementById('searchPrev').addEventListener('click', function () { gotoMatch(searchIdx - 1); });
+  document.getElementById('searchNext').addEventListener('click', function () { gotoMatch(searchIdx + 1); });
+
+  /* -------------------------------- session refresh (mock re-pull) -------------------------------- */
+  var refreshToggle = document.getElementById('refreshToggle');
+  var refreshInFlight = null;
+  function shellOf(a) {
+    var s = ((a && a.sub) || 'zsh').split('·')[0].trim();
+    return s || 'zsh';
+  }
+  refreshToggle.addEventListener('click', function () {
+    if (refreshInFlight) return;
+    var id = current;
+    refreshInFlight = id;
+    refreshToggle.classList.add('spinning');
+    refreshToggle.disabled = true;
+    refreshToggle.title = 'Refreshing…';
+    var a = agentById(id);
+    var shell = shellOf(a);
+    document.getElementById('hdrSub').textContent = shell + ' \u00b7 pulling session\u2026';
+    document.getElementById('hdrDot').className = 'terminal-topbar-dot busy';
+    setTimeout(function () {
+      var ag = agentById(id);
+      ag.sub = shell + ' \u00b7 updated just now';
+      ag.status = 'on';
+      var stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (!entries[id]) entries[id] = [];
+      entries[id].push({ role: 'agent', text: 'Direct on-session: latest pane output pulled in. Standing by.', time: stamp });
+      refreshInFlight = null;
+      refreshToggle.classList.remove('spinning');
+      refreshToggle.disabled = false;
+      refreshToggle.title = 'Refresh from session';
+      if (current === id) {
+        renderHeader();
+        renderTranscript();
+      }
+      showToast('Refreshed');
+    }, 700);
+  });
+
+  /* ------------------------------------- sheets --------------------------------------- */
+  function openSheet(id) {
+    document.getElementById('ov' + id.replace('sheet', '')).classList.add('open');
+    document.getElementById(id).classList.add('open');
+  }
+  function closeSheet(id) {
+    document.getElementById('ov' + id.replace('sheet', '')).classList.remove('open');
+    document.getElementById(id).classList.remove('open');
+  }
+  document.querySelectorAll('.terminal-menu-overlay').forEach(function (ov) {
+    ov.addEventListener('click', function () { ov.classList.remove('open'); ov.nextElementSibling.classList.remove('open'); });
+  });
+  document.querySelectorAll('[data-close]').forEach(function (btn) { btn.addEventListener('click', function () { closeSheet(btn.dataset.close); }); });
+  document.getElementById('settingsBtn').addEventListener('click', function () { openSheet('sheetSettings'); });
+  document.querySelectorAll('[data-open]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      closeSheet('sheetSettings');
+      openSheet(btn.dataset.open);
+      if (btn.dataset.open === 'sheetReminders') renderReminderSheet();
+      if (btn.dataset.open === 'sheetWakeup') renderWakeupSheet();
+      if (btn.dataset.open === 'sheetEndpoints') renderEndpoints();
+    });
+  });
+
+  /* ===================================================================
+     REMINDERS
+     =================================================================== */
+  document.getElementById('chipReminders').addEventListener('click', function () { openSheet('sheetReminders'); renderReminderSheet(); });
+  document.querySelectorAll('[data-remtab]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('[data-remtab]').forEach(function (b) { b.classList.remove('sel'); });
+      btn.classList.add('sel');
+      var conf = btn.dataset.remtab === 'configure';
+      document.getElementById('remConfigure').style.display = conf ? '' : 'none';
+      document.getElementById('remActive').style.display = conf ? 'none' : '';
+      if (!conf) renderActiveReminders();
+    });
+  });
+  document.getElementById('remActiveSwitch').addEventListener('click', function (e) {
+    reminder.active = !reminder.active;
+    e.currentTarget.classList.toggle('on', reminder.active);
+    renderUtilChips();
+  });
+  document.querySelectorAll('#remCadenceChips [data-cad]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#remCadenceChips [data-cad]').forEach(function (b) { b.classList.remove('sel'); });
+      btn.classList.add('sel');
+      var v = btn.dataset.cad;
+      var customInput = document.getElementById('remCustomInput');
+      document.getElementById('remCustomRow').style.display = v === 'custom' ? 'flex' : 'none';
+      if (v === 'custom') {
+        // Continuity: if coming from a preset, seed the custom field with it
+        // instead of silently falling back to a stale prior value.
+        if ([15, 30, 45, 60, 90].includes(reminder.cadence)) customInput.value = reminder.cadence;
+        reminder.cadence = Number(customInput.value || 20);
+      } else {
+        reminder.cadence = Number(v);
+      }
+    });
+  });
+  document.getElementById('remCustomInput').addEventListener('input', function (e) { reminder.cadence = Number(e.target.value || 1); });
+  var remStopBtn = document.getElementById('remStopBtn'), remUnlimBtn = document.getElementById('remUnlimBtn');
+  remStopBtn.addEventListener('click', function () {
+    reminder.repeat = 'stop'; remStopBtn.classList.add('sel'); remUnlimBtn.classList.remove('sel');
+    document.getElementById('remStopNRow').style.display = 'flex';
+  });
+  remUnlimBtn.addEventListener('click', function () {
+    reminder.repeat = 'unlimited'; remUnlimBtn.classList.add('sel'); remStopBtn.classList.remove('sel');
+    document.getElementById('remStopNRow').style.display = 'none';
+  });
+  document.getElementById('remNDec').addEventListener('click', function () { reminder.stopN = Math.max(1, reminder.stopN - 1); document.getElementById('remNVal').textContent = reminder.stopN; });
+  document.getElementById('remNInc').addEventListener('click', function () { reminder.stopN = Math.min(999, reminder.stopN + 1); document.getElementById('remNVal').textContent = reminder.stopN; });
+  document.getElementById('remMessage').addEventListener('input', function (e) { reminder.message = e.target.value; });
+
+  function renderAgentIncludeList() {
+    var wrap = document.getElementById('remAgentList');
+    wrap.innerHTML = AGENTS.map(function (a) {
+      return (
+        '<div class="cc-agentrow' + (a.id === current ? ' current' : '') + '">' +
+          '<div class="cc-agentrow-main"><div class="cc-agentrow-name">' + a.id + (a.id === current ? ' <span class="you">this window</span>' : '') + '</div>' +
+          '<div class="cc-agentrow-sub">' + (a.includeReminders ? 'Included · gets the solicit' : 'Skipped') + '</div></div>' +
+          '<button class="terminal-switch' + (a.includeReminders ? ' on' : '') + '" data-agent-toggle="' + a.id + '"></button>' +
+        '</div>'
+      );
+    }).join('');
+    wrap.querySelectorAll('[data-agent-toggle]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var a = agentById(btn.dataset.agentToggle);
+        a.includeReminders = !a.includeReminders;
+        renderAgentIncludeList();
+        renderUtilChips();
+      });
+    });
+  }
+  function renderReminderSheet() {
+    document.getElementById('remActiveSwitch').classList.toggle('on', reminder.active);
+    document.querySelectorAll('#remCadenceChips [data-cad]').forEach(function (b) {
+      b.classList.toggle('sel', (b.dataset.cad === 'custom' && ![15,30,45,60,90].includes(reminder.cadence)) || Number(b.dataset.cad) === reminder.cadence);
+    });
+    document.getElementById('remCustomRow').style.display = [15,30,45,60,90].includes(reminder.cadence) ? 'none' : 'flex';
+    document.getElementById('remCustomInput').value = reminder.cadence;
+    remStopBtn.classList.toggle('sel', reminder.repeat === 'stop');
+    remUnlimBtn.classList.toggle('sel', reminder.repeat === 'unlimited');
+    document.getElementById('remStopNRow').style.display = reminder.repeat === 'stop' ? 'flex' : 'none';
+    document.getElementById('remNVal').textContent = reminder.stopN;
+    document.getElementById('remMessage').value = reminder.message;
+    renderAgentIncludeList();
+  }
+  document.getElementById('remSave').addEventListener('click', function () {
+    reminder.nextFireAt = Date.now() + reminder.cadence * 60000;
+    reminder.fired = 0;
+    renderUtilChips();
+    showToast('🔔 Folder reminder saved · every ' + reminder.cadence + 'm');
+    closeSheet('sheetReminders');
+  });
+
+  function renderActiveReminders() {
+    var wrap = document.getElementById('remActive');
+    var included = AGENTS.filter(function (a) { return a.includeReminders; });
+    var remain = reminder.repeat === 'stop' ? Math.max(0, reminder.stopN - reminder.fired) : null;
+    wrap.innerHTML =
+      '<div class="cc-folder-card">' +
+        '<div class="cc-folder-card-head"><span class="cc-folder-card-name">Work folder</span>' +
+          '<button class="cc-demo-btn" id="remFireNow">Fire now (demo)</button></div>' +
+        '<div class="cc-folder-card-stats">' +
+          '<span>Every <b>' + reminder.cadence + 'm</b></span>' +
+          '<span>Next in <b id="remNextFireLbl">' + (reminder.active ? fmtMMSS(reminder.nextFireAt - Date.now()) : '—') + '</b></span>' +
+          '<span>Fired <b>' + reminder.fired + '</b>' + (remain === null ? ' · unlimited' : ' · ' + remain + ' left') + '</span>' +
+          '<span>' + (reminder.active ? '<span class="badge badge-active" style="font-size:9px">ACTIVE</span>' : '<span class="badge badge-draft" style="font-size:9px">PAUSED</span>') + '</span>' +
+        '</div></div>' +
+      '<div class="terminal-sheet-sect" style="margin-top:0">Per-agent breakdown</div>' +
+      included.concat(AGENTS.filter(function (a) { return !a.includeReminders; })).map(function (a) {
+        return (
+          '<div class="cc-agentrow' + (a.id === current ? ' current' : '') + '">' +
+            '<div class="cc-agentrow-main"><div class="cc-agentrow-name">' + a.id + '</div>' +
+            '<div class="cc-agentrow-sub">' + (a.includeReminders ? 'next in ' + (reminder.active ? fmtMMSS(reminder.nextFireAt - Date.now()) : '—') : 'skipped') + '</div></div>' +
+            (a.includeReminders ? '<span class="badge badge-active" style="font-size:9px">IN</span>' : '<span class="badge badge-draft" style="font-size:9px">OUT</span>') +
+          '</div>'
+        );
+      }).join('');
+    document.getElementById('remFireNow').addEventListener('click', function () { fireReminder(); renderActiveReminders(); });
+  }
+
+  function fireReminder() {
+    var included = AGENTS.filter(function (a) { return a.includeReminders; });
+    included.forEach(function (a) {
+      var stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      appendEntry(a.id, { role: 'user', text: reminder.message, time: stamp });
+      appendEntry(a.id, { role: 'agent', text: 'Status: on track, no blockers. Last checkpoint saved ' + stamp + '.', time: stamp });
+      var ep = defaultEndpoint();
+      if (!summaries[a.id]) summaries[a.id] = [];
+      summaries[a.id].unshift({ time: 'Today ' + stamp, text: a.id + ' reported it is on track with no blockers as of ' + stamp + '; last checkpoint saved successfully.', endpoint: ep.name });
+    });
+    reminder.fired += 1;
+    if (reminder.repeat === 'stop' && reminder.fired >= reminder.stopN) { reminder.active = false; }
+    else { reminder.nextFireAt = Date.now() + reminder.cadence * 60000; }
+    renderUtilChips();
+    renderSummCount();
+    showToast('🔔 Reminder fired — solicited ' + included.length + ' agent(s)');
+  }
+
+  /* ===================================================================
+     WAKEUP
+     =================================================================== */
+  document.getElementById('chipWakeup').addEventListener('click', function (e) {
+    if (e.target.id === 'chipWakeupX') return;
+    openSheet('sheetWakeup'); renderWakeupSheet();
+  });
+  document.getElementById('chipWakeupX').addEventListener('click', function (e) {
+    e.stopPropagation();
+    delete wakeups[current];
+    renderWakeupChip();
+    showToast('Wakeup cancelled for ' + current);
+  });
+  function defaultWakeDate(offsetMs) {
+    var d = new Date(Date.now() + offsetMs);
+    return d;
+  }
+  function fillWakeInputs(date) {
+    var pad = function (n) { return String(n).padStart(2, '0'); };
+    document.getElementById('wakeDate').value = date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+    document.getElementById('wakeTime').value = pad(date.getHours()) + ':' + pad(date.getMinutes());
+  }
+  var pendingQuickFire = null;
+  document.querySelectorAll('[data-quickwake]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('[data-quickwake]').forEach(function (b) { b.classList.remove('sel'); });
+      btn.classList.add('sel');
+      var v = btn.dataset.quickwake;
+      if (v === 'tomorrow7') {
+        var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(7, 0, 0, 0);
+        fillWakeInputs(d); pendingQuickFire = null;
+      } else {
+        var ms = Number(v) * 1000;
+        fillWakeInputs(defaultWakeDate(ms));
+        pendingQuickFire = ms;
+      }
+    });
+  });
+  function renderWakeupSheet() {
+    var existing = wakeups[current];
+    var card = document.getElementById('wakePendingCard');
+    var cancelBtn = document.getElementById('wakeCancelExisting');
+    if (existing) {
+      card.style.display = 'flex'; card.className = 'cc-pending-card';
+      card.innerHTML = '<span class="cc-pending-dot"></span><div>Pending — fires in <b id="wakePendingCountdown">' + fmtMMSS(existing.fireAt - Date.now()) + '</b><br><span style="color:var(--text-secondary)">“' + existing.action + '”</span></div>';
+      fillWakeInputs(new Date(existing.fireAt));
+      document.getElementById('wakeAction').value = existing.action;
+      cancelBtn.style.display = 'inline-block';
+    } else {
+      card.style.display = 'none';
+      fillWakeInputs(defaultWakeDate(5 * 60 * 1000));
+      document.getElementById('wakeAction').value = "Wake up — start today's queued tasks and report status.";
+      cancelBtn.style.display = 'none';
+    }
+    pendingQuickFire = null;
+    document.querySelectorAll('[data-quickwake]').forEach(function (b) { b.classList.remove('sel'); });
+  }
+  document.getElementById('wakeCancelExisting').addEventListener('click', function () {
+    delete wakeups[current]; renderWakeupChip(); closeSheet('sheetWakeup'); showToast('Wakeup cancelled for ' + current);
+  });
+  document.getElementById('wakeSave').addEventListener('click', function () {
+    var dateVal = document.getElementById('wakeDate').value;
+    var timeVal = document.getElementById('wakeTime').value;
+    var fireAt;
+    if (pendingQuickFire != null) fireAt = Date.now() + pendingQuickFire;
+    else if (dateVal && timeVal) fireAt = new Date(dateVal + 'T' + timeVal).getTime();
+    else fireAt = Date.now() + 5 * 60000;
+    var action = document.getElementById('wakeAction').value.trim() || 'Wake up.';
+    wakeups[current] = { fireAt: fireAt, action: action };
+    renderWakeupChip();
+    closeSheet('sheetWakeup');
+    showToast('⏰ Wakeup scheduled for ' + current + ' · ' + fmtMMSS(fireAt - Date.now()));
+  });
+
+  function renderWakeupChip() {
+    var chip = document.getElementById('chipWakeup');
+    var lbl = document.getElementById('chipWakeupLbl');
+    var x = document.getElementById('chipWakeupX');
+    var w = wakeups[current];
+    if (w) {
+      chip.classList.add('active-on'); chip.classList.remove('ghost');
+      lbl.textContent = 'Wakeup · ' + fmtMMSS(w.fireAt - Date.now());
+      x.style.display = 'flex';
+    } else {
+      chip.classList.remove('active-on'); chip.classList.add('ghost');
+      lbl.textContent = '+ Wakeup';
+      x.style.display = 'none';
+    }
+    renderUtilCollapsedHint();
+  }
+  function fireWakeup(agentId) {
+    var w = wakeups[agentId];
+    if (!w) return;
+    var stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    appendEntry(agentId, { role: 'system', text: '⏰ Wakeup fired · sent: "' + w.action + '"' });
+    appendEntry(agentId, { role: 'agent', text: 'Awake. Starting now.', time: stamp });
+    delete wakeups[agentId];
+    if (agentId === current) renderWakeupChip();
+    showToast('⏰ Wakeup fired for ' + agentId);
+  }
+
+  /* ===================================================================
+     SUMMARIES
+     =================================================================== */
+  var summOverlay = document.getElementById('summOverlay');
+  document.getElementById('chipSummaries').addEventListener('click', function () {
+    document.getElementById('summAgentName').textContent = current;
+    renderSummaryList();
+    document.getElementById('summPopover').style.top = (shellHeader.offsetHeight + 4) + 'px';
+    summOverlay.classList.add('open');
+  });
+  document.getElementById('summClose').addEventListener('click', function () { summOverlay.classList.remove('open'); });
+  summOverlay.addEventListener('click', function (e) { if (e.target === summOverlay) summOverlay.classList.remove('open'); });
+  function renderSummaryList() {
+    var list = summaries[current] || [];
+    var el = document.getElementById('summList');
+    if (!list.length) { el.innerHTML = '<div class="cc-sheet-empty">No summaries yet — the next reminder solicit will add one here.</div>'; return; }
+    el.innerHTML = list.map(function (s) {
+      return '<div class="cc-summary-card"><div class="cc-summary-top"><span class="cc-summary-time">' + s.time + '</span><span class="cc-summary-tag">via ' + s.endpoint + '</span></div><div class="cc-summary-text">' + escapeHtml(s.text) + '</div></div>';
+    }).join('');
+  }
+  function renderSummCount() { document.getElementById('summCount').textContent = (summaries[current] || []).length; }
+
+  /* ===================================================================
+     ENDPOINTS
+     =================================================================== */
+  function renderEndpoints() {
+    var el = document.getElementById('endpointList');
+    el.innerHTML = endpoints.map(function (e) {
+      return (
+        '<div class="cc-endpoint-row">' +
+          '<button class="cc-endpoint-radio' + (e.isDefault ? ' sel' : '') + '" data-setdefault="' + e.id + '" title="Make default"></button>' +
+          '<div class="cc-endpoint-main">' +
+            '<div class="cc-endpoint-name-row"><span class="cc-endpoint-name">' + e.name + '</span>' + (e.isDefault ? '<span class="cc-endpoint-default-badge">Default</span>' : '') + '</div>' +
+            '<div class="cc-endpoint-url">' + e.url + '</div>' +
+            '<span class="cc-endpoint-model">' + e.model + '</span>' +
+          '</div>' +
+          (e.isDefault ? '' : '<button class="cc-endpoint-del" data-delendpoint="' + e.id + '" title="Remove">×</button>') +
+        '</div>'
+      );
+    }).join('');
+    el.querySelectorAll('[data-setdefault]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        endpoints.forEach(function (e) { e.isDefault = (e.id === btn.dataset.setdefault); });
+        renderEndpoints();
+        showToast('Default summary-LLM set to ' + btn.dataset.setdefault);
+      });
+    });
+    el.querySelectorAll('[data-delendpoint]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        endpoints = endpoints.filter(function (e) { return e.id !== btn.dataset.delendpoint; });
+        renderEndpoints();
+      });
+    });
+  }
+  var addBtn = document.getElementById('addEndpointBtn');
+  var form = document.getElementById('endpointForm');
+  addBtn.addEventListener('click', function () { form.style.display = 'block'; addBtn.style.display = 'none'; });
+  document.getElementById('epCancel').addEventListener('click', function () { form.style.display = 'none'; addBtn.style.display = 'block'; });
+  document.getElementById('epSaveNew').addEventListener('click', function () {
+    var name = document.getElementById('epName').value.trim();
+    var url = document.getElementById('epUrl').value.trim();
+    var model = document.getElementById('epModel').value.trim();
+    if (!name || !url) { showToast('Name + Base URL are required'); return; }
+    endpoints.push({ id: 'ep' + Date.now(), name: name, url: url, model: model || '(unset)', isDefault: false });
+    document.getElementById('epName').value = ''; document.getElementById('epUrl').value = ''; document.getElementById('epModel').value = '';
+    form.style.display = 'none'; addBtn.style.display = 'block';
+    renderEndpoints();
+    showToast('Endpoint added');
+  });
+
+  /* ===================================================================
+     UTIL CHIPS (header row)
+     =================================================================== */
+  function renderUtilChips() {
+    var chip = document.getElementById('chipReminders');
+    var lbl = document.getElementById('chipRemindersLbl');
+    if (reminder.active) {
+      chip.classList.add('active-on');
+      lbl.textContent = 'Every ' + reminder.cadence + 'm · next ' + fmtMMSS(reminder.nextFireAt - Date.now());
+    } else {
+      chip.classList.remove('active-on');
+      lbl.textContent = 'Reminders off';
+    }
+    renderWakeupChip();
+    renderUtilCollapsedHint();
+  }
+
+  function renderUtilCollapsedHint() {
+    var wakeCount = Object.keys(wakeups).length;
+    utilCollapsedIcon.classList.toggle('has-reminder', !!reminder.active);
+    utilCollapsedIcon.classList.toggle('has-wakeup', wakeCount > 0);
+    document.getElementById('utilHintWakeCount').textContent = String(wakeCount);
+  }
+
+  /* ===================================================================
+     GLOBAL TICKER — advances countdowns + auto-fires reminder/wakeups
+     =================================================================== */
+  setInterval(function () {
+    if (reminder.active && Date.now() >= reminder.nextFireAt) fireReminder();
+    renderUtilChips();
+    if (document.getElementById('sheetReminders').classList.contains('open') && document.getElementById('remActive').style.display !== 'none') {
+      renderActiveReminders();
+    }
+    if (document.getElementById('sheetWakeup').classList.contains('open')) {
+      var w = wakeups[current];
+      var lbl = document.getElementById('wakePendingCountdown');
+      if (w && lbl) lbl.textContent = fmtMMSS(w.fireAt - Date.now());
+    }
+    Object.keys(wakeups).forEach(function (id) { if (Date.now() >= wakeups[id].fireAt) fireWakeup(id); });
+  }, 1000);
+
+  /* ------------------------------------- init ------------------------------------- */
+  applyFrameSize(390, 780);
+  setCollapsed(true);
+  setUtilCollapsed(false);
+  setCtrlCollapsed(false);
+  renderHeader();
+  renderTabs();
+  renderTranscript();
+  renderUtilChips();
+  renderSummCount();
+})();
+</script>
+</body>
+</html>

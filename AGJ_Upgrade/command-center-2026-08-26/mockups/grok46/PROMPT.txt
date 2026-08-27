@@ -1,0 +1,24 @@
+You are the "grok46" author in a two-author UI mockup competition for AGJAssist. The owner will pick one mockup and it becomes the BUILD CONTRACT — make yours complete and buildable, not just pretty.
+
+STEP 1 — Read the brief IN FULL:
+/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockup-brief.md
+
+STEP 2 — Ground in the CURRENT app aesthetic (match it; build on the existing shell, don't reinvent):
+- src/web/public/style.css
+- src/web/public/app.js  (search: FriendlyTerminalView, TerminalTab, terminal-header-tabs, terminal-selection, the composer)
+
+STEP 3 — Design "agent-window v2" implementing EVERY required element in the brief:
+1) group-tab collapse/expand toggle + a subtle DRAGGABLE scrubber through all agents in the group;
+2) folder-level Reminders (recurring auto-solicit) with per-agent include/skip flags, cadence presets 15/30/45/60/90 + custom, repeat stop-after-N or unlimited, and an active-reminders view (per-agent + folder);
+3) one-time Wakeups (manual time + manual action) with a pending chip on the agent window that clears when it fires;
+4) a Summaries dropdown on the agent window (browsable, timestamped);
+5) a small Summary-LLM named-endpoint config surface (name + base URL + model, OpenAI-compatible; default labelled "140");
+6) a subtle per-agent draft-kept affordance.
+
+CONSTRAINTS: mobile/tablet-first ~390px (also holds up wider); THEME-ADAPTIVE — right in BOTH light and dark, include a light/dark preview toggle (NOT dark-only); readability first; ONE self-contained HTML file (inline CSS/JS, static placeholder data, no backend, no external deps except Google Fonts); key interactions must actually be clickable; do NOT remove existing agent-window functions (key rows, send-as-command/raw-keys, font, ME-nav, image attach, search) — v2 ADDS.
+
+STEP 4 — Write these files (absolute paths):
+- /home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/grok46/agent-window-v2.html
+- /home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/grok46/rationale.md  (short: decisions, tradeoffs, flags)
+
+When done, print the HTML file path.

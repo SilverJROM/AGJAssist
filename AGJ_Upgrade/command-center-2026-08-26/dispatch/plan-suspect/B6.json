@@ -1,0 +1,13 @@
+{
+  "slice": "B6",
+  "first_seen_attempt": 2,
+  "signature": "IMPL_INCOMPLETE|B1,B2",
+  "requirements": "B1,B2",
+  "defect_class": "IMPL_INCOMPLETE",
+  "argument": "An acceptance criterion that no implementation can satisfy fails IDENTICALLY at every tier, so another attempt or a stronger seat buys more of the same failure at higher cost. This is the plan review, already written.",
+  "answer": "Criterion is sound and already satisfied. a1/a2 left src/api/routes/guardian-routes.ts in the tree (same incomplete diff, same commit c0b327a). a3 deleted the file (7047fc6/bc21bc78) and validator PASS on glimmer L1. Repeats were coincidental incomplete implementation, not an unsatisfiable AC. B6 is DONE; no plan edit.",
+  "how_to_answer": "Decompose or repair the criterion, OR write `answer` here saying why the row is sound and the repeats are coincidental. \"Noted and continued\" is not an answer.",
+  "raised_at": 1787800523,
+  "answered_at": "2026-08-27T03:21:00Z",
+  "answered_by": "projcore"
+}

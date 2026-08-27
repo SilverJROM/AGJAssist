@@ -1,0 +1,20 @@
+You are grok46 making ONE surgical, incremental change to the EXISTING agent-window v2 final mockup. Do NOT redesign or regress anything. Do NOT rewrite from scratch — edit the existing file in place.
+
+READ the current mockup (this is the file you will MODIFY IN PLACE):
+/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/agent-window-v2.html
+
+THE CHANGE (owner request, verbatim): "include a collapse/expand on the wakeup/reminders as well so that i can minimize them on the header as well if needed, the tabs (other agents) is auto minimized, and the reminder is auto expanded."
+
+Do EXACTLY this, nothing more:
+1) Add a collapse/expand control for the UTILITY CHIP ROW (the reminders / wakeup / summaries chips — `.cc-util-row`), mirroring the EXISTING agent-tabs collapse pattern (a small toggle + a compact collapsed pill). Collapsed = the util row minimizes into the header; expand restores it. When collapsed, still show a tiny hint so a PENDING WAKEUP or ACTIVE REMINDER is not fully hidden (e.g. a compact "⏰" / count + a dot). Keep it visually consistent with the tabs collapse.
+2) Change the DEFAULT load state: the AGENT TABS strip starts COLLAPSED (auto-minimized); the UTILITY/REMINDERS row starts EXPANDED (auto-expanded). (Currently tabs default expanded and the util row is always shown — flip to: tabs collapsed, util expanded.)
+3) Keep the two collapses INDEPENDENT — each with its own toggle.
+
+PRESERVE EVERYTHING ELSE EXACTLY: the drag-resize harness + all tablet/desktop responsive rules (data-band gating), the 3-state Light/System/Dark theme, and every interaction (reminders folder+per-agent flags+cadence+repeat, wakeup + clearing pending chip, summaries dropdown, endpoints, agent scrubber, draft-kept, key row, send modes, font A-/A+, ME-nav, search, image attach). The 390px phone must remain identical to now EXCEPT the two new default states and the new util-collapse control.
+
+Write the result back to the SAME path (overwrite):
+/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/agent-window-v2.html
+Append a short note to:
+/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/mockups/final/rationale.md
+describing the util-row collapse + the two new default states.
+When done, print the file path.

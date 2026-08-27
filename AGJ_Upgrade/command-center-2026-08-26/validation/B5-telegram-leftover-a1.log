@@ -1,0 +1,45 @@
+
+ RUN  v2.1.9 /home/agjrom/TGBOTS/AGJAssist
+
+ ❯ tests/telegram-commands.test.ts (6 tests | 1 failed) 10ms
+   × Telegram command menu > includes OVM and existing Overmind commands in setMyCommands 6ms
+     → expected [ 'help', 'app', 'weblogin', …(3) ] to deeply equal ArrayContaining{…}
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/telegram-commands.test.ts > Telegram command menu > includes OVM and existing Overmind commands in setMyCommands
+AssertionError: expected [ 'help', 'app', 'weblogin', …(3) ] to deeply equal ArrayContaining{…}
+
+- Expected
++ Received
+
+- ArrayContaining [
+-   "overmind",
+-   "om_pause",
+-   "om_resume",
+-   "ovm_start",
+-   "ovm_end",
++ Array [
++   "help",
++   "app",
++   "weblogin",
+    "lokalai_link",
++   "jobs",
++   "tmux_send",
+  ]
+
+ ❯ tests/telegram-commands.test.ts:39:22
+     37|     );
+     38|     // Menu trimmed to 10 essentials (om_tasks/om_drop removed from th…
+     39|     expect(commands).toEqual(
+       |                      ^
+     40|       expect.arrayContaining([
+     41|         "overmind",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  03:06:26
+   Duration  216ms (transform 67ms, setup 0ms, collect 82ms, tests 10ms, environment 0ms, prepare 34ms)
+

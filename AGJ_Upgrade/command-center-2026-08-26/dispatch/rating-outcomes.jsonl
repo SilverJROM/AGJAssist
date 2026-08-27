@@ -1,0 +1,5 @@
+{"slice": "A0", "rated": "L3", "landed": "L3", "delta": 0, "attempt": 3, "landed_model": "sonnet5", "acs": "HARNESS-SMOKE", "est_min": "30", "ts": 1787797081}
+{"slice": "B1", "rated": "L2", "landed": "L1", "delta": -1, "attempt": 1, "landed_model": "glimmer", "acs": "A1", "est_min": "25", "ts": 1787799455}
+{"slice": "B5", "rated": "L2", "landed": "L1", "delta": -1, "attempt": 1, "landed_model": "glimmer", "acs": "A3", "est_min": "25", "ts": 1787800099}
+{"slice": "B6", "rated": "L2", "landed": "L1", "delta": -1, "attempt": 3, "landed_model": "glimmer", "acs": "B1,B2", "est_min": "25", "ts": 1787800831}
+{"slice": "B2", "rated": "L3", "landed": "L1", "delta": -2, "attempt": 1, "landed_model": "glimmer", "acs": "A2", "est_min": "25", "ts": 1787801244}

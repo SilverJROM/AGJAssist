@@ -1,0 +1,9 @@
+{
+  "slice": "A0",
+  "attempt": 3,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "PLAN REVIEW answered: A0 must NOT make product A5 green (OVM still present; that AC is B8/G2). Gate is `--harness-smoke` exit 0 only. Recover parked commits first: git cherry-pick 7d0a47580252..refs/tiller/command-center-2026-08-26/A0. Then only these five gaps from the a3 validator: (1) reminders/summaries/wakeup/window specs must write fence-report-v1.json in finally like the OVM spec \u2014 a failed C6 run must not keep a stale B8 report. (2) FENCE_STUB handlers for C3, D3, E2, F1 as well as B2, each producing expected_negative_fail_ids with kind=assert. (3) --gate must read the negative report and require those named ids+kind; do not treat any nonzero as valid and do not synthesize the id. (4) FENCE_STUB replaces the contributor IN-PROCESS inside Fastify before the same assertions \u2014 not a :3210 HTTP proxy. (5) isolated --serve cleanup must print reclaimed_bytes=<n>. Do not implement product OVM removal. Validator: PASS iff the tests command exits 0 with named-assert reds; requiring product A5 green on this row is wrong.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-27T01:43:12Z"
+}

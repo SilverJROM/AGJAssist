@@ -1,0 +1,50 @@
+{
+  "type": "escalate",
+  "slice": "A0",
+  "gate": {
+    "decision": "ESCALATE",
+    "failed": [
+      "verdict=FAIL",
+      "redteam: need standard-clean, got standard-fail"
+    ],
+    "verdict": {
+      "run": "command-center-2026-08-26",
+      "batch": "A0",
+      "attempt": "3",
+      "marker": "DRV-A0-24",
+      "verdict": "FAIL",
+      "req": "A5",
+      "defect_class": "INTERCEPTION_GAP",
+      "failed_gate": "A5",
+      "commit": "d5571ac3e961b6858085b70f62bb220f56a7d2c6",
+      "redteam": "standard-fail",
+      "evidence": "e2e/run-command-center-playwright-fence.mjs:5fb2bd8eaebfe4b7a76ccd25a7b61cd3e0c535330475378ae3b28915f98858cc,scripts/cc-run-isolated.mjs:acf3e4e76f504ef116e2fcee0c3334e3887fff9e8d0e883b9073b5bf1e1dcd01,e2e/command-center-ovm-fence.spec.ts:0d5ec18d653e6918c124f64703a8019bbbc8950bd8ab365885ed834fbc380dde,e2e/command-center-reminders-fence.spec.ts:14bf304b3043a7618b1069d8c6b8426476e05b9c87b64dd84832c8527a44ba41,e2e/command-center-summaries-fence.spec.ts:0fde01b606d28ee5573a0b4b85b415e6dbbc89c3c1d6398ecf5b33084711c338,e2e/command-center-wakeup-fence.spec.ts:9348758a1ff6ff0b30154ffed670f3073186ccb2b74ccedfe4b634833ae4ada4,e2e/command-center-window-fence.spec.ts:872ec2addf4f9b8c7993dd1ebfa117f802302bf13b2e331c1e328881b8957cd7,playwright.cc.config.ts:c8f3f61671adb48018f1500c071c83bebec09052919484c9042ab9d7f6fac360,fence-report-v1.json:44d3d449e91e1eec8c5935c7004779ec85fa00ffcf82fe7b2c3ae6fc616ca985,.fence-harness-smoke-pos.json:f8d439657ec09b740d2459b11774857e2610ff0fa6879cc737d661f3a653d673,.fence-harness-smoke-neg.json:bf17b876fe3a0080d089dd741eb53e4d092ff52ae83fc641679378aed547bea3,validation/A0-fix-a3.md:340b9678f3f6605d8979c0cf754af7f442fa5439509892d3a495940e7e95f465"
+    },
+    "gate_review": false,
+    "release_review": false,
+    "validator_note": "[projcore callback] validator A0 STATUS: DONE \u2014 FAIL wrote A0-fix-a3; non-B8 reports/stubs/gate incomplete"
+  },
+  "edge_packet": {
+    "run_id": "command-center-2026-08-26",
+    "batch": "A0",
+    "trigger": "gate:ESCALATE",
+    "failed_conjuncts": [
+      "verdict=FAIL",
+      "redteam: need standard-clean, got standard-fail"
+    ],
+    "defect_class": "INTERCEPTION_GAP",
+    "row_tiers": {
+      "impl": "L3",
+      "val": "L3",
+      "deliberation": "no",
+      "redteam": "standard"
+    },
+    "available_destinations": [
+      "RE_DISPATCH",
+      "CO_PLANNERS",
+      "NORTH",
+      "PANEL",
+      "JROM"
+    ]
+  }
+}
