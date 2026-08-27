@@ -1334,7 +1334,7 @@ export function buildInitialFriendlyState({
   };
 }
 
-const _terminalDraftKey = (viewer, pane) => `agj_terminal_draft:${String(viewer)}:${String(pane)}`;
+const _terminalDraftKey = (viewer, pane) => `agj_terminal_draft:${encodeURIComponent(String(viewer))}:${encodeURIComponent(String(pane))}`;
 
 export function readTerminalDraft(viewer, pane) {
   try {

@@ -41,11 +41,10 @@ describe("terminal draft localStorage", () => {
 
   it("clears a specific viewer/pane draft", () => {
     writeTerminalDraft("v1", "0.0", "to be cleared");
+    writeTerminalDraft("v1", "0.1", "must-remain");
     clearTerminalDraft("v1", "0.0");
     expect(readTerminalDraft("v1", "0.0")).toBeNull();
-    // Other drafts remain
-    writeTerminalDraft("v1", "0.1", "still here");
-    expect(readTerminalDraft("v1", "0.1")).toBe("still here");
+    expect(readTerminalDraft("v1", "0.1")).toBe("must-remain");
   });
 
   it("returns null for missing drafts", () => {
@@ -67,5 +66,14 @@ describe("terminal draft localStorage", () => {
     writeTerminalDraft("v", "p", "first");
     writeTerminalDraft("v", "p", "second");
     expect(readTerminalDraft("v", "p")).toBe("second");
+  });
+
+  it("prevents colon collision between distinct viewer/pane pairs", () => {
+    writeTerminalDraft("v", "a:b", "draft-X");
+    writeTerminalDraft("v:a", "b", "draft-Y");
+    expect(localStorage.getItem("agj_terminal_draft:v:a%3Ab")).toBe("draft-X");
+    expect(localStorage.getItem("agj_terminal_draft:v%3Aa:b")).toBe("draft-Y");
+    expect(readTerminalDraft("v", "a:b")).toBe("draft-X");
+    expect(readTerminalDraft("v:a", "b")).toBe("draft-Y");
   });
 });
