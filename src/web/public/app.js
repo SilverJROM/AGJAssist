@@ -2266,6 +2266,11 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [replyLimit, setReplyLimit] = useState(() => readTerminalReplyLimit());
   const [showRawChrome, setShowRawChrome] = useState(false);
   const [agentReminders, setAgentReminders] = useState([]);
+  const [wakeups, setWakeups] = useState([]);
+  const [wakeupExpanded, setWakeupExpanded] = useState(true);
+  const [wakeupDate, setWakeupDate] = useState('');
+  const [wakeupTime, setWakeupTime] = useState('');
+  const [wakeupAction, setWakeupAction] = useState("Wake up — start today's queued tasks and report status.");
   const [cadenceMinutes, setCadenceMinutes] = useState(15);
   const [cadenceCustom, setCadenceCustom] = useState('');
   const [repeatMode, setRepeatMode] = useState('unlimited');
@@ -2388,6 +2393,11 @@ function TerminalTab({ projectId, projectName } = {}) {
         setAgentReminders(Array.isArray(data?.reminders) ? data.reminders : []);
       })
       .catch(() => setAgentReminders([]));
+    api('/api/agent-wakeups/pending')
+      .then(data => {
+        setWakeups(Array.isArray(data?.wakeups) ? data.wakeups : []);
+      })
+      .catch(() => setWakeups([]));
   }, [menuOpen]);
 
   useEffect(() => {
@@ -3107,6 +3117,63 @@ function TerminalTab({ projectId, projectName } = {}) {
             </div>
             <div class="terminal-sheet-row">
               <button type="button" data-testid="agent-reminder-save" onclick=${handleSaveReminder}>Save</button>
+            </div>
+          </div>
+          <div data-testid="wakeup-sheet">
+            <div class="terminal-sheet-sect">Wakeup</div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Pending wakeups</div>
+              <div>
+                <button type="button" data-testid="wakeup-expand-toggle" onclick=${() => setWakeupExpanded(e => !e)}>${wakeupExpanded ? 'Collapse' : 'Expand'}</button>
+                ${wakeupExpanded ? html`
+                  ${wakeups.length === 0 ? html`<div>No pending wakeups</div>` : html`
+                    ${wakeups.map(w => {
+                      const fireAt = new Date(w.manual_fire_time);
+                      const now = new Date();
+                      const diffMs = fireAt - now;
+                      const diffMin = Math.max(0, Math.round(diffMs / 60000));
+                      return html`<div data-testid="wakeup-pending-row" style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px">
+                        <span>${w.pane_target || ''} · ${w.action || ''} · in ${diffMin}m</span>
+                        <button type="button" data-testid="wakeup-cancel" onclick=${async () => {
+                          try {
+                            await api(`/api/agent-wakeups/${w.id}`, { method: 'DELETE' });
+                            setWakeups(prev => prev.filter(x => x.id !== w.id));
+                          } catch {}
+                        }}>Cancel</button>
+                      </div>`;
+                    })}
+                  `}
+                ` : ''}
+              </div>
+            </div>
+            <div class="terminal-sheet-sect">Schedule wakeup</div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Date</div>
+              <input data-testid="wakeup-date-input" type="date" value=${wakeupDate} oninput=${e => setWakeupDate(e.target.value)} />
+            </div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Time</div>
+              <input data-testid="wakeup-time-input" type="time" value=${wakeupTime} oninput=${e => setWakeupTime(e.target.value)} />
+            </div>
+            <div class="terminal-sheet-row">
+              <div class="terminal-sheet-lbl">Action</div>
+              <input data-testid="wakeup-action-input" type="text" value=${wakeupAction} oninput=${e => setWakeupAction(e.target.value)} />
+            </div>
+            <div class="terminal-sheet-row">
+              <button type="button" data-testid="wakeup-save" onclick=${async () => {
+                if (!wakeupDate || !wakeupTime || !wakeupAction) return;
+                const iso = new Date(`${wakeupDate}T${wakeupTime}`).toISOString();
+                try {
+                  const res = await api('/api/agent-wakeups', {
+                    method: 'POST',
+                    body: JSON.stringify({ pane_target: activeTarget || '', manual_fire_time: iso, action: wakeupAction })
+                  });
+                  setWakeups(prev => [...prev, res.wakeup]);
+                  setWakeupDate('');
+                  setWakeupTime('');
+                  setWakeupAction("Wake up — start today's queued tasks and report status.");
+                } catch {}
+              }}>Save wakeup</button>
             </div>
           </div>
           <div data-testid="summary-endpoint-sheet">
