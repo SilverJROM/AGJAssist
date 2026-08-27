@@ -1333,3 +1333,37 @@ export function buildInitialFriendlyState({
     ]
   };
 }
+
+const _terminalDraftKey = (viewer, pane) => `agj_terminal_draft:${String(viewer)}:${String(pane)}`;
+
+export function readTerminalDraft(viewer, pane) {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const key = _terminalDraftKey(viewer, pane);
+    const value = localStorage.getItem(key);
+    return value === null ? null : value;
+  } catch {
+    return null;
+  }
+}
+
+export function writeTerminalDraft(viewer, pane, draft) {
+  try {
+    if (typeof localStorage === "undefined") return;
+    const key = _terminalDraftKey(viewer, pane);
+    const value = draft == null ? "" : String(draft);
+    localStorage.setItem(key, value);
+  } catch {
+    // no-op on storage errors
+  }
+}
+
+export function clearTerminalDraft(viewer, pane) {
+  try {
+    if (typeof localStorage === "undefined") return;
+    const key = _terminalDraftKey(viewer, pane);
+    localStorage.removeItem(key);
+  } catch {
+    // no-op
+  }
+}
