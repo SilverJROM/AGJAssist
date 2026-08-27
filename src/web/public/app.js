@@ -2864,10 +2864,12 @@ function TerminalTab({ projectId, projectName } = {}) {
             </div>
             ${headerGroupSiblings.length ? html`
               <div class="terminal-header-tabs" data-testid="agent-group-switcher">
-                ${headerGroupSiblings.map((sib) => html`
+                ${headerGroupSiblings.map((sib) => {
+                  const hasDraft = Boolean(readTerminalDraft('friendly-terminal', sib.target));
+                  return html`
                   <button type="button" class="terminal-header-tab" data-testid="terminal-header-tab"
-                          title=${'Switch to ' + sib.name} onclick=${() => switchActiveTarget(sib.target)}>${sib.name}</button>
-                `)}
+                          title=${'Switch to ' + sib.name + (hasDraft ? ' — draft' : '')} onclick=${() => switchActiveTarget(sib.target)}>${sib.name}${hasDraft ? ' •' : ''}</button>
+                `})}
               </div>
             ` : ''}
             <div class="terminal-fontpill" title="Text size">
@@ -3579,15 +3581,10 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [entries, setEntries] = useState([]);
   const [input, setInput] = useState('');
   const draftViewer = 'friendly-terminal';
-  // Load draft on target/session change
+  const draftHydratedRef = useRef(false);
+  // Persist draft on input change, but skip writes during initial hydration
   useEffect(() => {
-    const draft = readTerminalDraft(draftViewer, target);
-    if (draft !== null && draft !== undefined) {
-      setInput(draft);
-    }
-  }, [target, sessionName, draftViewer]);
-  // Persist draft on input change
-  useEffect(() => {
+    if (!draftHydratedRef.current) return;
     writeTerminalDraft(draftViewer, target, input);
   }, [input, target, draftViewer]);
   const [composerHeight, setComposerHeight] = useState(() => {
@@ -3886,7 +3883,10 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
 
     async function loadInitial() {
       setStatus('loading');
-      setInput('');
+      draftHydratedRef.current = false;
+      const draft = readTerminalDraft(draftViewer, target);
+      setInput(draft ?? '');
+      draftHydratedRef.current = true;
       setAttachment(null);
       setAttachError('');
       setEntries([]);
@@ -4409,7 +4409,6 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
 
   return html`
     <div class="terminal-chat-view">
-      <div data-testid="agent-group-switcher-dropdown" style="display:none"></div>
       <div class="terminal-chat-transcript-wrap">
       ${searchOpen ? html`
         <div class="terminal-search-bar" data-testid="terminal-search-bar">
@@ -9004,9 +9003,6 @@ function App() {
   }
 
   return html`
-    <div data-testid="terminal-draft" style="display:none"></div>
-    <div data-testid="agent-group-switcher" style="display:none"></div>
-    <div data-testid="agent-group-switcher-dropdown" style="display:none"></div>
     <${Header} user=${user} />
     <main class="main">${content}</main>
     <${SessionExpiredOverlay} />
