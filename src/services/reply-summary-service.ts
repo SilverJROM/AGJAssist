@@ -42,7 +42,7 @@ export class ReplySummaryService {
         max_tokens: 256
       };
 
-      const res = await fetch(`${endpoint.base_url.replace(/\/$/, "")}/v1/chat/completions`, {
+      const res = await fetch(`${endpoint.base_url.replace(/\/$/, "")}/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

@@ -47,11 +47,15 @@ describe("ReplySummaryService D3", () => {
     const expectedSummary = "Fixed summary from mocked LLM for test input A";
 
     // Mock fetch to return a literal summary, not derived from input
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: expectedSummary } }]
-      })
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      // Default endpoint base_url is http://192.168.254.140:1234/v1
+      expect(url).toBe("http://192.168.254.140:1234/v1/chat/completions");
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: expectedSummary } }]
+        })
+      });
     });
 
     const result = await service.summarize("agent-foo", reply);
@@ -82,7 +86,7 @@ describe("ReplySummaryService D3", () => {
     const expectedSummary = "Explicit endpoint summary literal";
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      expect(url).toBe("http://example.com/v1/v1/chat/completions");
+      expect(url).toBe("http://example.com/v1/chat/completions");
       return Promise.resolve({
         ok: true,
         json: async () => ({
