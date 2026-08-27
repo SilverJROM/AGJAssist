@@ -2313,7 +2313,12 @@ function TerminalTab({ projectId, projectName } = {}) {
           const sig = (arr) => JSON.stringify(
             (arr || []).map(s => [s.session_name, (s.panes || []).map(p => [p.target, p.command, p.activity, p.busy].join(':')).join(',')])
           );
-          return sig(prev) === sig(next) ? prev : next;
+          if (sig(prev) === sig(next)) return prev;
+          // auto-select first pane if none active
+          if (!activeTarget && next.length > 0 && next[0].panes && next[0].panes.length > 0) {
+            setActiveTarget(next[0].panes[0].target);
+          }
+          return next;
         });
       })
       .catch(e => setSessionsError(e.message || 'Failed to load sessions'));
@@ -3142,7 +3147,7 @@ function TerminalTab({ projectId, projectName } = {}) {
               <div>
                 ${(() => {
                   const now = new Date();
-                  const pending = wakeups.filter(w => new Date(w.manual_fire_time) > now);
+                  const pending = wakeups.filter(w => w.pane_target === activeTarget && new Date(w.manual_fire_time) > now);
                   const count = pending.length;
                   const nearest = pending.reduce((min,w) => {
                     const diff = new Date(w.manual_fire_time) - now;
