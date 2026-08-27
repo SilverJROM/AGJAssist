@@ -1,38 +1,53 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 const args = process.argv.slice(2);
 const serve = args.includes('--serve');
-const slice = args.find(a => a.startsWith('--slice'))?.split('=')[1];
+const SRC_DB = process.env.DB_PATH_SOURCE || 'data/agjassist.db';
+const srcDbPath = path.resolve(SRC_DB);
 
-if (serve) {
-  // Minimal Fastify stub for cc project – reuse static server for now
-  // Real implementation would boot Fastify with temp DB copy
-  const server = spawnSync('node', ['e2e/static-server.mjs'], { stdio: 'inherit' });
-  process.exit(server.status ?? 0);
+function ensureTmpDb(tmpDir) {
+  fs.mkdirSync(tmpDir, { recursive: true });
+  const tmpDb = path.join(tmpDir, 'agjassist.db');
+  if (fs.existsSync(srcDbPath)) {
+    fs.copyFileSync(srcDbPath, tmpDb);
+  } else {
+    fs.writeFileSync(tmpDb, '');
+  }
+  return tmpDb;
 }
 
-// Isolated runner: create temp DB copy, run command, teardown, print reclaimed_bytes
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-'));
-const dbPath = path.join(tmpDir, 'agjassist.db');
-fs.writeFileSync(dbPath, '');
-const startSize = fs.statSync(dbPath).size;
-
-try {
-  // Run the command passed after --
-  const cmdIdx = args.indexOf('--');
-  if (cmdIdx !== -1) {
-    const cmd = args.slice(cmdIdx + 1);
-    const env = { ...process.env, DB_PATH: dbPath, AGJASSIST_FENCE_DB_MODE: 'temp-copy' };
-    const result = spawnSync(cmd[0], cmd.slice(1), { env, stdio: 'inherit' });
-    process.exit(result.status ?? 1);
+if (serve) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-'));
+  const tmpDb = ensureTmpDb(tmpDir);
+  const env = { ...process.env, DB_PATH: tmpDb, AGJASSIST_FENCE_DB_MODE: 'temp-copy' };
+  const server = spawn('node', ['e2e/static-server.mjs'], { stdio: 'inherit', env });
+  const cleanup = () => {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    server.kill();
+  };
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
+  server.on('exit', () => { cleanup(); process.exit(0); });
+} else {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-'));
+  const tmpDb = ensureTmpDb(tmpDir);
+  const startSize = fs.statSync(tmpDb).size;
+  let exitCode = 0;
+  try {
+    const cmdIdx = args.indexOf('--');
+    if (cmdIdx !== -1) {
+      const cmd = args.slice(cmdIdx + 1);
+      const env = { ...process.env, DB_PATH: tmpDb, AGJASSIST_FENCE_DB_MODE: 'temp-copy' };
+      const result = spawnSync(cmd[0], cmd.slice(1), { env, stdio: 'inherit' });
+      exitCode = result.status ?? 1;
+    }
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    console.log(`reclaimed_bytes=${startSize}`);
+    process.exitCode = exitCode;
   }
-} finally {
-  // Teardown
-  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-  const reclaimed = startSize; // simplified
-  console.log(`reclaimed_bytes=${reclaimed}`);
 }
