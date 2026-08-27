@@ -9,7 +9,7 @@ const serve = args.includes('--serve');
 
 const SRC_DB = process.env.DB_PATH_SOURCE || 'data/agjassist.db';
 const srcDbPath = path.resolve(SRC_DB);
-const PUBLIC_PORT = 3210;
+const PUBLIC_PORT = Number(process.env.FENCE_PORT || 3210);
 
 function ensureTmpDb(tmpDir) {
   fs.mkdirSync(tmpDir, { recursive: true });
@@ -23,8 +23,9 @@ function ensureTmpDb(tmpDir) {
 }
 
 if (serve) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-'));
-  const tmpDb = ensureTmpDb(tmpDir);
+  const suppliedDb = process.env.DB_PATH;
+  const tmpDir = suppliedDb ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'cc-'));
+  const tmpDb = suppliedDb || ensureTmpDb(tmpDir);
   const startSize = fs.statSync(tmpDb).size;
   const env = {
     ...process.env,
@@ -38,7 +39,9 @@ if (serve) {
   // serves the shipped app through Fastify's own static registration, not a stand-in.
   const server = spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], { stdio: 'inherit', env });
   const cleanup = () => {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    if (tmpDir) {
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    }
     console.log(`reclaimed_bytes=${startSize}`);
     server.kill();
   };
