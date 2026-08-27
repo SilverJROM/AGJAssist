@@ -2267,6 +2267,7 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [showRawChrome, setShowRawChrome] = useState(false);
   const [agentReminders, setAgentReminders] = useState([]);
   const [wakeups, setWakeups] = useState([]);
+  const [wakeupNowTick, setWakeupNowTick] = useState(0);
   const [wakeupExpanded, setWakeupExpanded] = useState(true);
   const [wakeupDate, setWakeupDate] = useState('');
   const [wakeupTime, setWakeupTime] = useState('');
@@ -2398,6 +2399,21 @@ function TerminalTab({ projectId, projectName } = {}) {
         setWakeups(Array.isArray(data?.wakeups) ? data.wakeups : []);
       })
       .catch(() => setWakeups([]));
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const id = setInterval(() => {
+      setWakeupNowTick(t => t + 1);
+      const now = new Date();
+      setWakeups(prev => prev.filter(w => new Date(w.manual_fire_time) > now));
+      api('/api/agent-wakeups/pending')
+        .then(data => {
+          setWakeups(Array.isArray(data?.wakeups) ? data.wakeups : []);
+        })
+        .catch(() => {});
+    }, 30000);
+    return () => clearInterval(id);
   }, [menuOpen]);
 
   useEffect(() => {
@@ -3124,26 +3140,38 @@ function TerminalTab({ projectId, projectName } = {}) {
             <div class="terminal-sheet-row">
               <div class="terminal-sheet-lbl">Pending wakeups</div>
               <div>
-                <button type="button" data-testid="wakeup-expand-toggle" onclick=${() => setWakeupExpanded(e => !e)}>${wakeupExpanded ? 'Collapse' : 'Expand'}</button>
-                ${wakeupExpanded ? html`
-                  ${wakeups.length === 0 ? html`<div>No pending wakeups</div>` : html`
-                    ${wakeups.map(w => {
-                      const fireAt = new Date(w.manual_fire_time);
-                      const now = new Date();
-                      const diffMs = fireAt - now;
-                      const diffMin = Math.max(0, Math.round(diffMs / 60000));
-                      return html`<div data-testid="wakeup-pending-row" style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px">
-                        <span>${w.pane_target || ''} · ${w.action || ''} · in ${diffMin}m</span>
-                        <button type="button" data-testid="wakeup-cancel" onclick=${async () => {
-                          try {
-                            await api(`/api/agent-wakeups/${w.id}`, { method: 'DELETE' });
-                            setWakeups(prev => prev.filter(x => x.id !== w.id));
-                          } catch {}
-                        }}>Cancel</button>
-                      </div>`;
-                    })}
-                  `}
-                ` : ''}
+                ${(() => {
+                  const now = new Date();
+                  const pending = wakeups.filter(w => new Date(w.manual_fire_time) > now);
+                  const count = pending.length;
+                  const nearest = pending.reduce((min,w) => {
+                    const diff = new Date(w.manual_fire_time) - now;
+                    return diff < min.diff ? {diff, w} : min;
+                  }, {diff: Infinity});
+                  const nearestMin = count ? Math.max(0, Math.round(nearest.diff/60000)) : null;
+                  return html`
+                    <button type="button" data-testid="wakeup-expand-toggle" onclick=${() => setWakeupExpanded(e => !e)}>${wakeupExpanded ? 'Collapse' : 'Expand'}</button>
+                    <span data-testid="wakeup-collapsed-summary" style="margin-left:8px">${count === 0 ? 'No pending wakeups' : `${count} wakeup${count!==1?'s':''} · in ${nearestMin}m`}</span>
+                    ${wakeupExpanded ? html`
+                      ${count === 0 ? html`<div>No pending wakeups</div>` : html`
+                        ${pending.map(w => {
+                          const fireAt = new Date(w.manual_fire_time);
+                          const diffMs = fireAt - now;
+                          const diffMin = Math.max(0, Math.round(diffMs/60000));
+                          return html`<div data-testid="wakeup-pending-row" style="display:flex;justify-content:space-between;gap:8px;margin-bottom:4px">
+                            <span>${w.pane_target || ''} · ${w.action || ''} · in ${diffMin}m</span>
+                            <button type="button" data-testid="wakeup-cancel" onclick=${async () => {
+                              try {
+                                await api(`/api/agent-wakeups/${w.id}`, { method: 'DELETE' });
+                                setWakeups(prev => prev.filter(x => x.id !== w.id));
+                              } catch {}
+                            }}>Cancel</button>
+                          </div>`;
+                        })}
+                      `}
+                    ` : ''}
+                  `;
+                })()}
               </div>
             </div>
             <div class="terminal-sheet-sect">Schedule wakeup</div>
