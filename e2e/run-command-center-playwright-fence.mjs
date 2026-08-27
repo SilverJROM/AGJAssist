@@ -19,8 +19,8 @@ if (!fence) {
   process.exit(1);
 }
 
-function verdictLine() {
-  return `[FENCE-VERDICT-V1] run=command-center-2026-08-26 fence=${fenceId} stub=${stub || 'none'} ts=${Date.now()}`;
+function verdictLine(verdict='PASS', faultClass='none') {
+  return `fence=${fenceId} verdict=${verdict} fault_class=${faultClass}`;
 }
 
 function writeReport(collected, passed, failed) {
@@ -109,9 +109,11 @@ if (gate) {
 }
 
 const testPath = fence.test_path;
-const integrationCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId });
+const integrationCode = runPlaywright(testPath, { ...process.env, FENCE_ID: fenceId, FENCE_REPORT_PATH: reportPath });
 const specReport = readReport(reportPath) || { schema: 'fence-report-v1', collected: fence.acceptance_ids, passed: [], failed: [] };
-specReport.verdict_line = verdictLine();
+const verdict = integrationCode === 0 ? 'PASS' : 'FAIL';
+const faultClass = integrationCode === 0 ? 'none' : 'implementation';
+specReport.verdict_line = verdictLine(verdict, faultClass);
 fs.writeFileSync(reportPath, JSON.stringify(specReport, null, 2) + '\n');
 console.log(specReport.verdict_line);
 process.exit(integrationCode);

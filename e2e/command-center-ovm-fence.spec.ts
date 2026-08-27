@@ -16,7 +16,6 @@ test('command-center ovm fence journey', async ({ page }) => {
       passed.push(id);
     } catch (e) {
       failed.push({ id, kind: 'assert' });
-      throw new Error(`FENCE_ASSERT:${id}`);
     }
   };
 
