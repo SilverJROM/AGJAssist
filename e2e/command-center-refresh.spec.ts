@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 test('command-center refresh control is always reachable and re-pulls output and session metadata', async ({ page }) => {
+  // The journey itself is ~10s of deliberate waits; page mount on this shared box has been
+  // measured between 1.2s and 16.9s. The 30000ms config default leaves no headroom.
+  test.setTimeout(90000);
   await page.addInitScript(() => {
     localStorage.setItem('agj_user', JSON.stringify({ id: 1, name: 'test' }));
     localStorage.setItem('agj_token', 'test-token');
