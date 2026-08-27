@@ -494,6 +494,18 @@ CREATE TABLE IF NOT EXISTS agent_summaries (
 CREATE INDEX IF NOT EXISTS idx_agent_summaries_agent ON agent_summaries(agent_name);
 CREATE INDEX IF NOT EXISTS idx_agent_summaries_endpoint ON agent_summaries(endpoint_id);
 CREATE INDEX IF NOT EXISTS idx_agent_summaries_created ON agent_summaries(created_at);
+
+CREATE TABLE IF NOT EXISTS agent_one_time_wakeups (
+  id INTEGER PRIMARY KEY,
+  pane_target TEXT NOT NULL,
+  manual_fire_time TEXT NOT NULL,
+  action TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('pending','fired','cancelled')) DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_one_time_wakeups_status ON agent_one_time_wakeups(status);
+CREATE INDEX IF NOT EXISTS idx_agent_one_time_wakeups_fire_time ON agent_one_time_wakeups(manual_fire_time);
 `;
 
 export const DEFAULT_SAFETY_PATTERNS = [
