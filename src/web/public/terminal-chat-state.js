@@ -1352,7 +1352,11 @@ export function writeTerminalDraft(viewer, pane, draft) {
     if (typeof localStorage === "undefined") return;
     const key = _terminalDraftKey(viewer, pane);
     const value = draft == null ? "" : String(draft);
-    localStorage.setItem(key, value);
+    if (!value) {
+      localStorage.removeItem(key);
+    } else {
+      localStorage.setItem(key, value);
+    }
   } catch {
     // no-op on storage errors
   }
