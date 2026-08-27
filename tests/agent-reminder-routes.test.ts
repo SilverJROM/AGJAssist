@@ -73,6 +73,15 @@ describe("agent-reminder-routes C4", () => {
     expect(body.reminders[0].folder_group).toBe("g1");
   });
 
+  it("GET /api/agent-reminders/active fails for non-owner", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/agent-reminders/active",
+      headers: { authorization: `Bearer ${viewerToken}` },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
   it("POST creates reminder with owner token, fails for non-owner", async () => {
     const resOwner = await app.inject({
       method: "POST",

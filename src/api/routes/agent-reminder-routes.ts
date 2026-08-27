@@ -12,10 +12,10 @@ export function registerAgentReminderRoutes(
   const authMiddleware = createAuthMiddleware(authService);
   const solicitService = new AgentSolicitService(db);
 
-  // Active reminders read (owner check not required for read, just auth)
+  // Active reminders read (owner only)
   app.get(
     "/api/agent-reminders/active",
-    { preHandler: authMiddleware },
+    { preHandler: [authMiddleware, requireOwner] },
     async (request: FastifyRequest) => {
       const userId = request.sessionUser!.id;
       return { reminders: solicitService.listActive(userId) };
