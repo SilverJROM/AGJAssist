@@ -2279,6 +2279,9 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [editingEndpointId, setEditingEndpointId] = useState(null);
   const [defaultEndpointId, setDefaultEndpointId] = useState(null);
   const [endpointError, setEndpointError] = useState('');
+  const [summariesOpen, setSummariesOpen] = useState(false);
+  const [summaries, setSummaries] = useState([]);
+  const [summariesLoading, setSummariesLoading] = useState(false);
   const menuRef = useRef(null);
   const sectionNavRef = useRef(null);
   const terminalGroupsRef = useRef(terminalGroups);
@@ -2401,6 +2404,27 @@ function TerminalTab({ projectId, projectName } = {}) {
         setDefaultEndpointId(null);
       });
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!summariesOpen) return;
+    if (!activeTarget) {
+      setSummaries([]);
+      return;
+    }
+    setSummariesLoading(true);
+    Promise.all([
+      api(`/api/summary-agents/${encodeURIComponent(activeTarget)}/summaries`),
+      api('/api/summary-endpoints').catch(() => ({ endpoints: [] }))
+    ]).then(([summData, epData]) => {
+      const rows = Array.isArray(summData?.summaries) ? summData.summaries : [];
+      setSummaries(rows);
+      const eps = Array.isArray(epData?.endpoints) ? epData.endpoints : [];
+      setSummaryEndpoints(eps);
+      const def = eps.find(e => e.is_default);
+      setDefaultEndpointId(def ? def.id : null);
+    }).catch(() => setSummaries([]))
+      .finally(() => setSummariesLoading(false));
+  }, [summariesOpen, activeTarget]);
 
   const handleSaveReminder = async () => {
     const folderGroup = resolvedActiveGroupTab === 'all' ? 'all' : (activeGroup?.id || resolvedActiveGroupTab);
@@ -2987,6 +3011,9 @@ function TerminalTab({ projectId, projectName } = {}) {
               <button type="button" class="terminal-mynav-hbtn" data-testid="terminal-mynav-down"
                       aria-label="Jump to my next message" onclick=${() => jumpToMyMessage(1)}>▼</button>
             </div>
+            <button type="button" class="terminal-topbar-icon-btn" data-testid="summaries-toggle" aria-label="Agent summaries" onclick=${() => setSummariesOpen(s => !s)}>
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H8l-4 4V4z"/><path d="M8 9h8M8 13h5"/></svg>
+            </button>
             <button type="button" class="terminal-topbar-icon-btn terminal-settings-trigger"
                     data-term-menu data-testid="terminal-menu" aria-label="Terminal settings" aria-expanded=${menuOpen}
                     onclick=${() => { setSectionNavOpen(false); setMenuOpen((current) => !current); }}>
@@ -2998,6 +3025,30 @@ function TerminalTab({ projectId, projectName } = {}) {
           `}
         </div>
       </div>
+      ${summariesOpen && html`
+        <div key="summaries-dropdown" data-testid="agent-summaries-dropdown" style="position:absolute;top:60px;right:12px;z-index:250;width:320px;max-height:400px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <strong>Summaries</strong>
+            <button type="button" onclick=${() => setSummariesOpen(false)}>✕</button>
+          </div>
+          ${summariesLoading ? html`<div>Loading…</div>` : summaries.length === 0 ? html`<div data-testid="summaries-empty">No summaries yet</div>` : html`
+            ${summaries.map(s => {
+              const ep = summaryEndpoints.find(e => e.id === s.endpoint_id);
+              const epName = ep ? ep.name : `id ${s.endpoint_id}`;
+              const time = s.created_at ? new Date(s.created_at).toLocaleString() : '';
+              return html`
+                <div data-testid="summary-card" style="border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px">
+                  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary)">
+                    <span>${time}</span>
+                    <span style="background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:4px">via ${epName}</span>
+                  </div>
+                  <div style="margin-top:4px;font-size:13px">${s.summary_text || ''}</div>
+                </div>
+              `;
+            })}
+          `}
+        </div>
+      `}
       <div key="sectionnav-overlay" class="terminal-sectionnav-overlay"
            hidden=${!sectionNavOpen} onclick=${() => setSectionNavOpen(false)}></div>
       ${(isTgMiniAppContext && sectionNavOpen) ? html`
