@@ -23,17 +23,24 @@ test('D6 AgentSummariesDropdown renders newest-first cards with endpoint tags', 
       })
     });
   });
+  let requestedPath = '';
   await page.route('**/api/summary-agents/*/summaries', async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        summaries: [
-          { id: 2, agent_name: 'agent-a', endpoint_id: 2, summary_text: 'Second summary', created_at: '2026-08-27T10:00:00Z' },
-          { id: 1, agent_name: 'agent-a', endpoint_id: 1, summary_text: 'First summary', created_at: '2026-08-27T09:00:00Z' }
-        ]
-      })
-    });
+    const pathname = new URL(route.request().url()).pathname;
+    requestedPath = pathname;
+    if (pathname === '/api/summary-agents/1/summaries') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          summaries: [
+            { id: 1, agent_name: 'agent-a', endpoint_id: 1, summary_text: 'First summary', created_at: '2026-08-27T09:00:00Z' },
+            { id: 2, agent_name: 'agent-a', endpoint_id: 2, summary_text: 'Second summary', created_at: '2026-08-27T10:00:00Z' }
+          ]
+        })
+      });
+    } else {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ summaries: [] }) });
+    }
   });
   await page.route('**/api/tmux/sessions', async route => {
     await route.fulfill({
@@ -52,13 +59,20 @@ test('D6 AgentSummariesDropdown renders newest-first cards with endpoint tags', 
 
   await page.locator('[data-testid="summaries-toggle"]').click();
   await expect(page.locator('[data-testid="agent-summaries-dropdown"]')).toBeVisible();
+  await expect(page.locator('[data-testid="agent-summaries-dropdown"]')).toHaveCSS('max-height', '400px');
+  await expect(page.locator('[data-testid="agent-summaries-dropdown"]')).toHaveCSS('overflow', 'auto');
+  expect(requestedPath).toBe('/api/summary-agents/1/summaries');
 
   const cards = page.locator('[data-testid="summary-card"]');
   await expect(cards).toHaveCount(2);
+  const newestStamp = new Date('2026-08-27T10:00:00Z').toLocaleString();
+  const oldestStamp = new Date('2026-08-27T09:00:00Z').toLocaleString();
   await expect(cards.nth(0)).toContainText('Second summary');
   await expect(cards.nth(0)).toContainText('via test-ep');
+  await expect(cards.nth(0)).toContainText(newestStamp);
   await expect(cards.nth(1)).toContainText('First summary');
   await expect(cards.nth(1)).toContainText('via 140');
+  await expect(cards.nth(1)).toContainText(oldestStamp);
 });
 
 test('D6 AgentSummariesDropdown shows empty state when no summaries', async ({ page }) => {

@@ -3032,7 +3032,7 @@ function TerminalTab({ projectId, projectName } = {}) {
             <button type="button" onclick=${() => setSummariesOpen(false)}>✕</button>
           </div>
           ${summariesLoading ? html`<div>Loading…</div>` : summaries.length === 0 ? html`<div data-testid="summaries-empty">No summaries yet</div>` : html`
-            ${summaries.map(s => {
+            ${[...summaries].sort((a, b) => { const tb = Date.parse(b.created_at || '') || 0; const ta = Date.parse(a.created_at || '') || 0; return tb - ta || (Number(b.id) || 0) - (Number(a.id) || 0); }).map(s => {
               const ep = summaryEndpoints.find(e => e.id === s.endpoint_id);
               const epName = ep ? ep.name : `id ${s.endpoint_id}`;
               const time = s.created_at ? new Date(s.created_at).toLocaleString() : '';
