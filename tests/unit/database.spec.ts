@@ -1,23 +1,29 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { DatabaseService } from "../../src/db/database.js";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 
-const TEST_DB = path.join("data", "test-db.sqlite");
+const tempDirs: string[] = [];
 
-function cleanup(): void {
-  for (const f of [TEST_DB, `${TEST_DB}-wal`, `${TEST_DB}-shm`]) {
-    if (fs.existsSync(f)) fs.unlinkSync(f);
-  }
+function tempDb(name: string): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agjassist-db-test-"));
+  tempDirs.push(dir);
+  return path.join(dir, name);
 }
 
+afterEach(() => {
+  for (const dir of tempDirs.splice(0)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 describe("DatabaseService", () => {
-  afterEach(() => cleanup());
 
   it("creates database with all tables", () => {
-    cleanup();
-    const db = new DatabaseService(TEST_DB);
+    // cleanup removed; temp dirs handled by afterEach
+    const db = new DatabaseService(tempDb("test-db.sqlite"));
 
     const tables = db.raw
       .prepare(
@@ -48,16 +54,16 @@ describe("DatabaseService", () => {
   });
 
   it("enables WAL mode", () => {
-    cleanup();
-    const db = new DatabaseService(TEST_DB);
+    // cleanup removed; temp dirs handled by afterEach
+    const db = new DatabaseService(tempDb("test-db.sqlite"));
     const result = db.raw.pragma("journal_mode") as { journal_mode: string }[];
     expect(result[0].journal_mode).toBe("wal");
     db.close();
   });
 
   it("seeds default safety patterns", () => {
-    cleanup();
-    const db = new DatabaseService(TEST_DB);
+    // cleanup removed; temp dirs handled by afterEach
+    const db = new DatabaseService(tempDb("test-db.sqlite"));
     const patterns = db
       .prepare("SELECT * FROM safety_patterns")
       .all() as { pattern: string }[];
@@ -69,19 +75,19 @@ describe("DatabaseService", () => {
   });
 
   it("tracks schema version", () => {
-    cleanup();
-    const db = new DatabaseService(TEST_DB);
+    // cleanup removed; temp dirs handled by afterEach
+    const db = new DatabaseService(tempDb("test-db.sqlite"));
     const version = db
       .prepare("SELECT version FROM schema_version")
       .get() as { version: number };
 
-    expect(version.version).toBe(36);
+    expect(version.version).toBe(37);
     db.close();
   });
 
   it("fresh DB accepts audit_log surface mcp and rejects an unknown surface", () => {
-    cleanup();
-    const db = new DatabaseService(TEST_DB);
+    // cleanup removed; temp dirs handled by afterEach
+    const db = new DatabaseService(tempDb("test-db.sqlite"));
     db.prepare(
       "INSERT INTO audit_log (action_type, surface) VALUES (?, ?)"
     ).run("mcp_test", "mcp");
@@ -96,8 +102,8 @@ describe("DatabaseService", () => {
   });
 
   it("creates owner user via ensureOwner", () => {
-    cleanup();
-    const db = new DatabaseService(TEST_DB);
+    // cleanup removed; temp dirs handled by afterEach
+    const db = new DatabaseService(tempDb("test-db.sqlite"));
     db.ensureOwner(123456);
 
     const user = db
@@ -110,20 +116,21 @@ describe("DatabaseService", () => {
   });
 
   it("is idempotent on re-open", () => {
-    cleanup();
-    const db1 = new DatabaseService(TEST_DB);
+    // cleanup removed; temp dirs handled by afterEach
+    const path = tempDb("test-db.sqlite");
+    const db1 = new DatabaseService(path);
     db1.ensureOwner(123);
     db1.close();
 
-    const db2 = new DatabaseService(TEST_DB);
+    const db2 = new DatabaseService(path);
     const users = db2.prepare("SELECT * FROM users").all();
     expect(users.length).toBe(1);
     db2.close();
   });
 
   it("creates projects table with active column", () => {
-    cleanup();
-    const db = new DatabaseService(TEST_DB);
+    // cleanup removed; temp dirs handled by afterEach
+    const db = new DatabaseService(tempDb("test-db.sqlite"));
 
     const cols = db.raw.pragma("table_info(projects)") as { name: string }[];
     const colNames = cols.map(c => c.name);
@@ -133,8 +140,8 @@ describe("DatabaseService", () => {
   });
 
   it("creates personal_tasks table with completed_at column", () => {
-    cleanup();
-    const db = new DatabaseService(TEST_DB);
+    // cleanup removed; temp dirs handled by afterEach
+    const db = new DatabaseService(tempDb("test-db.sqlite"));
 
     const cols = db.raw.pragma("table_info(personal_tasks)") as { name: string }[];
     const colNames = cols.map(c => c.name);
@@ -143,9 +150,10 @@ describe("DatabaseService", () => {
     db.close();
   });
 
-  it("upgrades a v23 snapshot DB to current and adds current overmind workflow columns", () => {
-    cleanup();
-    const raw = new Database(TEST_DB);
+  it("upgrades a v23 snapshot DB to current and drops overmind tables", () => {
+    // cleanup removed; temp dirs handled by afterEach
+    const path = tempDb("test-db.sqlite");
+    const raw = new Database(path);
     raw.exec(`
       CREATE TABLE schema_version (version INTEGER NOT NULL);
       INSERT INTO schema_version (version) VALUES (23);
@@ -187,23 +195,20 @@ describe("DatabaseService", () => {
     `);
     raw.close();
 
-    const upgraded = new DatabaseService(TEST_DB);
+    const upgraded = new DatabaseService(path);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(36);
-    const upgradedCols = upgraded.raw.pragma("table_info(overmind_workflows)") as { name: string }[];
-    const upgradedColNames = upgradedCols.map((c) => c.name);
-    expect(upgradedColNames).toContain("last_parent_update_at");
-    expect(upgradedColNames).toContain("evidence_idle_threshold_override_minutes");
-    expect(upgradedColNames).toContain("orphaned");
-    expect(upgradedColNames).toContain("completion_nudge_count");
-    expect(upgradedColNames).toContain("working_accepts");
-    expect(upgradedColNames).toContain("completion_nudge_last_at");
+    expect(version.version).toBe(37);
+    const tables = upgraded.raw.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[];
+    const names = tables.map(t => t.name);
+    expect(names).not.toContain("overmind_workflows");
+    expect(names).not.toContain("overmind_projects");
     upgraded.close();
   });
 
   it("upgrades a v31 DB to current with agent tables and leaves existing project rows intact", () => {
-    cleanup();
-    const raw = new Database(TEST_DB);
+    // cleanup removed; temp dirs handled by afterEach
+    const path = tempDb("test-db.sqlite");
+    const raw = new Database(path);
     raw.exec(`
       PRAGMA foreign_keys = ON;
       CREATE TABLE schema_version (version INTEGER NOT NULL);
@@ -222,9 +227,9 @@ describe("DatabaseService", () => {
     `);
     raw.close();
 
-    const upgraded = new DatabaseService(TEST_DB);
+    const upgraded = new DatabaseService(path);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(36);
+    expect(version.version).toBe(37);
 
     const tableNames = (
       upgraded.raw
@@ -256,9 +261,10 @@ describe("DatabaseService", () => {
     upgraded.close();
   });
 
-  it("rebuilds v27 overmind_workflows for nullable identity with row survival and project/run uniqueness", () => {
-    cleanup();
-    const raw = new Database(TEST_DB);
+  it("upgrades v27 DB and drops overmind tables", () => {
+    // cleanup removed; temp dirs handled by afterEach
+    const path = tempDb("test-db.sqlite");
+    const raw = new Database(path);
     raw.exec(`
       PRAGMA foreign_keys = ON;
       CREATE TABLE schema_version (version INTEGER NOT NULL);
@@ -341,72 +347,18 @@ describe("DatabaseService", () => {
     `);
     raw.close();
 
-    const upgraded = new DatabaseService(TEST_DB);
+    const upgraded = new DatabaseService(path);
     const version = upgraded.prepare("SELECT version FROM schema_version").get() as { version: number };
-    expect(version.version).toBe(36);
+    expect(version.version).toBe(37);
 
-    const count = upgraded.prepare("SELECT COUNT(*) AS count FROM overmind_workflows").get() as { count: number };
-    expect(count.count).toBe(2);
-
-    const row = upgraded.prepare("SELECT * FROM overmind_workflows WHERE id = 10").get() as Record<string, unknown>;
-    expect(row).toMatchObject({
-      project_id: 1,
-      label: "workflow one",
-      display_name: "Display One",
-      coordinator_session: "coord-one",
-      child_sessions: "[\"child-a\"]",
-      child_roles: "[\"coder\"]",
-      run_dir: "/tmp/agj/run-one",
-      status: "working",
-      current_task: "B12c",
-      pending_decision: "decision?",
-      active_session: "child-a",
-      active_role: "child",
-      last_pane_hash: "hash-one",
-      nudge_count: 3,
-      tier: 2,
-      accumulated_ms: 1234,
-      monitoring_paused: 1,
-      evidence_idle_threshold_override_minutes: 35,
-      orphaned: 0
-    });
-
-    const legacy = upgraded.prepare("SELECT project_id, label, coordinator_session, run_dir FROM overmind_workflows WHERE id = 11").get();
-    expect(legacy).toEqual({
-      project_id: null,
-      label: "legacy workflow",
-      coordinator_session: "coord-legacy",
-      run_dir: "/tmp/legacy/run"
-    });
-
-    const cols = upgraded.raw.pragma("table_info(overmind_workflows)") as Array<{ name: string; notnull: number }>;
-    expect(cols.find((col) => col.name === "label")?.notnull).toBe(0);
-    expect(cols.find((col) => col.name === "coordinator_session")?.notnull).toBe(0);
-
-    const indexes = upgraded.raw.pragma("index_list(overmind_workflows)") as Array<{ name: string; unique: number }>;
-    expect(indexes).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "idx_overmind_workflows_coordinator_session", unique: 0 }),
-      expect.objectContaining({ name: "idx_overmind_workflows_status", unique: 0 }),
-      expect.objectContaining({ name: "idx_overmind_workflows_project_id", unique: 0 }),
-      expect.objectContaining({ name: "idx_overmind_workflows_project_status", unique: 0 }),
-      expect.objectContaining({ name: "idx_overmind_workflows_project_run_dir", unique: 1 })
-    ]));
-
-    upgraded.prepare("INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir) VALUES (1, NULL, NULL, '/tmp/agj/run-two')").run();
-    upgraded.prepare("INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir) VALUES (1, NULL, NULL, '/tmp/agj/run-three')").run();
-    upgraded.prepare("INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir) VALUES (NULL, 'dup session a', 'coord-one', '/tmp/legacy/dup-a')").run();
-    upgraded.prepare("INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir) VALUES (NULL, 'dup session b', 'coord-one', '/tmp/legacy/dup-b')").run();
-    expect(() => {
-      upgraded.prepare("INSERT INTO overmind_workflows (project_id, label, coordinator_session, run_dir) VALUES (1, 'dup project run', 'coord-new', '/tmp/agj/run-one')").run();
-    }).toThrow();
+    const tables = upgraded.raw.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[];
+    const names = tables.map(t => t.name);
+    expect(names).not.toContain("overmind_workflows");
+    expect(names).not.toContain("overmind_projects");
+    expect(names).not.toContain("overmind_task_history");
 
     expect((upgraded.raw.pragma("foreign_keys") as Array<{ foreign_keys: number }>)[0].foreign_keys).toBe(1);
     expect(upgraded.raw.pragma("foreign_key_check")).toEqual([]);
     upgraded.close();
-
-    const reopened = new DatabaseService(TEST_DB);
-    const reopenedCount = reopened.prepare("SELECT COUNT(*) AS count FROM overmind_workflows").get() as { count: number };
-    expect(reopenedCount.count).toBe(6);
-    reopened.close();
   });
 });
