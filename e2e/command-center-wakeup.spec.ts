@@ -54,7 +54,7 @@ test('command-center wakeup UI and API', async ({ page }) => {
     }
   });
 
-  await page.route('**/api/agent-wakeups/*', async route => {
+  await page.route('**/api/agent-wakeups/w1', async route => {
     if (route.request().method() === 'DELETE') {
       deleteId = route.request().url().split('/').pop();
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) });
@@ -63,11 +63,13 @@ test('command-center wakeup UI and API', async ({ page }) => {
     }
   });
 
-  await page.goto(`${APP_ORIGIN}/index.html`, { waitUntil: 'domcontentloaded' });
   await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(10000);
 
-  // Open terminal menu
+  // Select the active chat through the public list navigation before opening its menu.
+  await page.locator('[data-testid="terminal-session-row"][data-session-target="pane-1"]').click();
+
+  // Open terminal menu from the active chat
   const menuBtn = page.locator('[data-testid="terminal-menu"]');
   await menuBtn.waitFor({ state: 'attached', timeout: 30000 });
   await menuBtn.click();
@@ -87,15 +89,21 @@ test('command-center wakeup UI and API', async ({ page }) => {
   await expect(collapsed).toContainText('1 wakeup');
   await expect(collapsed).toContainText('in');
 
-  // Expand
-  await page.locator('[data-testid="wakeup-expand-toggle"]').click();
-
-  // Only active pane row should appear
+  // The expanded sheet shows only the active pane's pending row.
   const rows = page.locator('[data-testid="wakeup-pending-row"]');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText(pane1);
   await expect(rows.first()).toContainText(action1);
   await expect(rows.first()).not.toContainText(action2);
+
+  // The indicator remains visible while the details can be collapsed and restored.
+  const expandToggle = page.locator('[data-testid="wakeup-expand-toggle"]');
+  await expect(expandToggle).toHaveText('Collapse');
+  await expandToggle.click();
+  await expect(rows).toHaveCount(0);
+  await expect(collapsed).toContainText('1 wakeup');
+  await expandToggle.click();
+  await expect(rows).toHaveCount(1);
 
   // Fill non-default schedule
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -120,6 +128,8 @@ test('command-center wakeup UI and API', async ({ page }) => {
   await page.locator('[data-testid="wakeup-cancel"]').first().click();
   expect(deleteId).toBe('w1');
 
-  // Row removed
-  await expect(page.locator('[data-testid="wakeup-pending-row"]')).toHaveCount(0);
+  // The cancelled fixture row is removed while the newly saved wakeup remains.
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText(nonDefaultAction);
+  await expect(rows.first()).not.toContainText(action1);
 });
