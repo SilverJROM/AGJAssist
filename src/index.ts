@@ -17,12 +17,8 @@ import { StepTemplateService } from "./services/step-template-service.js";
 import { PersonalTaskService } from "./services/personal-task-service.js";
 import { ReminderService } from "./services/reminder-service.js";
 import { createApiServer } from "./api/server.js";
-import { OvermindService } from "./services/overmind-service.js";
-import { OvermindWatcher, POLL_MS } from "./services/overmind-watcher.js";
-import { SonnetOvermindBrain } from "./services/overmind-brain.js";
 import { AppSettingsService } from "./services/app-settings-service.js";
 import { NudgeStateService } from "./services/nudge-state-service.js";
-import { OvermindStreamManager } from "./api/websocket/overmind-stream-manager.js";
 import { AgentEventsStreamManager } from "./api/websocket/agent-events-stream-manager.js";
 import { OvmSessionService } from "./services/ovm-session.js";
 import { AgentAssignmentService } from "./services/agent-assignment-service.js";
@@ -82,7 +78,6 @@ async function main(): Promise<void> {
   const agentEventsStreamManager = new AgentEventsStreamManager(authService, agentEventsService);
   agentEventsService.onEvent((event) => agentEventsStreamManager.broadcast(event));
   const agentWakeScheduler = new AgentWakeScheduler(db, tmuxService, agentEventsService);
-  const overmindService = new OvermindService(db);
   const appSettingsService = new AppSettingsService();
   await appSettingsService.load();
   const nudgeStateService = new NudgeStateService();
@@ -94,7 +89,6 @@ async function main(): Promise<void> {
   // Wire services to bot core
   const ownerRow = db.prepare("SELECT id FROM users WHERE telegram_id = ?").get(config.telegram.authorizedUserId) as { id: number } | undefined;
   core.setServices(projectService, noteService, authService, ownerRow?.id || 1);
-  core.setOvermindService(overmindService);
   core.setOvmSessionService(ovmSessionService);
   const telegramAssistant = config.telegram.testMode
     ? null
@@ -103,23 +97,6 @@ async function main(): Promise<void> {
       webhookUrl: config.telegram.webhookUrl,
       webhookSecretToken: config.telegram.webhookSecretToken
     });
-  const overmindNotify = async (text: string): Promise<void> => {
-    if (!telegramAssistant) return;
-    await telegramAssistant.sendMessage(config.telegram.authorizedUserId, text);
-  };
-  const overmindBrain = new SonnetOvermindBrain();
-  const overmindStreamManager = new OvermindStreamManager(authService, overmindService);
-  const overmindWatcher = new OvermindWatcher(
-    overmindService,
-    tmuxService,
-    overmindNotify,
-    overmindBrain,
-    (workflows) => overmindStreamManager.broadcast(workflows),
-    appSettingsService,
-    nudgeStateService,
-    agentWakeScheduler
-  );
-
   // Tmux streaming
   const tmuxStreamManager = new TmuxStreamManager(
     tmuxService,
@@ -148,9 +125,6 @@ async function main(): Promise<void> {
     reminderService,
     agentAssignmentService,
     coordinatorLaunchService,
-    overmindService,
-    overmindNotify,
-    overmindStreamManager,
     agentEventsStreamManager,
     ovmSessionService,
     appSettingsService,
@@ -160,8 +134,6 @@ async function main(): Promise<void> {
 
   await apiServer.listen({ port: config.api.port, host: config.api.host });
   console.log(`AGJAssist API server listening on ${config.api.host}:${config.api.port}`);
-  overmindWatcher.start();
-  console.log(`Overmind watcher started (${Math.round(POLL_MS / 1000)}s)`);
 
   // Reminder scheduler — check every 60 seconds for due reminders
   setInterval(async () => {
