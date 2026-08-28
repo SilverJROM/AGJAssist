@@ -12,6 +12,29 @@ function tempDb() {
   return path.join(dir, "test.sqlite");
 }
 
+type RepairAcceptanceId = "D1" | "D2";
+type RepairFailure = { id: RepairAcceptanceId; kind: "assert"; message?: string };
+
+function recordRepairFailure(failures: RepairFailure[], id: RepairAcceptanceId, error: unknown) {
+  failures.push({ id, kind: "assert", message: error instanceof Error ? error.message : String(error) });
+}
+
+function writeE3RepairReport(passed: Set<RepairAcceptanceId>, failed: RepairFailure[]) {
+  if (process.env.FENCE_ID !== "E5") return;
+
+  const acceptanceIds: RepairAcceptanceId[] = ["D1", "D2"];
+  const verdict = failed.length === 0 ? "PASS" : "FAIL";
+  const faultClass = failed.length === 0 ? "none" : "implementation";
+  const report = {
+    schema: "fence-report-v1",
+    verdict_line: `fence=E5 verdict=${verdict} fault_class=${faultClass}`,
+    collected: acceptanceIds,
+    passed: acceptanceIds.filter((id) => passed.has(id) && !failed.some((failure) => failure.id === id)),
+    failed,
+  };
+  fs.writeFileSync(path.resolve("fence-report-v1.json"), JSON.stringify(report, null, 2) + "\n");
+}
+
 describe("agent-wakeup-routes E3", () => {
   let app: any;
   let db: DatabaseService;
@@ -98,6 +121,61 @@ describe("agent-wakeup-routes E3", () => {
       },
     });
     expect(resViewer.statusCode).toBe(403);
+  });
+
+  it("POST accepts real tmux pane targets through pending and cancel", async () => {
+    const passed = new Set<RepairAcceptanceId>();
+    const failed: RepairFailure[] = [];
+    const paneTarget = "e3-repair-session:0.0";
+    const future = new Date(Date.now() + 60_000).toISOString();
+    let wakeup: any;
+
+    try {
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/agent-wakeups",
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: {
+          pane_target: paneTarget,
+          manual_fire_time: future,
+          action: "LITERAL_ACTION_D1_REPAIR",
+        },
+      });
+
+      expect(createRes.statusCode).toBe(201);
+      wakeup = JSON.parse(createRes.body).wakeup;
+      expect(wakeup.pane_target).toBe(paneTarget);
+      passed.add("D1");
+    } catch (error) {
+      recordRepairFailure(failed, "D1", error);
+    }
+
+    try {
+      expect(wakeup, "D1 wakeup must exist before D2 pending/cancel can be verified").toBeTruthy();
+
+      const pendingRes = await app.inject({
+        method: "GET",
+        url: "/api/agent-wakeups/pending",
+        headers: { authorization: `Bearer ${ownerToken}` },
+      });
+      expect(pendingRes.statusCode).toBe(200);
+      const pendingBody = JSON.parse(pendingRes.body);
+      expect(pendingBody.wakeups.some((row: any) => row.id === wakeup.id && row.pane_target === paneTarget)).toBe(true);
+
+      const cancelRes = await app.inject({
+        method: "DELETE",
+        url: `/api/agent-wakeups/${wakeup.id}`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+      });
+      expect(cancelRes.statusCode).toBe(204);
+      passed.add("D2");
+    } catch (error) {
+      recordRepairFailure(failed, "D2", error);
+    } finally {
+      writeE3RepairReport(passed, failed);
+    }
+
+    expect(failed, `REPAIR E3 failures: ${JSON.stringify(failed)}`).toEqual([]);
   });
 
   it("POST fails closed on past time and empty action", async () => {
