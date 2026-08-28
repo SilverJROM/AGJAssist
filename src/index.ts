@@ -17,10 +17,7 @@ import { StepTemplateService } from "./services/step-template-service.js";
 import { PersonalTaskService } from "./services/personal-task-service.js";
 import { ReminderService } from "./services/reminder-service.js";
 import { createApiServer } from "./api/server.js";
-import { AppSettingsService } from "./services/app-settings-service.js";
-import { NudgeStateService } from "./services/nudge-state-service.js";
 import { AgentEventsStreamManager } from "./api/websocket/agent-events-stream-manager.js";
-import { OvmSessionService } from "./services/ovm-session.js";
 import { AgentAssignmentService } from "./services/agent-assignment-service.js";
 import { AgentEventsService } from "./services/agent-events-service.js";
 import { CoordinatorLaunchService } from "./services/coordinator-launch-service.js";
@@ -78,18 +75,10 @@ async function main(): Promise<void> {
   const agentEventsStreamManager = new AgentEventsStreamManager(authService, agentEventsService);
   agentEventsService.onEvent((event) => agentEventsStreamManager.broadcast(event));
   const agentWakeScheduler = new AgentWakeScheduler(db, tmuxService, agentEventsService);
-  const appSettingsService = new AppSettingsService();
-  await appSettingsService.load();
-  const nudgeStateService = new NudgeStateService();
-  await nudgeStateService.load();
-  const ovmSessionService = new OvmSessionService(tmuxService, {
-    overmindToken: config.overmind.token
-  });
 
   // Wire services to bot core
   const ownerRow = db.prepare("SELECT id FROM users WHERE telegram_id = ?").get(config.telegram.authorizedUserId) as { id: number } | undefined;
   core.setServices(projectService, noteService, authService, ownerRow?.id || 1);
-  core.setOvmSessionService(ovmSessionService);
   const telegramAssistant = config.telegram.testMode
     ? null
     : new TelegramAssistant(config.telegram.botToken, core, {
@@ -126,9 +115,6 @@ async function main(): Promise<void> {
     agentAssignmentService,
     coordinatorLaunchService,
     agentEventsStreamManager,
-    ovmSessionService,
-    appSettingsService,
-    nudgeStateService,
     telegramAssistant
   });
 

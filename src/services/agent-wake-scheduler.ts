@@ -1,7 +1,9 @@
 import { DatabaseService } from "../db/database.js";
 import { TmuxService } from "../tmux/tmux-service.js";
 import { AgentEventsService } from "./agent-events-service.js";
-import { hasBusySignal } from "./overmind/pane-utils.js";
+function hasBusySignal(pane: string): boolean {
+  return /esc to interrupt|Working \(|Worked for\s+/i.test(pane);
+}
 
 export type AgentWakeKind = "poke-pane" | "wake-coordinator";
 export type AgentWakeOutcome =
@@ -36,7 +38,7 @@ export interface AgentWakeSchedulerOptions {
 }
 
 const DEFAULT_MAX_PER_TICK = 25;
-const WAKE_NUDGE_PREFIX = "overmind: Scheduled wake is due";
+const WAKE_NUDGE_PREFIX = "Scheduled wake is due";
 
 export class AgentWakeScheduler {
   private readonly now: () => Date;

@@ -84,7 +84,7 @@ export async function startTelegramNonFatal(
     return true;
   } catch (error) {
     logger.error(
-      "Telegram bot startup failed; API, dashboard, and Overmind watcher remain online:",
+      "Telegram bot startup failed; API and dashboard remain online:",
       formatError(error)
     );
     return false;

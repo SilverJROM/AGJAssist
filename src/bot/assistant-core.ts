@@ -5,39 +5,12 @@ import { TmuxService } from "../tmux/tmux-service.js";
 import { ProjectService } from "../services/project-service.js";
 import { NoteService } from "../services/note-service.js";
 import { AuthService } from "../auth/auth-service.js";
-import { OvermindService, OvermindWorkflow, OvermindWorkflowStatus } from "../services/overmind-service.js";
-import type { OvmSessionManager } from "../services/ovm-session.js";
 import { lokalaiLinkCodeStore } from "./lokalai-link-code-store.js";
 
 const WEBSITES_ROOT = "/home/agjrom/websites";
-const OVERMIND_ACTIVE_STATUSES: OvermindWorkflowStatus[] = [
-  "active",
-  "working",
-  "waiting_human",
-  "awaiting_decision",
-  "stuck",
-  "paused"
-];
-const OVERMIND_STATUS_ICONS: Record<OvermindWorkflowStatus, string> = {
-  active: "•",
-  working: "▶",
-  waiting_human: "⏸",
-  awaiting_decision: "❓",
-  stuck: "⚠",
-  paused: "⏯",
-  completed: "•",
-  failed: "•"
-};
-const OVERMIND_TASK_GLYPHS = {
-  done: "[x]",
-  processing: "[~]",
-  pending: "[ ]"
-} as const;
-const OVM_RELAY_FALLBACK = "OVM is taking a while / still working.";
 
 interface UserState {
   cwd: string;
-  ovmChatMode: boolean;
 }
 
 export class AssistantCore {
@@ -46,8 +19,6 @@ export class AssistantCore {
   private noteService: NoteService | null = null;
   private authService: AuthService | null = null;
   private ownerUserId: number | null = null;
-  private overmindService: OvermindService | null = null;
-  private ovmSessionService: OvmSessionManager | null = null;
 
   // Per-user state for TG conversations
   private userState: Map<number, UserState> = new Map();
@@ -66,19 +37,10 @@ export class AssistantCore {
     this.ownerUserId = ownerUserId;
   }
 
-  setOvermindService(overmindService: OvermindService): void {
-    this.overmindService = overmindService;
-  }
-
-  setOvmSessionService(ovmSessionService: OvmSessionManager): void {
-    this.ovmSessionService = ovmSessionService;
-  }
-
   private getState(userId: number): UserState {
     if (!this.userState.has(userId)) {
       this.userState.set(userId, {
         cwd: WEBSITES_ROOT,
-        ovmChatMode: false
       });
     }
     return this.userState.get(userId)!;
@@ -97,10 +59,6 @@ export class AssistantCore {
     if (!userId) return false;
     const ids = this.config.telegram.authorizedChatIds || [this.config.telegram.authorizedUserId];
     return ids.includes(userId);
-  }
-
-  isOvmChatMode(userId: number): boolean {
-    return this.getState(userId).ovmChatMode;
   }
 
   async handleCommand(input: string, userId?: number): Promise<string> {
@@ -276,100 +234,6 @@ export class AssistantCore {
     }
   }
 
-  private handleOvermindStatusCommand(): string {
-    if (!this.overmindService) return "Overmind service not available.";
-    const workflows = this.overmindService
-      .list()
-      .filter((workflow) => OVERMIND_ACTIVE_STATUSES.includes(workflow.status));
-    if (!workflows.length) return "No active workflows.";
-    return workflows.map((workflow) => this.formatOvermindWorkflowLine(workflow)).join("\n");
-  }
-
-  private handleOvermindTasksCommand(rawId: string | undefined): string {
-    const id = this.parseOvermindId(rawId, "/om_tasks <id>");
-    if (typeof id === "string") return id;
-    if (!this.overmindService) return "Overmind service not available.";
-    const workflow = this.overmindService.get(id);
-    if (!workflow) return `Workflow not found: ${id}`;
-
-    const lines = [`${this.overmindDisplayName(workflow)} ${OVERMIND_STATUS_ICONS[workflow.status]} ${workflow.status}`];
-    if (!workflow.tasks.length) {
-      lines.push("No tasks.");
-      return lines.join("\n");
-    }
-
-    lines.push(
-      ...workflow.tasks.map((task) => `${OVERMIND_TASK_GLYPHS[task.state]} ${task.label}`)
-    );
-    return lines.join("\n");
-  }
-
-  // Pause/resume overmind's monitoring of a workflow (suppresses nudges/requests/brain
-  // while JROM talks to the coordinator). Separate from status — the card stays visible.
-  private handleOvermindPauseMutation(rawId: string | undefined, paused: boolean): string {
-    const id = this.parseOvermindId(rawId, paused ? "/om_pause <id>" : "/om_resume <id>");
-    if (typeof id === "string") return id;
-    if (!this.overmindService) return "Overmind service not available.";
-    const workflow = this.overmindService.setMonitoringPaused(id, paused, paused ? "jrom" : null);
-    if (!workflow) return `Workflow not found: ${id}`;
-    const name = this.overmindDisplayName(workflow);
-    return paused
-      ? `⏸ Paused overmind checks for ${id}: ${name}. I won't interrupt — /om_resume ${id} when done.`
-      : `▶ Resumed overmind checks for ${id}: ${name}.`;
-  }
-
-  private handleOvermindDropCommand(rawId: string | undefined): string {
-    const id = this.parseOvermindId(rawId, "/om_drop <id>");
-    if (typeof id === "string") return id;
-    if (!this.overmindService) return "Overmind service not available.";
-    const workflow = this.overmindService.get(id);
-    if (!workflow) return `Workflow not found: ${id}`;
-    this.overmindService.delete(id);
-    return `Dropped workflow ${id}: ${this.overmindDisplayName(workflow)}`;
-  }
-
-  private async handleOvmStartCommand(userId: number): Promise<string> {
-    if (!this.ovmSessionService) return "OVM session service not available.";
-    await this.ovmSessionService.open();
-    this.getState(userId).ovmChatMode = true;
-    return "OVM chat on - talk to me; /ovm_end to stop";
-  }
-
-  private handleOvmEndCommand(userId: number): string {
-    this.getState(userId).ovmChatMode = false;
-    return "OVM chat off.";
-  }
-
-  private formatOvermindWorkflowLine(workflow: OvermindWorkflow): string {
-    const doneCount = workflow.tasks.filter((task) => task.state === "done").length;
-    const currentTask = workflow.current_task || "—";
-    return `${this.overmindDisplayName(workflow)} ${OVERMIND_STATUS_ICONS[workflow.status]} ${workflow.status} · "${currentTask}" · ${doneCount}/${workflow.tasks.length}`;
-  }
-
-  private overmindDisplayName(workflow: OvermindWorkflow): string {
-    return workflow.display_name || workflow.label;
-  }
-
-  private parseOvermindId(rawId: string | undefined, usage: string): number | string {
-    if (!rawId) return `Usage: ${usage}`;
-    const id = Number(rawId);
-    if (!Number.isInteger(id) || id < 1) return `Usage: ${usage}`;
-    return id;
-  }
-
-  private async relayOvmMessage(input: string): Promise<string> {
-    if (!this.ovmSessionService) return "OVM session service not available.";
-
-    try {
-      const result = await this.ovmSessionService.sendAndAwaitReply(input);
-      if (result.pending) return OVM_RELAY_FALLBACK;
-      return result.reply || OVM_RELAY_FALLBACK;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return `OVM relay error: ${message}`;
-    }
-  }
-
     private async sleep(ms: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -378,10 +242,6 @@ export class AssistantCore {
     const trimmed = input.trim();
     const uid = userId || this.config.telegram.authorizedUserId;
     const state = this.getState(uid);
-
-    if (state.ovmChatMode) {
-      return this.relayOvmMessage(trimmed);
-    }
 
     // --- Directory commands ---
     if (/^cd(\s|$)/i.test(trimmed)) {
@@ -423,8 +283,7 @@ export class AssistantCore {
       }
     }
 
-    // Not in OVM chat mode — return a short hint.
-    return "Use /ovm_start to chat with OVM, or a slash command. /help for the list.";
+    return "Unknown command. Use /help.";
   }
 
 }

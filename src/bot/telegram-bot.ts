@@ -161,10 +161,6 @@ export class TelegramAssistant {
 
       try {
         const fromId = message.from?.id;
-        const isOvmChat = !text.startsWith("/") && fromId !== undefined && this.core.isOvmChatMode(fromId);
-        if (isOvmChat) {
-          await this.sendMessageSafe(chatId, "⏳ Sent to OVM — processing…");
-        }
 
         const response = text.startsWith("/")
           ? await this.core.handleCommand(text, fromId)
@@ -251,7 +247,7 @@ export class TelegramAssistant {
       await this.bot.deleteWebHook();
       await this.bot.startPolling();
     } catch (error) {
-      console.error("Telegram startPolling failed; API/dashboard/Overmind remain online:", error);
+      console.error("Telegram startPolling failed; API and dashboard remain online:", error);
       this.schedulePollingRetry();
       throw error;
     }

@@ -42,10 +42,6 @@ import { AgentAssignmentService } from "../services/agent-assignment-service.js"
 import { CoordinatorLaunchService } from "../services/coordinator-launch-service.js";
 import { AgentEventsStreamManager } from "./websocket/agent-events-stream-manager.js";
 import { registerAgentEventsRoutes } from "./routes/agent-events-routes.js";
-import type { OvmSessionManager } from "../services/ovm-session.js";
-import { AppSettingsService } from "../services/app-settings-service.js";
-import { registerAppSettingsRoutes } from "./routes/app-settings-routes.js";
-import type { NudgeStateService } from "../services/nudge-state-service.js";
 import type { TelegramAssistant } from "../bot/telegram-bot.js";
 import { registerTgLoginRoutes } from "./routes/tg-login-routes.js";
 import { registerLokalaiLinkRoutes } from "./routes/lokalai-link-routes.js";
@@ -86,9 +82,6 @@ export interface ApiServices {
   agentAssignmentService: AgentAssignmentService;
   coordinatorLaunchService?: CoordinatorLaunchService;
   agentEventsStreamManager?: AgentEventsStreamManager;
-  ovmSessionService?: OvmSessionManager;
-  appSettingsService?: AppSettingsService;
-  nudgeStateService?: NudgeStateService;
   telegramAssistant?: TelegramAssistant | null;
 }
 
@@ -136,12 +129,7 @@ export async function createApiServer(
   // late (post-registration), it silently never fires for existing routes.
   if (process.env.FENCE_STUB) {
     const stub = process.env.FENCE_STUB;
-    if (stub === "B2") {
-      // Re-register stub GET for unregistered /api/overmind/status so preHandler never fires
-      app.get("/api/overmind/status", async (request, reply) => {
-        reply.code(200).type("application/json").send({ stubbed: true, contributor: "B2" });
-      });
-    } else {
+    if (stub !== "B2") {
       app.addHook("preHandler", async (request, reply) => {
         const url = request.url || "";
         // C3: make reminders active fail
@@ -204,10 +192,6 @@ export async function createApiServer(
 
   if (services.agentEventsStreamManager) {
     registerAgentEventsRoutes(app, services.agentEventsStreamManager);
-  }
-
-  if (services.appSettingsService) {
-    registerAppSettingsRoutes(app, services.authService, services.appSettingsService);
   }
 
   const terminalGroupsService = new TerminalGroupsService(services.db);
