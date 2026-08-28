@@ -1,0 +1,7 @@
+{
+  "type": "plan-review-required",
+  "slice": "C0",
+  "attempt": 4,
+  "defect_class": "TEST_NOT_DISCRIMINATING",
+  "top_rung": true
+}

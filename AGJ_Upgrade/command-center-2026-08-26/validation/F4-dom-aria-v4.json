@@ -1,0 +1,1109 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "url": "http://localhost:3210/index.html#/terminals",
+  "consoleMessages": [
+    {
+      "type": "error",
+      "text": "WebSocket connection to 'ws://localhost:3210/ws/tmux/t1?token=f4-ui-probe-token' failed: Error during WebSocket handshake: Unexpected response code: 404"
+    }
+  ],
+  "pageErrors": [],
+  "steps": [
+    {
+      "label": "list",
+      "selectorCounts": {
+        "commandCenterHeader": 0,
+        "terminalHeaderV2": 0,
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0
+      },
+      "visibleCounts": {
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 0,
+        "terminalMynav": 0,
+        "summariesToggle": 0,
+        "terminalMenu": 0
+      },
+      "text": {
+        "commandCenterHeader": "",
+        "body": "☰\nTerminals\n+\nAll\ngroup1\n⋮\n+\nalpha\nready\nYesterday\n📁\nbravo\nready\nYesterday\n📁\ncharlie\nready\nYesterday\n📁\ndelta\nready\nYesterday\n📁\necho\nready\nYesterday\n📁\nfoxtrot\nready\nYesterday\n📁"
+      },
+      "targetBlock": {
+        "topbarMain": {
+          "w": 350,
+          "h": 32,
+          "x": 20,
+          "y": 13,
+          "display": "flex",
+          "flex": "1 1 0%",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "target": {
+          "w": 266,
+          "h": 18,
+          "x": 62,
+          "y": 19,
+          "display": "block",
+          "flex": "1 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "sessionName": null,
+        "header": null,
+        "headerV2": null
+      },
+      "headerRows": {
+        "error": "TimeoutError: locator.evaluate: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"command-center-header\"]').first()\u001b[22m\n"
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 46
+        },
+        "commandCenterHeader": {
+          "error": "TimeoutError: locator.evaluate: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"command-center-header\"]').first()\u001b[22m\n"
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-sectionnav",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "☰",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "Terminals",
+            "x": 62,
+            "y": 19,
+            "width": 266,
+            "height": 18
+          },
+          {
+            "testId": "terminal-new-session",
+            "className": "terminal-topbar-icon-btn terminal-new-session-trigger",
+            "text": "+",
+            "x": 338,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "label": "detail-default",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 0,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 1,
+        "terminalMynav": 1,
+        "summariesToggle": 1,
+        "terminalMenu": 1
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▼ (5)",
+        "body": "←\nalpha\nt1 · bash · updated 7:30:52 AM\nTabs ▼ (5)\n‹\nA−\nA+\n▲\nME\n▼\nReminder: rem-1\nWakeup: wake-1\nSummary: Summary signal test\nToday\nAGENT\nalpha · 7:30:52 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "targetBlock": {
+        "topbarMain": {
+          "w": 350,
+          "h": 42,
+          "x": 20,
+          "y": 12,
+          "display": "flex",
+          "flex": "1 1 0%",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "target": {
+          "w": 84,
+          "h": 34,
+          "x": 53,
+          "y": 12,
+          "display": "block",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "sessionName": {
+          "w": 84,
+          "h": 18,
+          "x": 53,
+          "y": 12,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "hidden",
+          "visibility": "visible"
+        },
+        "header": {
+          "w": 49,
+          "h": 28,
+          "x": 142,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "headerV2": {
+          "w": 49,
+          "h": 28,
+          "x": 142,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        }
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 15,
+            "bottom": 43,
+            "members": [
+              "tabs-collapse"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 95
+        },
+        "commandCenterHeader": {
+          "x": 142,
+          "y": 15,
+          "width": 49,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 15,
+            "width": 28,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 7:30:52 AM",
+            "x": 53,
+            "y": 12,
+            "width": 84,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▼ (5)bravocharliedeltaechofoxtrot",
+            "x": 142,
+            "y": 15,
+            "width": 49,
+            "height": 28
+          },
+          {
+            "testId": "utilities-collapse",
+            "className": "cc-util-toggle",
+            "text": "‹",
+            "x": 196,
+            "y": 17,
+            "width": 24,
+            "height": 24
+          },
+          {
+            "testId": "",
+            "className": "cc-ctrlcluster",
+            "text": "A−A+▲ME▼‹",
+            "x": 225,
+            "y": 15,
+            "width": 145,
+            "height": 28
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-utilities-collapse",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 1,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 1,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 1,
+        "terminalMynav": 1,
+        "summariesToggle": 1,
+        "terminalMenu": 1
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▼ (5)",
+        "body": "←\nalpha\nt1 · bash · updated 7:30:52 AM\nTabs ▼ (5)\n🔔\n1\nA−\nA+\n▲\nME\n▼\n‹\nToday\nAGENT\nalpha · 7:30:52 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "targetBlock": {
+        "topbarMain": {
+          "w": 350,
+          "h": 34,
+          "x": 20,
+          "y": 12,
+          "display": "flex",
+          "flex": "1 1 0%",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "target": {
+          "w": 65,
+          "h": 34,
+          "x": 53,
+          "y": 12,
+          "display": "block",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "sessionName": {
+          "w": 65,
+          "h": 18,
+          "x": 53,
+          "y": 12,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "hidden",
+          "visibility": "visible"
+        },
+        "header": {
+          "w": 39,
+          "h": 28,
+          "x": 123,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "headerV2": {
+          "w": 39,
+          "h": 28,
+          "x": 123,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        }
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 15,
+            "bottom": 43,
+            "members": [
+              "tabs-collapse"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 47
+        },
+        "commandCenterHeader": {
+          "x": 123,
+          "y": 15,
+          "width": 39,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 15,
+            "width": 28,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 7:30:52 AM",
+            "x": 53,
+            "y": 12,
+            "width": 65,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▼ (5)bravocharliedeltaechofoxtrot",
+            "x": 123,
+            "y": 15,
+            "width": 39,
+            "height": 28
+          },
+          {
+            "testId": "bell-indicator",
+            "className": "command-center-bell has-reminder has-wakeup",
+            "text": "🔔1",
+            "x": 167,
+            "y": 15,
+            "width": 28,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "cc-ctrlcluster",
+            "text": "A−A+▲ME▼‹",
+            "x": 200,
+            "y": 15,
+            "width": 170,
+            "height": 28
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-bell-restore",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 0,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 1,
+        "terminalMynav": 1,
+        "summariesToggle": 1,
+        "terminalMenu": 1
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▼ (5)",
+        "body": "←\nalpha\nt1 · bash · updated 7:30:52 AM\nTabs ▼ (5)\n‹\nA−\nA+\n▲\nME\n▼\nReminder: rem-1\nWakeup: wake-1\nSummary: Summary signal test\nToday\nAGENT\nalpha · 7:30:52 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "targetBlock": {
+        "topbarMain": {
+          "w": 350,
+          "h": 42,
+          "x": 20,
+          "y": 12,
+          "display": "flex",
+          "flex": "1 1 0%",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "target": {
+          "w": 84,
+          "h": 34,
+          "x": 53,
+          "y": 12,
+          "display": "block",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "sessionName": {
+          "w": 84,
+          "h": 18,
+          "x": 53,
+          "y": 12,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "hidden",
+          "visibility": "visible"
+        },
+        "header": {
+          "w": 49,
+          "h": 28,
+          "x": 142,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "headerV2": {
+          "w": 49,
+          "h": 28,
+          "x": 142,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        }
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 15,
+            "bottom": 43,
+            "members": [
+              "tabs-collapse"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 95
+        },
+        "commandCenterHeader": {
+          "x": 142,
+          "y": 15,
+          "width": 49,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 15,
+            "width": 28,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 7:30:52 AM",
+            "x": 53,
+            "y": 12,
+            "width": 84,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▼ (5)bravocharliedeltaechofoxtrot",
+            "x": 142,
+            "y": 15,
+            "width": 49,
+            "height": 28
+          },
+          {
+            "testId": "utilities-collapse",
+            "className": "cc-util-toggle",
+            "text": "‹",
+            "x": 196,
+            "y": 17,
+            "width": 24,
+            "height": 24
+          },
+          {
+            "testId": "",
+            "className": "cc-ctrlcluster",
+            "text": "A−A+▲ME▼‹",
+            "x": 225,
+            "y": 15,
+            "width": 145,
+            "height": 28
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-tabs-expand",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 0,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5,
+        "terminalFontDecrease": 1,
+        "terminalMynav": 1,
+        "summariesToggle": 1,
+        "terminalMenu": 1
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▲ (5)\nbravo\ncharlie\ndelta\necho\nfoxtrot",
+        "body": "←\nalpha\nt1 · bash · updated 7:30:52 AM\nTabs ▲ (5)\nbravo\ncharlie\ndelta\necho\nfoxtrot\n‹\nA−\nA+\n▲\nME\n▼\nReminder: rem-1\nWakeup: wake-1\nSummary: Summary signal test\nToday\nAGENT\nalpha · 7:30:52 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "targetBlock": {
+        "topbarMain": {
+          "w": 350,
+          "h": 42,
+          "x": 20,
+          "y": 12,
+          "display": "flex",
+          "flex": "1 1 0%",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "target": {
+          "w": 35,
+          "h": 34,
+          "x": 53,
+          "y": 12,
+          "display": "block",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "sessionName": {
+          "w": 35,
+          "h": 18,
+          "x": 53,
+          "y": 12,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "hidden",
+          "visibility": "visible"
+        },
+        "header": {
+          "w": 98,
+          "h": 28,
+          "x": 93,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "headerV2": {
+          "w": 98,
+          "h": 28,
+          "x": 93,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        }
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 15,
+            "bottom": 43,
+            "members": [
+              "tabs-collapse",
+              "terminal-header-tab",
+              "terminal-header-tab",
+              "terminal-header-tab",
+              "terminal-header-tab",
+              "terminal-header-tab"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 95
+        },
+        "commandCenterHeader": {
+          "x": 93,
+          "y": 15,
+          "width": 98,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 15,
+            "width": 28,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 7:30:52 AM",
+            "x": 53,
+            "y": 12,
+            "width": 35,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▲ (5)bravocharliedeltaechofoxtrot",
+            "x": 93,
+            "y": 15,
+            "width": 98,
+            "height": 28
+          },
+          {
+            "testId": "utilities-collapse",
+            "className": "cc-util-toggle",
+            "text": "‹",
+            "x": 196,
+            "y": 17,
+            "width": 24,
+            "height": 24
+          },
+          {
+            "testId": "",
+            "className": "cc-ctrlcluster",
+            "text": "A−A+▲ME▼‹",
+            "x": 225,
+            "y": 15,
+            "width": 145,
+            "height": 28
+          }
+        ]
+      }
+    },
+    {
+      "label": "fully-collapsed",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 1,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 1,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 0,
+        "terminalMynav": 0,
+        "summariesToggle": 0,
+        "terminalMenu": 0
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▼ (5)",
+        "body": "←\nalpha\nt1 · bash · updated 7:30:52 AM\nTabs ▼ (5)\n🔔\n1\n...\nToday\nAGENT\nalpha · 7:30:52 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "targetBlock": {
+        "topbarMain": {
+          "w": 350,
+          "h": 34,
+          "x": 20,
+          "y": 12,
+          "display": "flex",
+          "flex": "1 1 0%",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "target": {
+          "w": 137,
+          "h": 34,
+          "x": 53,
+          "y": 12,
+          "display": "block",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "sessionName": {
+          "w": 137,
+          "h": 18,
+          "x": 53,
+          "y": 12,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "hidden",
+          "visibility": "visible"
+        },
+        "header": {
+          "w": 81,
+          "h": 28,
+          "x": 195,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "headerV2": {
+          "w": 81,
+          "h": 28,
+          "x": 195,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        }
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 15,
+            "bottom": 43,
+            "members": [
+              "tabs-collapse"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 47
+        },
+        "commandCenterHeader": {
+          "x": 195,
+          "y": 15,
+          "width": 81,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 15,
+            "width": 28,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 7:30:52 AM",
+            "x": 53,
+            "y": 12,
+            "width": 137,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▼ (5)bravocharliedeltaechofoxtrot",
+            "x": 195,
+            "y": 15,
+            "width": 81,
+            "height": 28
+          },
+          {
+            "testId": "bell-indicator",
+            "className": "command-center-bell has-reminder has-wakeup",
+            "text": "🔔1",
+            "x": 281,
+            "y": 15,
+            "width": 28,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "cc-ctrlcluster collapsed",
+            "text": "A−A+▲ME▼...",
+            "x": 314,
+            "y": 15,
+            "width": 28,
+            "height": 28
+          }
+        ]
+      }
+    },
+    {
+      "label": "restored-default",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 1,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 1,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 1,
+        "terminalMynav": 1,
+        "summariesToggle": 1,
+        "terminalMenu": 1
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▼ (5)",
+        "body": "←\nalpha\nt1 · bash · updated 7:30:52 AM\nTabs ▼ (5)\n🔔\n1\nA−\nA+\n▲\nME\n▼\n‹\nSummaries\n✕\n1/1/2099, 12:00:00 AM\nvia ep-test\nSummary signal test\nAGENT REMINDERS\nActive reminders\nrem-1 30 min\nNEW REMINDER\nCadence\n15m\n30m\n60m\nRepeat limit\nUnlimited\nStop after N\nRecipient agent\n Include\nSave\nWAKEUP\nPending wakeups\nCollapse1 wakeup · in 38050109m\nt1 · test · in 38050109m\nCancel\nSCHEDULE WAKEUP\nDate\nTime\nAction\nSave wakeup\nSUMMARY ENDPOINTS\nExisting endpoints\nep-test\nEdit\nDel\nNEW ENDPOINT\nName\nBase URL\nModel\nAdd\nTerminal settings\nDone\nTEXT SIZE\nConversation size\nAlso in Settings ▸ Appearance (syncs everywhere)\nA−\n17px\nA＋\nReset to default\nReset · 17px\nREPLY LENGTH\nMinimize agent replies\nShows the most recent N lines · tap a reply to expand\n10\n50\nFull\nRAW TERMINAL SIZE\nA-\nReset\nA+\nOUTPUT\nShow raw terminal output\nReveals stripped CLI chrome\nSESSION\nTerminal Chat\nt1\nCONNECTED\nSelect a pane...\nalpha · t1 · bash\nbravo · t2 · bash\ncharlie · t3 · bash\ndelta · t4 · bash\necho · t5 · bash\nfoxtrot · t6 · bash\n+ New\nRefresh\nDisconnect\nLines captured\nLines\n25\n50\n100\n150\n200\nFull Screen\nFriendly\nRaw\nToday\nAGENT\nalpha · 7:30:52 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "targetBlock": {
+        "topbarMain": {
+          "w": 350,
+          "h": 34,
+          "x": 20,
+          "y": 12,
+          "display": "flex",
+          "flex": "1 1 0%",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "target": {
+          "w": 65,
+          "h": 34,
+          "x": 53,
+          "y": 12,
+          "display": "block",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "sessionName": {
+          "w": 65,
+          "h": 18,
+          "x": 53,
+          "y": 12,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "hidden",
+          "visibility": "visible"
+        },
+        "header": {
+          "w": 39,
+          "h": 28,
+          "x": 123,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        },
+        "headerV2": {
+          "w": 39,
+          "h": 28,
+          "x": 123,
+          "y": 15,
+          "display": "flex",
+          "flex": "0 1 auto",
+          "overflow": "visible",
+          "visibility": "visible"
+        }
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 15,
+            "bottom": 43,
+            "members": [
+              "tabs-collapse"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 47
+        },
+        "commandCenterHeader": {
+          "x": 123,
+          "y": 15,
+          "width": 39,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 15,
+            "width": 28,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 7:30:52 AM",
+            "x": 53,
+            "y": 12,
+            "width": 65,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▼ (5)bravocharliedeltaechofoxtrot",
+            "x": 123,
+            "y": 15,
+            "width": 39,
+            "height": 28
+          },
+          {
+            "testId": "bell-indicator",
+            "className": "command-center-bell has-reminder has-wakeup",
+            "text": "🔔1",
+            "x": 167,
+            "y": 15,
+            "width": 28,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "cc-ctrlcluster",
+            "text": "A−A+▲ME▼‹",
+            "x": 200,
+            "y": 15,
+            "width": 170,
+            "height": 28
+          }
+        ]
+      }
+    }
+  ],
+  "summariesFreshness": {
+    "beforeOpen": 1,
+    "afterOpen": 2,
+    "refetchedOnOpen": true
+  },
+  "remindersFreshness": {
+    "beforeMenuOpen": 1,
+    "afterMenuOpen": 2,
+    "refetchedOnMenuOpen": true
+  },
+  "ariaSnapshot": "- main:\n  - button \"Back to terminal list\": ←\n  - text: alpha t1 · bash · updated 7:30:52 AM\n  - button \"Tabs ▼ (5)\"\n  - button \"Show utilities\": 🔔 1\n  - button \"A−\"\n  - button \"A+\"\n  - button \"Jump to my previous message\": ▲\n  - text: ME\n  - button \"Jump to my next message\": ▼\n  - button \"Agent summaries\":\n    - img\n  - button \"Terminal settings\" [expanded]\n  - button \"Hide controls\": ‹\n  - strong: Summaries\n  - button \"✕\"\n  - text: 1/1/2099, 12:00:00 AM via ep-test Summary signal test\n  - menu:\n    - text: Agent Reminders Active reminders rem-1 30 min New reminder Cadence\n    - button \"15m\"\n    - button \"30m\"\n    - button \"60m\"\n    - spinbutton\n    - text: Repeat limit\n    - button \"Unlimited\"\n    - button \"Stop after N\"\n    - text: Recipient agent\n    - textbox: agent-a\n    - checkbox \"Include\" [checked]\n    - text: Include\n    - button \"Save\"\n    - text: Wakeup Pending wakeups\n    - button \"Collapse\"\n    - text: 1 wakeup · in 38050109m t1 · test · in 38050109m\n    - button \"Cancel\"\n    - text: Schedule wakeup Date\n    - textbox\n    - text: Time\n    - textbox\n    - text: Action\n    - textbox: Wake up — start today's queued tasks and report status.\n    - button \"Save wakeup\"\n    - text: Summary Endpoints Existing endpoints\n    - radio [checked]\n    - text: ep-test\n    - button \"Edit\"\n    - button \"Del\"\n    - text: New endpoint Name\n    - textbox \"Name\"\n    - text: Base URL\n    - textbox \"https://.../v1\"\n    - text: Model\n    - textbox \"Model\"\n    - button \"Add\"\n    - text: Terminal settings\n    - button \"Close settings\": Done\n    - text: Text size Conversation size Also in Settings ▸ Appearance (syncs everywhere)\n    - button \"A−\"\n    - text: 17px\n    - button \"A＋\"\n    - slider: \"17\"\n    - text: Reset to default\n    - button \"Reset · 17px\"\n    - text: Reply length Minimize agent replies Shows the most recent N lines · tap a reply to expand\n    - group \"Reply length\":\n      - button \"10\"\n      - button \"50\"\n      - button \"Full\"\n    - text: Raw terminal size\n    - button \"A-\" [disabled]\n    - button \"Reset\"\n    - button \"A+\"\n    - text: Output Show raw terminal output Reveals stripped CLI chrome\n    - switch\n    - text: Session\n    - strong: Terminal Chat\n    - text: t1 connected\n    - combobox:\n      - option \"Select a pane...\"\n      - option \"alpha · t1 · bash\" [selected]\n      - option \"bravo · t2 · bash\"\n      - option \"charlie · t3 · bash\"\n      - option \"delta · t4 · bash\"\n      - option \"echo · t5 · bash\"\n      - option \"foxtrot · t6 · bash\"\n    - button \"+ New\"\n    - button \"Refresh\"\n    - button \"Disconnect\"\n    - text: Lines captured Lines\n    - combobox \"Lines\":\n      - option \"25\" [selected]\n      - option \"50\"\n      - option \"100\"\n      - option \"150\"\n      - option \"200\"\n    - button \"Full Screen\"\n    - button \"Friendly\"\n    - button \"Raw\"\n  - button \"Search chat\"\n  - button \"Refresh terminal\"\n  - text: Today AGENT alpha · 7:30:52 AM alpha ready $\n  - group \"Terminal keys\":\n    - button \"⏎\"\n    - button \"Esc\"\n    - button \"^C\"\n    - button \"⇧⇥\"\n    - button \"↑\"\n    - button \"↓\"\n  - button \"Send as command\"\n  - button \"Send raw keys\"\n  - button \"▴ Large input\"\n  - button \"Attach image\"\n  - textbox \"Message the agent...\"\n  - button \"➤\" [disabled]"
+}

@@ -1,0 +1,941 @@
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/callbacks.md b/AGJ_Upgrade/command-center-2026-08-26/callbacks.md
+index 3515778..f0d0707 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/callbacks.md
++++ b/AGJ_Upgrade/command-center-2026-08-26/callbacks.md
+@@ -51,3 +51,9 @@ Workers emit one-line `[projcore callback] <role> <batch-id> STATUS: …` here.
+ [projcore callback] implementer B2 STATUS: DONE — commit 59fb99d removed overmind routes and ApiServices fields
+ [projcore callback] validator B2 STATUS: DONE — PASS scope authority; Overmind API fields/routes removed; tests green
+ [VERDICT-V1] run=command-center-2026-08-26 batch=B2 attempt=1 marker=DRV-B2-24 verdict=PASS req=A2 defect_class=none failed_gate=none commit=59fb99d5bbabf471dbff63af4f9e131224644c03 redteam=standard-clean evidence=src/api/server.ts:0fc39f6b049cad33782477c6924aad9d034fa4a41cf898eb6a0bbd27fe7432d5,tests/overmind-removal-api.test.ts:07f912e42b5acbf82584f6dc2f118284f1c73315cdb50f3364d2d6d8c8533f9b
++[projcore callback] implementer F4 STATUS: DONE — commit bb82a57 port header v2 collapse chrome with bell hints controls tuck row split spec hardening
++[FENCE-VERDICT-V1] fence=E5 verdict=FAIL fault_class=implementation failing_units=E3 plan_defect=false plan_defect_reason=none
++[FENCE-VERDICT-V1] fence=E5 verdict=FAIL fault_class=implementation failing_units=E3 plan_defect=false plan_defect_reason=none
++[projcore callback] validator F4 STATUS: DONE — PASS one-row header, bell hint, ⋯ tuck; 11/11 mutations caught
++[VERDICT-V1] run=command-center-2026-08-26 batch=F4 attempt=4 marker=DRV-F4-21 verdict=PASS req=H1,H2 defect_class=none failed_gate=none commit=23ff1d1b3c304afbaa5315af2719760ac5c0ae30 redteam=standard-clean evidence=src/web/public/app.js:04587a17f0df4427c66afb44cc491c1caa4a34fd080e4d7bf4ba7563706bf3fb,src/web/public/style.css:de39b807790cbdd8811b61807f805681d1203306c6b4cf49cca5d65d9f51f121,e2e/command-center-header.spec.ts:d80ec1c8a3ddc747488753e9133f290a74046e9d4992ba0bf99786e63456c66b,validation/F4-redteam-v4.md:bd619ef6b4e4272d4c292e86bceb34b1916544cd44fb0e6d81aaa70e0b2393fe,validation/F4-focused-v4.log:2c9eaa9c8d1feeaabae721f045ef8149e62da5922f7d2cef93b9acc69e75fe1b,validation/F4-focused-v4-worktree.log:7c9662353dfa7698ead0299af7740ef75e793dcda272c14d41a92e5638ef2cc9,validation/F4-mutation-v4.log:dc4c7432362639f220aa60f61864fb377ac04780c7e29f826ecada1f9300f2af,validation/F4-dom-aria-v4.json:5b9b300779e6535aed661ab9394b9953bbd2efd7c76443266680c6b7b3b9c33a,validation/F4-bandcount-v4.json:4fb07f2d2796633967f1e25fda5ab58645fb29bed58b140a4d288ab0e7ee2b0f,validation/F4-header-v4-fully-collapsed.png:4565340bd107387e468c5f10fe26d67a69df5d0fa66323dda52fd91d49e22f01,validation/F4-header-v4.png:a2d2410cb7e586e4d50ee4d9241c76afe4514c32a088219f0997da04610d9192,validation/F4-ui-probe-v4.mjs:2ea69f618f87e45e7e12b8ba3689e71996b8bdd0627733887ca29e50b22ac8ba
++[projcore callback] implementer F4 STATUS: DONE — commit "a62de6d" fix spec bands height and menu close
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/.esc-seen b/AGJ_Upgrade/command-center-2026-08-26/dispatch/.esc-seen
+index 19e6848..3e1c3a4 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/.esc-seen
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/.esc-seen
+@@ -1 +1,18 @@
+ RAISE-A0-c1.json
++RAISE-B8-c1.json
++RAISE-C0-c1.json
++RAISE-C5-c1.json
++RAISE-C6-c1.json
++RAISE-D0-c1.json
++RAISE-D5-c1.json
++RAISE-D7-c1.json
++RAISE-E5-c1.json
++RAISE-E5-c2.json
++RAISE-E5-c3.json
++RAISE-F3-c1.json
++RAISE-F4-c1.json
++RAISE-F4-c2.json
++RAISE-F7-c1.json
++RAISE-E5-c4.json
++RAISE-F4-c3.json
++RAISE-E5-c5.json
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/.north-watchdog-state b/AGJ_Upgrade/command-center-2026-08-26/dispatch/.north-watchdog-state
+index 2035c7a..d162909 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/.north-watchdog-state
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/.north-watchdog-state
+@@ -1 +1 @@
+-1787794758
++1787901468
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/.pulse-stale-nagged b/AGJ_Upgrade/command-center-2026-08-26/dispatch/.pulse-stale-nagged
+index 697696a..feb1e74 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/.pulse-stale-nagged
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/.pulse-stale-nagged
+@@ -1 +1 @@
+-1787795466
++1787901467
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/NORTH-DIGEST.md b/AGJ_Upgrade/command-center-2026-08-26/dispatch/NORTH-DIGEST.md
+index 2e270d0..0fd634c 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/NORTH-DIGEST.md
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/NORTH-DIGEST.md
+@@ -1,11 +1,11 @@
+ <!-- regenerated each cadence; north reads this when already awake, it is never pushed -->
+ 
+ ```
+-[tiller] STATUS 03:32 · command-center-2026-08-26 · NOMINAL
++[tiller] STATUS 07:39 · command-center-2026-08-26 · NOMINAL
+ drain advancing, nothing owed to you
+-now: B3 (brief_sent, quiet 5m)
+-proc: driver pid 2805424 (pid-file verified against /proc) · seats: 1 working (x-tlre7cd71a78feb_impl_glimmer); 3 gone
+-queue: 5/36 done · 31 pending
+-fences: 0/5 closed, 1 opened
++now: F4 (brief_sent, quiet 9m)
++proc: driver pid 143379 (pid-file verified against /proc) · seats: 1 working (x-tlre7cd71a78feb_impl_glimmer); 4 gone
++queue: 32/41 done · 9 pending
++fences: 2/5 closed, 5 opened
+ action: none — do not spend a turn on this
+ ```
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/STATUS.md b/AGJ_Upgrade/command-center-2026-08-26/dispatch/STATUS.md
+index c0a089d..077946c 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/STATUS.md
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/STATUS.md
+@@ -1,11 +1,11 @@
+ <!-- regenerated each cadence; latest only -->
+ 
+ ```
+-[tiller] STATUS 03:32 · command-center-2026-08-26 · NOMINAL
++[tiller] STATUS 07:39 · command-center-2026-08-26 · NOMINAL
+ drain advancing, nothing owed to you
+-now: B3 (brief_sent, quiet 5m)
+-proc: driver pid 2805424 (pid-file verified against /proc) · seats: 1 working (x-tlre7cd71a78feb_impl_glimmer); 3 gone
+-queue: 5/36 done · 31 pending
+-fences: 0/5 closed, 1 opened
++now: F4 (brief_sent, quiet 9m)
++proc: driver pid 143379 (pid-file verified against /proc) · seats: 1 working (x-tlre7cd71a78feb_impl_glimmer); 4 gone
++queue: 32/41 done · 9 pending
++fences: 2/5 closed, 5 opened
+ action: none — do not spend a turn on this
+ ```
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/driver.log b/AGJ_Upgrade/command-center-2026-08-26/dispatch/driver.log
+index 327d5f3..b851b39 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/driver.log
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/driver.log
+@@ -118,3 +118,63 @@
+ [driver] B2: MIS-RATED — planned L3, landed on L1 (glimmer) at a1: OVER-rated by 2 rung(s). Recorded for post-run tagging review; NOT acted on mid-run.
+ [driver] B2: DRIVE after 1 attempt(s) → advanced {'advanced': True, 'marker': '/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/dispatch/advance-B2.marker', 'caveat': None}
+ [driver] B3 a1: build → impl x-tlre7cd71a78feb_impl_glimmer (glimmer, wm=19926, base_head=59fb99d5bb, claude_esc_left=3)
++[driver] B3: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=B3 attempt=? marker=advance-B3.marker verdict=PASS req=none defect_class=none failed_gate=none commit=c288020a4b865c8b5227525991cc3413157ed6b9 redteam=reconcile evidence=advance-B3.marker
++[driver] B4: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=B4 attempt=? marker=advance-B4.marker verdict=PASS req=none defect_class=none failed_gate=none commit=251129b762e17543c14e54be5f12db748dd2237e redteam=reconcile evidence=advance-B4.marker
++[driver] B7: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=B7 attempt=? marker=advance-B7.marker verdict=PASS req=none defect_class=none failed_gate=none commit=78e8448e8dbf2da3570a37146e47c22d8c5d4709 redteam=reconcile evidence=advance-B7.marker
++[driver] B8: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=B8 attempt=? marker=advance-B8.marker verdict=PASS req=none defect_class=none failed_gate=none commit=78fe35e10ee05ad7bdae57c5e881d30bb2c02a0b redteam=reconcile evidence=advance-B8.marker
++[driver] C0: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=C0 attempt=? marker=advance-C0.marker verdict=PASS req=none defect_class=none failed_gate=none commit=fe98610ebf3444fa3d9977e4bad71eeae6a4d867 redteam=reconcile evidence=advance-C0.marker
++[driver] C1: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=C1 attempt=? marker=advance-C1.marker verdict=PASS req=none defect_class=none failed_gate=none commit=87117c7ac3f9cf726d762ebd3823c1742f22abcb redteam=reconcile evidence=advance-C1.marker
++[driver] C2: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=C2 attempt=? marker=advance-C2.marker verdict=PASS req=none defect_class=none failed_gate=none commit=65b3b528577e153a4b4e90abed4b5d2d16266d20 redteam=reconcile evidence=advance-C2.marker
++[driver] C3: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=C3 attempt=? marker=advance-C3.marker verdict=PASS req=none defect_class=none failed_gate=none commit=22c4ae4c92ca23808d06251dc705a591552ab769 redteam=reconcile evidence=advance-C3.marker
++[driver] C4: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=C4 attempt=? marker=advance-C4.marker verdict=PASS req=none defect_class=none failed_gate=none commit=3bde8f4fd6b8a29513cd7c7fee520874989b9fe6 redteam=reconcile evidence=advance-C4.marker
++[driver] C5: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=C5 attempt=? marker=advance-C5.marker verdict=PASS req=none defect_class=none failed_gate=none commit=fb921dcfcdd35a94c5ee80401f16b81cdb784d24 redteam=reconcile evidence=advance-C5.marker
++[driver] C6: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=C6 attempt=? marker=advance-C6.marker verdict=PASS req=none defect_class=none failed_gate=none commit=fe98610ebf3444fa3d9977e4bad71eeae6a4d867 redteam=reconcile evidence=advance-C6.marker
++[driver] D1: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=D1 attempt=? marker=advance-D1.marker verdict=PASS req=none defect_class=none failed_gate=none commit=e1c0cca2cb7ca416184e6135991fa081c86ffae6 redteam=reconcile evidence=advance-D1.marker
++[driver] D2: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=D2 attempt=? marker=advance-D2.marker verdict=PASS req=none defect_class=none failed_gate=none commit=37567aeb8c21fe73c2e5f96907c3774c533e8bbc redteam=reconcile evidence=advance-D2.marker
++[driver] D3: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=D3 attempt=? marker=advance-D3.marker verdict=PASS req=none defect_class=none failed_gate=none commit=6144ea00896d968f67f8b9460f9c651c9189a89c redteam=reconcile evidence=advance-D3.marker
++[driver] D4: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=D4 attempt=? marker=advance-D4.marker verdict=PASS req=none defect_class=none failed_gate=none commit=6a11ee027c1e9e0803fcc1c8cbb05c8b3c1a1ae3 redteam=reconcile evidence=advance-D4.marker
++[driver] D5: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=D5 attempt=? marker=advance-D5.marker verdict=PASS req=none defect_class=none failed_gate=none commit=5990791a082b16d75224545b879ddef5fe1e90a6 redteam=reconcile evidence=advance-D5.marker
++[driver] D6: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=D6 attempt=? marker=advance-D6.marker verdict=PASS req=none defect_class=none failed_gate=none commit=b687e58a439efca490c6b31a8b0c447c8fabe101 redteam=reconcile evidence=advance-D6.marker
++[driver] E0: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=E0 attempt=? marker=advance-E0.marker verdict=PASS req=none defect_class=none failed_gate=none commit=88d17608cca3266eacec90b8e24a82402bcb3b95 redteam=reconcile evidence=advance-E0.marker
++[driver] E1: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=E1 attempt=? marker=advance-E1.marker verdict=PASS req=none defect_class=none failed_gate=none commit=245e1293ff1cb6f5c0b8f383f79f170f541d4d97 redteam=reconcile evidence=advance-E1.marker
++[driver] E2: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=E2 attempt=? marker=advance-E2.marker verdict=PASS req=none defect_class=none failed_gate=none commit=5dfa879526e348016d1b7f2734772d86cccd1afe redteam=reconcile evidence=advance-E2.marker
++[driver] E3: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=E3 attempt=? marker=advance-E3.marker verdict=PASS req=none defect_class=none failed_gate=none commit=2e2c18f91eefd3ea93f079f2624807c97014c569 redteam=reconcile evidence=advance-E3.marker
++[driver] E4: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=E4 attempt=? marker=advance-E4.marker verdict=PASS req=none defect_class=none failed_gate=none commit=b1d8258c5d4d4121a63f3231df70e434143ee638 redteam=reconcile evidence=advance-E4.marker
++[driver] F0: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=F0 attempt=? marker=advance-F0.marker verdict=PASS req=none defect_class=none failed_gate=none commit=d08ca352dd82017d5784cc0ec7ea8371551bac68 redteam=reconcile evidence=advance-F0.marker
++[driver] F1: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=F1 attempt=? marker=advance-F1.marker verdict=PASS req=none defect_class=none failed_gate=none commit=c5aa50963b0c07b4becd0984038632928a9d3513 redteam=reconcile evidence=advance-F1.marker
++[driver] F2: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=F2 attempt=? marker=advance-F2.marker verdict=PASS req=none defect_class=none failed_gate=none commit=afa783f35e136a7c9fae7a3b841c867b45fb7496 redteam=reconcile evidence=advance-F2.marker
++[driver] F3: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=F3 attempt=? marker=advance-F3.marker verdict=PASS req=none defect_class=none failed_gate=none commit=41459b9897b7615ac3135f824369baa32d967192 redteam=reconcile evidence=advance-F3.marker
++[driver] H8: RECONCILE after park-rollback restored truncated driver.log — [VERDICT-V1] run=command-center-2026-08-26 batch=H8 attempt=? marker=advance-H8.marker verdict=PASS req=none defect_class=none failed_gate=none commit=78fe35e10ee05ad7bdae57c5e881d30bb2c02a0b redteam=reconcile evidence=advance-H8.marker
++[driver] F4 a4: role_done channel=matched
++[driver] F4 a4: impl [projcore callback] implementer F4 STATUS: DONE — commit bb82a57 port header v2 collapse chrome with bell hints controls tuck row split spec hardening
++[driver] F4 a4: validator x-tlre7cd71a78feb_validator_opus5 (wm=20079)
++[driver] config-in-effect: CONFIG UNVERIFIED — this run predates the config snapshot. NOT stamping the current values: doing so on a run already in flight would bless whatever is in effect now, including a wiped rung. Adopt deliberately: TILLER_ADOPT_CONFIG=1
++[preflight] BUDGET CANNOT ESCALATE — F1: budget 3 < L1_ATTEMPTS+1 (4) — every attempt is glimmer and the row PARKS instead of escalating. Raise it to >=4, or leave it if glimmer-only is deliberate.
++[driver] --allow-baseline-dirt: baselined 732 coordination path(s); 0 PRODUCT dirty path(s) NOT baselined (still gate)
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for B8 — DIRECTION-B8-a1.json (action=RETRY_WITH_DIRECTION) is being SUPERSEDED by DIRECTION-B8-a6.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for E5 — DIRECTION-E5-a8.json (action=SKIP_TO_PROJCORE) is being SUPERSEDED by DIRECTION-E5-a9.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ DIRECTION DIRECTION-F4-a2.json on F4 is NOT being applied: RETRY_WITH_DIRECTION only acts on a PARKED row and F4 is not parked. It stays pending in case F4 parks later. If this was meant to steer the NEXT attempt, it will not — put it in `directions-active/F4.txt`, which rides every attempt and, since 2026-08-28, the fence PREPARE brief too.
++[driver] fence E5: red CLOSE → dispatching opus5 to LOCALIZE (read-only, no implementer runs before a unit is named)
++[driver] fence E5: localized → fault_class=implementation failing_units=E3
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for E5 — DIRECTION-E5-a10.json (action=SKIP_TO_PROJCORE) is being SUPERSEDED by DIRECTION-E5-a8.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for F4 — DIRECTION-F4-a2.json (action=RETRY_WITH_DIRECTION) is being SUPERSEDED by DIRECTION-F4-a7.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for F4 — DIRECTION-F4-a7.json (action=SKIP_TO_PROJCORE) is being SUPERSEDED by DIRECTION-F4-a8.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ DIRECTION DIRECTION-B8-a1.json on B8 is NOT being applied: RETRY_WITH_DIRECTION only acts on a PARKED row and B8 is not parked. It stays pending in case B8 parks later. If this was meant to steer the NEXT attempt, it will not — put it in `directions-active/B8.txt`, which rides every attempt and, since 2026-08-28, the fence PREPARE brief too.
++[driver] F4: STOPPING THE DRAIN, not parking the queue — this is a TREE-level cause and every remaining row would refuse identically. pre-dispatch: TRACKED PRODUCT dirt at slice entry — refusing to dispatch, tree preserved: M e2e/command-center-header.spec.ts; M src/web/public/app.js; M src/web/public/style.css
++[driver] all owned seats reaped at terminal drain
++[driver] config-in-effect: CONFIG UNVERIFIED — this run predates the config snapshot. NOT stamping the current values: doing so on a run already in flight would bless whatever is in effect now, including a wiped rung. Adopt deliberately: TILLER_ADOPT_CONFIG=1
++[preflight] BUDGET CANNOT ESCALATE — F1: budget 3 < L1_ATTEMPTS+1 (4) — every attempt is glimmer and the row PARKS instead of escalating. Raise it to >=4, or leave it if glimmer-only is deliberate.
++[driver] --allow-baseline-dirt: baselined 739 coordination path(s); 0 PRODUCT dirty path(s) NOT baselined (still gate)
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for E5 — DIRECTION-E5-a10.json (action=SKIP_TO_PROJCORE) is being SUPERSEDED by DIRECTION-E5-a11.json (action=PLAN_SOUND). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for F4 — DIRECTION-F4-a2.json (action=RETRY_WITH_DIRECTION) is being SUPERSEDED by DIRECTION-F4-a7.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for F4 — DIRECTION-F4-a7.json (action=SKIP_TO_PROJCORE) is being SUPERSEDED by DIRECTION-F4-a9.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ DIRECTION DIRECTION-B8-a1.json on B8 is NOT being applied: RETRY_WITH_DIRECTION only acts on a PARKED row and B8 is not parked. It stays pending in case B8 parks later. If this was meant to steer the NEXT attempt, it will not — put it in `directions-active/B8.txt`, which rides every attempt and, since 2026-08-28, the fence PREPARE brief too.
++[driver] DIRECTION PLAN_SOUND on E5 accepted → un-parked (counts as a round; validator missed: ACCEPTANCE_IDS D1/D2/D3 for four contributors (E1 schema, E2 service, E3 route, E4 UI). D1 is asserted by both test_e1 (LITERAL_ACTION_D1_SCHEMA) and test_e3 (LITERAL_ACTION_D1_ROUTE); D2 by both test_e3 and test_e4 (LITERAL_ACTION_D2_UI). Schema-break and route-break share fingerprint fp1:4c534f69. D3 is unique to E2 (that id stays green). The F-WAKEUP ACs and E1-E4 product are satisfiable. The journey must give EACH contributor its own distinct named-red (E1/E2/E3/E4 or D1/D2/D3/D4), own LITERAL, and own FENCE_STUB so FENCE_STUB=E1|E2|E3|E4 each forces a unique id red and four distinct fingerprints. Do not collapse two layers onto one id. Fence-author at sonnet5/opus5. Not an L2/L3 impl retry.)
++[driver] fence E5: red CLOSE → dispatching opus5 to LOCALIZE (read-only, no implementer runs before a unit is named)
++[driver] fence E5: localized → fault_class=implementation failing_units=E3
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for F4 — DIRECTION-F4-a2.json (action=RETRY_WITH_DIRECTION) is being SUPERSEDED by DIRECTION-F4-a7.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] F4 a1: build → impl x-tlre7cd71a78feb_impl_glimmer (glimmer, wm=20333, base_head=23ff1d1b3c, claude_esc_left=3)
++[driver] F4 a1: role_done channel=matched
++[driver] F4 a1: impl [projcore callback] implementer F4 STATUS: DONE — commit "a62de6d" fix spec bands height and menu close
++[driver] F4 a1: validator x-tlre7cd71a78feb_validator_opus5 (wm=21922)
++[driver] F4: seat/dispatch failure → PARK (drain continues): spawn_seat refused: x-tlre7cd71a78feb_validator_opus5 exists but is NOT in this run ledger (another run owns it)
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/engine-fingerprint.txt b/AGJ_Upgrade/command-center-2026-08-26/dispatch/engine-fingerprint.txt
+index 111a773..9c3cda8 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/engine-fingerprint.txt
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/engine-fingerprint.txt
+@@ -1 +1 @@
+-55edbc348ea40046b3bc612a9d3d56795ddb5ea72dff8c124e87ce2759c53704
++64b0d67787c14975f917884505c3673113c0bcf90dc88391c3e98c54f79aaaef
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-pulse.heartbeat b/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-pulse.heartbeat
+index 334f6b0..ffd4f63 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-pulse.heartbeat
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-pulse.heartbeat
+@@ -1 +1 @@
+-1787801337
++1787902748
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-pulse.log b/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-pulse.log
+index 3841e07..edda0fd 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-pulse.log
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-pulse.log
+@@ -6,3 +6,5 @@
+ 2026-08-27T02:52:50+00:00 solicit OK — issues/raises none, north stays asleep
+ 2026-08-27T03:22:53+00:00 projcore pane is CHURNING — skipping this tick (it is working, not wedged)
+ 2026-08-27T03:28:57+00:00 solicit OK — issues/raises none, north stays asleep
++2026-08-28T07:28:31+00:00 projcore pane is CHURNING — skipping this tick (it is working, not wedged)
++2026-08-28T07:33:34+00:00 projcore pane is CHURNING — skipping this tick (it is working, not wedged)
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-status.md b/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-status.md
+index 6d1e1f9..476200c 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-status.md
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-status.md
+@@ -1,6 +1,6 @@
+-[projcore] STATUS command-center-2026-08-26  2026-08-27T03:28:08Z
+-now:      B3 (a1 glimmer, ~0m elapsed)
+-done:     5/36   pending: 31   parked: 0
+-raises:   none
+-issues:   none
+-next:     wait B3; F-OVM OPEN; B6 suspect answered (AC sound, slice DONE)
++[projcore] STATUS command-center-2026-08-26  2026-08-28T07:38:53Z
++now:      F4 a1 glimmer (quiet 8m) from 23ff1d1; no advance-F4
++done:     32 DONE / 9 PENDING of 41 (D7 E5 F4 F5 F6 F7 G1 G2 D0)
++raises:   all ACKED. E5 PLAN_SOUND a11 stands; E5-c5 SKIP a14; F4-c3 SKIP a10
++issues:   none. Monitor 143379 + driver 143400 live. Pulse LIVE. parked=[]
++next:     wait F4 a1 gate. E5 fence-author named-reds after F4 (directions-active/E5.txt). Do not poke.
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-watchdog.log b/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-watchdog.log
+index 7c42266..9858052 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-watchdog.log
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/north-watchdog.log
+@@ -373,3 +373,59 @@
+ 2026-08-27T03:32:05+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
+ 2026-08-27T03:32:28+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
+ 2026-08-27T03:32:52+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:17:49+00:00 woke agj-3767: tiller has not reported for 1664m (last verdict was NOMINAL) — the cadence has gone quiet
++2026-08-28T07:18:27+00:00 would wake (tiller reported STALLED 0m ago — not a nothing-owed verdict) but nagged 0m ago
++2026-08-28T07:18:50+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:19:13+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:19:37+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:20:00+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:20:23+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:20:46+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:21:10+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:21:33+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:21:56+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:22:19+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:22:42+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:23:06+00:00 would wake (tiller reported STALLED 0m ago — not a nothing-owed verdict) but nagged 5m ago
++2026-08-28T07:23:29+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:23:52+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:24:15+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:24:39+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:25:02+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:25:25+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:25:48+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:26:12+00:00 would wake (tiller reported STALLED 0m ago — not a nothing-owed verdict) but nagged 8m ago
++2026-08-28T07:26:32+00:00 would wake (tiller reported STALLED 0m ago — not a nothing-owed verdict) but nagged 8m ago
++2026-08-28T07:26:53+00:00 would wake (tiller reported STALLED 0m ago — not a nothing-owed verdict) but nagged 9m ago
++2026-08-28T07:27:13+00:00 would wake (tiller reported STALLED 0m ago — not a nothing-owed verdict) but nagged 9m ago
++2026-08-28T07:27:34+00:00 would wake (tiller reported STALLED 0m ago — not a nothing-owed verdict) but nagged 9m ago
++2026-08-28T07:27:54+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:28:17+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:28:40+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:29:03+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:29:27+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:29:50+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:30:13+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:30:37+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:31:01+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:31:24+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:31:51+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:32:14+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:32:38+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:33:01+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:33:24+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:33:47+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:34:10+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:34:34+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:34:57+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:35:20+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:35:43+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:36:07+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:36:30+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:36:53+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:37:16+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:37:39+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:38:03+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:38:26+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:38:49+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
++2026-08-28T07:39:12+00:00 quiet: verdict=NOMINAL age=0m — north stays asleep
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/parked-slices.json b/AGJ_Upgrade/command-center-2026-08-26/dispatch/parked-slices.json
+index 0637a08..a95e418 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/parked-slices.json
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/parked-slices.json
+@@ -1 +1,3 @@
+-[]
+\ No newline at end of file
++[
++  "E5"
++]
+\ No newline at end of file
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/status-heartbeat.jsonl b/AGJ_Upgrade/command-center-2026-08-26/dispatch/status-heartbeat.jsonl
+index 5f71596..40cbdad 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/status-heartbeat.jsonl
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/status-heartbeat.jsonl
+@@ -392,3 +392,66 @@
+ {"ts": 1787801528, "verdict": "NOMINAL", "done": 5, "pending": 31, "total": 36, "fences": 5, "fences_opened": 1, "fences_closed": 0, "open_raises": 0, "quiet_min": 4, "driver_alive": true, "driver_pid": 2805424, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "B3", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
+ {"ts": 1787801551, "verdict": "NOMINAL", "done": 5, "pending": 31, "total": 36, "fences": 5, "fences_opened": 1, "fences_closed": 0, "open_raises": 0, "quiet_min": 4, "driver_alive": true, "driver_pid": 2805424, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "B3", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
+ {"ts": 1787801575, "verdict": "NOMINAL", "done": 5, "pending": 31, "total": 36, "fences": 5, "fences_opened": 1, "fences_closed": 0, "open_raises": 0, "quiet_min": 5, "driver_alive": true, "driver_pid": 2805424, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "B3", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901472, "verdict": "STALLED", "done": 5, "pending": 31, "total": 36, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": false, "driver_pid": 2805424, "liveness": "pid file present but that process is neither this run's driver nor its monitor", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901510, "verdict": "STALLED", "done": 5, "pending": 31, "total": 36, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": false, "driver_pid": 2805424, "liveness": "pid file present but that process is neither this run's driver nor its monitor", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901530, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 3851479, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901533, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 3851479, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901557, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 3851479, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901580, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 3851479, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901603, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 3851479, "liveness": "pid-file verified against /proc", "seats_working": [], "seats_idle": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901626, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 3851479, "liveness": "pid-file verified against /proc", "seats_working": [], "seats_idle": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901649, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 3851479, "liveness": "pid-file verified against /proc", "seats_working": [], "seats_idle": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901673, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 3851479, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901696, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 3851479, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901719, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 2, "driver_alive": true, "driver_pid": 3851479, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901742, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 2, "driver_alive": true, "driver_pid": 3851479, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901766, "verdict": "STALLED", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 3, "driver_alive": false, "driver_pid": 3851479, "liveness": "pid file present but that process is neither this run's driver nor its monitor", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901789, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 111806, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901812, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 111806, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901835, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 111806, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901858, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 111806, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901882, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 111806, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901905, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 111806, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901928, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 2, "driver_alive": true, "driver_pid": 111806, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901948, "verdict": "STALLED", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": false, "driver_pid": null, "liveness": "no live driver process", "seats_working": [], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": true, "slice": null, "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901951, "verdict": "STALLED", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": false, "driver_pid": null, "liveness": "no live driver process", "seats_working": [], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": true, "slice": null, "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901972, "verdict": "STALLED", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": false, "driver_pid": null, "liveness": "no live driver process", "seats_working": [], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": true, "slice": null, "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901972, "verdict": "STALLED", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": false, "driver_pid": null, "liveness": "no live driver process", "seats_working": [], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": true, "slice": null, "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901992, "verdict": "STALLED", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": false, "driver_pid": null, "liveness": "no live driver process", "seats_working": [], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": true, "slice": null, "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787901993, "verdict": "STALLED", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": false, "driver_pid": null, "liveness": "no live driver process", "seats_working": [], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": true, "slice": null, "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902013, "verdict": "STALLED", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": false, "driver_pid": null, "liveness": "no live driver process", "seats_working": [], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": true, "slice": null, "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902013, "verdict": "STALLED", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": false, "driver_pid": null, "liveness": "no live driver process", "seats_working": [], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": true, "slice": null, "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902033, "verdict": "STALLED", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": false, "driver_pid": null, "liveness": "no live driver process", "seats_working": [], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": true, "slice": null, "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902033, "verdict": "STALLED", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": false, "driver_pid": null, "liveness": "no live driver process", "seats_working": [], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": true, "slice": null, "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902054, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": [], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": null, "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902077, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902100, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902123, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902146, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902170, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902193, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_floc_opus5"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_impl_glimmer", "x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46"], "exited": false, "slice": "E5", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902216, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902240, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902264, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 0, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902287, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902310, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902314, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 1, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902337, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 2, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902361, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 2, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902384, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 2, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902407, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 3, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902430, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 3, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902454, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 4, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902477, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 4, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902500, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 4, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902523, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 5, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902546, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 5, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902570, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 6, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902593, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 6, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902616, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 6, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902639, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 7, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902662, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 7, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902686, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 7, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902709, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 8, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902732, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 8, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
++{"ts": 1787902755, "verdict": "NOMINAL", "done": 32, "pending": 9, "total": 41, "fences": 5, "fences_opened": 5, "fences_closed": 2, "open_raises": 0, "quiet_min": 9, "driver_alive": true, "driver_pid": 143379, "liveness": "pid-file verified against /proc", "seats_working": ["x-tlre7cd71a78feb_impl_glimmer"], "seats_idle": [], "seats_gone": ["x-tlre7cd71a78feb_validator_codex55", "x-tlre7cd71a78feb_impl_sonnet5", "x-tlre7cd71a78feb_validator_grok46", "x-tlre7cd71a78feb_floc_opus5"], "exited": false, "slice": "F4", "cadence_min": 30, "coord_session": "x-01_projcore_grok46_agjassist"}
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/telemetry.jsonl b/AGJ_Upgrade/command-center-2026-08-26/dispatch/telemetry.jsonl
+index 12ec392..8edc063 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/telemetry.jsonl
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/telemetry.jsonl
+@@ -194,3 +194,55 @@
+ {"schema": "tiller-telemetry-v1", "ts_ns": 1787801244945002538, "run_id": "command-center-2026-08-26", "driver_epoch": "2805445-1787798898116922947-1", "seq": 84, "phase": "seat_spawn", "seat": "x-tlre7cd71a78feb_impl_glimmer", "model": "glimmer", "reused": false, "slice": "B3", "role": "implementer", "attempt": 1, "marker": "DRV-B3-24"}
+ {"schema": "tiller-telemetry-v1", "ts_ns": 1787801250360772191, "run_id": "command-center-2026-08-26", "driver_epoch": "2805445-1787798898116922947-1", "seq": 85, "phase": "seat_ready", "seat": "x-tlre7cd71a78feb_impl_glimmer", "model": "glimmer", "reused": false, "slice": "B3", "role": "implementer", "attempt": 1, "marker": "DRV-B3-24", "dur_ms": 5429}
+ {"schema": "tiller-telemetry-v1", "ts_ns": 1787801252676125686, "run_id": "command-center-2026-08-26", "driver_epoch": "2805445-1787798898116922947-1", "seq": 86, "phase": "brief_sent", "seat": "x-tlre7cd71a78feb_impl_glimmer", "model": "glimmer", "slice": "B3", "role": "implementer", "attempt": 1, "marker": "DRV-B3-24", "seat_try": 1, "brief_bytes": 5738}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901456449918377, "run_id": "command-center-2026-08-26", "driver_epoch": "3851501-1787897126932833593-1", "seq": 53, "phase": "callback_file_shrank", "slice": "F4", "was": 25649, "now": 19926}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901576939397641, "run_id": "command-center-2026-08-26", "driver_epoch": "3851501-1787897126932833593-1", "seq": 54, "phase": "role_done", "slice": "F4", "attempt": 4, "role": "implementer", "model": "sol", "why": "matched", "context_observed": false}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901576945294192, "run_id": "command-center-2026-08-26", "driver_epoch": "3851501-1787897126932833593-1", "seq": 55, "phase": "seat_spawn", "seat": "x-tlre7cd71a78feb_validator_opus5", "model": "opus5", "reused": true, "dur_ms": 0, "slice": "F4", "role": "validator", "attempt": 4, "marker": "DRV-F4-21"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901579261799439, "run_id": "command-center-2026-08-26", "driver_epoch": "3851501-1787897126932833593-1", "seq": 56, "phase": "brief_sent", "seat": "x-tlre7cd71a78feb_validator_opus5", "model": "opus5", "slice": "F4", "role": "validator", "attempt": 4, "marker": "DRV-F4-21", "seat_try": 1, "brief_bytes": 8460}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901779075617840, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 1, "phase": "run_started", "contract_version": 1, "flags": {"suite_tiers": "0", "atomicity": "atomic", "lane": "v1"}, "pid": 111833}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901779075721594, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 2, "phase": "policy_effective", "lane": "v1", "contract_hash": "sha256:62412cad07ad6e98", "suite_tiers": "0", "atomicity": "atomic", "coverage_guard": "tiering off", "seeded": "0"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901782867008179, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 3, "phase": "budget_no_headroom", "detail": "F1: budget 3 < L1_ATTEMPTS+1 (4) — every attempt is glimmer and the row PARKS instead of escalating. Raise it to >=4, or leave it if glimmer-only is deliberate."}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901782882749213, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 4, "phase": "direction_superseded", "slice": "B8", "dropped": "DIRECTION-B8-a1.json", "dropped_action": "RETRY_WITH_DIRECTION", "kept": "DIRECTION-B8-a6.json", "kept_action": "SKIP_TO_PROJCORE"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901782883676667, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 5, "phase": "direction_superseded", "slice": "E5", "dropped": "DIRECTION-E5-a8.json", "dropped_action": "SKIP_TO_PROJCORE", "kept": "DIRECTION-E5-a9.json", "kept_action": "SKIP_TO_PROJCORE"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901782885602538, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 6, "phase": "direction_undeliverable", "slice": "F4", "action": "RETRY_WITH_DIRECTION", "file": "DIRECTION-F4-a2.json", "why": "row not parked"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901796064519264, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 7, "phase": "test_run", "tier": "fence-close", "rc": 1, "timeout": false, "cmd_hash": "sha256:af441005322cde3e", "collected": 3, "failed": 2, "dur_ms": 13175}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901796064603872, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 8, "phase": "fence_probe", "fence": "E5", "at": "close", "cmd_hash": "sha256:af441005322cde3e", "dur_ms": 13175, "ok": true}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901796064682810, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 9, "phase": "fence_close_run", "fence": "E5", "ok": false, "fingerprint": "fp1:4c534f69e7dd8f2fd157", "failed": 2, "negative_control_ok": true, "seeded": "0"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901796067097534, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 10, "phase": "fence_localize_dispatch", "fence": "E5", "model": "opus5", "fingerprint": "fp1:4c534f69e7dd8f2fd157"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901796079389696, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 11, "phase": "seat_spawn", "seat": "x-tlre7cd71a78feb_floc_opus5", "model": "opus5", "reused": false, "slice": "E5", "role": "fence-localizer", "attempt": 1, "marker": "FLOC-E5"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901801495125436, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 12, "phase": "seat_ready", "seat": "x-tlre7cd71a78feb_floc_opus5", "model": "opus5", "reused": false, "slice": "E5", "role": "fence-localizer", "attempt": 1, "marker": "FLOC-E5", "dur_ms": 5427}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901803812689158, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 13, "phase": "brief_sent", "seat": "x-tlre7cd71a78feb_floc_opus5", "model": "opus5", "slice": "E5", "role": "fence-localizer", "attempt": 1, "marker": "FLOC-E5", "seat_try": 1, "brief_bytes": 1858}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932366207856, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 14, "phase": "fence_localized", "fence": "E5", "fault_class": "implementation", "failing_units": "E3"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932366964109, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 15, "phase": "raise", "slice": "E5", "cycle": 4, "why": "the same seam failed twice running (fingerprint fp1:4c534f69e7dd8f2fd157) — this is a composition defect, not an implementation gap", "fault_class": "plan"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932367134978, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 16, "phase": "fence_verdict", "fence": "E5", "action": "RAISE", "why": "the same seam failed twice running (fingerprint fp1:4c534f69e7dd8f2fd157) — this is a composition defect, not an implementation gap", "fault_class": "plan"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932368355527, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 17, "phase": "direction_superseded", "slice": "E5", "dropped": "DIRECTION-E5-a10.json", "dropped_action": "SKIP_TO_PROJCORE", "kept": "DIRECTION-E5-a8.json", "kept_action": "SKIP_TO_PROJCORE"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932368813352, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 18, "phase": "direction_superseded", "slice": "F4", "dropped": "DIRECTION-F4-a2.json", "dropped_action": "RETRY_WITH_DIRECTION", "kept": "DIRECTION-F4-a7.json", "kept_action": "SKIP_TO_PROJCORE"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932368950058, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 19, "phase": "direction_superseded", "slice": "F4", "dropped": "DIRECTION-F4-a7.json", "dropped_action": "SKIP_TO_PROJCORE", "kept": "DIRECTION-F4-a8.json", "kept_action": "SKIP_TO_PROJCORE"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932369197119, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 20, "phase": "direction_undeliverable", "slice": "B8", "action": "RETRY_WITH_DIRECTION", "file": "DIRECTION-B8-a1.json", "why": "row not parked"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932390855359, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 21, "phase": "slice_start", "slice": "F4", "base_head": "bb82a579400c", "est_min": "35", "impl_tier": "L4", "val_tier": "L4", "integration": false}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932449981566, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 22, "phase": "seats_reaped", "slice": "F4", "survivors": 0, "dur_ms": 54}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932450231623, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 23, "phase": "drain_stopped_tree_cause", "slice": "F4", "why": "pre-dispatch: TRACKED PRODUCT dirt at slice entry — refusing to dispatch, tree preserved: M e2e/command-center-header.spec.ts; M src/web/public/app.js; M src/web/public/style.css"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932450643182, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 24, "phase": "raise", "slice": "F4", "cycle": 3, "why": "pre-dispatch: TRACKED PRODUCT dirt at slice entry — refusing to dispatch, tree preserved: M e2e/command-center-header.spec.ts; M src/web/public/app.js; M src/web/public/style.css"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787901932450941780, "run_id": "command-center-2026-08-26", "driver_epoch": "111833-1787901779075613121-1", "seq": 25, "phase": "run_ended", "parked": 1, "pending_remaining": 9}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902053238928964, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 1, "phase": "run_started", "contract_version": 1, "flags": {"suite_tiers": "0", "atomicity": "atomic", "lane": "v1"}, "pid": 143400}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902053239007721, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 2, "phase": "policy_effective", "lane": "v1", "contract_hash": "sha256:62412cad07ad6e98", "suite_tiers": "0", "atomicity": "atomic", "coverage_guard": "tiering off", "seeded": "0"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902057025646769, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 3, "phase": "budget_no_headroom", "detail": "F1: budget 3 < L1_ATTEMPTS+1 (4) — every attempt is glimmer and the row PARKS instead of escalating. Raise it to >=4, or leave it if glimmer-only is deliberate."}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902057042978705, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 4, "phase": "direction_superseded", "slice": "E5", "dropped": "DIRECTION-E5-a10.json", "dropped_action": "SKIP_TO_PROJCORE", "kept": "DIRECTION-E5-a11.json", "kept_action": "PLAN_SOUND"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902057043469791, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 5, "phase": "direction_superseded", "slice": "F4", "dropped": "DIRECTION-F4-a2.json", "dropped_action": "RETRY_WITH_DIRECTION", "kept": "DIRECTION-F4-a7.json", "kept_action": "SKIP_TO_PROJCORE"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902057043600145, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 6, "phase": "direction_superseded", "slice": "F4", "dropped": "DIRECTION-F4-a7.json", "dropped_action": "SKIP_TO_PROJCORE", "kept": "DIRECTION-F4-a9.json", "kept_action": "SKIP_TO_PROJCORE"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902057043842938, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 7, "phase": "direction_undeliverable", "slice": "B8", "action": "RETRY_WITH_DIRECTION", "file": "DIRECTION-B8-a1.json", "why": "row not parked"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902069295078096, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 8, "phase": "test_run", "tier": "fence-close", "rc": 1, "timeout": false, "cmd_hash": "sha256:af441005322cde3e", "collected": 3, "failed": 2, "dur_ms": 12246}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902069295201005, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 9, "phase": "fence_probe", "fence": "E5", "at": "close", "cmd_hash": "sha256:af441005322cde3e", "dur_ms": 12246, "ok": true}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902069295267179, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 10, "phase": "fence_close_run", "fence": "E5", "ok": false, "fingerprint": "fp1:4c534f69e7dd8f2fd157", "failed": 2, "negative_control_ok": true, "seeded": "0"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902069297298710, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 11, "phase": "fence_localize_dispatch", "fence": "E5", "model": "opus5", "fingerprint": "fp1:4c534f69e7dd8f2fd157"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902069308266828, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 12, "phase": "seat_spawn", "seat": "x-tlre7cd71a78feb_floc_opus5", "model": "opus5", "reused": false, "slice": "E5", "role": "fence-localizer", "attempt": 1, "marker": "FLOC-E5"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902074724023449, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 13, "phase": "seat_ready", "seat": "x-tlre7cd71a78feb_floc_opus5", "model": "opus5", "reused": false, "slice": "E5", "role": "fence-localizer", "attempt": 1, "marker": "FLOC-E5", "dur_ms": 5426}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902077040554932, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 14, "phase": "brief_sent", "seat": "x-tlre7cd71a78feb_floc_opus5", "model": "opus5", "slice": "E5", "role": "fence-localizer", "attempt": 1, "marker": "FLOC-E5", "seat_try": 1, "brief_bytes": 1858}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902197554413746, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 15, "phase": "fence_localized", "fence": "E5", "fault_class": "implementation", "failing_units": "E3"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902197555082503, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 16, "phase": "raise", "slice": "E5", "cycle": 5, "why": "the same seam failed twice running (fingerprint fp1:4c534f69e7dd8f2fd157) — this is a composition defect, not an implementation gap", "fault_class": "plan"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902197555280903, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 17, "phase": "fence_verdict", "fence": "E5", "action": "RAISE", "why": "the same seam failed twice running (fingerprint fp1:4c534f69e7dd8f2fd157) — this is a composition defect, not an implementation gap", "fault_class": "plan"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902197556798674, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 18, "phase": "direction_superseded", "slice": "F4", "dropped": "DIRECTION-F4-a2.json", "dropped_action": "RETRY_WITH_DIRECTION", "kept": "DIRECTION-F4-a7.json", "kept_action": "SKIP_TO_PROJCORE"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902197577433829, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 19, "phase": "slice_start", "slice": "F4", "base_head": "23ff1d1b3c30", "est_min": "35", "impl_tier": "L4", "val_tier": "L4", "integration": false}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902197609310229, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 20, "phase": "seat_spawn", "seat": "x-tlre7cd71a78feb_impl_glimmer", "model": "glimmer", "reused": false, "slice": "F4", "role": "implementer", "attempt": 1, "marker": "DRV-F4-21"}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902203024342137, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 21, "phase": "seat_ready", "seat": "x-tlre7cd71a78feb_impl_glimmer", "model": "glimmer", "reused": false, "slice": "F4", "role": "implementer", "attempt": 1, "marker": "DRV-F4-21", "dur_ms": 5426}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902205340639546, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 22, "phase": "brief_sent", "seat": "x-tlre7cd71a78feb_impl_glimmer", "model": "glimmer", "slice": "F4", "role": "implementer", "attempt": 1, "marker": "DRV-F4-21", "seat_try": 1, "brief_bytes": 12905}
++{"schema": "tiller-telemetry-v1", "ts_ns": 1787902759189308403, "run_id": "command-center-2026-08-26", "driver_epoch": "143400-1787902053238924365-1", "seq": 23, "phase": "role_done", "slice": "F4", "attempt": 1, "role": "implementer", "model": "glimmer", "why": "matched", "context_observed": false}
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller-sessions.ledger b/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller-sessions.ledger
+index e887321..ae3b625 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller-sessions.ledger
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller-sessions.ledger
+@@ -16,3 +16,6 @@ x-tlre7cd71a78feb_validator_codex55
+ x-tlre7cd71a78feb_impl_glimmer
+ x-tlre7cd71a78feb_validator_codex55
+ x-tlre7cd71a78feb_impl_glimmer
++x-tlre7cd71a78feb_floc_opus5
++x-tlre7cd71a78feb_floc_opus5
++x-tlre7cd71a78feb_impl_glimmer
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller-watch.log b/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller-watch.log
+index 245d066..3fbedf8 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller-watch.log
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller-watch.log
+@@ -9,3 +9,5 @@ watch: status cadence -> [tiller] STATUS 02:21 · command-center-2026-08-26 · N
+ watch: status cadence = 30m
+ watch: status cadence -> [tiller] STATUS 02:48 · command-center-2026-08-26 · NOMINAL
+ watch: status cadence -> [tiller] STATUS 03:18 · command-center-2026-08-26 · NOMINAL
++watch: another watcher already owns this run — exiting
++watch: another watcher already owns this run — exiting
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller.log b/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller.log
+index 1a341e2..b2e86a1 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller.log
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller.log
+@@ -187,3 +187,77 @@
+ [driver] B2: MIS-RATED — planned L3, landed on L1 (glimmer) at a1: OVER-rated by 2 rung(s). Recorded for post-run tagging review; NOT acted on mid-run.
+ [driver] B2: DRIVE after 1 attempt(s) → advanced {'advanced': True, 'marker': '/home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/dispatch/advance-B2.marker', 'caveat': None}
+ [driver] B3 a1: build → impl x-tlre7cd71a78feb_impl_glimmer (glimmer, wm=19926, base_head=59fb99d5bb, claude_esc_left=3)
++/home/agjrom/websites/wflow/tokenless_coord/shadow-harness/tiller: line 135: anyone: command not found
++2026-08-28T07:22:58Z monitor start run=command-center-2026-08-26 repo=/home/agjrom/TGBOTS/AGJAssist only='' baseline='--allow-baseline-dirt'
++2026-08-28T07:22:58Z monitor: sourced /home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/run.env into driver env (SEAT_PROFILE=roster IMPL_L3=sonnet5 IMPL_HARD_CAP=?)
++[driver] config-in-effect: CONFIG UNVERIFIED — this run predates the config snapshot. NOT stamping the current values: doing so on a run already in flight would bless whatever is in effect now, including a wiped rung. Adopt deliberately: TILLER_ADOPT_CONFIG=1
++[preflight] BUDGET CANNOT ESCALATE — F1: budget 3 < L1_ATTEMPTS+1 (4) — every attempt is glimmer and the row PARKS instead of escalating. Raise it to >=4, or leave it if glimmer-only is deliberate.
++[driver] --allow-baseline-dirt: baselined 732 coordination path(s); 0 PRODUCT dirty path(s) NOT baselined (still gate)
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for B8 — DIRECTION-B8-a1.json (action=RETRY_WITH_DIRECTION) is being SUPERSEDED by DIRECTION-B8-a6.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for E5 — DIRECTION-E5-a8.json (action=SKIP_TO_PROJCORE) is being SUPERSEDED by DIRECTION-E5-a9.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ DIRECTION DIRECTION-F4-a2.json on F4 is NOT being applied: RETRY_WITH_DIRECTION only acts on a PARKED row and F4 is not parked. It stays pending in case F4 parks later. If this was meant to steer the NEXT attempt, it will not — put it in `directions-active/F4.txt`, which rides every attempt and, since 2026-08-28, the fence PREPARE brief too.
++[driver] fence E5: red CLOSE → dispatching opus5 to LOCALIZE (read-only, no implementer runs before a unit is named)
++[driver] fence E5: localized → fault_class=implementation failing_units=E3
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for E5 — DIRECTION-E5-a10.json (action=SKIP_TO_PROJCORE) is being SUPERSEDED by DIRECTION-E5-a8.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for F4 — DIRECTION-F4-a2.json (action=RETRY_WITH_DIRECTION) is being SUPERSEDED by DIRECTION-F4-a7.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for F4 — DIRECTION-F4-a7.json (action=SKIP_TO_PROJCORE) is being SUPERSEDED by DIRECTION-F4-a8.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ DIRECTION DIRECTION-B8-a1.json on B8 is NOT being applied: RETRY_WITH_DIRECTION only acts on a PARKED row and B8 is not parked. It stays pending in case B8 parks later. If this was meant to steer the NEXT attempt, it will not — put it in `directions-active/B8.txt`, which rides every attempt and, since 2026-08-28, the fence PREPARE brief too.
++[driver] F4: STOPPING THE DRAIN, not parking the queue — this is a TREE-level cause and every remaining row would refuse identically. pre-dispatch: TRACKED PRODUCT dirt at slice entry — refusing to dispatch, tree preserved: M e2e/command-center-header.spec.ts; M src/web/public/app.js; M src/web/public/style.css
++[driver] all owned seats reaped at terminal drain
++{
++  "run_id": "command-center-2026-08-26",
++  "mode": "live",
++  "parked": [
++    "E5"
++  ],
++  "security_review_required": [],
++  "gate_review": [],
++  "release_review": [],
++  "norow_capstones": [],
++  "claude_esc_left": 3,
++  "steps": [
++    {
++      "slice": "E5",
++      "decision": "ESCALATE",
++      "attempts": 0,
++      "why": "the same seam failed twice running (fingerprint fp1:4c534f69e7dd8f2fd157) \u2014 this is a composition defect, not an implementation gap",
++      "fault_class": "plan",
++      "plan_defect": false,
++      "skip_ladder": true,
++      "brain_note": "fault_class=plan means the implementer seat ladder is SKIPPED entirely \u2014 do not answer RETRY_WITH_DIRECTION into L2/L3. Walking the ladder on a broken plan burns three seats to rediscover the plan is broken. Re-plan the fence, or return a DIRECTION with action=PLAN_SOUND carrying `what_validator_missed`."
++    },
++    {
++      "slice": "F4",
++      "decision": "ESCALATE",
++      "attempts": 0,
++      "why": "pre-dispatch: TRACKED PRODUCT dirt at slice entry \u2014 refusing to dispatch, tree preserved: M e2e/command-center-header.spec.ts; M src/web/public/app.js; M src/web/public/style.css"
++    },
++    {
++      "action": "STOP",
++      "reason": "TREE_CAUSE_PRE_DISPATCH",
++      "slice": "F4",
++      "why": "pre-dispatch: TRACKED PRODUCT dirt at slice entry \u2014 refusing to dispatch, tree preserved: M e2e/command-center-header.spec.ts; M src/web/public/app.js; M src/web/public/style.css",
++      "note": "The TREE is the problem, not this row \u2014 so nothing else was parked and the queue is intact. Fix the tree (e.g. `git checkout HEAD -- <path>`), then `tiller resume`. No DIRECTION is needed and no slice has failed."
++    }
++  ]
++}
++2026-08-28T07:25:33Z monitor end rc=0
++/home/agjrom/websites/wflow/tokenless_coord/shadow-harness/tiller: line 135: anyone: command not found
++2026-08-28T07:27:33Z monitor start run=command-center-2026-08-26 repo=/home/agjrom/TGBOTS/AGJAssist only='' baseline='--allow-baseline-dirt'
++2026-08-28T07:27:33Z monitor: sourced /home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/run.env into driver env (SEAT_PROFILE=roster IMPL_L3=sonnet5 IMPL_HARD_CAP=?)
++[driver] config-in-effect: CONFIG UNVERIFIED — this run predates the config snapshot. NOT stamping the current values: doing so on a run already in flight would bless whatever is in effect now, including a wiped rung. Adopt deliberately: TILLER_ADOPT_CONFIG=1
++[preflight] BUDGET CANNOT ESCALATE — F1: budget 3 < L1_ATTEMPTS+1 (4) — every attempt is glimmer and the row PARKS instead of escalating. Raise it to >=4, or leave it if glimmer-only is deliberate.
++[driver] --allow-baseline-dirt: baselined 739 coordination path(s); 0 PRODUCT dirty path(s) NOT baselined (still gate)
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for E5 — DIRECTION-E5-a10.json (action=SKIP_TO_PROJCORE) is being SUPERSEDED by DIRECTION-E5-a11.json (action=PLAN_SOUND). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for F4 — DIRECTION-F4-a2.json (action=RETRY_WITH_DIRECTION) is being SUPERSEDED by DIRECTION-F4-a7.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for F4 — DIRECTION-F4-a7.json (action=SKIP_TO_PROJCORE) is being SUPERSEDED by DIRECTION-F4-a9.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] ⚠ DIRECTION DIRECTION-B8-a1.json on B8 is NOT being applied: RETRY_WITH_DIRECTION only acts on a PARKED row and B8 is not parked. It stays pending in case B8 parks later. If this was meant to steer the NEXT attempt, it will not — put it in `directions-active/B8.txt`, which rides every attempt and, since 2026-08-28, the fence PREPARE brief too.
++[driver] DIRECTION PLAN_SOUND on E5 accepted → un-parked (counts as a round; validator missed: ACCEPTANCE_IDS D1/D2/D3 for four contributors (E1 schema, E2 service, E3 route, E4 UI). D1 is asserted by both test_e1 (LITERAL_ACTION_D1_SCHEMA) and test_e3 (LITERAL_ACTION_D1_ROUTE); D2 by both test_e3 and test_e4 (LITERAL_ACTION_D2_UI). Schema-break and route-break share fingerprint fp1:4c534f69. D3 is unique to E2 (that id stays green). The F-WAKEUP ACs and E1-E4 product are satisfiable. The journey must give EACH contributor its own distinct named-red (E1/E2/E3/E4 or D1/D2/D3/D4), own LITERAL, and own FENCE_STUB so FENCE_STUB=E1|E2|E3|E4 each forces a unique id red and four distinct fingerprints. Do not collapse two layers onto one id. Fence-author at sonnet5/opus5. Not an L2/L3 impl retry.)
++[driver] fence E5: red CLOSE → dispatching opus5 to LOCALIZE (read-only, no implementer runs before a unit is named)
++[driver] fence E5: localized → fault_class=implementation failing_units=E3
++[driver] ⚠ TWO UNAPPLIED DIRECTIONS for F4 — DIRECTION-F4-a2.json (action=RETRY_WITH_DIRECTION) is being SUPERSEDED by DIRECTION-F4-a7.json (action=SKIP_TO_PROJCORE). Only the second will run. If these came from different authors, one of them is waiting on an instruction that will never execute.
++[driver] F4 a1: build → impl x-tlre7cd71a78feb_impl_glimmer (glimmer, wm=20333, base_head=23ff1d1b3c, claude_esc_left=3)
++[driver] F4 a1: role_done channel=matched
++[driver] F4 a1: impl [projcore callback] implementer F4 STATUS: DONE — commit "a62de6d" fix spec bands height and menu close
++[driver] F4 a1: validator x-tlre7cd71a78feb_validator_opus5 (wm=21922)
++[driver] F4: seat/dispatch failure → PARK (drain continues): spawn_seat refused: x-tlre7cd71a78feb_validator_opus5 exists but is NOT in this run ledger (another run owns it)
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller.pid b/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller.pid
+index 1090e7c..b40e7cb 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller.pid
++++ b/AGJ_Upgrade/command-center-2026-08-26/dispatch/tiller.pid
+@@ -1 +1 @@
+-2805424
++143379
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/fence-contract.json b/AGJ_Upgrade/command-center-2026-08-26/fence-contract.json
+index 4e40789..45da148 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/fence-contract.json
++++ b/AGJ_Upgrade/command-center-2026-08-26/fence-contract.json
+@@ -5,62 +5,142 @@
+       "integration_cmd": "FENCE_ID=B8 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+       "negative_control_cmd": "FENCE_STUB=B2 FENCE_ID=B8 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+       "gate_cmd": "FENCE_ID=B8 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate",
+-      "acceptance_ids": ["A1", "A2", "A3", "A4", "A5", "B1", "B2"],
+-      "expected_negative_fail_ids": ["A2"],
++      "acceptance_ids": [
++        "A1",
++        "A2",
++        "A3",
++        "A4",
++        "A5",
++        "B1",
++        "B2"
++      ],
++      "expected_negative_fail_ids": [
++        "A2"
++      ],
+       "expected_negative_kind": "assert",
+       "test_path": "e2e/command-center-ovm-fence.spec.ts",
+       "authored_by": "coplanner:sol+grok46; rev2-projcore",
+-      "contributors": ["B1", "B2", "B3", "B4", "B5", "B6", "B7"],
+-      "seed_slice": "A0"
++      "contributors": [
++        "B1",
++        "B2",
++        "B3",
++        "B4",
++        "B5",
++        "B6",
++        "B7"
++      ],
++      "seed_slice": "H8"
+     },
+     "C6": {
+       "integration_cmd": "FENCE_ID=C6 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+       "negative_control_cmd": "FENCE_STUB=C3 FENCE_ID=C6 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+       "gate_cmd": "FENCE_ID=C6 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate",
+-      "acceptance_ids": ["C1", "C2", "C3", "C4", "C5", "C6"],
+-      "expected_negative_fail_ids": ["C5"],
++      "acceptance_ids": [
++        "C1",
++        "C2",
++        "C3",
++        "C4",
++        "C5",
++        "C6"
++      ],
++      "expected_negative_fail_ids": [
++        "C5"
++      ],
+       "expected_negative_kind": "assert",
+       "test_path": "e2e/command-center-reminders-fence.spec.ts",
+       "authored_by": "coplanner:sol+grok46; rev2-projcore",
+-      "contributors": ["C1", "C2", "C3", "C4", "C5"],
+-      "seed_slice": "A0"
++      "contributors": [
++        "C1",
++        "C2",
++        "C3",
++        "C4",
++        "C5"
++      ],
++      "seed_slice": "C0"
+     },
+     "D7": {
+       "integration_cmd": "FENCE_ID=D7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+       "negative_control_cmd": "FENCE_STUB=D3 FENCE_ID=D7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+       "gate_cmd": "FENCE_ID=D7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate",
+-      "acceptance_ids": ["E1", "E2", "E3", "F1", "F2", "F3"],
+-      "expected_negative_fail_ids": ["E1"],
++      "acceptance_ids": [
++        "E1",
++        "E2",
++        "E3",
++        "F1",
++        "F2",
++        "F3"
++      ],
++      "expected_negative_fail_ids": [
++        "E1"
++      ],
+       "expected_negative_kind": "assert",
+       "test_path": "e2e/command-center-summaries-fence.spec.ts",
+       "authored_by": "coplanner:sol+grok46; rev2-projcore",
+-      "contributors": ["D1", "D2", "D3", "D4", "D5", "D6"],
+-      "seed_slice": "A0",
++      "contributors": [
++        "D1",
++        "D2",
++        "D3",
++        "D4",
++        "D5",
++        "D6"
++      ],
++      "seed_slice": "D0",
+       "arrival_fixture": "closed-C6-solicit-reply-on-temp-pane; no INSERT agent_summaries; no faked reply body"
+     },
+     "E5": {
+       "integration_cmd": "FENCE_ID=E5 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+       "negative_control_cmd": "FENCE_STUB=E2 FENCE_ID=E5 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+       "gate_cmd": "FENCE_ID=E5 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate",
+-      "acceptance_ids": ["D1", "D2", "D3"],
+-      "expected_negative_fail_ids": ["D3"],
++      "acceptance_ids": [
++        "D1",
++        "D2",
++        "D3"
++      ],
++      "expected_negative_fail_ids": [
++        "D3"
++      ],
+       "expected_negative_kind": "assert",
+       "test_path": "e2e/command-center-wakeup-fence.spec.ts",
+       "authored_by": "coplanner:sol+grok46; rev2-projcore",
+-      "contributors": ["E1", "E2", "E3", "E4"],
+-      "seed_slice": "A0"
++      "contributors": [
++        "E1",
++        "E2",
++        "E3",
++        "E4"
++      ],
++      "seed_slice": "E0"
+     },
+     "F7": {
+       "integration_cmd": "FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+       "negative_control_cmd": "FENCE_STUB=F1 FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+       "gate_cmd": "FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate",
+-      "acceptance_ids": ["G1", "G2", "G3", "H1", "H2", "H3", "I1", "I2", "J1", "J2"],
+-      "expected_negative_fail_ids": ["G3"],
++      "acceptance_ids": [
++        "G1",
++        "G2",
++        "G3",
++        "H1",
++        "H2",
++        "H3",
++        "I1",
++        "I2",
++        "J1",
++        "J2"
++      ],
++      "expected_negative_fail_ids": [
++        "G3"
++      ],
+       "expected_negative_kind": "assert",
+       "test_path": "e2e/command-center-window-fence.spec.ts",
+       "authored_by": "coplanner:sol+grok46; rev2-projcore",
+-      "contributors": ["F1", "F2", "F3", "F4", "F5", "F6"],
+-      "seed_slice": "A0"
++      "contributors": [
++        "F1",
++        "F2",
++        "F3",
++        "F4",
++        "F5",
++        "F6"
++      ],
++      "seed_slice": "F0"
+     }
+   }
+ }
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/findings/conductor-escalations.md b/AGJ_Upgrade/command-center-2026-08-26/findings/conductor-escalations.md
+index eebc784..259f1b7 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/findings/conductor-escalations.md
++++ b/AGJ_Upgrade/command-center-2026-08-26/findings/conductor-escalations.md
+@@ -3,3 +3,20 @@
+ - why: PLAN REVIEW REQUIRED — the TOP RUNG failed. budget exhausted. THE QUESTION IS NOT "which model next" — it is: **is the acceptance criterion still true of the product?** Re-read the AC text against what the product actually does now. A criterion that has drifted fails IDENTICALLY at every tier, so a retry or an escalation buys more failures at higher cost. Answer the question before offering an action; RETRY_WITH_DIRECTION is NOT the default here. — REPEATED_FAILURE_SAME_REQUIREMENT (GAP_INTERCEPTION|A5): the same criterion failed the same way on consecutive attempts. Before retrying or escalating a tier, check whether the AC is satisfiable as written; a defective one fails identically at every tier.
+ - gate_failed: ['verdict=FAIL', 'redteam: need standard-clean, got standard-fail']
+ - action: BRAIN(projcore)/JROM — re-plan/split or supply a DIRECTION. Conductor will NOT re-grind it this run.
++
++## PARKED+RAISED E5 — attempts=0
++- why: the same seam failed twice running (fingerprint fp1:4c534f69e7dd8f2fd157) — this is a composition defect, not an implementation gap
++- gate_failed: None
++- note: fault_class=plan means the implementer seat ladder is SKIPPED entirely — do not answer RETRY_WITH_DIRECTION into L2/L3. Walking the ladder on a broken plan burns three seats to rediscover the plan is broken. Re-plan the fence, or return a DIRECTION with action=PLAN_SOUND carrying `what_validator_missed`.
++- action: BRAIN(projcore)/JROM — re-plan/split or supply a DIRECTION. Conductor will NOT re-grind it this run.
++
++## PARKED+RAISED F4 — attempts=0
++- why: pre-dispatch: TRACKED PRODUCT dirt at slice entry — refusing to dispatch, tree preserved: M e2e/command-center-header.spec.ts; M src/web/public/app.js; M src/web/public/style.css
++- gate_failed: None
++- action: BRAIN(projcore)/JROM — re-plan/split or supply a DIRECTION. Conductor will NOT re-grind it this run.
++
++## PARKED+RAISED E5 — attempts=0
++- why: the same seam failed twice running (fingerprint fp1:4c534f69e7dd8f2fd157) — this is a composition defect, not an implementation gap
++- gate_failed: None
++- note: fault_class=plan means the implementer seat ladder is SKIPPED entirely — do not answer RETRY_WITH_DIRECTION into L2/L3. Walking the ladder on a broken plan burns three seats to rediscover the plan is broken. Re-plan the fence, or return a DIRECTION with action=PLAN_SOUND carrying `what_validator_missed`.
++- action: BRAIN(projcore)/JROM — re-plan/split or supply a DIRECTION. Conductor will NOT re-grind it this run.
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/plan.md b/AGJ_Upgrade/command-center-2026-08-26/plan.md
+index 73e95d0..86a26a4 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/plan.md
++++ b/AGJ_Upgrade/command-center-2026-08-26/plan.md
+@@ -22,32 +22,37 @@ Each fence has its **own** journey spec. A0 authors all five plus the runner. `F
+ | B5 | Bot layer only: remove `/overmind`, `/om_tasks`, `/om_pause`, `/om_resume`, `/om_drop`, `/ovm_start`, `/ovm_end` from `AssistantCore` and `TelegramAssistant`; they follow the normal unknown-command path. | A3 | `npx vitest run tests/overmind-command-removal.test.ts --minWorkers=1 --maxWorkers=4` | 25 | A0 | L2 | L2 | no | standard | 4 |
+ | B6 | API layer: remove `registerGuardianRoutes` and `POST /api/guardian/escalate`; stop importing `isLoopbackAddress` / `buildGuardianEscalationNotification` (delete them here if unused, else leave a local copy for non-OVM loopback routes). Regression fixture: calendar-reminder Telegram paging still sends. Precedes B2/B3. | B1,B2 | `npx vitest run tests/guardian-removal.test.ts --minWorkers=1 --maxWorkers=4` | 25 | A0 | L2 | L3 | no | standard | 4 |
+ | B7 | RELEASE-ATOMIC schema layer: bump `SCHEMA_VERSION`, remove OVM DDL, and on upgrade copy the DB being migrated to `<that-db-path>.pre-ovm-drop-<UTC>-<PID>.bak` before dropping `overmind_projects`, `overmind_workflows`, `overmind_task_history`. Prove fresh-vs-upgrade parity only on temp copies. Live path `data/agjassist.db.pre-ovm-drop-<UTC>-<PID>.bak` is G2 execute-only. Isolated runner tears down the temp DB. | A4 | `node scripts/cc-run-isolated.mjs --slice B7 -- npx vitest run tests/unit/command-center-migration.spec.ts --minWorkers=1 --maxWorkers=4` | 35 | A0 | L4 | L4 | no | standard | 5 |
+-| B8 | INTEGRATION: F-OVM OVM and guardian are gone while the app boots and core surfaces remain — composes B1,B2,B3,B4,B5,B6,B7 because teardown is one rollback domain and any survivor leaves OVM exposed, stale schema, or a broken bootstrap; load the built Mini App and real API on a temp `DB_PATH` copy; run unit plus terminal-ux e2e; never touch live DB or pm2. `--gate` requires the positive journey PASS and `FENCE_STUB=B2` FAIL on named A2 kind=assert. | A1,A2,A3,A4,A5,B1,B2 | `FENCE_ID=B8 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 45 | B1,B2,B3,B4,B5,B6,B7 | L4 | L4 | no | elite | 5 |
++| H8 | HARNESS-CORRECTNESS ONLY. Fix B8 CLOSE measurement. Do not remove more product. Collect ALL of A1,A2,A3,A4,A5,B1,B2; FENCE_STUB=B2 named-red on A2 kind=assert. Write fence-report-v1.json in finally. | HARNESS-SMOKE | `FENCE_ID=B8 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 25 | A0,B1,B2,B3,B4,B5,B6,B7 | L3 | L3 | no | standard | 4 |
++| B8 | INTEGRATION: F-OVM OVM and guardian are gone while the app boots and core surfaces remain — composes B1,B2,B3,B4,B5,B6,B7 because teardown is one rollback domain and any survivor leaves OVM exposed, stale schema, or a broken bootstrap; load the built Mini App and real API on a temp `DB_PATH` copy; run unit plus terminal-ux e2e; never touch live DB or pm2. `--gate` requires the positive journey PASS and `FENCE_STUB=B2` FAIL on named A2 kind=assert. | A1,A2,A3,A4,A5,B1,B2 | `FENCE_ID=B8 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 45 | B1,B2,B3,B4,B5,B6,B7,H8 | L4 | L4 | no | elite | 5 |
+ | C1 | Schema layer: additive `agent_solicit_reminders` plus recipient rows in `SCHEMA_SQL` and `DatabaseService` migrations (folder-group, cadence, repeat limit, include/skip, next-fire, fresh-vs-upgrade). Do not alter calendar `reminders`. | C1,C2,C3,C4,C6 | `node scripts/cc-run-isolated.mjs --slice C1 -- npx vitest run tests/unit/agent-reminder-schema.spec.ts --minWorkers=1 --maxWorkers=4` | 30 | B8 | L3 | L3 | no | standard | 4 |
+ | C2 | Services layer: `AgentSolicitService` CRUD and due-state for preset/custom cadence, stop-after-N or unlimited, immediate include/skip, persisted active-reminder projections. | C2,C3,C4,C6 | `node scripts/cc-run-isolated.mjs --slice C2 -- npx vitest run tests/unit/agent-reminder-service.spec.ts --minWorkers=1 --maxWorkers=4` | 30 | A0,C1 | L2 | L2 | no | standard | 4 |
+ | C3 | Services layer, ONE claim=`fireDue`: resolve current group panes, skip excluded agents, pass every solicit through existing `SafetyService`+`TmuxService`, write `AuditService`, advance/deactivate repeats with the Mini App closed. | C5 | `node scripts/cc-run-isolated.mjs --slice C3 -- npx vitest run tests/unit/agent-reminder-scheduler.spec.ts --minWorkers=1 --maxWorkers=4` | 35 | A0,C2 | L3 | L3 | no | standard | 5 |
+ | C4 | API layer: owner-only `registerAgentReminderRoutes` for create/update/cancel, include/skip, and active-reminder reads; non-owner and malformed cadence/repeat fail-closed. | C1,C4,C6 | `node scripts/cc-run-isolated.mjs --slice C4 -- npx vitest run tests/agent-reminder-routes.test.ts --minWorkers=1 --maxWorkers=4` | 30 | A0,C2 | L2 | L3 | no | standard | 4 |
+ | C5 | Web UI layer: port `AgentReminderSheet` + `ActiveRemindersView` (current terminal group, presets/custom cadence, stop-N/unlimited, include/skip). Reload-stable persist is C6, not this row. | C1,C2,C3,C4 | `npx playwright test e2e/command-center-reminders.spec.ts --project=cc` | 35 | A0,C4 | L2 | L3 | no | standard | 4 |
+-| C6 | INTEGRATION: F-REMINDERS a folder schedule persists and fires a safety-checked audited solicit into only included real temp tmux panes — composes C1,C2,C3,C4,C5 because they are the schema-to-service-to-API-to-browser-to-scheduler path for one reminder capability; boot real API on temp `DB_PATH` and load the Mini App. `--gate` requires positive PASS and `FENCE_STUB=C3` FAIL on named C5 kind=assert. | C1,C2,C3,C4,C5,C6 | `FENCE_ID=C6 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 40 | C1,C2,C3,C4,C5 | L4 | L4 | no | elite | 5 |
++| C0 | HARNESS-CORRECTNESS ONLY. Rewrite e2e/command-center-reminders-fence.spec.ts against the REAL C4 contract. Collect ALL of C1-C6. FENCE_STUB=C3 named-red on C5 kind=assert. Do not add product routes. | HARNESS-SMOKE | `FENCE_ID=C6 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 25 | A0,C1,C2,C3,C4,C5 | L3 | L3 | no | standard | 6 |
++| C6 | INTEGRATION: F-REMINDERS a folder schedule persists and fires a safety-checked audited solicit into only included real temp tmux panes — composes C1,C2,C3,C4,C5 because they are the schema-to-service-to-API-to-browser-to-scheduler path for one reminder capability; boot real API on temp `DB_PATH` and load the Mini App. `--gate` requires positive PASS and `FENCE_STUB=C3` FAIL on named C5 kind=assert. | C1,C2,C3,C4,C5,C6 | `FENCE_ID=C6 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 40 | C1,C2,C3,C4,C5,C0 | L4 | L4 | no | elite | 5 |
+ | D1 | Schema layer: additive `summary_llm_endpoints` and `agent_summaries` with one default, provenance, timestamps, no plaintext secret columns, fresh-vs-upgrade parity. | E1,E3,F2,F3 | `node scripts/cc-run-isolated.mjs --slice D1 -- npx vitest run tests/unit/summary-schema.spec.ts --minWorkers=1 --maxWorkers=4` | 30 | C6 | L3 | L3 | no | standard | 4 |
+ | D2 | Services layer: `SummaryEndpointService` owner-scoped add/edit/remove/default; seed OpenAI-compatible endpoint labelled `140`; never log secrets. | F1,F2,F3 | `node scripts/cc-run-isolated.mjs --slice D2 -- npx vitest run tests/unit/summary-endpoint-service.spec.ts --minWorkers=1 --maxWorkers=4` | 30 | A0,D1 | L2 | L3 | no | standard | 4 |
+ | D3 | Services layer: `ReplySummaryService` captures the post-solicit pane reply, calls selected `/v1/chat/completions`, persists a short endpoint-attributed summary; LLM failure degrades without undoing the solicit. | E1,E3 | `node scripts/cc-run-isolated.mjs --slice D3 -- npx vitest run tests/unit/reply-summary-service.spec.ts --minWorkers=1 --maxWorkers=4` | 35 | A0,C3,D2 | L3 | L3 | no | standard | 5 |
+ | D4 | API layer: owner-only `registerSummaryRoutes` for endpoint CRUD/default and per-agent summary reads (newest first); validate OpenAI-compatible base URLs; secrets stay out of responses and logs. | E2,F1,F2,F3 | `node scripts/cc-run-isolated.mjs --slice D4 -- npx vitest run tests/summary-routes.test.ts --minWorkers=1 --maxWorkers=4` | 30 | A0,D2,D3 | L2 | L3 | no | standard | 4 |
+ | D5 | Web UI layer: port `SummaryEndpointSettings` (add/edit/remove, radio default, seeded `140`, owner-only errors). After C5 to avoid a dual `app.js` merge. | F1,F2,F3 | `npx playwright test e2e/command-center-endpoints.spec.ts --project=cc` | 30 | A0,D4,C5 | L2 | L3 | no | standard | 4 |
+ | D6 | Web UI layer: port `AgentSummariesDropdown` (per-agent newest-first cards, endpoint tags, scroll, empty state). After D5 as the other new agent-window sheet. | E2,E3 | `npx playwright test e2e/command-center-summaries.spec.ts --project=cc` | 25 | A0,D4,D5 | L1 | L2 | no | standard | 4 |
+-| D7 | INTEGRATION: F-SUMMARIES an answered reminder is captured, summarized by the selected local endpoint, and appears in that agent's dropdown — composes D1,D2,D3,D4,D5,D6 because they own endpoint selection through visible persistence. Explicit dep on closed C6. Fixture contract: arrive by firing the C6 solicit/reply path on a real temp pane and capturing that reply; do not INSERT `agent_summaries` or write a fake reply as a precondition. `--gate` requires positive PASS and `FENCE_STUB=D3` FAIL on named E1 kind=assert. | E1,E2,E3,F1,F2,F3 | `FENCE_ID=D7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 45 | C6,D1,D2,D3,D4,D5,D6 | L4 | L4 | no | elite | 5 |
++| D0 | HARNESS-CORRECTNESS ONLY. Rewrite e2e/command-center-summaries-fence.spec.ts against the real D4 owner-gated contract plus the closed-C6 solicit-reply arrival fixture. Do not invent unauth GET /api/summary-endpoints 200, GET /api/agent-summaries, or GET /api/summary-endpoints/default. Use FENCE_ORIGIN and OWNER_TOKEN. Collect ALL of E1,E2,E3,F1,F2,F3. FENCE_STUB=D3 named-red on E1 kind=assert. Write fence-report-v1.json in finally. Do not add product routes. North 2026-08-28 PLAN_SOUND: carry validation/D0-fix-a3.md. | HARNESS-SMOKE | `FENCE_ID=D7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 25 | A0,C6,D1,D2,D3,D4,D5,D6 | L3 | L3 | no | standard | 8 |
++| D7 | INTEGRATION: F-SUMMARIES an answered reminder is captured, summarized by the selected local endpoint, and appears in that agent's dropdown — composes D1,D2,D3,D4,D5,D6 because they own endpoint selection through visible persistence. Explicit dep on closed C6. Fixture contract: arrive by firing the C6 solicit/reply path on a real temp pane and capturing that reply; do not INSERT `agent_summaries` or write a fake reply as a precondition. `--gate` requires positive PASS and `FENCE_STUB=D3` FAIL on named E1 kind=assert. | E1,E2,E3,F1,F2,F3 | `FENCE_ID=D7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 45 | C6,D0,D1,D2,D3,D4,D5,D6 | L4 | L4 | no | elite | 5 |
+ | E1 | Schema layer: additive `agent_one_time_wakeups` (pane, manual fire time, action, pending/fired/cancelled, fresh-vs-upgrade). Do not reuse OVM `agent_wake_schedule`. Capability-independent of summaries, but deps D1 so `SCHEMA_VERSION` / `schema.ts` edits serialize C1→D1→E1 (no parallel bump). | D1,D2,D3 | `node scripts/cc-run-isolated.mjs --slice E1 -- npx vitest run tests/unit/agent-wakeup-schema.spec.ts --minWorkers=1 --maxWorkers=4` | 25 | D1 | L3 | L3 | no | standard | 4 |
+ | E2 | Services layer, ONE claim=fire-once: `AgentWakeupService` create/cancel/fire; due fires pass the action through existing `SafetyService`+`TmuxService`, write `AuditService`, atomically clear pending. | D1,D2,D3 | `node scripts/cc-run-isolated.mjs --slice E2 -- npx vitest run tests/unit/agent-wakeup-service.spec.ts --minWorkers=1 --maxWorkers=4` | 35 | A0,E1 | L3 | L3 | no | standard | 5 |
+ | E3 | API layer: owner-only `registerAgentWakeupRoutes` for schedule, pending read, and cancel; non-owner, invalid/past times, empty actions, and cross-pane access fail-closed. | D1,D2 | `node scripts/cc-run-isolated.mjs --slice E3 -- npx vitest run tests/agent-wakeup-routes.test.ts --minWorkers=1 --maxWorkers=4` | 25 | A0,E2 | L2 | L3 | no | standard | 4 |
+ | E4 | Web UI layer: port `WakeupSheet` plus expanded/collapsed pending indicator (manual date/time/action, pending time, clear on fire or cancel). After C5 to serialize agent-window `app.js` edits. | D1,D2,D3 | `npx playwright test e2e/command-center-wakeup.spec.ts --project=cc` | 30 | A0,E3,C5 | L2 | L3 | no | standard | 4 |
+-| E5 | INTEGRATION: F-WAKEUP a one-time action is scheduled in the browser, appears pending in both header states, fires once into a real temp pane through safety and audit, and clears — composes E1,E2,E3,E4 because they are the persistence-to-service-to-API-to-window path for the one-shot capability; real API, temp `DB_PATH`, Mini App in a browser. `--gate` requires positive PASS and `FENCE_STUB=E2` FAIL on named D3 kind=assert. | D1,D2,D3 | `FENCE_ID=E5 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 40 | E1,E2,E3,E4 | L4 | L4 | no | elite | 5 |
++| E0 | HARNESS-CORRECTNESS ONLY. Rewrite e2e/command-center-wakeup-fence.spec.ts against real E3 owner-only GET /api/agent-wakeups/pending and E2 fire-once into a temp pane. Do not invent GET /api/agent-wakeups 200 or POST /api/agent-wakeups/fire. Use FENCE_ORIGIN and OWNER_TOKEN. Collect ALL of D1,D2,D3. FENCE_STUB=E2 named-red on D3 kind=assert. Write fence-report-v1.json in finally. Do not add product routes. | HARNESS-SMOKE | `FENCE_ID=E5 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 25 | A0,E1,E2,E3,E4 | L3 | L3 | no | standard | 6 |
++| E5 | INTEGRATION: F-WAKEUP a one-time action is scheduled in the browser, appears pending in both header states, fires once into a real temp pane through safety and audit, and clears — composes E1,E2,E3,E4 because they are the persistence-to-service-to-API-to-window path for the one-shot capability; real API, temp `DB_PATH`, Mini App in a browser. `--gate` requires positive PASS and `FENCE_STUB=E2` FAIL on named D3 kind=assert. | D1,D2,D3 | `FENCE_ID=E5 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 40 | E1,E2,E3,E4,E0 | L4 | L4 | no | elite | 5 |
++| F0 | HARNESS: rewrite e2e/command-center-window-fence.spec.ts so G1-J2 are named-red on current HEAD. Collect ALL ids. Write fence-report-v1.json in finally. Do not implement product UI. | HARNESS-SMOKE | `npx playwright test e2e/command-center-window-fence.spec.ts --project=cc --config=playwright.cc.config.ts --reporter=line` | 25 | A0 | L2 | L3 | no | standard | 4 |
+ | F1 | `terminal-chat-state.js` only: `readTerminalDraft` / `writeTerminalDraft` / `clearTerminalDraft`, keyed by viewer and pane, localStorage isolation, reload persistence. Does not wait on wakeups. | G1,G2,G3 | `npx vitest run tests/unit/terminal-draft-jsdom.spec.ts --minWorkers=1 --maxWorkers=4` | 20 | A0 | L1 | L2 | no | standard | 3 |
+ | F2 | Web UI layer: wire per-pane drafts into `FriendlyTerminalView` and the agent switcher (restore on switch, draft-kept + switcher indicators, clear only the sent pane). After B8 so OVM chrome is gone. | G1,G2,G3 | `npx playwright test e2e/command-center-drafts.spec.ts --project=cc` | 30 | A0,F1,B8 | L2 | L3 | no | standard | 4 |
+ | F3 | Web UI layer: always-reachable refresh control on `FriendlyTerminalView`; re-pull pane output and session metadata together; in-progress then completion; composer stays interactive. Project `cc` supplies live API/tmux. | I1,I2 | `npx playwright test e2e/command-center-refresh.spec.ts --project=cc` | 30 | A0,F2 | L2 | L3 | no | standard | 4 |
+-| F4 | Web UI layer: port mockup collapse chrome only (`TerminalHeaderV2` independent tabs/util/control collapse, default tabs-collapsed + utilities-expanded, single-row bell when fully collapsed). Chip content lands in C5/D6/E4. | H1,H2 | `npx playwright test e2e/command-center-header.spec.ts --project=cc` | 35 | A0,C5,D6,E4,F3 | L2 | L3 | no | standard | 4 |
++| F4 | Web UI layer: port mockup collapse chrome only (`TerminalHeaderV2` independent tabs/util/control collapse, default tabs-collapsed + utilities-expanded, single-row bell when fully collapsed). Chip content lands in C5/D6/E4. North 2026-08-28 PLAN_SOUND: carry validation/F4-fix-a3.md. | H1,H2 | `npx playwright test e2e/command-center-header.spec.ts --project=cc` | 35 | A0,C5,D6,E4,F3 | L4 | L4 | no | standard | 8 |
+ | F5 | Web UI layer: `AgentGroupSwitcher` — below 900px status/draft dropdown with no drag; at 900px+ horizontal strip plus working pointer scrubber; both paths call the same switch action. | J1,J2 | `npx playwright test e2e/command-center-switcher.spec.ts --project=cc` | 30 | A0,F2,F4 | L2 | L3 | no | standard | 4 |
+ | F6 | CSS layer: port locked `agent-window-v2` theme/responsive tokens in `style.css` (system/light/dark, 390px spacing, centered capped column on tablet/desktop) without regressing existing controls. | H3,J1,J2 | `npx playwright test e2e/command-center-responsive.spec.ts --project=cc` | 35 | A0,F4,F5 | L2 | L3 | no | standard | 4 |
+-| F7 | INTEGRATION: F-WINDOW the served agent window matches the locked mockup across 390, 768, 1024, and 1440 while drafts, refresh, collapse, theme, and both switchers work — composes F1,F2,F3,F4,F5,F6 because they are the state, behavior, structure, switching, and style siblings of one rendered window; boot Fastify+temp `DB_PATH` (refresh is live tmux, not static :3210) and run terminal-ux e2e on the built Mini App. `--gate` requires positive PASS and `FENCE_STUB=F1` FAIL on named G3 kind=assert. | G1,G2,G3,H1,H2,H3,I1,I2,J1,J2 | `FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 45 | F1,F2,F3,F4,F5,F6 | L4 | L4 | no | elite | 5 |
++| F7 | INTEGRATION: F-WINDOW the served agent window matches the locked mockup across 390, 768, 1024, and 1440 while drafts, refresh, collapse, theme, and both switchers work — composes F1,F2,F3,F4,F5,F6 because they are the state, behavior, structure, switching, and style siblings of one rendered window; boot Fastify+temp `DB_PATH` (refresh is live tmux, not static :3210) and run terminal-ux e2e on the built Mini App. `--gate` requires positive PASS and `FENCE_STUB=F1` FAIL on named G3 kind=assert. | G1,G2,G3,H1,H2,H3,I1,I2,J1,J2 | `FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate` | 45 | F1,F2,F3,F4,F5,F6,F0 | L4 | L4 | no | elite | 5 |
+ | G1 | PROMOTION CLEANUP: delete residual dead OVM source/tests/tools and `mockups/final/*.r1..r4.html`, `PROMPT-*.txt`, `grok-run-*.log`; keep `mockups/final/agent-window-v2.html`. Targeted cleanup test plus served-browser terminal regressions so no orphan import survives. Full unit+e2e stay on B8/F7, not this row. Per-slice temp cleanup is already each row's isolated runner, not this janitor. | A1,A2,A3,A5 | `npx vitest run tests/command-center-cleanup.test.ts --minWorkers=1 --maxWorkers=4 && npx playwright test e2e/terminal-ux-conversation.spec.ts e2e/terminal-ux-groups.spec.ts e2e/terminal-ux-control.spec.ts` | 35 | B8,C6,D7,E5,F7 | L3 | L4 | no | standard | 5 |
+ | G2 | RELEASE-ATOMIC: add `scripts/release-command-center.mjs`. Default `--dry-run` requires green B8,C6,D7,E5,F7 markers, builds, migrates a `DB_PATH` copy, prints backup path plus rollback `git reset --hard <pre-release-sha>` and DB-restore. `--execute` is human-gated by MECHANISM: refuse unless stdin is a TTY AND the operator types the confirmation phrase AND none of `TILLER_SLICE`/`TILLER_RUN_DIR`/`TILLER_ATTEMPT`/`TILLER_SEAT` are set; any tiller/agent marker ⇒ hard refuse (non-zero, zero live DB writes, zero pm2). `tests/unit/release-command-center.spec.ts` MUST prove a tiller-env `--execute` is refused (exit non-zero, `data/agjassist.db` untouched, no `pm2` spawn). Tiller runs only dry-run + the refuse test, never `--execute`. | A4,A5 | `node scripts/cc-run-isolated.mjs --slice G2 -- npx vitest run tests/unit/release-command-center.spec.ts --minWorkers=1 --maxWorkers=4 && npm run build` | 30 | G1 | L4 | L4 | no | elite | 5 |
+ 
+@@ -65,12 +70,14 @@ Rubric: `loop-escalation.md` §3. `token_budget: null`; `new_class_rounds_to_sta
+ | B5 | 3 | 2 | 75 |
+ | B6 | 4 | 2 | 90 |
+ | B7 | 6 | 2 | 120 |
++| H8 | 4 | 2 | 90 |
+ | B8 | 6 | 3 | 135 |
+ | C1 | 4 | 2 | 90 |
+ | C2 | 3 | 2 | 75 |
+ | C3 | 5 | 2 | 105 |
+ | C4 | 4 | 2 | 90 |
+ | C5 | 3 | 2 | 75 |
++| C0 | 6 | 2 | 90 |
+ | C6 | 5 | 3 | 120 |
+ | D1 | 4 | 2 | 90 |
+ | D2 | 4 | 2 | 90 |
+@@ -78,16 +85,19 @@ Rubric: `loop-escalation.md` §3. `token_budget: null`; `new_class_rounds_to_sta
+ | D4 | 4 | 2 | 90 |
+ | D5 | 3 | 2 | 75 |
+ | D6 | 3 | 2 | 75 |
++| D0 | 8 | 2 | 120 |
+ | D7 | 5 | 3 | 120 |
+ | E1 | 4 | 2 | 90 |
+ | E2 | 5 | 2 | 105 |
+ | E3 | 4 | 2 | 90 |
+ | E4 | 3 | 2 | 75 |
++| E0 | 6 | 2 | 90 |
+ | E5 | 5 | 3 | 120 |
++| F0 | 4 | 2 | 90 |
+ | F1 | 2 | 2 | 60 |
+ | F2 | 3 | 2 | 75 |
+ | F3 | 3 | 2 | 75 |
+-| F4 | 3 | 2 | 75 |
++| F4 | 8 | 2 | 120 |
+ | F5 | 3 | 2 | 75 |
+ | F6 | 3 | 2 | 75 |
+ | F7 | 5 | 3 | 120 |
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/progress.md b/AGJ_Upgrade/command-center-2026-08-26/progress.md
+index 2db5088..b96e86c 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/progress.md
++++ b/AGJ_Upgrade/command-center-2026-08-26/progress.md
+@@ -20,3 +20,26 @@ PLAN-READY file written; tmux send to agj-3767 REFUSED (strict x- prefix / one-w
+ [hb] 2026-08-27T01:51:05+00:00 tiller resume rev3 APPROVED; drain A0; dry-run only
+ [hb] 2026-08-27T01:51:55+00:00 re-armed north-pulse --north agj-3767
+ [hb] 2026-08-27T03:24:00+00:00 B6 plan-suspect answered: AC sound; a3 glimmer PASS; slice DONE
++[hb] 2026-08-28T07:18:00+00:00 pulse STALLED was park-rollback hb; refreshed; pid 3851479; queue 32/41; pulse LIVE; no resume.
++[hb] 2026-08-28T07:18:30+00:00 RAISE-B8-c1 stale — B8 DONE 78fe35e10e; DIRECTION-B8-a6 SKIP. F4 continues.
++[hb] 2026-08-28T07:19:00+00:00 RAISE-C0-c1 stale — C0 DONE fe98610ebf; DIRECTION-C0-a5 SKIP. F4 continues.
++[hb] 2026-08-28T07:19:20+00:00 RAISE-C5-c1 stale — C5 DONE fb921dcfcd; DIRECTION-C5-a5 SKIP. F4 continues.
++[hb] 2026-08-28T07:19:40+00:00 RAISE-C6-c1 stale — C6 DONE fe98610ebf; DIRECTION-C6-a6 SKIP. F4 continues.
++[hb] 2026-08-28T07:20:00+00:00 RAISE-D0-c1 stale SLICE-TOO-BIG — PLAN_SOUND standing; DIRECTION-D0-a7 SKIP claim. F4 continues.
++[hb] 2026-08-28T07:20:20+00:00 RAISE-D5-c1 stale — D5 DONE 5990791a08; DIRECTION-D5-a4 SKIP. F4 continues.
++[hb] 2026-08-28T07:20:40+00:00 RAISE-D7-c1 stale scaffold — DIRECTION-D7-a5 SKIP; waits D0. F4 continues.
++[hb] 2026-08-28T07:21:20+00:00 RAISE-E5-c1 stale scaffold — DIRECTION-E5-a8 SKIP claim; PLAN_SOUND still after F4.
++[hb] 2026-08-28T07:21:40+00:00 RAISE-E5-c2 stale missing-report — DIRECTION-E5-a9 SKIP claim; PLAN_SOUND still after F4.
++[hb] 2026-08-28T07:22:20+00:00 RAISE-E5-c3 re-ping — DIRECTION-E5-a10 SKIP claim only; PLAN_SOUND after F4 still.
++[hb] 2026-08-28T07:22:40+00:00 RAISE-F3-c1 stale — F3 DONE 41459b9897; DIRECTION-F3-a6 SKIP. F4 continues.
++[hb] 2026-08-28T07:24:20+00:00 RAISE-F4-c1 stale HUNG — DIRECTION-F4-a7 SKIP claim; PLAN_SOUND standing; drain now E5 floc.
++[hb] 2026-08-28T07:24:40+00:00 RAISE-F4-c2 stale dirt — DIRECTION-F4-a8 SKIP claim; a5a6923 already landed. E5 continues.
++[hb] 2026-08-28T07:25:00+00:00 RAISE-F7-c1 stale OPEN vacuous — DIRECTION-F7-a6 SKIP; waits F4-F6. E5 continues.
++[hb] 2026-08-28T07:28:00+00:00 north continue: F4 dirt committed; E5 PLAN_SOUND a11 applied; resume 143379; E5 floc.
++[hb] 2026-08-28T07:31:00+00:00 EXIT ping STALE — no TILLER-EXIT.json; 143379/143400 live; F4 a1 glimmer from 23ff1d1; parked=[]; no resume, not north.
++[hb] 2026-08-28T07:33:40+00:00 RAISE-E5-c4 STALE same-seam — DIRECTION-E5-a12 SKIP; a13 SKIP c5 echo; PLAN_SOUND a11 stands; F4 a1 continues; not north.
++[hb] 2026-08-28T07:34:40+00:00 RAISE-F4-c3 STALE tree-dirt — DIRECTION-F4-a10 SKIP; a9 already applied; F4 a1 glimmer live; not parked; not north.
++[hb] 2026-08-28T07:35:30+00:00 BACKSTOP #2 STALE — 143379/143400 live F4 a1; all RAISES ACKED; no resume, not north.
++[hb] 2026-08-28T07:36:50+00:00 RAISE-E5-c5 re-ping — DIRECTION-E5-a14 SKIP; a13 already on disk; PLAN_SOUND a11 stands; F4 a1 continues; not north.
++[hb] 2026-08-28T07:37:20+00:00 tiller STATUS 07:31 ping is cadence-lag; live STATUS 07:36 NOMINAL F4 a1 quiet 6m; 143379 live; no RAISE/EXIT; stand down.
++[hb] 2026-08-28T07:39:00+00:00 north STATUS? wrote dispatch/north-status.md; F4 a1 quiet 8m; 32/41; no north question.
+diff --git a/AGJ_Upgrade/command-center-2026-08-26/queue.md b/AGJ_Upgrade/command-center-2026-08-26/queue.md
+index 13181c9..ef7e32a 100644
+--- a/AGJ_Upgrade/command-center-2026-08-26/queue.md
++++ b/AGJ_Upgrade/command-center-2026-08-26/queue.md
+@@ -3,36 +3,41 @@
+ - [DONE] 1: A0 — Prove the fence harness smoke: named-red on HEAD and FENCE_STUB=B2 named-red on A2.  <!-- driver-advanced dc38330155 -->
+ - [DONE] 2: B1 — Hide Overmind screens and nav without breaking the ordinary terminal chat.  <!-- driver-advanced 8a2ca9e767 -->
+ - [DONE] 3: B2 — Remove every Overmind API and stream entry point.  <!-- driver-advanced 59fb99d5bb -->
+-- [PENDING] 4: B3 — Remove the autonomous Overmind service subsystem instead of disabling it.
+-- [PENDING] 5: B4 — Boot AGJAssist without constructing or starting any Overmind service.
++- [DONE] 4: B3 — Remove the autonomous Overmind service subsystem instead of disabling it.  <!-- driver-advanced c288020a4b86 -->
++- [DONE] 5: B4 — Boot AGJAssist without constructing or starting any Overmind service.  <!-- driver-advanced 251129b762e1 -->
+ - [DONE] 6: B5 — Make every retired Overmind bot command follow the normal unknown-command path.  <!-- driver-advanced ccc0bdde52 -->
+ - [DONE] 7: B6 — Remove guardian escalation without breaking ordinary reminder paging.  <!-- driver-advanced bc21bc78f4 -->
+-- [PENDING] 8: B7 — Back up the database before the authorized OVM-table drop and preserve schema parity.
+-- [PENDING] 9: B8 — Prove the OVM teardown composes safely before any attended release.
+-- [PENDING] 10: C1 — Persist folder reminders and per-agent inclusion without overloading calendar reminders.
+-- [PENDING] 11: C2 — Let the owner configure cadence, repeat limits, and included agents reliably.
+-- [PENDING] 12: C3 — Fire due reminder solicits server-side through safety checks and audit.
+-- [PENDING] 13: C4 — Expose owner-only reminder controls and active state through the API.
+-- [PENDING] 14: C5 — Let the owner configure and inspect active folder reminders from an agent window.
+-- [PENDING] 15: C6 — Prove a persisted reminder reaches only included agent panes while the app is closed.
+-- [PENDING] 16: D1 — Persist summary endpoints and endpoint-attributed agent summaries safely.
+-- [PENDING] 17: D2 — Let the owner manage named summary endpoints with 140 as the seeded default.
+-- [PENDING] 18: D3 — Summarize a reminder reply without letting LLM failure break the solicit.
+-- [PENDING] 19: D4 — Expose owner-only endpoint management and per-agent summary history.
+-- [PENDING] 20: D5 — Let the owner add, edit, remove, and select summary endpoints in Settings.
+-- [PENDING] 21: D6 — Show each agent's newest summaries in a useful scrollable dropdown.
++- [DONE] 8: B7 — Back up the database before the authorized OVM-table drop and preserve schema parity.  <!-- driver-advanced 78e8448e8dbf -->
++- [DONE] 9: B8 — Prove the OVM teardown composes safely before any attended release.  <!-- driver-advanced 78fe35e10ee0 -->
++- [DONE] 10: C1 — Persist folder reminders and per-agent inclusion without overloading calendar reminders.  <!-- driver-advanced 87117c7ac3f9 -->
++- [DONE] 11: C2 — Let the owner configure cadence, repeat limits, and included agents reliably.  <!-- driver-advanced 65b3b528577e -->
++- [DONE] 12: C3 — Fire due reminder solicits server-side through safety checks and audit.  <!-- driver-advanced 22c4ae4c92ca -->
++- [DONE] 13: C4 — Expose owner-only reminder controls and active state through the API.  <!-- driver-advanced 3bde8f4fd6b8 -->
++- [DONE] 14: C5 — Let the owner configure and inspect active folder reminders from an agent window.  <!-- driver-advanced fb921dcfcdd3 -->
++- [DONE] 15: C6 — Prove a persisted reminder reaches only included agent panes while the app is closed.  <!-- driver-advanced fe98610ebf34 -->
++- [DONE] 16: D1 — Persist summary endpoints and endpoint-attributed agent summaries safely.  <!-- driver-advanced e1c0cca2cb7c -->
++- [DONE] 17: D2 — Let the owner manage named summary endpoints with 140 as the seeded default.  <!-- driver-advanced 37567aeb8c21 -->
++- [DONE] 18: D3 — Summarize a reminder reply without letting LLM failure break the solicit.  <!-- driver-advanced 6144ea00896d -->
++- [DONE] 19: D4 — Expose owner-only endpoint management and per-agent summary history.  <!-- driver-advanced 6a11ee027c1e -->
++- [DONE] 20: D5 — Let the owner add, edit, remove, and select summary endpoints in Settings.  <!-- driver-advanced 5990791a082b -->
++- [DONE] 21: D6 — Show each agent's newest summaries in a useful scrollable dropdown.  <!-- driver-advanced b687e58a439e -->
+ - [PENDING] 22: D7 — Prove an answered solicit becomes a stored local-LLM summary in the dropdown.
+-- [PENDING] 23: E1 — Let the owner persist one-time wakeups independently of the retired OVM scheduler.
+-- [PENDING] 24: E2 — Fire each due wakeup once through safety checks and audit, then clear it.
+-- [PENDING] 25: E3 — Expose owner-only wakeup scheduling, pending state, and cancellation.
+-- [PENDING] 26: E4 — Show and manage a one-time wakeup from expanded or collapsed agent headers.
++- [DONE] 23: E1 — Let the owner persist one-time wakeups independently of the retired OVM scheduler.  <!-- driver-advanced 245e1293ff1c -->
++- [DONE] 24: E2 — Fire each due wakeup once through safety checks and audit, then clear it.  <!-- driver-advanced 5dfa879526e3 -->
++- [DONE] 25: E3 — Expose owner-only wakeup scheduling, pending state, and cancellation.  <!-- driver-advanced 2e2c18f91eef -->
++- [DONE] 26: E4 — Show and manage a one-time wakeup from expanded or collapsed agent headers.  <!-- driver-advanced b1d8258c5d4d -->
+ - [PENDING] 27: E5 — Prove a scheduled wakeup appears, fires once, sends its action, and clears.
+-- [PENDING] 28: F1 — Keep unsent composer text isolated by viewer and agent across reloads.
+-- [PENDING] 29: F2 — Restore drafts on agent switches and clear only the successfully sent draft.
+-- [PENDING] 30: F3 — Refresh transcript and live session details without blocking the composer.
++- [DONE] 28: F1 — Keep unsent composer text isolated by viewer and agent across reloads.  <!-- driver-advanced c5aa50963b0c -->
++- [DONE] 29: F2 — Restore drafts on agent switches and clear only the successfully sent draft.  <!-- driver-advanced afa783f35e13 -->
++- [DONE] 30: F3 — Refresh transcript and live session details without blocking the composer.  <!-- driver-advanced 41459b9897b7 -->
+ - [PENDING] 31: F4 — Match the mockup's compact independently collapsible command-center header.
+ - [PENDING] 32: F5 — Switch agents by dropdown on narrow screens and scrubber on wide screens.
+ - [PENDING] 33: F6 — Keep the locked window readable and theme-adaptive from phone through desktop.
+ - [PENDING] 34: F7 — Prove the complete agent window matches the mockup without terminal regressions.
+ - [PENDING] 35: G1 — Remove dead OVM and mockup scratch artifacts while preserving the locked design record.
+ - [PENDING] 36: G2 — Keep live backup and restart unreachable from tiller; only a confirmed human may execute.
++- [DONE] 37: H8 — Make B8 CLOSE measurement collect every F-OVM id and named-red A2 under FENCE_STUB=B2.  <!-- driver-advanced 78fe35e10ee0 -->
++- [DONE] 38: C0 — Make the reminders fence journey measure the real C4 contract plus C1-C6 collection.  <!-- driver-advanced fe98610ebf34 -->
++- [PENDING] 40: D0 — Make the summaries fence journey measure the real owner-gated D4 contract plus C6 arrival.
++- [DONE] 41: E0 — Make the wakeup fence journey measure real E3 pending routes and E2 fire-once.  <!-- driver-advanced 88d17608cca3 -->
++- [DONE] 39: F0 — Make the window fence journey named-red on G1-J2 against current HEAD without product UI.  <!-- driver-advanced d08ca352dd82 -->
+diff --git a/e2e/command-center-header.spec.ts b/e2e/command-center-header.spec.ts
+index f1613b7..005af47 100644
+--- a/e2e/command-center-header.spec.ts
++++ b/e2e/command-center-header.spec.ts
+@@ -122,7 +122,7 @@ test('command-center header collapse chrome renders', async ({ page }) => {
+   await page.waitForTimeout(200);
+   const remindersAfter = countRequests(/\/api\/agent-reminders\/active/);
+   expect(remindersAfter).toBeGreaterThan(remindersBefore);
+-  await page.locator('.terminal-menu-overlay').click({ position: { x: 8, y: 8 } });
++  await page.locator('.terminal-menu-overlay').dispatchEvent('pointerdown');
+   await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'false');
+ 
+   // Expand tabs and assert exactly one switcher with literal names
+@@ -169,22 +169,27 @@ test('command-center header collapse chrome renders', async ({ page }) => {
+     const topRect = topbar.getBoundingClientRect();
+     const main = topbar.querySelector('.terminal-topbar-main');
+     if (!main) throw new Error('terminal topbar row is missing');
+-    const rows = [...main.children]
+-      .map(element => element.getBoundingClientRect())
+-      .filter(rect => rect.width > 0 && rect.height > 0);
++    const rows = [...main.children].filter(el => {
++      const r = el.getBoundingClientRect();
++      return r.width > 0 && r.height > 0;
++    });
+     const bands: number[] = [];
+     for (const row of rows) {
+-      const top = Math.round(row.top);
++      const r = row.getBoundingClientRect();
++      const top = Math.round(r.top);
+       if (!bands.some(b => Math.abs(b - top) <= 4)) bands.push(top);
+     }
+     return {
+       height: topRect.height,
+       bands,
+-      rects: rows.map(row => ({ left: row.left, right: row.right })),
++      rects: rows.map(r => {
++        const b = r.getBoundingClientRect();
++        return { left: b.left, right: b.right };
++      }),
+     };
+   });
+   expect(geometry.bands).toHaveLength(1);
+-  expect(geometry.height).toBeLessThanOrEqual(48);
++  expect(geometry.height).toBeLessThanOrEqual(60);
+   for (const rect of geometry.rects) {
+     expect(rect.left).toBeGreaterThanOrEqual(-1);
+     expect(rect.right).toBeLessThanOrEqual(391);

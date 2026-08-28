@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 5,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "superseded by DIRECTION-F4-a2.json (north PLAN_SOUND + a3 remainder)",
+  "applied": true,
+  "outcome": "superseded-by-DIRECTION-F4-a2.json",
+  "applied_at": "2026-08-28T00:36:00Z"
+}

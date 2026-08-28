@@ -1,0 +1,9 @@
+FINDING 1 of 2
+WHAT FAILED: e2e/command-center-summaries-fence.spec.ts E1 still bypasses the closed-C6 arrival fixture at lines that send a literal reply and then directly import/call ReplySummaryService.summarize(agentName, 'Reply: literal reply text'). That direct service call supplies the reply body itself, so the harness does not prove a closed-C6 fired pane reply was captured and summarized through the production arrival path.
+THE FIX: Replace the direct `await svc.summarize(...)` shortcut with the real arrival mechanism: create/fire the C6 due reminder into the unique tmux session, produce the agent reply in that pane before the capture/summarization mechanism runs, then trigger the same production capture path that D7 is meant to compose. Assert the persisted summary only through GET /api/summary-agents/<unique-agent>/summaries and the literal OpenAI fixture response. Do not import ReplySummaryService from the Playwright spec and do not pass a hand-written reply string directly to any summary service.
+WHY THE LAST ATTEMPT MISSED IT: It added C6 setup but kept the actual summary creation as a direct unit-service call.
+
+FINDING 2 of 2
+WHAT FAILED: e2e/command-center-summaries-fence.spec.ts E2 does not verify UI visibility. It comments that UI checks are best-effort and uses the summaries API as a proxy, so the harness would still pass if the summaries toggle, dropdown, or summary card rendering were removed.
+THE FIX: In E2, navigate to /index.html#/terminals, select the unique tmux session/agent from the terminal UI if required, click data-testid="summaries-toggle", wait for data-testid="agent-summaries-dropdown", and assert data-testid="summary-card" contains `LITERAL_SUMMARY_FOR_TEST` plus the fixture endpoint name/label, preferably the preserved default endpoint name `140`.
+WHY THE LAST ATTEMPT MISSED IT: It proved the API row exists but did not exercise the DOM path required by the scope.

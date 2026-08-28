@@ -1,0 +1,28 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "pageErrors": [],
+  "menuVisibleBeforeClick": true,
+  "clickError": null,
+  "menuExpanded": "true",
+  "onMount": {
+    "reminders": 1,
+    "wakeups": 1
+  },
+  "afterMenuOpen": {
+    "reminders": 2,
+    "wakeups": 2
+  },
+  "refetchedOnMenuOpen": {
+    "reminders": true,
+    "wakeups": true
+  },
+  "reminderRequests": [
+    "http://localhost:3210/api/agent-reminders/active",
+    "http://localhost:3210/api/agent-wakeups/pending",
+    "http://localhost:3210/api/agent-reminders/active",
+    "http://localhost:3210/api/agent-wakeups/pending"
+  ]
+}

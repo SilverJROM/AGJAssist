@@ -1,0 +1,9 @@
+{
+  "slice": "F3",
+  "attempt": 12,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F3-c1 re-delivery (raised 2026-08-27T09:56:46Z, epoch 1787807412-3745902 dead). F3 DONE at 41459b9897b7. DIRECTION-F3-a7 SKIP already on disk. Do NOT RETRY. Live drain is 381861 F4. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:16:29Z"
+}

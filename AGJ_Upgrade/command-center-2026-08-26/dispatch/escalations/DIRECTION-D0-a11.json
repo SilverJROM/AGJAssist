@@ -1,0 +1,9 @@
+{
+  "slice": "D0",
+  "attempt": 11,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "EXIT 09:55:16Z D0-a10 unparked then immediately re-parked: fences_for(D0) included D7 because D0 was in D7 plan deps, and parked fence D7 has no OPEN (retired to .pre-reprepare; post-PREPARE OPEN is vacuous because D1-D6 already landed). D0 is harness-author, not a product unit. Plan D7 deps no longer list D0; D7 stays parked until advance-D0.marker. Standing D0.txt: port summaries-fence from 8a0ebc5 / D0-fix-a3.md onto HEAD 241b5cf; do NOT wholesale cherry-pick 8a0ebc5 (would revert F4-F6). Keep cc-capture-reply.mts. FENCE_STUB=D3 named-red E1. Not a new north question.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T10:05:49Z"
+}

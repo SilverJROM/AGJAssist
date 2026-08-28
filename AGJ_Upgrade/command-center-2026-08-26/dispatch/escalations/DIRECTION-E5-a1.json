@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 1,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "E0 injected as an E5 dep: rewrite the wakeup fence journey first. After E0, driver CLOSE E5 against real E3 pending routes plus E2 fire-once. Do not walk L2/L3 on the A0 scaffold. Product E1-E4 unchanged.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T00:29:08Z"
+}

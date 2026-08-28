@@ -1,0 +1,9 @@
+[2m[WebServer] [22m(node:803046) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-switcher.spec.ts:121:1 › phone width uses a visible full-group dropdown with current status and draft markers (451ms)
+  ✓  2 [cc] › e2e/command-center-switcher.spec.ts:156:1 › desktop width uses the strip and a pointer-drag scrubber that scrolls the strip (625ms)
+
+  2 passed (2.1s)

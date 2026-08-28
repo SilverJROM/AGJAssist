@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 4,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "HUNG on terra a4 after a 1800s static pane, not SLICE-TOO-BIG and not north. H1/H2 still satisfiable (plan-suspect SOUND). Park rolled HEAD to b1d8258. Cherry-pick refs/tiller/command-center-2026-08-26/F4 (4d32468) onto CURRENT HEAD. Do not start from a blank header. After the cherry-pick, emit the implementer DONE callback immediately (do not sit at the prompt). Wrap Playwright: timeout --signal=TERM --kill-after=15s 180s npx playwright test e2e/command-center-header.spec.ts --project=cc. If still red: finish TerminalHeaderV2 independent tabs/util/control collapse, default tabs-collapsed and utilities-expanded, single-row bell when fully collapsed, data-testid hooks. Do not rewrite unrelated app.js. Budget now 6. Engine still enters L1 then terra/sol.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T00:29:08Z"
+}

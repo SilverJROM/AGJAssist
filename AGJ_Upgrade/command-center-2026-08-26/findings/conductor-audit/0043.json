@@ -1,0 +1,12 @@
+{
+  "type": "rollback-discarded",
+  "slice": "D0",
+  "commits": 3,
+  "shortstat": "1 file changed, 222 insertions(+), 17 deletions(-)",
+  "preserved_ref": "refs/tiller/command-center-2026-08-26/D0",
+  "shas": [
+    "8a0ebc5 [D0] Fix harness for closed-C6 arrival fixture and UI verification",
+    "5a54514 [D0] Rewrite summaries fence harness for closed-C6 arrival fixture and UI verification",
+    "e88a200 [D0] Rewrite summaries fence harness for D4 owner-gated contract"
+  ]
+}

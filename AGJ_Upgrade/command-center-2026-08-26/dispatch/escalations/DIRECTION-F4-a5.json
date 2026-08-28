@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 9,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "RAISE-F4-c2 is TREE dirt from E5/F7 fence PREPARE (wakeup-fence.spec, window-fence.spec, agent-wakeup-routes.test) not an F4 AC miss. Those files will be committed so pre-dispatch is clean. F4 is NOT parked. PLAN_SOUND remains in directions-active/F4.txt (cherry-pick 4d32468, a3 brief, sol after L1). Do not park F4. After resume, dispatch F4 on the clean tree.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T06:05:30Z"
+}

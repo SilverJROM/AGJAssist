@@ -1,0 +1,9 @@
+{
+  "slice": "F3",
+  "attempt": 4,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "I1/I2 are still true of the product (plan-suspect SOUND). Budget exhausted on leftover wiring, not an unsatisfiable AC. Park rolled HEAD to afa783f35e; cherry-pick refs/tiller/command-center-2026-08-26/F3 (fe71264) then apply ONLY the a4 remainder: (1) FriendlyTerminalView refreshOutput must rebuild the visible transcript from the latest snapshot when prior output was non-empty \u2014 applyConversationSnapshot currently keeps initial output fixture after /output?refresh=1 returns refreshed output fixture. (2) e2e/command-center-refresh.spec.ts initial /output fixture must be a non-empty literal; assert replacement for both normal and search-open refresh. Do not re-litigate lifecycle/status-span. Not north.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-27T10:00:32Z"
+}

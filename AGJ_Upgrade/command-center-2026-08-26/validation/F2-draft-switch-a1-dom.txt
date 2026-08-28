@@ -1,0 +1,70 @@
+F2 draft switch DOM/ARIA evidence
+mechanism: preload distinct localStorage draft values for SA:0.0 and SB:0.0, then switch header tabs and read composer via public DOM path
+expected.afterOpenA=literal-alpha-preloaded
+actual.afterOpenA=
+storageAfterOpenA=
+expected.afterSwitchB=literal-beta-preloaded
+actual.afterSwitchB=
+storageAfterSwitchB=
+expected.afterReturnA=literal-alpha-live
+actual.afterReturnA=
+storageAfterReturnA=
+
+visible/testid inventory:
+{
+  "terminalDraft": [
+    {
+      "selector": "[data-testid=\"terminal-draft\"]",
+      "text": "",
+      "display": "block",
+      "visibility": "visible",
+      "hiddenAttr": false,
+      "width": 201,
+      "height": 44,
+      "visible": true
+    }
+  ],
+  "switcher": [
+    {
+      "selector": "[data-testid=\"agent-group-switcher\"]",
+      "text": "SB",
+      "display": "flex",
+      "visibility": "visible",
+      "hiddenAttr": false,
+      "width": 304,
+      "height": 27,
+      "visible": true
+    }
+  ],
+  "dropdown": [
+    {
+      "selector": "[data-testid=\"agent-group-switcher-dropdown\"]",
+      "text": "",
+      "display": "none",
+      "visibility": "visible",
+      "hiddenAttr": false,
+      "width": 0,
+      "height": 0,
+      "visible": false
+    }
+  ],
+  "headerTabs": [
+    {
+      "selector": "[data-testid=\"terminal-header-tab\"]",
+      "text": "SB",
+      "display": "block",
+      "visibility": "visible",
+      "hiddenAttr": false,
+      "width": 40,
+      "height": 27,
+      "visible": true
+    }
+  ],
+  "composerInputCount": 1,
+  "activeSessionText": "SA"
+}
+
+console:
+error: WebSocket connection to 'ws://localhost:3210/ws/tmux/SA%3A0.0?token=f2-validator-token' failed: Error during WebSocket handshake: Unexpected response code: 404
+error: WebSocket connection to 'ws://localhost:3210/ws/tmux/SB%3A0.0?token=f2-validator-token' failed: Error during WebSocket handshake: Unexpected response code: 404
+error: WebSocket connection to 'ws://localhost:3210/ws/tmux/SA%3A0.0?token=f2-validator-token' failed: Error during WebSocket handshake: Unexpected response code: 404

@@ -1,0 +1,9 @@
+{
+  "slice": "D5",
+  "attempt": 2,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-D5-c1 re-delivery after EXIT resume (raised 16:26:46Z, impl BLOCKED too-big). Already answered by DIRECTION-D5-a0 RETRY (applied 16:41Z); D5 then PASSED a4 and is DONE at 5990791a08. parked=[]. Live drain is D0. Do NOT unpark or re-dispatch D5. Product F1-F3 unchanged \u2014 not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T04:31:29Z"
+}

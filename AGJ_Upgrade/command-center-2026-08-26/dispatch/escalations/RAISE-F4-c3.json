@@ -1,0 +1,14 @@
+{
+  "slice": "F4",
+  "cycle": 3,
+  "attempt": 0,
+  "why": "pre-dispatch: TRACKED PRODUCT dirt at slice entry \u2014 refusing to dispatch, tree preserved: M e2e/command-center-header.spec.ts; M src/web/public/app.js; M src/web/public/style.css",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787901779-111833",
+  "raised_at": "2026-08-28T07:25:32Z"
+}

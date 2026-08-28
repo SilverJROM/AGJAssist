@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 21,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F4-c1 re-delivery (raised 2026-08-28T00:25:10Z, epoch 1787824829-1201168 dead, HUNG 1800s). F4 PENDING not parked; a1 glimmer live on 381861. North land-a62de6d in directions-active/F4.txt (HEAD c62553e). DIRECTION-F4-a7/a12 SKIP already on disk. Do NOT RETRY (not parked; would not steer a1). Do NOT split. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:57:29Z"
+}

@@ -1,0 +1,13 @@
+{
+  "slice": "D5",
+  "first_seen_attempt": 3,
+  "signature": "TEST_NOT_DISCRIMINATING|F1,F2,F3",
+  "requirements": "F1,F2,F3",
+  "defect_class": "TEST_NOT_DISCRIMINATING",
+  "argument": "An acceptance criterion that no implementation can satisfy fails IDENTICALLY at every tier, so another attempt or a stronger seat buys more of the same failure at higher cost. This is the plan review, already written.",
+  "answer": "Criterion is sound. D5 a2/a3 TEST_NOT_DISCRIMINATING was the e2e spec not asserting edit/delete target ids; a4 terra PASS 5990791 and the slice advanced. Repeats were coincidental incomplete tests, not an unsatisfiable AC. No plan edit, no north.",
+  "answered_at": "2026-08-27T18:39:54Z",
+  "answered_by": "projcore",
+  "how_to_answer": "Decompose or repair the criterion, OR write `answer` here saying why the row is sound and the repeats are coincidental. \"Noted and continued\" is not an answer.",
+  "raised_at": 1787855637
+}

@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 /home/agjrom/TGBOTS/AGJAssist
+
+ ✓ tests/unit/agent-wakeup-schema.spec.ts (3 tests) 115ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  16:35:38
+   Duration  304ms (transform 57ms, setup 0ms, collect 64ms, tests 115ms, environment 0ms, prepare 33ms)
+
+reclaimed_bytes=7606272

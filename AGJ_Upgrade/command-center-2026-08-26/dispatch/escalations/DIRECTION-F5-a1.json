@@ -1,0 +1,11 @@
+{
+  "slice": "F5",
+  "attempt": 1,
+  "action": "PLAN_SOUND",
+  "what_validator_missed": "Validator recorded PASS standard-clean at 40ec05e for J1,J2. The gate parked because e2e/command-center-switcher.spec.ts was dirty at verdict commit. That spec is in 40ec05e. HEAD is now 40ec05e (ff from 138b91f). Re-gate the existing commit. Do not rebuild product. Do not walk L2/L3 as a new impl.",
+  "plan_level_fingerprint": "gate-dirt:switcher.spec.ts@40ec05e",
+  "note": "RAISE-F5-c1 is GATE disagreement after PASS, not failed work. Cherry-pick/ff already landed. Implementer: make NO product edits; run timeout 180s npx playwright test e2e/command-center-switcher.spec.ts --project=cc; callback DONE with 40ec05e. Validator re-gate. Not north.",
+  "applied": true,
+  "outcome": "PLAN_SOUND accepted \u2014 counts as a repair round",
+  "applied_at": "2026-08-28T08:53:08Z"
+}

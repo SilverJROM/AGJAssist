@@ -1,0 +1,9 @@
+{
+  "slice": "C5",
+  "attempt": 1,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-C5-c1 (raised 06:58:11Z, driver_epoch 1787807412-3745902). Already answered by DIRECTION-C5-a0 (applied 07:10:29Z, unparked): transient codex CLI self-update, PATH restored, cherry-pick C5, re-validate. C5 is DONE at fb921dcfcd. parked=[]. Do NOT unpark or re-dispatch C5. Product C5 ACs unchanged \u2014 not north. Drain continues F3; this file only claims the stale re-delivery.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-27T13:18:42Z"
+}

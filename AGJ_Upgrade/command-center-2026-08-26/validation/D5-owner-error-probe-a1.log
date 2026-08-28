@@ -1,0 +1,8 @@
+file:///home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/validation/D5-owner-error-probe-a1.mjs:106
+    throw new Error('No visible owner/permission error after POST /api/summary-endpoints returned 403');
+          ^
+
+Error: No visible owner/permission error after POST /api/summary-endpoints returned 403
+    at file:///home/agjrom/TGBOTS/AGJAssist/AGJ_Upgrade/command-center-2026-08-26/validation/D5-owner-error-probe-a1.mjs:106:11
+
+Node.js v20.20.1

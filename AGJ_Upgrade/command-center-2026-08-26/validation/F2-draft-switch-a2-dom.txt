@@ -1,0 +1,109 @@
+F2 attempt 2 draft switch DOM/ARIA evidence
+mechanism: mock two grouped panes, preload distinct draft keys, assert public composer values across header-tab switches and send only active pane
+
+expected:
+{
+  "afterOpenA": "literal-alpha-preloaded",
+  "storageAfterFillA": "literal-alpha-live",
+  "afterSwitchB": "literal-beta-preloaded",
+  "storageAfterSwitchA": "literal-alpha-live",
+  "storageAfterSwitchB": "literal-beta-preloaded",
+  "afterReturnA": "literal-alpha-live",
+  "storageAfterSendA": null,
+  "storageAfterSendB": "literal-beta-live"
+}
+
+actual:
+{
+  "afterOpenA": "literal-alpha-preloaded",
+  "storageAfterOpenA": "literal-alpha-preloaded",
+  "tabTextAfterOpenA": [
+    "SB •"
+  ],
+  "tabTitlesAfterOpenA": [
+    "Switch to SB — draft"
+  ],
+  "storageAfterFillA": "literal-alpha-live",
+  "tabTextAfterFillA": [
+    "SB •"
+  ],
+  "tabTitlesAfterFillA": [
+    "Switch to SB — draft"
+  ],
+  "afterSwitchB": "literal-beta-preloaded",
+  "storageAfterSwitchA": "literal-alpha-live",
+  "storageAfterSwitchB": "literal-beta-preloaded",
+  "tabTextAfterSwitchB": [
+    "SA •"
+  ],
+  "tabTitlesAfterSwitchB": [
+    "Switch to SA — draft"
+  ],
+  "storageAfterFillB": "literal-beta-live",
+  "afterReturnA": "literal-alpha-live",
+  "storageAfterReturnA": "literal-alpha-live",
+  "storageAfterReturnB": "literal-beta-live",
+  "afterSendA": "",
+  "storageAfterSendA": "",
+  "storageAfterSendB": "literal-beta-live",
+  "sends": [
+    {
+      "url": "http://localhost:3210/api/tmux/panes/SA:0.0/send",
+      "body": "{\"command\":\"literal-alpha-live\",\"enter\":true,\"clear_first\":false}"
+    }
+  ]
+}
+
+visible/testid inventory:
+{
+  "terminalDraft": [
+    {
+      "selector": "[data-testid=\"terminal-draft\"]",
+      "text": "",
+      "title": null,
+      "ariaLabel": null,
+      "display": "block",
+      "visibility": "visible",
+      "hiddenAttr": false,
+      "width": 201,
+      "height": 44,
+      "visible": true
+    }
+  ],
+  "switcher": [
+    {
+      "selector": "[data-testid=\"agent-group-switcher\"]",
+      "text": "SB •",
+      "title": null,
+      "ariaLabel": null,
+      "display": "flex",
+      "visibility": "visible",
+      "hiddenAttr": false,
+      "width": 304,
+      "height": 27,
+      "visible": true
+    }
+  ],
+  "dropdown": [],
+  "headerTabs": [
+    {
+      "selector": "[data-testid=\"terminal-header-tab\"]",
+      "text": "SB •",
+      "title": "Switch to SB — draft",
+      "ariaLabel": null,
+      "display": "block",
+      "visibility": "visible",
+      "hiddenAttr": false,
+      "width": 47,
+      "height": 27,
+      "visible": true
+    }
+  ],
+  "composerInputCount": 1,
+  "activeSessionText": "SA"
+}
+
+console:
+error: WebSocket connection to 'ws://localhost:3210/ws/tmux/SA%3A0.0?token=f2-validator-token' failed: Error during WebSocket handshake: Unexpected response code: 404
+error: WebSocket connection to 'ws://localhost:3210/ws/tmux/SB%3A0.0?token=f2-validator-token' failed: Error during WebSocket handshake: Unexpected response code: 404
+error: WebSocket connection to 'ws://localhost:3210/ws/tmux/SA%3A0.0?token=f2-validator-token' failed: Error during WebSocket handshake: Unexpected response code: 404

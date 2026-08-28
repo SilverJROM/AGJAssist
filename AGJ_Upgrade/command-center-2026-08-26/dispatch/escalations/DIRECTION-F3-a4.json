@@ -1,0 +1,9 @@
+{
+  "slice": "F3",
+  "attempt": 8,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F3-c1 re-delivery (raised 2026-08-27T09:56:46Z, epoch 3745902, TOP RUNG I1/I2). Already answered by PLAN_SOUND budget 6 then PASS. F3 is DONE at 41459b9897. parked=[]. Live drain is D0. Do NOT unpark or re-dispatch F3. Product I1/I2 unchanged \u2014 not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T05:39:52Z"
+}

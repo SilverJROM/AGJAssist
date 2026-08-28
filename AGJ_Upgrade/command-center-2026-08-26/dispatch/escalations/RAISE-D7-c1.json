@@ -1,0 +1,15 @@
+{
+  "slice": "D7",
+  "cycle": 1,
+  "attempt": 0,
+  "why": "D7_journey_is_still_the_A0_scaffold_not_an_authored_journey__E1_asserts_unauthenticated_GET_api_summary-endpoints_eq_200_while_og-req_F3_and_slice_D4_mandate_owner-only__measured_401_unauth_but_200_with_owner_token_returning_seeded_default_label_140__E3_targets_api_agent-summaries_404_and_F2_targets_GET_api_summary-endpoints_default_404_neither_of_which_any_unit_was_asked_to_build_real_routes_are_api_summary-agents_NAME_summaries_and_POST_api_summary-endpoints_ID_default__spec_hardcodes_origin_3210_and_ignores_FENCE_ORIGIN_OWNER_TOKEN_unlike_the_authored_C6_journey__contracted_arrival_fixture_closed-C6-solicit-reply-on-temp-pane_is_absent_so_requirement_E1_capture-summarize-persist_is_never_exercised__fingerprint_fp1_133f738fe4897111ec47_was_already_red_at_the_pre-D1_baseline_so_no_contributing_unit_can_own_it",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787824829-1201168",
+  "raised_at": "2026-08-27T19:29:40Z",
+  "note": "fault_class=plan means the implementer seat ladder is SKIPPED entirely \u2014 do not answer RETRY_WITH_DIRECTION into L2/L3. Walking the ladder on a broken plan burns three seats to rediscover the plan is broken. Re-plan the fence, or return a DIRECTION with action=PLAN_SOUND carrying `what_validator_missed`."
+}

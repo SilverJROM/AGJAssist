@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 16,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F4-c1 re-delivery (raised 2026-08-28T00:25:10Z, epoch 1787824829-1201168 dead, HUNG 1800s). F4 PENDING not parked. PLAN_SOUND stands in directions-active/F4.txt. DIRECTION-F4-a7 SKIP already applied 07:29. HEAD 23ff1d1; no advance-F4. Do NOT RETRY (not parked). Do NOT split. Live drain is 276623. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T09:52:35Z"
+}

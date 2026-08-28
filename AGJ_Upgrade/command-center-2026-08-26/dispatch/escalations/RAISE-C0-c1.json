@@ -1,0 +1,18 @@
+{
+  "slice": "C0",
+  "cycle": 1,
+  "attempt": 4,
+  "why": "PLAN REVIEW REQUIRED \u2014 the TOP RUNG failed. budget exhausted. THE QUESTION IS NOT \"which model next\" \u2014 it is: **is the acceptance criterion still true of the product?** Re-read the AC text against what the product actually does now. A criterion that has drifted fails IDENTICALLY at every tier, so a retry or an escalation buys more failures at higher cost. Answer the question before offering an action; RETRY_WITH_DIRECTION is NOT the default here. \u2014 REPEATED_FAILURE_SAME_REQUIREMENT (TEST_NOT_DISCRIMINATING|HARNESS-SMOKE): the same criterion failed the same way on consecutive attempts. Before retrying or escalating a tier, check whether the AC is satisfiable as written; a defective one fails identically at every tier.",
+  "gate_failed": [
+    "verdict=FAIL",
+    "commit: PRODUCT dirt at verdict commit (inside this slice's own diff): [' M e2e/command-center-reminders-fence.spec.ts']",
+    "redteam: need standard-clean, got standard-failed"
+  ],
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787824829-1201168",
+  "raised_at": "2026-08-27T11:42:46Z"
+}

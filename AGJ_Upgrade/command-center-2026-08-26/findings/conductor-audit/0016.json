@@ -1,0 +1,7 @@
+{
+  "type": "plan-review-required",
+  "slice": "F3",
+  "attempt": 4,
+  "defect_class": "IMPL_INCOMPLETE",
+  "top_rung": true
+}

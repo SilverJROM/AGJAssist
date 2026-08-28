@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 25,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F4-c5 re-delivery (raised 2026-08-28T08:00:39Z, epoch 276663, TRACKED PRODUCT dirt summaries-fence.spec.ts). Dirt already landed 12b6391+d643c37. F4 PENDING not parked; a1 validator_codex55 live after 138b91f. DIRECTION-F4-a16 SKIP already on disk. Do NOT RETRY (not parked). Do NOT park. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:16:29Z"
+}

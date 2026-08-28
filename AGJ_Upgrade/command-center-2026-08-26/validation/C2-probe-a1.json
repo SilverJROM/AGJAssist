@@ -1,0 +1,29 @@
+{
+  "commit": "90df357522aa119c41380ae903ac019c05e323b1",
+  "update_repeat_limit_null": {
+    "before": 5,
+    "after_repeat_limit": 5,
+    "after_next_fire": "2026-01-01T00:00:00.000Z",
+    "intended": { "repeat_limit": null, "next_fire": null },
+    "bug_repeat": true,
+    "bug_next_fire": true
+  },
+  "advance_cadence": {
+    "start": "2026-01-01T00:00:00.000Z",
+    "got": "2026-01-01T00:30:00.000Z",
+    "expected_plus_30m": "2026-01-01T00:30:00.000Z",
+    "matches_30m": true,
+    "spec_greaterThan_would_pass_plus_1ms": true
+  },
+  "format_due_sameday": {
+    "nowIso": "2026-08-27T05:44:38.337Z",
+    "sameDayLaterSqlite": "2026-08-27 23:59:59",
+    "sameDayLaterIso": "2026-08-27T23:59:59.000Z",
+    "lex_sqlite_lte_now": true,
+    "lex_iso_lte_now": false,
+    "sqlite_in_due": true,
+    "iso_in_due": false,
+    "datetime_fn_sqlite_due": 0,
+    "datetime_fn_iso_due": 0
+  }
+}

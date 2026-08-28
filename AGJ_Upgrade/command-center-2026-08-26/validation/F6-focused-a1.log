@@ -1,0 +1,8 @@
+[2m[WebServer] [22m(node:774082) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-responsive.spec.ts:3:1 › responsive tokens present (41ms)
+
+  1 passed (1.1s)

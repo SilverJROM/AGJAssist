@@ -1,0 +1,13 @@
+{
+  "slice": "C0",
+  "first_seen_attempt": 2,
+  "signature": "TEST_NOT_DISCRIMINATING|HARNESS-SMOKE",
+  "requirements": "HARNESS-SMOKE",
+  "defect_class": "TEST_NOT_DISCRIMINATING",
+  "argument": "An acceptance criterion that no implementation can satisfy fails IDENTICALLY at every tier, so another attempt or a stronger seat buys more of the same failure at higher cost. This is the plan review, already written.",
+  "answer": "Criterion is sound. C0 is harness rewrite of the C6 journey against the real C4 contract, not an unsatisfiable AC. a1 failed TEST_NOT_DISCRIMINATING because the spec still lacked owner JWT on page.request, used GET-due/absence instead of fireDue, and did not write the report in finally (plus boot crash on missing pane-utils). a2 signed a hardcoded JWT with the wrong secret and still substituted tmux send-keys for AgentReminderScheduler.fireDue. Different remaining gaps, same HARNESS-SMOKE label — coincidental incomplete harness, not a plan defect. Driver already RE_DISPATCH a3 (budget 2/4). No plan edit, no north.",
+  "answered_at": "2026-08-27T10:51:24Z",
+  "answered_by": "projcore",
+  "how_to_answer": "Decompose or repair the criterion, OR write `answer` here saying why the row is sound and the repeats are coincidental. \"Noted and continued\" is not an answer.",
+  "raised_at": 1787827454
+}

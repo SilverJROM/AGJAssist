@@ -1,0 +1,17 @@
+{
+  "fence": "E5",
+  "fingerprint": "fp1:4c534f69e7dd8f2fd157",
+  "open_failed_ids": [
+    "D1",
+    "D2"
+  ],
+  "negative_control_open_executable": true,
+  "negative_control_open_shape": "assertion-red",
+  "collected": 3,
+  "test_path": "e2e/command-center-wakeup-fence.spec.ts",
+  "test_hash": "sha256:b57c5b9d6cb0b4cd239ecf3814fdc483ed6fa9d1c66e9f16e1beeabe65dc63ee",
+  "negative_control": "FENCE_STUB=E2 FENCE_ID=E5 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+  "authored_by": "coplanner:sol+grok46; rev2-projcore",
+  "opened_at": 1787895592,
+  "driver_epoch": "1787894777-3583140"
+}

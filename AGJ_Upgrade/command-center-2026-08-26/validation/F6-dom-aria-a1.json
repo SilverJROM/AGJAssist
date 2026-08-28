@@ -1,0 +1,3941 @@
+{
+  "errors": [],
+  "results": [
+    {
+      "width": 390,
+      "scheme": "light",
+      "activeName": "alpha",
+      "shell": {
+        "rect": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 820,
+          "left": 10,
+          "right": 380
+        },
+        "bg": "rgb(13, 17, 23)",
+        "color": "rgb(230, 237, 243)",
+        "colorScheme": "dark"
+      },
+      "transcript": {
+        "rect": {
+          "x": 11,
+          "y": 128.2,
+          "width": 368,
+          "height": 535.5,
+          "left": 11,
+          "right": 379
+        },
+        "paddingLeft": "12px",
+        "paddingRight": "12px"
+      },
+      "composer": {
+        "rect": {
+          "x": 11,
+          "y": 702.7,
+          "width": 368,
+          "height": 122.3,
+          "left": 11,
+          "right": 379
+        },
+        "paddingLeft": "12px",
+        "paddingRight": "12px"
+      },
+      "controlBar": {
+        "rect": {
+          "x": 11,
+          "y": 663.7,
+          "width": 368,
+          "height": 39,
+          "left": 11,
+          "right": 379
+        },
+        "justifyContent": "normal",
+        "paddingLeft": "10px",
+        "paddingRight": "10px"
+      },
+      "controlButton": {
+        "rect": {
+          "x": 21,
+          "y": 671.7,
+          "width": 49.6,
+          "height": 31,
+          "left": 21,
+          "right": 70.6
+        },
+        "flexGrow": "1",
+        "flexBasis": "auto",
+        "maxWidth": "none"
+      },
+      "searchToggle": {
+        "rect": {
+          "x": 335,
+          "y": 111.2,
+          "width": 32,
+          "height": 32,
+          "left": 335,
+          "right": 367
+        },
+        "right": "12px"
+      },
+      "searchBar": {
+        "exists": false,
+        "rect": null
+      },
+      "switcher": {
+        "dropdownDisplay": "flex",
+        "stripDisplay": "none",
+        "scrubberDisplay": "none",
+        "optionTexts": [
+          "alpha running",
+          "bravo idle • draft",
+          "charlie idle",
+          "delta idle"
+        ]
+      },
+      "aria": [
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-back-list",
+          "role": null,
+          "aria": "Back to terminal list",
+          "text": "←"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-session-name",
+          "role": null,
+          "aria": null,
+          "text": "alpha"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-last-updated",
+          "role": null,
+          "aria": null,
+          "text": "t1 · bash · updated 9:11:34 AM"
+        },
+        {
+          "tag": "DIV",
+          "testid": "command-center-header",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-header-v2",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "tabs-collapse",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher",
+          "role": null,
+          "aria": null,
+          "text": "bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolima"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "bravo •"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "charlie"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "delta"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "echo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "foxtrot"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "golf"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "hotel"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "india"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "juliet"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "kilo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "lima"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-scrubber",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-dropdown",
+          "role": null,
+          "aria": null,
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": "Agent group switcher",
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "utilities-collapse",
+          "role": null,
+          "aria": "Hide utilities",
+          "text": "‹"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-decrease",
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-increase",
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-mynav",
+          "role": null,
+          "aria": null,
+          "text": "▲ME▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-up",
+          "role": null,
+          "aria": "Jump to my previous message",
+          "text": "▲"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-down",
+          "role": null,
+          "aria": "Jump to my next message",
+          "text": "▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "summaries-toggle",
+          "role": null,
+          "aria": "Agent summaries",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu",
+          "role": null,
+          "aria": "Terminal settings",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "controls-collapse",
+          "role": null,
+          "aria": "Hide controls",
+          "text": "‹"
+        },
+        {
+          "tag": "DIV",
+          "testid": "utilities",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: noneWakeup: noneSummary: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "reminder-chip",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-chip",
+          "role": null,
+          "aria": null,
+          "text": "Wakeup: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "summary-chip",
+          "role": null,
+          "aria": null,
+          "text": "Summary: none"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-menu-sheet",
+          "role": "menu",
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-reminder-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-15",
+          "role": null,
+          "aria": null,
+          "text": "15m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-30",
+          "role": null,
+          "aria": null,
+          "text": "30m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-60",
+          "role": null,
+          "aria": null,
+          "text": "60m"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "cadence-custom-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-unlimited",
+          "role": null,
+          "aria": null,
+          "text": "Unlimited"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-stop",
+          "role": null,
+          "aria": null,
+          "text": "Stop after N"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-agent-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-include-toggle",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "agent-reminder-save",
+          "role": null,
+          "aria": null,
+          "text": "Save"
+        },
+        {
+          "tag": "DIV",
+          "testid": "wakeup-sheet",
+          "role": null,
+          "aria": null,
+          "text": "WakeupPending wakeupsCollapseNo pending wakeupsNo pending wakeupsSchedule wakeupDateTimeActionSave w"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-expand-toggle",
+          "role": null,
+          "aria": null,
+          "text": "Collapse"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-collapsed-summary",
+          "role": null,
+          "aria": null,
+          "text": "No pending wakeups"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-date-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-time-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-action-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-save",
+          "role": null,
+          "aria": null,
+          "text": "Save wakeup"
+        },
+        {
+          "tag": "DIV",
+          "testid": "summary-endpoint-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Summary EndpointsExisting endpointsNo endpointsNew endpointNameBase URLModelAdd"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-baseurl-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-model-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "endpoint-save",
+          "role": null,
+          "aria": null,
+          "text": "Add"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu-done",
+          "role": null,
+          "aria": "Close settings",
+          "text": "Done"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A＋"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset · 17px"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-reply-limit",
+          "role": "group",
+          "aria": "Reply length",
+          "text": "1050Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "10"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "50"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A-"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-show-raw",
+          "role": "switch",
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Select a pane...alpha · t1 · bashbravo · t2 · bashcharlie · t3 · bashdelta · t4 · bashecho · t5 · ba"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "+ New"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Refresh"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Disconnect"
+        },
+        {
+          "tag": "SELECT",
+          "testid": "terminal-lines",
+          "role": null,
+          "aria": null,
+          "text": "2550100150200"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full Screen"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Friendly"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Raw"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-search-toggle",
+          "role": null,
+          "aria": "Search chat",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-refresh",
+          "role": null,
+          "aria": "Refresh terminal",
+          "text": ""
+        },
+        {
+          "tag": "SPAN",
+          "testid": "terminal-refresh-status",
+          "role": null,
+          "aria": null,
+          "text": ""
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "scheme": "light",
+      "activeName": "alpha",
+      "shell": {
+        "rect": {
+          "x": 10,
+          "y": 6,
+          "width": 748,
+          "height": 820,
+          "left": 10,
+          "right": 758
+        },
+        "bg": "rgb(13, 17, 23)",
+        "color": "rgb(230, 237, 243)",
+        "colorScheme": "dark"
+      },
+      "transcript": {
+        "rect": {
+          "x": 11,
+          "y": 128.2,
+          "width": 746,
+          "height": 535.5,
+          "left": 11,
+          "right": 757
+        },
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      },
+      "composer": {
+        "rect": {
+          "x": 11,
+          "y": 702.7,
+          "width": 746,
+          "height": 122.3,
+          "left": 11,
+          "right": 757
+        },
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      },
+      "controlBar": {
+        "rect": {
+          "x": 11,
+          "y": 663.7,
+          "width": 746,
+          "height": 39,
+          "left": 11,
+          "right": 757
+        },
+        "justifyContent": "center",
+        "paddingLeft": "13px",
+        "paddingRight": "13px"
+      },
+      "controlButton": {
+        "rect": {
+          "x": 24,
+          "y": 671.7,
+          "width": 111.6,
+          "height": 31,
+          "left": 24,
+          "right": 135.6
+        },
+        "flexGrow": "1",
+        "flexBasis": "auto",
+        "maxWidth": "none"
+      },
+      "searchToggle": {
+        "rect": {
+          "x": 713,
+          "y": 111.2,
+          "width": 32,
+          "height": 32,
+          "left": 713,
+          "right": 745
+        },
+        "right": "12px"
+      },
+      "searchBar": {
+        "exists": false,
+        "rect": null
+      },
+      "switcher": {
+        "dropdownDisplay": "flex",
+        "stripDisplay": "none",
+        "scrubberDisplay": "none",
+        "optionTexts": [
+          "alpha running",
+          "bravo idle • draft",
+          "charlie idle",
+          "delta idle"
+        ]
+      },
+      "aria": [
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-back-list",
+          "role": null,
+          "aria": "Back to terminal list",
+          "text": "←"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-session-name",
+          "role": null,
+          "aria": null,
+          "text": "alpha"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-last-updated",
+          "role": null,
+          "aria": null,
+          "text": "t1 · bash · updated 9:11:34 AM"
+        },
+        {
+          "tag": "DIV",
+          "testid": "command-center-header",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-header-v2",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "tabs-collapse",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher",
+          "role": null,
+          "aria": null,
+          "text": "bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolima"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "bravo •"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "charlie"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "delta"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "echo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "foxtrot"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "golf"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "hotel"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "india"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "juliet"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "kilo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "lima"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-scrubber",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-dropdown",
+          "role": null,
+          "aria": null,
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": "Agent group switcher",
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "utilities-collapse",
+          "role": null,
+          "aria": "Hide utilities",
+          "text": "‹"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-decrease",
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-increase",
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-mynav",
+          "role": null,
+          "aria": null,
+          "text": "▲ME▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-up",
+          "role": null,
+          "aria": "Jump to my previous message",
+          "text": "▲"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-down",
+          "role": null,
+          "aria": "Jump to my next message",
+          "text": "▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "summaries-toggle",
+          "role": null,
+          "aria": "Agent summaries",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu",
+          "role": null,
+          "aria": "Terminal settings",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "controls-collapse",
+          "role": null,
+          "aria": "Hide controls",
+          "text": "‹"
+        },
+        {
+          "tag": "DIV",
+          "testid": "utilities",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: noneWakeup: noneSummary: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "reminder-chip",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-chip",
+          "role": null,
+          "aria": null,
+          "text": "Wakeup: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "summary-chip",
+          "role": null,
+          "aria": null,
+          "text": "Summary: none"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-menu-sheet",
+          "role": "menu",
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-reminder-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-15",
+          "role": null,
+          "aria": null,
+          "text": "15m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-30",
+          "role": null,
+          "aria": null,
+          "text": "30m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-60",
+          "role": null,
+          "aria": null,
+          "text": "60m"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "cadence-custom-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-unlimited",
+          "role": null,
+          "aria": null,
+          "text": "Unlimited"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-stop",
+          "role": null,
+          "aria": null,
+          "text": "Stop after N"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-agent-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-include-toggle",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "agent-reminder-save",
+          "role": null,
+          "aria": null,
+          "text": "Save"
+        },
+        {
+          "tag": "DIV",
+          "testid": "wakeup-sheet",
+          "role": null,
+          "aria": null,
+          "text": "WakeupPending wakeupsCollapseNo pending wakeupsNo pending wakeupsSchedule wakeupDateTimeActionSave w"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-expand-toggle",
+          "role": null,
+          "aria": null,
+          "text": "Collapse"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-collapsed-summary",
+          "role": null,
+          "aria": null,
+          "text": "No pending wakeups"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-date-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-time-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-action-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-save",
+          "role": null,
+          "aria": null,
+          "text": "Save wakeup"
+        },
+        {
+          "tag": "DIV",
+          "testid": "summary-endpoint-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Summary EndpointsExisting endpointsNo endpointsNew endpointNameBase URLModelAdd"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-baseurl-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-model-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "endpoint-save",
+          "role": null,
+          "aria": null,
+          "text": "Add"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu-done",
+          "role": null,
+          "aria": "Close settings",
+          "text": "Done"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A＋"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset · 17px"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-reply-limit",
+          "role": "group",
+          "aria": "Reply length",
+          "text": "1050Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "10"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "50"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A-"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-show-raw",
+          "role": "switch",
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Select a pane...alpha · t1 · bashbravo · t2 · bashcharlie · t3 · bashdelta · t4 · bashecho · t5 · ba"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "+ New"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Refresh"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Disconnect"
+        },
+        {
+          "tag": "SELECT",
+          "testid": "terminal-lines",
+          "role": null,
+          "aria": null,
+          "text": "2550100150200"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full Screen"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Friendly"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Raw"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-search-toggle",
+          "role": null,
+          "aria": "Search chat",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-refresh",
+          "role": null,
+          "aria": "Refresh terminal",
+          "text": ""
+        },
+        {
+          "tag": "SPAN",
+          "testid": "terminal-refresh-status",
+          "role": null,
+          "aria": null,
+          "text": ""
+        }
+      ]
+    },
+    {
+      "width": 1024,
+      "scheme": "light",
+      "activeName": "alpha",
+      "shell": {
+        "rect": {
+          "x": 10,
+          "y": 6,
+          "width": 1004,
+          "height": 820,
+          "left": 10,
+          "right": 1014
+        },
+        "bg": "rgb(13, 17, 23)",
+        "color": "rgb(230, 237, 243)",
+        "colorScheme": "dark"
+      },
+      "transcript": {
+        "rect": {
+          "x": 11,
+          "y": 128.2,
+          "width": 1002,
+          "height": 535.5,
+          "left": 11,
+          "right": 1013
+        },
+        "paddingLeft": "61px",
+        "paddingRight": "61px"
+      },
+      "composer": {
+        "rect": {
+          "x": 11,
+          "y": 702.7,
+          "width": 1002,
+          "height": 122.3,
+          "left": 11,
+          "right": 1013
+        },
+        "paddingLeft": "61px",
+        "paddingRight": "61px"
+      },
+      "controlBar": {
+        "rect": {
+          "x": 11,
+          "y": 663.7,
+          "width": 1002,
+          "height": 39,
+          "left": 11,
+          "right": 1013
+        },
+        "justifyContent": "center",
+        "paddingLeft": "61px",
+        "paddingRight": "61px"
+      },
+      "controlButton": {
+        "rect": {
+          "x": 72,
+          "y": 671.7,
+          "width": 138.3,
+          "height": 31,
+          "left": 72,
+          "right": 210.3
+        },
+        "flexGrow": "1",
+        "flexBasis": "auto",
+        "maxWidth": "none"
+      },
+      "searchToggle": {
+        "rect": {
+          "x": 969,
+          "y": 111.2,
+          "width": 32,
+          "height": 32,
+          "left": 969,
+          "right": 1001
+        },
+        "right": "12px"
+      },
+      "searchBar": {
+        "exists": false,
+        "rect": null
+      },
+      "switcher": {
+        "dropdownDisplay": "none",
+        "stripDisplay": "none",
+        "scrubberDisplay": "block",
+        "optionTexts": [
+          "alpha running",
+          "bravo idle • draft",
+          "charlie idle",
+          "delta idle"
+        ]
+      },
+      "aria": [
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-back-list",
+          "role": null,
+          "aria": "Back to terminal list",
+          "text": "←"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-session-name",
+          "role": null,
+          "aria": null,
+          "text": "alpha"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-last-updated",
+          "role": null,
+          "aria": null,
+          "text": "t1 · bash · updated 9:11:34 AM"
+        },
+        {
+          "tag": "DIV",
+          "testid": "command-center-header",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-header-v2",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "tabs-collapse",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher",
+          "role": null,
+          "aria": null,
+          "text": "bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolima"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "bravo •"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "charlie"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "delta"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "echo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "foxtrot"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "golf"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "hotel"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "india"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "juliet"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "kilo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "lima"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-scrubber",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-dropdown",
+          "role": null,
+          "aria": null,
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": "Agent group switcher",
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "utilities-collapse",
+          "role": null,
+          "aria": "Hide utilities",
+          "text": "‹"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-decrease",
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-increase",
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-mynav",
+          "role": null,
+          "aria": null,
+          "text": "▲ME▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-up",
+          "role": null,
+          "aria": "Jump to my previous message",
+          "text": "▲"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-down",
+          "role": null,
+          "aria": "Jump to my next message",
+          "text": "▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "summaries-toggle",
+          "role": null,
+          "aria": "Agent summaries",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu",
+          "role": null,
+          "aria": "Terminal settings",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "controls-collapse",
+          "role": null,
+          "aria": "Hide controls",
+          "text": "‹"
+        },
+        {
+          "tag": "DIV",
+          "testid": "utilities",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: noneWakeup: noneSummary: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "reminder-chip",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-chip",
+          "role": null,
+          "aria": null,
+          "text": "Wakeup: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "summary-chip",
+          "role": null,
+          "aria": null,
+          "text": "Summary: none"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-menu-sheet",
+          "role": "menu",
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-reminder-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-15",
+          "role": null,
+          "aria": null,
+          "text": "15m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-30",
+          "role": null,
+          "aria": null,
+          "text": "30m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-60",
+          "role": null,
+          "aria": null,
+          "text": "60m"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "cadence-custom-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-unlimited",
+          "role": null,
+          "aria": null,
+          "text": "Unlimited"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-stop",
+          "role": null,
+          "aria": null,
+          "text": "Stop after N"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-agent-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-include-toggle",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "agent-reminder-save",
+          "role": null,
+          "aria": null,
+          "text": "Save"
+        },
+        {
+          "tag": "DIV",
+          "testid": "wakeup-sheet",
+          "role": null,
+          "aria": null,
+          "text": "WakeupPending wakeupsCollapseNo pending wakeupsNo pending wakeupsSchedule wakeupDateTimeActionSave w"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-expand-toggle",
+          "role": null,
+          "aria": null,
+          "text": "Collapse"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-collapsed-summary",
+          "role": null,
+          "aria": null,
+          "text": "No pending wakeups"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-date-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-time-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-action-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-save",
+          "role": null,
+          "aria": null,
+          "text": "Save wakeup"
+        },
+        {
+          "tag": "DIV",
+          "testid": "summary-endpoint-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Summary EndpointsExisting endpointsNo endpointsNew endpointNameBase URLModelAdd"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-baseurl-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-model-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "endpoint-save",
+          "role": null,
+          "aria": null,
+          "text": "Add"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu-done",
+          "role": null,
+          "aria": "Close settings",
+          "text": "Done"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A＋"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset · 17px"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-reply-limit",
+          "role": "group",
+          "aria": "Reply length",
+          "text": "1050Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "10"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "50"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A-"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-show-raw",
+          "role": "switch",
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Select a pane...alpha · t1 · bashbravo · t2 · bashcharlie · t3 · bashdelta · t4 · bashecho · t5 · ba"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "+ New"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Refresh"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Disconnect"
+        },
+        {
+          "tag": "SELECT",
+          "testid": "terminal-lines",
+          "role": null,
+          "aria": null,
+          "text": "2550100150200"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full Screen"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Friendly"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Raw"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-search-toggle",
+          "role": null,
+          "aria": "Search chat",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-refresh",
+          "role": null,
+          "aria": "Refresh terminal",
+          "text": ""
+        },
+        {
+          "tag": "SPAN",
+          "testid": "terminal-refresh-status",
+          "role": null,
+          "aria": null,
+          "text": ""
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "scheme": "dark",
+      "activeName": "alpha",
+      "shell": {
+        "rect": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 820,
+          "left": 10,
+          "right": 380
+        },
+        "bg": "rgb(13, 17, 23)",
+        "color": "rgb(230, 237, 243)",
+        "colorScheme": "dark"
+      },
+      "transcript": {
+        "rect": {
+          "x": 11,
+          "y": 128.2,
+          "width": 368,
+          "height": 535.5,
+          "left": 11,
+          "right": 379
+        },
+        "paddingLeft": "12px",
+        "paddingRight": "12px"
+      },
+      "composer": {
+        "rect": {
+          "x": 11,
+          "y": 702.7,
+          "width": 368,
+          "height": 122.3,
+          "left": 11,
+          "right": 379
+        },
+        "paddingLeft": "12px",
+        "paddingRight": "12px"
+      },
+      "controlBar": {
+        "rect": {
+          "x": 11,
+          "y": 663.7,
+          "width": 368,
+          "height": 39,
+          "left": 11,
+          "right": 379
+        },
+        "justifyContent": "normal",
+        "paddingLeft": "10px",
+        "paddingRight": "10px"
+      },
+      "controlButton": {
+        "rect": {
+          "x": 21,
+          "y": 671.7,
+          "width": 49.6,
+          "height": 31,
+          "left": 21,
+          "right": 70.6
+        },
+        "flexGrow": "1",
+        "flexBasis": "auto",
+        "maxWidth": "none"
+      },
+      "searchToggle": {
+        "rect": {
+          "x": 335,
+          "y": 111.2,
+          "width": 32,
+          "height": 32,
+          "left": 335,
+          "right": 367
+        },
+        "right": "12px"
+      },
+      "searchBar": {
+        "exists": false,
+        "rect": null
+      },
+      "switcher": {
+        "dropdownDisplay": "flex",
+        "stripDisplay": "none",
+        "scrubberDisplay": "none",
+        "optionTexts": [
+          "alpha running",
+          "bravo idle • draft",
+          "charlie idle",
+          "delta idle"
+        ]
+      },
+      "aria": [
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-back-list",
+          "role": null,
+          "aria": "Back to terminal list",
+          "text": "←"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-session-name",
+          "role": null,
+          "aria": null,
+          "text": "alpha"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-last-updated",
+          "role": null,
+          "aria": null,
+          "text": "t1 · bash · updated 9:11:34 AM"
+        },
+        {
+          "tag": "DIV",
+          "testid": "command-center-header",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-header-v2",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "tabs-collapse",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher",
+          "role": null,
+          "aria": null,
+          "text": "bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolima"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "bravo •"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "charlie"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "delta"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "echo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "foxtrot"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "golf"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "hotel"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "india"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "juliet"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "kilo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "lima"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-scrubber",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-dropdown",
+          "role": null,
+          "aria": null,
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": "Agent group switcher",
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "utilities-collapse",
+          "role": null,
+          "aria": "Hide utilities",
+          "text": "‹"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-decrease",
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-increase",
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-mynav",
+          "role": null,
+          "aria": null,
+          "text": "▲ME▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-up",
+          "role": null,
+          "aria": "Jump to my previous message",
+          "text": "▲"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-down",
+          "role": null,
+          "aria": "Jump to my next message",
+          "text": "▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "summaries-toggle",
+          "role": null,
+          "aria": "Agent summaries",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu",
+          "role": null,
+          "aria": "Terminal settings",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "controls-collapse",
+          "role": null,
+          "aria": "Hide controls",
+          "text": "‹"
+        },
+        {
+          "tag": "DIV",
+          "testid": "utilities",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: noneWakeup: noneSummary: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "reminder-chip",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-chip",
+          "role": null,
+          "aria": null,
+          "text": "Wakeup: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "summary-chip",
+          "role": null,
+          "aria": null,
+          "text": "Summary: none"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-menu-sheet",
+          "role": "menu",
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-reminder-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-15",
+          "role": null,
+          "aria": null,
+          "text": "15m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-30",
+          "role": null,
+          "aria": null,
+          "text": "30m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-60",
+          "role": null,
+          "aria": null,
+          "text": "60m"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "cadence-custom-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-unlimited",
+          "role": null,
+          "aria": null,
+          "text": "Unlimited"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-stop",
+          "role": null,
+          "aria": null,
+          "text": "Stop after N"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-agent-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-include-toggle",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "agent-reminder-save",
+          "role": null,
+          "aria": null,
+          "text": "Save"
+        },
+        {
+          "tag": "DIV",
+          "testid": "wakeup-sheet",
+          "role": null,
+          "aria": null,
+          "text": "WakeupPending wakeupsCollapseNo pending wakeupsNo pending wakeupsSchedule wakeupDateTimeActionSave w"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-expand-toggle",
+          "role": null,
+          "aria": null,
+          "text": "Collapse"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-collapsed-summary",
+          "role": null,
+          "aria": null,
+          "text": "No pending wakeups"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-date-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-time-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-action-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-save",
+          "role": null,
+          "aria": null,
+          "text": "Save wakeup"
+        },
+        {
+          "tag": "DIV",
+          "testid": "summary-endpoint-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Summary EndpointsExisting endpointsNo endpointsNew endpointNameBase URLModelAdd"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-baseurl-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-model-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "endpoint-save",
+          "role": null,
+          "aria": null,
+          "text": "Add"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu-done",
+          "role": null,
+          "aria": "Close settings",
+          "text": "Done"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A＋"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset · 17px"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-reply-limit",
+          "role": "group",
+          "aria": "Reply length",
+          "text": "1050Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "10"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "50"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A-"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-show-raw",
+          "role": "switch",
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Select a pane...alpha · t1 · bashbravo · t2 · bashcharlie · t3 · bashdelta · t4 · bashecho · t5 · ba"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "+ New"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Refresh"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Disconnect"
+        },
+        {
+          "tag": "SELECT",
+          "testid": "terminal-lines",
+          "role": null,
+          "aria": null,
+          "text": "2550100150200"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full Screen"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Friendly"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Raw"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-search-toggle",
+          "role": null,
+          "aria": "Search chat",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-refresh",
+          "role": null,
+          "aria": "Refresh terminal",
+          "text": ""
+        },
+        {
+          "tag": "SPAN",
+          "testid": "terminal-refresh-status",
+          "role": null,
+          "aria": null,
+          "text": ""
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "scheme": "dark",
+      "activeName": "alpha",
+      "shell": {
+        "rect": {
+          "x": 10,
+          "y": 6,
+          "width": 748,
+          "height": 820,
+          "left": 10,
+          "right": 758
+        },
+        "bg": "rgb(13, 17, 23)",
+        "color": "rgb(230, 237, 243)",
+        "colorScheme": "dark"
+      },
+      "transcript": {
+        "rect": {
+          "x": 11,
+          "y": 128.2,
+          "width": 746,
+          "height": 535.5,
+          "left": 11,
+          "right": 757
+        },
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      },
+      "composer": {
+        "rect": {
+          "x": 11,
+          "y": 702.7,
+          "width": 746,
+          "height": 122.3,
+          "left": 11,
+          "right": 757
+        },
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      },
+      "controlBar": {
+        "rect": {
+          "x": 11,
+          "y": 663.7,
+          "width": 746,
+          "height": 39,
+          "left": 11,
+          "right": 757
+        },
+        "justifyContent": "center",
+        "paddingLeft": "13px",
+        "paddingRight": "13px"
+      },
+      "controlButton": {
+        "rect": {
+          "x": 24,
+          "y": 671.7,
+          "width": 111.6,
+          "height": 31,
+          "left": 24,
+          "right": 135.6
+        },
+        "flexGrow": "1",
+        "flexBasis": "auto",
+        "maxWidth": "none"
+      },
+      "searchToggle": {
+        "rect": {
+          "x": 713,
+          "y": 111.2,
+          "width": 32,
+          "height": 32,
+          "left": 713,
+          "right": 745
+        },
+        "right": "12px"
+      },
+      "searchBar": {
+        "exists": false,
+        "rect": null
+      },
+      "switcher": {
+        "dropdownDisplay": "flex",
+        "stripDisplay": "none",
+        "scrubberDisplay": "none",
+        "optionTexts": [
+          "alpha running",
+          "bravo idle • draft",
+          "charlie idle",
+          "delta idle"
+        ]
+      },
+      "aria": [
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-back-list",
+          "role": null,
+          "aria": "Back to terminal list",
+          "text": "←"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-session-name",
+          "role": null,
+          "aria": null,
+          "text": "alpha"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-last-updated",
+          "role": null,
+          "aria": null,
+          "text": "t1 · bash · updated 9:11:34 AM"
+        },
+        {
+          "tag": "DIV",
+          "testid": "command-center-header",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-header-v2",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "tabs-collapse",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher",
+          "role": null,
+          "aria": null,
+          "text": "bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolima"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "bravo •"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "charlie"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "delta"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "echo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "foxtrot"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "golf"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "hotel"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "india"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "juliet"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "kilo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "lima"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-scrubber",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-dropdown",
+          "role": null,
+          "aria": null,
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": "Agent group switcher",
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "utilities-collapse",
+          "role": null,
+          "aria": "Hide utilities",
+          "text": "‹"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-decrease",
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-increase",
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-mynav",
+          "role": null,
+          "aria": null,
+          "text": "▲ME▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-up",
+          "role": null,
+          "aria": "Jump to my previous message",
+          "text": "▲"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-down",
+          "role": null,
+          "aria": "Jump to my next message",
+          "text": "▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "summaries-toggle",
+          "role": null,
+          "aria": "Agent summaries",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu",
+          "role": null,
+          "aria": "Terminal settings",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "controls-collapse",
+          "role": null,
+          "aria": "Hide controls",
+          "text": "‹"
+        },
+        {
+          "tag": "DIV",
+          "testid": "utilities",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: noneWakeup: noneSummary: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "reminder-chip",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-chip",
+          "role": null,
+          "aria": null,
+          "text": "Wakeup: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "summary-chip",
+          "role": null,
+          "aria": null,
+          "text": "Summary: none"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-menu-sheet",
+          "role": "menu",
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-reminder-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-15",
+          "role": null,
+          "aria": null,
+          "text": "15m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-30",
+          "role": null,
+          "aria": null,
+          "text": "30m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-60",
+          "role": null,
+          "aria": null,
+          "text": "60m"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "cadence-custom-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-unlimited",
+          "role": null,
+          "aria": null,
+          "text": "Unlimited"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-stop",
+          "role": null,
+          "aria": null,
+          "text": "Stop after N"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-agent-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-include-toggle",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "agent-reminder-save",
+          "role": null,
+          "aria": null,
+          "text": "Save"
+        },
+        {
+          "tag": "DIV",
+          "testid": "wakeup-sheet",
+          "role": null,
+          "aria": null,
+          "text": "WakeupPending wakeupsCollapseNo pending wakeupsNo pending wakeupsSchedule wakeupDateTimeActionSave w"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-expand-toggle",
+          "role": null,
+          "aria": null,
+          "text": "Collapse"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-collapsed-summary",
+          "role": null,
+          "aria": null,
+          "text": "No pending wakeups"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-date-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-time-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-action-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-save",
+          "role": null,
+          "aria": null,
+          "text": "Save wakeup"
+        },
+        {
+          "tag": "DIV",
+          "testid": "summary-endpoint-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Summary EndpointsExisting endpointsNo endpointsNew endpointNameBase URLModelAdd"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-baseurl-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-model-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "endpoint-save",
+          "role": null,
+          "aria": null,
+          "text": "Add"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu-done",
+          "role": null,
+          "aria": "Close settings",
+          "text": "Done"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A＋"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset · 17px"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-reply-limit",
+          "role": "group",
+          "aria": "Reply length",
+          "text": "1050Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "10"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "50"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A-"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-show-raw",
+          "role": "switch",
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Select a pane...alpha · t1 · bashbravo · t2 · bashcharlie · t3 · bashdelta · t4 · bashecho · t5 · ba"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "+ New"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Refresh"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Disconnect"
+        },
+        {
+          "tag": "SELECT",
+          "testid": "terminal-lines",
+          "role": null,
+          "aria": null,
+          "text": "2550100150200"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full Screen"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Friendly"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Raw"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-search-toggle",
+          "role": null,
+          "aria": "Search chat",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-refresh",
+          "role": null,
+          "aria": "Refresh terminal",
+          "text": ""
+        },
+        {
+          "tag": "SPAN",
+          "testid": "terminal-refresh-status",
+          "role": null,
+          "aria": null,
+          "text": ""
+        }
+      ]
+    },
+    {
+      "width": 1024,
+      "scheme": "dark",
+      "activeName": "alpha",
+      "shell": {
+        "rect": {
+          "x": 10,
+          "y": 6,
+          "width": 1004,
+          "height": 820,
+          "left": 10,
+          "right": 1014
+        },
+        "bg": "rgb(13, 17, 23)",
+        "color": "rgb(230, 237, 243)",
+        "colorScheme": "dark"
+      },
+      "transcript": {
+        "rect": {
+          "x": 11,
+          "y": 128.2,
+          "width": 1002,
+          "height": 535.5,
+          "left": 11,
+          "right": 1013
+        },
+        "paddingLeft": "61px",
+        "paddingRight": "61px"
+      },
+      "composer": {
+        "rect": {
+          "x": 11,
+          "y": 702.7,
+          "width": 1002,
+          "height": 122.3,
+          "left": 11,
+          "right": 1013
+        },
+        "paddingLeft": "61px",
+        "paddingRight": "61px"
+      },
+      "controlBar": {
+        "rect": {
+          "x": 11,
+          "y": 663.7,
+          "width": 1002,
+          "height": 39,
+          "left": 11,
+          "right": 1013
+        },
+        "justifyContent": "center",
+        "paddingLeft": "61px",
+        "paddingRight": "61px"
+      },
+      "controlButton": {
+        "rect": {
+          "x": 72,
+          "y": 671.7,
+          "width": 138.3,
+          "height": 31,
+          "left": 72,
+          "right": 210.3
+        },
+        "flexGrow": "1",
+        "flexBasis": "auto",
+        "maxWidth": "none"
+      },
+      "searchToggle": {
+        "rect": {
+          "x": 969,
+          "y": 111.2,
+          "width": 32,
+          "height": 32,
+          "left": 969,
+          "right": 1001
+        },
+        "right": "12px"
+      },
+      "searchBar": {
+        "exists": false,
+        "rect": null
+      },
+      "switcher": {
+        "dropdownDisplay": "none",
+        "stripDisplay": "none",
+        "scrubberDisplay": "block",
+        "optionTexts": [
+          "alpha running",
+          "bravo idle • draft",
+          "charlie idle",
+          "delta idle"
+        ]
+      },
+      "aria": [
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-back-list",
+          "role": null,
+          "aria": "Back to terminal list",
+          "text": "←"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-session-name",
+          "role": null,
+          "aria": null,
+          "text": "alpha"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-last-updated",
+          "role": null,
+          "aria": null,
+          "text": "t1 · bash · updated 9:11:34 AM"
+        },
+        {
+          "tag": "DIV",
+          "testid": "command-center-header",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-header-v2",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolimaalpha runningbravo idle • draft"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "tabs-collapse",
+          "role": null,
+          "aria": null,
+          "text": "Tabs ▼ (11)"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher",
+          "role": null,
+          "aria": null,
+          "text": "bravo •charliedeltaechofoxtrotgolfhotelindiajulietkilolima"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "bravo •"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "charlie"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "delta"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "echo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "foxtrot"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "golf"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "hotel"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "india"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "juliet"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "kilo"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-header-tab",
+          "role": null,
+          "aria": null,
+          "text": "lima"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-scrubber",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-group-switcher-dropdown",
+          "role": null,
+          "aria": null,
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": "Agent group switcher",
+          "text": "alpha runningbravo idle • draftcharlie idledelta idleecho idlefoxtrot idlegolf idlehotel idleindia i"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "utilities-collapse",
+          "role": null,
+          "aria": "Hide utilities",
+          "text": "‹"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-decrease",
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-font-increase",
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-mynav",
+          "role": null,
+          "aria": null,
+          "text": "▲ME▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-up",
+          "role": null,
+          "aria": "Jump to my previous message",
+          "text": "▲"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-mynav-down",
+          "role": null,
+          "aria": "Jump to my next message",
+          "text": "▼"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "summaries-toggle",
+          "role": null,
+          "aria": "Agent summaries",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu",
+          "role": null,
+          "aria": "Terminal settings",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "controls-collapse",
+          "role": null,
+          "aria": "Hide controls",
+          "text": "‹"
+        },
+        {
+          "tag": "DIV",
+          "testid": "utilities",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: noneWakeup: noneSummary: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "reminder-chip",
+          "role": null,
+          "aria": null,
+          "text": "Reminder: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-chip",
+          "role": null,
+          "aria": null,
+          "text": "Wakeup: none"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "summary-chip",
+          "role": null,
+          "aria": null,
+          "text": "Summary: none"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-menu-sheet",
+          "role": "menu",
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "DIV",
+          "testid": "agent-reminder-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedS"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-15",
+          "role": null,
+          "aria": null,
+          "text": "15m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-30",
+          "role": null,
+          "aria": null,
+          "text": "30m"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "cadence-preset-60",
+          "role": null,
+          "aria": null,
+          "text": "60m"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "cadence-custom-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-unlimited",
+          "role": null,
+          "aria": null,
+          "text": "Unlimited"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "repeat-limit-mode-stop",
+          "role": null,
+          "aria": null,
+          "text": "Stop after N"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-agent-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "recipient-include-toggle",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "agent-reminder-save",
+          "role": null,
+          "aria": null,
+          "text": "Save"
+        },
+        {
+          "tag": "DIV",
+          "testid": "wakeup-sheet",
+          "role": null,
+          "aria": null,
+          "text": "WakeupPending wakeupsCollapseNo pending wakeupsNo pending wakeupsSchedule wakeupDateTimeActionSave w"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-expand-toggle",
+          "role": null,
+          "aria": null,
+          "text": "Collapse"
+        },
+        {
+          "tag": "SPAN",
+          "testid": "wakeup-collapsed-summary",
+          "role": null,
+          "aria": null,
+          "text": "No pending wakeups"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-date-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-time-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "wakeup-action-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "wakeup-save",
+          "role": null,
+          "aria": null,
+          "text": "Save wakeup"
+        },
+        {
+          "tag": "DIV",
+          "testid": "summary-endpoint-sheet",
+          "role": null,
+          "aria": null,
+          "text": "Summary EndpointsExisting endpointsNo endpointsNew endpointNameBase URLModelAdd"
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-name-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-baseurl-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "testid": "endpoint-model-input",
+          "role": null,
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "endpoint-save",
+          "role": null,
+          "aria": null,
+          "text": "Add"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-menu-done",
+          "role": null,
+          "aria": "Close settings",
+          "text": "Done"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A−"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A＋"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset · 17px"
+        },
+        {
+          "tag": "DIV",
+          "testid": "terminal-reply-limit",
+          "role": "group",
+          "aria": "Reply length",
+          "text": "1050Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "10"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "50"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A-"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Reset"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "A+"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-show-raw",
+          "role": "switch",
+          "aria": null,
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Select a pane...alpha · t1 · bashbravo · t2 · bashcharlie · t3 · bashdelta · t4 · bashecho · t5 · ba"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "+ New"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Refresh"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Disconnect"
+        },
+        {
+          "tag": "SELECT",
+          "testid": "terminal-lines",
+          "role": null,
+          "aria": null,
+          "text": "2550100150200"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Full Screen"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Friendly"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": null,
+          "role": null,
+          "aria": null,
+          "text": "Raw"
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-search-toggle",
+          "role": null,
+          "aria": "Search chat",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "testid": "terminal-refresh",
+          "role": null,
+          "aria": "Refresh terminal",
+          "text": ""
+        },
+        {
+          "tag": "SPAN",
+          "testid": "terminal-refresh-status",
+          "role": null,
+          "aria": null,
+          "text": ""
+        }
+      ]
+    }
+  ]
+}

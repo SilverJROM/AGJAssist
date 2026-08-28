@@ -1,0 +1,17 @@
+{
+  "secondInsertAccepted": true,
+  "secondInsertError": null,
+  "defaults": [
+    {
+      "name": "default-a",
+      "is_default": 1
+    },
+    {
+      "name": "default-b",
+      "is_default": 1
+    }
+  ],
+  "freshInitialDefaults": {
+    "count": 0
+  }
+}

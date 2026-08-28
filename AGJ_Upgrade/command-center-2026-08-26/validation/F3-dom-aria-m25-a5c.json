@@ -1,0 +1,8 @@
+{
+  "duringRefresh_editable": true,
+  "duringRefresh_value": "typed-while-refreshing",
+  "afterRefresh_valueKept": "typed-while-refreshing",
+  "afterRefresh_editable": true,
+  "afterRefresh_value": "typed-after-refreshing",
+  "afterRefresh_sendEnabled": true
+}

@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 6,
+  "action": "SKIP_TO_PROJCORE",
+  "applied": true,
+  "outcome": "NOT SKIP — superseded by north PLAN_SOUND (harness distinct named-reds). Hold parked until F4 gate; then DIRECTION-E5-a7 RETRY.",
+  "applied_at": "2026-08-28T06:31:30Z",
+  "note": "North 2026-08-28: do not apply this SKIP. PLAN_SOUND harness-correctness after F4. Product E1-E4 unchanged."
+}

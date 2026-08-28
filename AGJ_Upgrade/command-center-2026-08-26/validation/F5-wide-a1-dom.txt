@@ -1,0 +1,30 @@
+{
+  "activeName": "alpha",
+  "dropdownDisplay": "none",
+  "dropdownHidden": false,
+  "selectValue": "bravo:0.0",
+  "selectAria": "Agent group switcher",
+  "options": [
+    {
+      "text": "bravo • draft",
+      "value": "bravo:0.0"
+    },
+    {
+      "text": "charlie",
+      "value": "charlie:0.0"
+    },
+    {
+      "text": "delta",
+      "value": "delta:0.0"
+    }
+  ],
+  "stripDisplay": "flex",
+  "visibleTabs": [
+    "bravo •",
+    "charlie",
+    "delta"
+  ],
+  "scrubberCount": 0,
+  "scrubbers": [],
+  "headerHtml": "<div class=\"terminal-header-v2\" data-testid=\"terminal-header-v2\"><button type=\"button\" class=\"command-center-toggle\" data-testid=\"tabs-collapse\">Tabs ▲ (3)</button><div class=\"terminal-header-tabs\" data-testid=\"agent-group-switcher\"><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to bravo — draft\">bravo •</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to charlie\">charlie</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to delta\">delta</button></div><div class=\"agent-group-switcher-dropdown-wrap\" data-testid=\"agent-group-switcher-dropdown\"><select aria-label=\"Agent group switcher\"><option value=\"bravo:0.0\">bravo • draft</option><option value=\"charlie:0.0\">charlie</option><option value=\"delta:0.0\">delta</option></select></div></div>"
+}

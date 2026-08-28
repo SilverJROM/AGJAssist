@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 13,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "RAISE-E5-c5 (raised 2026-08-28T07:29:57Z, live epoch 143400) is the same fingerprint fp1:4c534f69e7dd8f2fd157 after PLAN_SOUND a11 unpark localized OLD journeys (failing_units=E3) then continued to F4. Fence-author PREPARE has not run. SKIP claims the echo. Do NOT RETRY L2/L3. Do NOT second PLAN_SOUND (would interrupt F4 a1 / double-count a round). Standing E5.txt rides next E5 PREPARE after F4. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T07:49:07Z"
+}

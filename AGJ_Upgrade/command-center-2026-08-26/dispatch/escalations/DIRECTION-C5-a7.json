@@ -1,0 +1,9 @@
+{
+  "slice": "C5",
+  "attempt": 7,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-C5-c1 re-delivery (raised 2026-08-27T06:58:11Z, epoch 1787807412-3745902 dead, codex PATH). C5 DONE at fb921dcfcdd3. DIRECTION-C5-a6 SKIP already on disk. Do NOT RETRY. Live drain is 381861 F4. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:16:29Z"
+}

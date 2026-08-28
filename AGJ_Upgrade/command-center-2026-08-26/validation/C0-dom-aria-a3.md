@@ -1,0 +1,37 @@
+- banner:
+  - heading "AGJAssist" [level=1]
+  - navigation:
+    - link "Dashboard":
+      - /url: "#/"
+    - link "Projects":
+      - /url: "#/projects"
+    - link "Terminals":
+      - /url: "#/terminals"
+    - link "Tasks":
+      - /url: "#/tasks"
+    - link "Notes":
+      - /url: "#/notes"
+    - link "Agent OS":
+      - /url: "#/agent-os"
+    - link "Settings":
+      - /url: "#/settings"
+    - link "MCP Access":
+      - /url: "#/mcp-access"
+  - text: User owner
+  - button "Logout"
+- main:
+  - heading "Terminals" [level=2]
+  - button "Sections": ☰
+  - text: Terminals
+  - button "New session": +
+  - tablist "Session groups":
+    - tab "All" [selected]
+    - button "Create group": +
+  - text: Session expired. Please log in again.
+  - button "Retry"
+- text: 🔒
+- heading "Session Expired" [level=3]
+- paragraph: Your session has expired. Please log in again to continue.
+- text: "Draft auto-saved (1 field) Text: \"agent-a\" Saved at 2:29:01 PM"
+- button "Log In Again"
+- paragraph: Your current page content is still visible behind this overlay. You can copy any unsaved text before logging in.

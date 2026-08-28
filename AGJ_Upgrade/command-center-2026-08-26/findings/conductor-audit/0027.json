@@ -1,0 +1,6 @@
+{
+  "type": "repeated-failure-same-requirement",
+  "slice": "D4",
+  "attempt": 2,
+  "signature": "IMPL_INCOMPLETE|E2,F1,F2,F3"
+}

@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-drafts.spec.ts:3:1 › command-center drafts persist per pane (1.2s)
+
+  1 passed (2.3s)

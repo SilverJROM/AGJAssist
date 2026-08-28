@@ -1,0 +1,10 @@
+
+ RUN  v2.1.9 /home/agjrom/TGBOTS/AGJAssist
+
+ ✓ tests/overmind-removal-services.test.ts (1 test) 1ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  03:37:00
+   Duration  135ms (transform 19ms, setup 0ms, collect 16ms, tests 1ms, environment 0ms, prepare 31ms)
+

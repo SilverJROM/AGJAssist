@@ -1,0 +1,9 @@
+{
+  "slice": "C0",
+  "attempt": 5,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "HARNESS-SMOKE still satisfiable (plan-suspect C0 SOUND at 10:51Z). Not product AC drift, not a plan defect, not north. a4 remainder in validation/C0-fix-a4.md never ran: this RAISE is TOP RUNG on the pre-remainder attempt; budget already 6. HEAD is now F3 (e00ed40+), not afa783f35e. Cherry-pick refs/tiller/command-center-2026-08-26/C0 (6811b3f) onto CURRENT HEAD using harness files only: e2e/command-center-reminders-fence.spec.ts, e2e/run-command-center-playwright-fence.mjs, playwright.cc.config.ts, scripts/cc-run-isolated.mjs. DROP src/api/server.ts and src/web/public/app.js hunks from the cherry-pick \u2014 F3 owns app.js; C0 is HARNESS-CORRECTNESS ONLY. Then only: (1) commit scripts/cc-fire-due.mts so a clean checkout can fireDue; (2) remove spec if (FENCE_STUB===C3) throw \u2014 negative must be exact C5 kind=assert via ActiveRemindersView, must not 500 C4/C6; (3) parse audit details JSON string before solicit_message; (4) C5 positive: seed LITERAL_ACTIVE_C5 in the sheet current folder group then wait /active; (5) make positive C5 and C6 green before --gate. Do not re-litigate JWT/report-finally. Do not add product routes.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-27T13:18:42Z"
+}

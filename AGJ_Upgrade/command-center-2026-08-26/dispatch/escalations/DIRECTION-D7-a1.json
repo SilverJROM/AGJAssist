@@ -1,0 +1,9 @@
+{
+  "slice": "D7",
+  "attempt": 1,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "D0 injected as a D7 dep: rewrite the summaries fence journey first. After D0, driver CLOSE D7 against the real D4 contract plus C6 arrival fixture. Do not walk L2/L3 on the A0 scaffold. Product D1-D6 unchanged.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T00:29:08Z"
+}

@@ -1,0 +1,11 @@
+{
+  "slice": "F5",
+  "first_seen_attempt": 2,
+  "signature": "IMPL_INCOMPLETE|J1,J2",
+  "requirements": "J1,J2",
+  "defect_class": "IMPL_INCOMPLETE",
+  "argument": "An acceptance criterion that no implementation can satisfy fails IDENTICALLY at every tier, so another attempt or a stronger seat buys more of the same failure at higher cost. This is the plan review, already written.",
+  "answer": "J1/J2 ARE satisfiable. a4 validator PASS standard-clean at 40ec05e (validation/F5-redteam-a4.md): 390px native dropdown 120px wide, no overlap with .cc-ctrlcluster; 900px strip+scrubber scrollLeft 0->228; spec uses literal fixtures. a2/a3 IMPL_INCOMPLETE repeats were coincidental phone-width CSS (dropdown vs controls overlap), not AC drift. Terra a4 landed the CSS. Gate then parked a PASS over dirty switcher.spec.ts; that spec is in 40ec05e. PLAN_SOUND re-gate in flight. Do not decompose J1/J2.",
+  "how_to_answer": "Decompose or repair the criterion, OR write `answer` here saying why the row is sound and the repeats are coincidental. \"Noted and continued\" is not an answer.",
+  "raised_at": 1787906553
+}

@@ -1,0 +1,10 @@
+{
+  "lens5_head_youTurnsAfter": 1,
+  "lens5_head_livePollRendered": true,
+  "lens5_head_afterText": "Today\nAGENT\nTEST · 12:51:07 PM\ninitial output fixture\n12:51:07 PM\nYOU\nprobe midsend body rho\nAGENT\nTEST · 12:51:08 PM\nREFRESH BODY rho\nPOST REFRESH POLL rho",
+  "lens6_m2_mutationHits": 1,
+  "lens6_m2_mutationApplied": true,
+  "lens6_m2_youTurnsAfter": 1,
+  "lens6_m2_livePollRendered": false,
+  "lens6_m2_afterText": "Today\nAGENT\nTEST · 12:51:15 PM\ninitial output fixture\n12:51:15 PM\nYOU\nprobe midsend body rho\nAGENT\nTEST · 12:51:15 PM\nREFRESH BODY rho"
+}

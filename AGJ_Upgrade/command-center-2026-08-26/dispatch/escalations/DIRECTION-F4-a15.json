@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 19,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F4-c4 re-delivery (raised 2026-08-28T07:39:19Z, epoch 1787902053-143400). spawn_seat validator_opus5 already handled: orphan reaped 07:42, DIRECTION-F4-a11 SKIP on disk. opus5/sol gone; live seat is fprep_codex55. F4 PENDING not parked. PLAN_SOUND in directions-active/F4.txt. Do NOT RETRY (not parked). Live drain is 276623. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:00:39Z"
+}

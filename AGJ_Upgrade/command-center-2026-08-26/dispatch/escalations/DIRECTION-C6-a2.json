@@ -1,0 +1,9 @@
+{
+  "slice": "C6",
+  "attempt": 2,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-C6-c1 (raised 08:02:10Z, epoch 1787807412-3745902, fault_class=plan). Already answered: DIRECTION-C6-a0 SKIP (keep parked, do not walk L2/L3) then C0 injected as C6 dep and DIRECTION-C6-a1 RETRY unparked 10:00:32Z. C6 is PENDING waiting on C0. fence-close.C6.json still last_green=false on the pre-C0 journey \u2014 do NOT re-CLOSE or dispatch C6 seats until C0 is DONE. Product C1-C6 ACs unchanged. Not north. Drain continues F3 then C0; this file only claims the stale re-delivery.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-27T13:18:42Z"
+}

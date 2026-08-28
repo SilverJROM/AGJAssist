@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 /home/agjrom/TGBOTS/AGJAssist
+
+ ✓ tests/unit/agent-reminder-service.spec.ts (8 tests) 308ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  05:53:38
+   Duration  508ms (transform 65ms, setup 0ms, collect 74ms, tests 308ms, environment 0ms, prepare 38ms)
+
+reclaimed_bytes=7606272

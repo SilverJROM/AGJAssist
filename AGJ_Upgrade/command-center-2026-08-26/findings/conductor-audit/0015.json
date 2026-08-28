@@ -1,0 +1,50 @@
+{
+  "type": "escalate",
+  "slice": "F3",
+  "gate": {
+    "decision": "ESCALATE",
+    "failed": [
+      "verdict=FAIL",
+      "redteam: need standard-clean, got standard-finding"
+    ],
+    "verdict": {
+      "run": "command-center-2026-08-26",
+      "batch": "F3",
+      "attempt": "4",
+      "marker": "DRV-F3-24",
+      "verdict": "FAIL",
+      "req": "I1,I2",
+      "defect_class": "IMPL_INCOMPLETE",
+      "failed_gate": "I2",
+      "commit": "fe7126493cdde78282fa4c5133dae5f05787a8e6",
+      "redteam": "standard-finding",
+      "evidence": "validation/F3-focused-a4.log:d44f8471c48dbbcaf216c2b854b32a46305d323620152a2598a0c4e0da6d4438,validation/F3-redteam-probe-a4.log:0f79eaa7dc63b8b728a82d0e757e9719f595d75a787826c775da914e1a61b36d,validation/F3-redteam-a4.md:7a13001195da892315134a3465a1008752c450d3716a0b99930226a9e28717cf,validation/F3-fix-a4.md:8d67fe8d6ceba78aecc61e37d1c57f628767f487cb3ac0a39cd9b30cbbe62386,validation/F3-dom-aria-a4.json:370a203017c5e73a988011330c4dce939c20b9946a62287bbe20a789730541eb,validation/F3-refresh-before-a4.png:fd91b0fcf218ed33069254bcf8f505605795f5e97c2b5c4b656f4bf8ad9c1606,validation/F3-refresh-normal-during-a4.png:e9bfacbc609b6d0ca7254716634460de4a83ef615ce94774e1b23fe1dd5c1987,validation/F3-refresh-normal-after-a4.png:9b67e8dd19003d080f72416a94249dff05be26605bd2ba6abc4ecb132eebeee3,validation/F3-refresh-search-before-a4.png:6875583671e7780e881c2a86d6b524f41b782c8b434aee51299a528edbfbcf4c,validation/F3-refresh-search-during-a4.png:ad1ea4d50901de1e0de0320ecbaca3f675b3614d22ac01d3738869806f311d50,validation/F3-refresh-search-after-a4.png:1179946e9fe65979e0344ee2a5727447fe03ecff9751b141a60e6ce57ec96acb,e2e/command-center-refresh.spec.ts:6a64c7b77e19a14763c62c046869bbbabf11ac3f0d16fecaae55ed777e8ccdb4,src/web/public/app.js:dea59e47764ae526364c2cc8d48331dd170f84dbadf6d46d58494e407d407296"
+    },
+    "gate_review": false,
+    "release_review": false,
+    "validator_note": "[projcore callback] validator F3 STATUS: DONE \u2014 FAIL existing-output refresh stays stale"
+  },
+  "edge_packet": {
+    "run_id": "command-center-2026-08-26",
+    "batch": "F3",
+    "trigger": "gate:ESCALATE",
+    "failed_conjuncts": [
+      "verdict=FAIL",
+      "redteam: need standard-clean, got standard-finding"
+    ],
+    "defect_class": "IMPL_INCOMPLETE",
+    "row_tiers": {
+      "impl": "L2",
+      "val": "L3",
+      "deliberation": "no",
+      "redteam": "standard"
+    },
+    "available_destinations": [
+      "RE_DISPATCH",
+      "CO_PLANNERS",
+      "NORTH",
+      "PANEL",
+      "JROM"
+    ]
+  }
+}

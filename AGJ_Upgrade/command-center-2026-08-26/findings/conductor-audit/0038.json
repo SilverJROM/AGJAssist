@@ -1,0 +1,14 @@
+{
+  "type": "rollback-discarded",
+  "slice": "F4",
+  "commits": 5,
+  "shortstat": "3 files changed, 191 insertions(+), 13 deletions(-)",
+  "preserved_ref": "refs/tiller/command-center-2026-08-26/F4",
+  "shas": [
+    "4d32468 fix(F4): repair command center header collapse chrome",
+    "7a77cc6 [F4] fix header render tree, controls tuck, utilities toggle, duplicate switcher, and rewrite spec",
+    "7c9b5ae [F4] port TerminalHeaderV2 collapse chrome with data-testid hooks",
+    "038ac73 [F4] Add data-collapsed attribute for TerminalHeaderV2 default collapse",
+    "aaa85de [F4] Add command-center header collapse chrome test scaffold"
+  ]
+}

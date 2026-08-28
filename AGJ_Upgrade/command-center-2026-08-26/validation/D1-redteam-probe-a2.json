@@ -1,0 +1,108 @@
+{
+  "freshResult": {
+    "label": "fresh",
+    "defaults": [
+      {
+        "name": "140",
+        "base_url": "http://192.168.254.140:1234/v1",
+        "model": "qwen2.5-14b-instruct",
+        "is_default": 1,
+        "provenance": "system",
+        "created_at": "2026-08-27 14:46:17",
+        "updated_at": "2026-08-27 14:46:17"
+      }
+    ],
+    "endpointCols": [
+      "id",
+      "name",
+      "base_url",
+      "model",
+      "is_default",
+      "provenance",
+      "created_at",
+      "updated_at"
+    ],
+    "summaryCols": [
+      "id",
+      "agent_name",
+      "endpoint_id",
+      "summary_text",
+      "provenance",
+      "created_at",
+      "updated_at"
+    ],
+    "indexes": [
+      {
+        "name": "idx_summary_llm_endpoints_one_default",
+        "sql": "CREATE UNIQUE INDEX idx_summary_llm_endpoints_one_default ON summary_llm_endpoints(is_default) WHERE is_default = 1"
+      },
+      {
+        "name": "sqlite_autoindex_summary_llm_endpoints_1",
+        "sql": null
+      }
+    ],
+    "secondDefaultAccepted": false,
+    "secondDefaultError": "UNIQUE constraint failed: summary_llm_endpoints.is_default",
+    "summary": {
+      "agent_name": "fresh-agent",
+      "endpoint_id": 2,
+      "summary_text": "literal summary",
+      "provenance": "probe-summary",
+      "created_at": "2026-08-27 14:46:17",
+      "updated_at": "2026-08-27 14:46:17"
+    }
+  },
+  "upgradeResult": {
+    "label": "upgrade",
+    "defaults": [
+      {
+        "name": "140",
+        "base_url": "http://192.168.254.140:1234/v1",
+        "model": "qwen2.5-14b-instruct",
+        "is_default": 1,
+        "provenance": "system",
+        "created_at": "2026-08-27 14:46:17",
+        "updated_at": "2026-08-27 14:46:17"
+      }
+    ],
+    "endpointCols": [
+      "id",
+      "name",
+      "base_url",
+      "model",
+      "is_default",
+      "provenance",
+      "created_at",
+      "updated_at"
+    ],
+    "summaryCols": [
+      "id",
+      "agent_name",
+      "endpoint_id",
+      "summary_text",
+      "provenance",
+      "created_at",
+      "updated_at"
+    ],
+    "indexes": [
+      {
+        "name": "idx_summary_llm_endpoints_one_default",
+        "sql": "CREATE UNIQUE INDEX idx_summary_llm_endpoints_one_default ON summary_llm_endpoints(is_default) WHERE is_default = 1"
+      },
+      {
+        "name": "sqlite_autoindex_summary_llm_endpoints_1",
+        "sql": null
+      }
+    ],
+    "secondDefaultAccepted": false,
+    "secondDefaultError": "UNIQUE constraint failed: summary_llm_endpoints.is_default",
+    "summary": {
+      "agent_name": "upgrade-agent",
+      "endpoint_id": 2,
+      "summary_text": "literal summary",
+      "provenance": "probe-summary",
+      "created_at": "2026-08-27 14:46:17",
+      "updated_at": "2026-08-27 14:46:17"
+    }
+  }
+}

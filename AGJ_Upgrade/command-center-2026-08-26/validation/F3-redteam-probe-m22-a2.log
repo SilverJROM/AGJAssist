@@ -1,0 +1,62 @@
+### MUTANT M1 (reverts Finding-1 fix: kept -> []) — EXPECTED RED
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M1-m22.spec.ts:3:1 › MUTANT M1: M1 reverts Finding-1 fix (kept -> [])
+[1A[2K  1) [cc] › e2e/F3-mutant-M1-m22.spec.ts:3:1 › MUTANT M1: M1 reverts Finding-1 fix (kept -> []) ────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCount[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator:  locator('[data-testid="terminal-turn-user"]')
+    Expected: [32m1[39m
+    Received: [31m0[39m
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toHaveCount" with timeout 5000ms[22m
+    [2m  - waiting for locator('[data-testid="terminal-turn-user"]')[22m
+    [2m    14 × locator resolved to 0 elements[22m
+    [2m       - unexpected value "0"[22m
+
+
+      179 |   await refreshBtn.click();
+      180 |   await expect(refreshStatus).toContainText('Updated', { timeout: 10000 });
+    > 181 |   await expect(page.locator('[data-testid="terminal-turn-user"]')).toHaveCount(1);
+          |                                                                    ^
+      182 |   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('you-turn fixture');
+      183 |
+      184 |   // Freeze prevention: background poll must still reach the transcript after refresh
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/F3-mutant-M1-m22.spec.ts:181:68
+
+    Error Context: test-results/F3-mutant-M1-m22-MUTANT-M1-M1-reverts-Finding-1-fix-kept----cc/error-context.md
+
+
+[1A[2K  1 failed
+    [cc] › e2e/F3-mutant-M1-m22.spec.ts:3:1 › MUTANT M1: M1 reverts Finding-1 fix (kept -> []) ─────
+MUTANT_M1_EXIT=1
+
+### MUTANT M2 (reverts Finding-2 fix: send-ref resets removed) — EXPECTED RED, OBSERVED GREEN
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M2-m22.spec.ts:3:1 › MUTANT M2: M2 reverts Finding-2 fix (send-ref resets removed)
+[1A[2K  1 passed (10.9s)
+MUTANT_M2_EXIT=0
+
+### RED-TEAM PROBES (lenses 1-4)
+
+Running 4 tests using 1 worker
+
+[1A[2K[1/4] [cc] › e2e/F3-redteam-probe-m22.spec.ts:81:1 › LENS 1 HEAD: refresh mid-send keeps the YOU turn and the live poll alive
+[1A[2K[2/4] [cc] › e2e/F3-redteam-probe-m22.spec.ts:85:1 › LENS 2 M2 mutant: same mid-send journey with the send-ref resets removed
+[1A[2K[3/4] [cc] › e2e/F3-redteam-probe-m22.spec.ts:92:1 › LENS 3 HEAD: refresh replaces the agent tail even when a YOU turn is kept
+[1A[2K[4/4] [cc] › e2e/F3-redteam-probe-m22.spec.ts:122:1 › LENS 4 HEAD: a failed YOU turn and its Resend affordance survive refresh
+[1A[2K  4 passed (25.3s)
+
+### RED-TEAM PROBES (lenses 5-6, sharper mid-send specimen)
+
+Running 2 tests using 1 worker
+
+[1A[2K[1/2] [cc] › e2e/F3-redteam-probe-m22b.spec.ts:70:1 › LENS 5 HEAD: mid-send refresh WITH new body, live poll must keep flowing
+[1A[2K[2/2] [cc] › e2e/F3-redteam-probe-m22b.spec.ts:74:1 › LENS 6 M2 mutant: same, with the send-ref resets removed
+[1A[2K  2 passed (16.8s)

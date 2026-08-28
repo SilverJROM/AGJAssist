@@ -1,0 +1,4 @@
+FINDING 1 of 1
+WHAT FAILED: D3 in e2e/command-center-wakeup-fence.spec.ts does not prove fire-once into a temp pane. It creates a tmux session, but the generated script instantiates AgentWakeupService with only DatabaseService, so fireDue() can update agent_one_time_wakeups.status to fired without calling TmuxService.sendCommand or delivering LITERAL_ACTION_D3 to the pane.
+THE FIX: In D3, instantiate the service with a real TmuxService (and any required safety/audit dependencies only if needed by its constructor), then after fireDue() capture the temp pane with tmux capture-pane -p -t ${paneTarget} and assert the literal action LITERAL_ACTION_D3 appears exactly through that pane path before accepting the fired status.
+WHY THE LAST ATTEMPT MISSED IT: The harness asserted the database state transition but not the tmux delivery side effect named by the scope.

@@ -1,0 +1,13 @@
+{
+  "type": "rollback-discarded",
+  "slice": "C0",
+  "commits": 4,
+  "shortstat": "7 files changed, 337 insertions(+), 45 deletions(-)",
+  "preserved_ref": "refs/tiller/command-center-2026-08-26/C0",
+  "shas": [
+    "6811b3f [C0] fix C0 correction attempt 3 token bootstrap, real fireDue, unique tmux sessions, C5 UI negative control",
+    "981b228 [C0] fix harness correctness findings 1-5",
+    "ea2109a [C0] fix fence spec auth, verdict, pane-utils, C3/C6 discrimination",
+    "59e056d [C0] rewrite reminders fence spec for C4 contract"
+  ]
+}

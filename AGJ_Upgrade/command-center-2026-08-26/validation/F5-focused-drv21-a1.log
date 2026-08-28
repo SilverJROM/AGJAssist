@@ -1,0 +1,7 @@
+
+Running 2 tests using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-switcher.spec.ts:121:1 › phone width uses a visible full-group dropdown with current status and draft markers (621ms)
+  ✓  2 [cc] › e2e/command-center-switcher.spec.ts:156:1 › desktop width uses the strip and a pointer-drag scrubber that scrolls the strip (641ms)
+
+  2 passed (2.3s)

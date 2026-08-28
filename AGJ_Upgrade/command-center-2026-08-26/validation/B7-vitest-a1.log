@@ -1,0 +1,247 @@
+=== B7 validation attempt 1 — commit under test 2973a9feb2001cf9e83345ead4e75883d56f4525 ===
+cwd: /home/agjrom/TGBOTS/AGJAssist
+
+--- [1] FOCUSED ROW COMMAND (brief authority) ---
+$ node scripts/cc-run-isolated.mjs --slice B7 -- npx vitest run tests/unit/command-center-migration.spec.ts --minWorkers=1 --maxWorkers=4
+
+ RUN  v2.1.9 /home/agjrom/TGBOTS/AGJAssist
+
+ ✓ tests/unit/command-center-migration.spec.ts (3 tests) 342ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  04:01:01
+   Duration  528ms (transform 55ms, setup 0ms, collect 64ms, tests 342ms, environment 0ms, prepare 31ms)
+
+reclaimed_bytes=7606272
+focused_exit=0
+
+--- [2] REGRESSION SWEEP AT THE COMMIT UNDER TEST (specs that were GREEN at parent 251129b) ---
+$ npx vitest run tests/unit/database.spec.ts tests/mcp-migration.test.ts tests/overmind-project-migration.test.ts --minWorkers=1 --maxWorkers=4
+
+ RUN  v2.1.9 /home/agjrom/TGBOTS/AGJAssist
+
+ ❯ tests/overmind-project-migration.test.ts (3 tests | 1 failed) 83ms
+   × propose-overmind-projects > derives app paths, groups completed workflows, marks slug conflicts, and ignores non-completed rows 55ms
+     → no such table: overmind_workflows
+ ❯ tests/unit/database.spec.ts (12 tests | 4 failed) 719ms
+   × DatabaseService > tracks schema version 30ms
+     → expected 37 to be 36 // Object.is equality
+   × DatabaseService > upgrades a v23 snapshot DB to current and adds current overmind workflow columns 80ms
+     → expected 37 to be 36 // Object.is equality
+   × DatabaseService > upgrades a v31 DB to current with agent tables and leaves existing project rows intact 93ms
+     → expected 37 to be 36 // Object.is equality
+   × DatabaseService > rebuilds v27 overmind_workflows for nullable identity with row survival and project/run uniqueness 197ms
+     → expected 37 to be 36 // Object.is equality
+ ❯ tests/mcp-migration.test.ts (3 tests | 3 failed) 818ms
+   × MCP schema v36 migration parity > upgrades a v34 fixture through groups and MCP with fresh-schema parity 332ms
+     → expected 37 to be 36 // Object.is equality
+   × MCP schema v36 migration parity > is a schema no-op when an already-v36 database is reopened 268ms
+     → expected 37 to be 36 // Object.is equality
+   × MCP schema v36 migration parity > skips the audit rebuild when a partial v35 database already has the mcp CHECK 218ms
+     → expected 37 to be 36 // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/mcp-migration.test.ts > MCP schema v36 migration parity > upgrades a v34 fixture through groups and MCP with fresh-schema parity
+AssertionError: expected 37 to be 36 // Object.is equality
+
+- Expected
++ Received
+
+- 36
++ 37
+
+ ❯ tests/mcp-migration.test.ts:247:36
+    245|       }
+    246| 
+    247|       expect(schemaVersion(fresh)).toBe(36);
+       |                                    ^
+    248|       expect(schemaVersion(upgraded)).toBe(36);
+    249|       expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  tests/mcp-migration.test.ts > MCP schema v36 migration parity > is a schema no-op when an already-v36 database is reopened
+AssertionError: expected 37 to be 36 // Object.is equality
+
+- Expected
++ Received
+
+- 36
++ 37
+
+ ❯ tests/mcp-migration.test.ts:296:39
+    294|     const reopened = new DatabaseService(dbPath);
+    295|     try {
+    296|       expect(schemaVersion(reopened)).toBe(36);
+       |                                       ^
+    297|       expect(relevantSchemaFingerprint(reopened.raw)).toEqual(before);
+    298|       expect(reopened.prepare("SELECT * FROM audit_log ORDER BY id").a…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  tests/mcp-migration.test.ts > MCP schema v36 migration parity > skips the audit rebuild when a partial v35 database already has the mcp CHECK
+AssertionError: expected 37 to be 36 // Object.is equality
+
+- Expected
++ Received
+
+- 36
++ 37
+
+ ❯ tests/mcp-migration.test.ts:315:39
+    313|         .get() as { sql: string; rootpage: number };
+    314| 
+    315|       expect(schemaVersion(upgraded)).toBe(36);
+       |                                       ^
+    316|       expect(auditEntry.sql).toBe(fixture.auditSql);
+    317|       expect(auditEntry.rootpage).toBe(fixture.auditRootPage);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  tests/overmind-project-migration.test.ts > propose-overmind-projects > derives app paths, groups completed workflows, marks slug conflicts, and ignores non-completed rows
+SqliteError: no such table: overmind_workflows
+ ❯ Database.prepare node_modules/better-sqlite3/lib/methods/wrappers.js:5:21
+ ❯ DatabaseService.prepare src/db/database.ts:929:20
+    927| 
+    928|   prepare(sql: string): Database.Statement {
+    929|     return this.db.prepare(sql);
+       |                    ^
+    930|   }
+    931| 
+ ❯ insertWorkflow tests/overmind-project-migration.test.ts:230:6
+ ❯ tests/overmind-project-migration.test.ts:37:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  tests/unit/database.spec.ts > DatabaseService > tracks schema version
+AssertionError: expected 37 to be 36 // Object.is equality
+
+- Expected
++ Received
+
+- 36
++ 37
+
+ ❯ tests/unit/database.spec.ts:78:29
+     76|       .get() as { version: number };
+     77| 
+     78|     expect(version.version).toBe(36);
+       |                             ^
+     79|     db.close();
+     80|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  tests/unit/database.spec.ts > DatabaseService > upgrades a v23 snapshot DB to current and adds current overmind workflow columns
+AssertionError: expected 37 to be 36 // Object.is equality
+
+- Expected
++ Received
+
+- 36
++ 37
+
+ ❯ tests/unit/database.spec.ts:192:29
+    190|     const upgraded = new DatabaseService(TEST_DB);
+    191|     const version = upgraded.prepare("SELECT version FROM schema_versi…
+    192|     expect(version.version).toBe(36);
+       |                             ^
+    193|     const upgradedCols = upgraded.raw.pragma("table_info(overmind_work…
+    194|     const upgradedColNames = upgradedCols.map((c) => c.name);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  tests/unit/database.spec.ts > DatabaseService > upgrades a v31 DB to current with agent tables and leaves existing project rows intact
+AssertionError: expected 37 to be 36 // Object.is equality
+
+- Expected
++ Received
+
+- 36
++ 37
+
+ ❯ tests/unit/database.spec.ts:227:29
+    225|     const upgraded = new DatabaseService(TEST_DB);
+    226|     const version = upgraded.prepare("SELECT version FROM schema_versi…
+    227|     expect(version.version).toBe(36);
+       |                             ^
+    228| 
+    229|     const tableNames = (
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  tests/unit/database.spec.ts > DatabaseService > rebuilds v27 overmind_workflows for nullable identity with row survival and project/run uniqueness
+AssertionError: expected 37 to be 36 // Object.is equality
+
+- Expected
++ Received
+
+- 36
++ 37
+
+ ❯ tests/unit/database.spec.ts:346:29
+    344|     const upgraded = new DatabaseService(TEST_DB);
+    345|     const version = upgraded.prepare("SELECT version FROM schema_versi…
+    346|     expect(version.version).toBe(36);
+       |                             ^
+    347| 
+    348|     const count = upgraded.prepare("SELECT COUNT(*) AS count FROM over…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+ Test Files  3 failed (3)
+      Tests  8 failed | 10 passed (18)
+   Start at  04:01:02
+   Duration  1.01s (transform 91ms, setup 0ms, collect 202ms, tests 1.62s, environment 0ms, prepare 101ms)
+
+regression_exit=1
+
+--- [3] SAME SPECS AT PARENT COMMIT 251129b (baseline, isolated worktree) ---
+$ (worktree @ 2973a9f^) npx vitest run tests/unit/database.spec.ts tests/mcp-migration.test.ts tests/overmind-project-migration.test.ts --minWorkers=1 --maxWorkers=4
+ ✓ tests/unit/database.spec.ts (12 tests) 822ms
+ ✓ tests/mcp-migration.test.ts (3 tests) 914ms
+   ✓ MCP schema v36 migration parity > upgrades a v34 fixture through groups and MCP with fresh-schema parity 359ms
+   ✓ MCP schema v36 migration parity > is a schema no-op when an already-v36 database is reopened 325ms
+
+ Test Files  3 passed (3)
+      Tests  18 passed (18)
+   Start at  04:01:17
+   Duration  1.12s (transform 96ms, setup 0ms, collect 219ms, tests 1.83s, environment 0ms, prepare 104ms)
+
+
+--- [4] PROBE: backup fidelity with an uncheckpointed WAL (crashed-prior-process shape) ---
+main_db_size_before = 4096
+wal_size_before     = 24752
+backups = [ 'agjassist.db.pre-ovm-drop-20260827040118.bak' ]
+backup_size = 4096
+backup_tables = []
+backup_overmind_projects_rows = ERROR: no such table: overmind_projects
+
+--- [5] PROBE: clean-close fidelity (CASE A) + read-only dir (CASE B, inconclusive: sqlite also blocked) ---
+CASE A clean-close: backup_rows = [{"id":1,"slug":"precious-data"}]
+CASE B readonly-dir: constructor_threw = attempt to write a readonly database
+CASE B readonly-dir: backups_created = 0
+CASE B readonly-dir: overmind_projects_still_present = true
+CASE B readonly-dir: version = {"version":36}
+
+--- [6] PROBE: backup copy fails (EISDIR) while sqlite stays writable -> is the DROP still executed? ---
+constructor_threw            = no
+ovm_table_still_present      = false
+version_after                = {"version":37}
+backup_entry agjassist.db.pre-ovm-drop-20260827040118.bak -> isDirectory=true size=4096
+usable_backup_files          = 0
+
+--- [7] PROBE: full-fidelity fresh-vs-upgraded parity on a TRUE v36 DB built at the parent commit ---
+upgraded version = {"version":37}
+fresh version    = {"version":37}
+upgraded objects = 81  fresh objects = 81
+
+PRESENT ONLY IN UPGRADED (leftovers): []
+
+PRESENT ONLY IN FRESH (missing after upgrade): []
+
+DDL TEXT DIFFERS: []
+
+B7-spec-style TABLE-NAME comparison equal? -> true

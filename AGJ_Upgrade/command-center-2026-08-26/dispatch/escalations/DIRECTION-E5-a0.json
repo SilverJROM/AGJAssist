@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 0,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "fault_class=plan: do not walk L2/L3. e2e/command-center-wakeup-fence.spec.ts is still the A0 scaffold: unauthenticated GET /api/agent-wakeups 200 (route does not exist, 404 both ways; E3 asked owner-only GET /api/agent-wakeups/pending), invented POST /api/agent-wakeups/fire (E2 is service-level fireDue, not HTTP), hardcodes origin 3210, ignores FENCE_ORIGIN/OWNER_TOKEN, aborts on first fail so D3 negative is unreachable and FENCE_STUB=E2 is vacuous. Fingerprint fp1:789e9419ade03537b1bb was already red at OPEN before E1 so no unit owns it. Product E1-E4 ACs unchanged. Keep E5 parked. Next TILLER-EXIT/boundary: inject a C0-style harness row to rewrite the journey against real E3 pending routes plus E2 fire-once into a temp pane; FENCE_STUB=E2 named-red on D3 kind=assert; collect ALL ids. Then RETRY E5 CLOSE. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T00:25:10Z"
+}

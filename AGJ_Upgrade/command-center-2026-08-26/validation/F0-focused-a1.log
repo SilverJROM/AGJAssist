@@ -1,0 +1,75 @@
+[1A[2K[2m[WebServer] [22m(node:255031) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/command-center-window-fence.spec.ts:9:1 › command-center window fence journey
+[1A[2K  1) [cc] › e2e/command-center-window-fence.spec.ts:9:1 › command-center window fence journey ──────
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: FENCE failures: [{"id":"G1","kind":"assert"},{"id":"G2","kind":"assert"},{"id":"G3","kind":"assert"},{"id":"H1","kind":"assert"},{"id":"H2","kind":"assert"},{"id":"H3","kind":"assert"},{"id":"I1","kind":"assert"},{"id":"I2","kind":"assert"},{"id":"J1","kind":"assert"},{"id":"J2","kind":"assert"}]
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoEqual[2m([22m[32mexpected[39m[2m) // deep equality[22m
+
+    [32m- Expected  -  1[39m
+    [31m+ Received  + 42[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   Object {[39m
+    [31m+     "id": "G1",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "G2",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "G3",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "H1",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "H2",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "H3",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "I1",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "I2",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "J1",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "J2",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+ ][39m
+
+      86 |   }
+      87 |
+    > 88 |   expect(failed, `FENCE failures: ${JSON.stringify(failed)}`).toEqual([]);
+         |                                                               ^
+      89 | });
+      90 |
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-window-fence.spec.ts:88:63
+
+    Error Context: test-results/command-center-window-fenc-f8fe0-center-window-fence-journey-cc/error-context.md
+
+
+[1A[2K  1 failed
+    [cc] › e2e/command-center-window-fence.spec.ts:9:1 › command-center window fence journey ───────

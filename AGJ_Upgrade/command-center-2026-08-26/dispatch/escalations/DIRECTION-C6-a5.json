@@ -1,0 +1,9 @@
+{
+  "slice": "C6",
+  "attempt": 5,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-C6-c1 re-delivery (raised 2026-08-27T08:02:10Z, epoch 3745902, fault_class=plan scaffold). C6 is DONE at fe98610ebf. fence-close green C1-C6. parked=[]. Live drain is D0. Do NOT re-CLOSE or walk L2/L3. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T05:26:21Z"
+}

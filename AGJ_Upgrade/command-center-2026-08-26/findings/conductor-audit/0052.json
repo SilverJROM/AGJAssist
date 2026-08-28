@@ -1,0 +1,48 @@
+{
+  "type": "escalate",
+  "slice": "F5",
+  "gate": {
+    "decision": "ESCALATE",
+    "failed": [
+      "commit: PRODUCT dirt at verdict commit (inside this slice's own diff): [' M e2e/command-center-switcher.spec.ts']"
+    ],
+    "verdict": {
+      "run": "command-center-2026-08-26",
+      "batch": "F5",
+      "attempt": "4",
+      "marker": "DRV-F5-21",
+      "verdict": "PASS",
+      "req": "J1,J2",
+      "defect_class": "none",
+      "failed_gate": "none",
+      "commit": "40ec05e841e42289566ee9fd36224ca351c43076",
+      "redteam": "standard-clean",
+      "evidence": "e2e/command-center-switcher.spec.ts:9ef3f2aaa4fb2d327aa4018e55ce39d41fc782456891143e0393fca7bc2a6c64,src/web/public/app.js:8801c84a93b223314939f573deab44a30720b4e3a4f7fc9104d3bdce8de3c46e,src/web/public/style.css:5616f7ea2a18c3064441fd4c299b4555099aadea9d481b5db473dcb300bad87e,AGJ_Upgrade/command-center-2026-08-26/validation/F5-focused-a4.log:8d2d0f0b3a4b4c8a676d89974a9220426c096b7706bc78db2a35dccd0bfd5ab3,AGJ_Upgrade/command-center-2026-08-26/validation/F5-narrow-a4.png:6e0b0c0f3a67968f975115d2ea43561108e5ee056d3cdcba1564b4c3503582f5,AGJ_Upgrade/command-center-2026-08-26/validation/F5-narrow-a4-dom.txt:d9061ef26585a0ebdf0e8494493a67be495235ffa692feb5a40ff31068ad93fc,AGJ_Upgrade/command-center-2026-08-26/validation/F5-wide-a4-before.png:a08e4d26c00dbe2cc719df6b520619417c4556a505c03993585a4153da79bb7c,AGJ_Upgrade/command-center-2026-08-26/validation/F5-wide-a4-before-dom.txt:37dc373c9d0c6d2ef20ec81f8ab291e00bcd0eb8688e0556d58747a34d1d3a59,AGJ_Upgrade/command-center-2026-08-26/validation/F5-wide-a4-after.png:33a91efdc31f4c9cd62f5f40994c22abc6d03cb3aefa504a52e64ae6ab4f283b,AGJ_Upgrade/command-center-2026-08-26/validation/F5-wide-a4-after-dom.txt:2944d7f23f0b073169ac3f6f5c0e4108bd9bea3b5918fcd94a074f14b4b28ff2,AGJ_Upgrade/command-center-2026-08-26/validation/F5-redteam-a4.md:093b54770a194bab5bfdc1f51da4797080f37e6039c68d4711934727fb067b68"
+    },
+    "gate_review": false,
+    "release_review": false,
+    "validator_note": "[projcore callback] validator F5 STATUS: DONE \u2014 PASS mechanism=390px non-overlap + scrubber scroll"
+  },
+  "edge_packet": {
+    "run_id": "command-center-2026-08-26",
+    "batch": "F5",
+    "trigger": "gate:ESCALATE",
+    "failed_conjuncts": [
+      "commit: PRODUCT dirt at verdict commit (inside this slice's own diff): [' M e2e/command-center-switcher.spec.ts']"
+    ],
+    "defect_class": "none",
+    "row_tiers": {
+      "impl": "L2",
+      "val": "L3",
+      "deliberation": "no",
+      "redteam": "standard"
+    },
+    "available_destinations": [
+      "RE_DISPATCH",
+      "CO_PLANNERS",
+      "NORTH",
+      "PANEL",
+      "JROM"
+    ]
+  }
+}

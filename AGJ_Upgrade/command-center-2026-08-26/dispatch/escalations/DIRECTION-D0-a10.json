@@ -1,0 +1,9 @@
+{
+  "slice": "D0",
+  "attempt": 10,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "Unpark D0 while F7 waits north. Standing directions-active/D0.txt PLAN_SOUND: cherry-pick refs/tiller/command-center-2026-08-26/D0 (8a0ebc5). Real C6 create-path + LITERAL_SUMMARY_FOR_TEST + timeout so E1 assert beats 60s. Fence-author sonnet5/opus5. Do not add product routes. Not a new north question.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T09:55:16Z"
+}

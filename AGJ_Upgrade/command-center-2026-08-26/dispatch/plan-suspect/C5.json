@@ -1,0 +1,13 @@
+{
+  "slice": "C5",
+  "first_seen_attempt": 2,
+  "signature": "IMPL_INCOMPLETE|C1,C2,C3,C4",
+  "requirements": "C1,C2,C3,C4",
+  "defect_class": "IMPL_INCOMPLETE",
+  "argument": "An acceptance criterion that no implementation can satisfy fails IDENTICALLY at every tier, so another attempt or a stronger seat buys more of the same failure at higher cost. This is the plan review, already written.",
+  "answer": "Criterion is sound. C5 is the UI port of C1-C4 against the existing C4 API, not an unsatisfiable AC. a1 failed C5_SCOPE (stub sheet, not the live controls). a2 failed C5_API_CONTRACT (POST folder_group:null and recipients as boolean toggles instead of C4's non-empty folder_group + recipients:[{agent_name,include}]). Different failed_gates, same req list — coincidental incomplete wiring, not a plan defect. Driver already RE_DISPATCH a3 (budget 2/4). No plan edit, no north.",
+  "answered_at": "2026-08-27T07:55:00Z",
+  "answered_by": "projcore",
+  "how_to_answer": "Decompose or repair the criterion, OR write `answer` here saying why the row is sound and the repeats are coincidental. \"Noted and continued\" is not an answer.",
+  "raised_at": 1787817081
+}

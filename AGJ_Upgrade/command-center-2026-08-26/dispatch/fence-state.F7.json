@@ -1,0 +1,10 @@
+{
+  "fence": "F7",
+  "fingerprints": [
+    "fp1:d6ff8c3e05e42f8c1bb9"
+  ],
+  "rounds": 0,
+  "reprepare_attempts": 1,
+  "plan_sound_rounds": 1,
+  "last_green": false
+}

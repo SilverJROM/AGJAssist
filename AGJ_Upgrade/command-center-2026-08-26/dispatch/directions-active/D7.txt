@@ -1,0 +1,1 @@
+D0 is the summaries harness rewrite, not a D7 product contributor (fence-contract contributors stay D1-D6). D7 stays PARKED until dispatch/advance-D0.marker exists, then CLOSE against the real D4 contract plus C6 arrival fixture. Do not OPEN or CLOSE on the A0/12b6391 scaffold. Product D1-D6 unchanged. Do not walk L2/L3.

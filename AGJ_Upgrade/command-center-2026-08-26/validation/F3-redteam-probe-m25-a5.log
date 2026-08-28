@@ -1,0 +1,88 @@
+### SHIPPED SPEC, 5 CONSECUTIVE RUNS
+load at start: load average: 1.97, 2.29, 2.44
+===== FOCUSED RUN 1 =====
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.4s)
+
+  1 passed (12.5s)
+FOCUSED_RUN_1_EXIT=0
+===== FOCUSED RUN 2 =====
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.6s)
+
+  1 passed (12.7s)
+FOCUSED_RUN_2_EXIT=0
+===== FOCUSED RUN 3 =====
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.4s)
+
+  1 passed (12.4s)
+FOCUSED_RUN_3_EXIT=0
+===== FOCUSED RUN 4 =====
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.2s)
+
+  1 passed (12.3s)
+FOCUSED_RUN_4_EXIT=0
+===== FOCUSED RUN 5 =====
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.4s)
+
+  1 passed (12.5s)
+FOCUSED_RUN_5_EXIT=0
+
+### MUTANT M1 (byte-for-byte shipped spec, inheriting its own test.setTimeout(90000))
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M1-m25.spec.ts:3:1 › MUTANT M1: kept -> []
+[1A[2K  1) [cc] › e2e/F3-mutant-M1-m25.spec.ts:3:1 › MUTANT M1: kept -> [] ───────────────────────────────
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCount[2m([22m[32mexpected[39m[2m)[22m failed
+    > 184 |   await expect(page.locator('[data-testid="terminal-turn-user"]')).toHaveCount(1);
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/F3-mutant-M1-m25.spec.ts:184:68
+[1A[2K  1 failed
+MUTANT_M1_EXIT=1
+
+### MUTANT M2 (byte-for-byte shipped spec, inheriting its own test.setTimeout(90000))
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M2-m25.spec.ts:3:1 › MUTANT M2: both resets removed
+[1A[2K  1) [cc] › e2e/F3-mutant-M2-m25.spec.ts:3:1 › MUTANT M2: both resets removed ──────────────────────
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+    > 206 |   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('midsend poll fixture', { timeout: 10000 });
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/F3-mutant-M2-m25.spec.ts:206:71
+[1A[2K  1 failed
+MUTANT_M2_EXIT=1
+
+### MUTANT M2a (byte-for-byte shipped spec, inheriting its own test.setTimeout(90000))
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M2a-m25.spec.ts:3:1 › MUTANT M2a: only openAgentAfterYouRef reset removed
+[1A[2K  1) [cc] › e2e/F3-mutant-M2a-m25.spec.ts:3:1 › MUTANT M2a: only openAgentAfterYouRef reset removed 
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+    > 206 |   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('midsend poll fixture', { timeout: 10000 });
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/F3-mutant-M2a-m25.spec.ts:206:71
+[1A[2K  1 failed
+MUTANT_M2a_EXIT=1
+
+### MUTANT M2b (byte-for-byte shipped spec, inheriting its own test.setTimeout(90000))
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M2b-m25.spec.ts:3:1 › MUTANT M2b: only sendBaselineRef reset removed
+[1A[2K  1 passed (12.5s)
+MUTANT_M2b_EXIT=0
+
+### HEADROOM LENS: 20s simulated slow mount
+[1A[2K[1/1] [cc] › e2e/F3-headroom90-m25.spec.ts:3:1 › HEADROOM headroom90: 20s slow mount, test timeout 90000ms
+[1A[2K  1 passed (31.6s)
+headroom90_EXIT=0
+[1A[2K[1/1] [cc] › e2e/F3-headroom30-m25.spec.ts:3:1 › HEADROOM headroom30: 20s slow mount, test timeout 30000ms
+[1A[2K  1) [cc] › e2e/F3-headroom30-m25.spec.ts:3:1 › HEADROOM headroom30: 20s slow mount, test timeout 30000ms 
+    [31mTest timeout of 30000ms exceeded.[39m
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/F3-headroom30-m25.spec.ts:196:71
+headroom30_EXIT=1
+
+### FAIL-FAST CHECK
+### fail-fast check: does the 90s ceiling delay a mutant's failure?
+    [32m- [7mmidsend poll[27m fixture[39m
+      205 |   nonRefreshOutput = 'initial output fixture\nmidsend refresh body fixture\nmidsend poll fixture';
+    > 206 |   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('midsend poll fixture', { timeout: 10000 });
+WALL_SECONDS=22 EXIT=1 (mutant fails at its own 10s assertion budget, not the 90s test ceiling)
+
+### PRODUCT + COMPOSER LENSES 1-7 at this commit
+[1A[2K[5/7] [cc] › e2e/F3-redteam-probe-m25.spec.ts:122:1 › LENS 4 HEAD: a failed YOU turn and its Resend affordance survive refresh
+[1A[2K[6/7] [cc] › e2e/F3-redteam-probe-m25b.spec.ts:70:1 › LENS 5 HEAD: mid-send refresh WITH new body, live poll must keep flowing
+[1A[2K[7/7] [cc] › e2e/F3-redteam-probe-m25b.spec.ts:74:1 › LENS 6 M2 mutant: same, with the send-ref resets removed
+[1A[2K  7 passed (44.3s)

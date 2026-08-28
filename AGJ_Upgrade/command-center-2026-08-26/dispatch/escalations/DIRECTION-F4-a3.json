@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 7,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F4-c1 re-delivery (raised 2026-08-28T00:25:10Z, epoch 1201168, HUNG 1800s terra). Already answered: north PLAN_SOUND + DIRECTION-F4-a0 unparked + DIRECTION-F4-a2 RETRY (a3 brief, cherry-pick 4d32468, sol after L1, budget 8) standing in directions-active/F4.txt. F4 is PENDING not parked. Live drain is D0. Do NOT park or split. Product H1/H2 unchanged \u2014 not a new north question.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T05:39:52Z"
+}

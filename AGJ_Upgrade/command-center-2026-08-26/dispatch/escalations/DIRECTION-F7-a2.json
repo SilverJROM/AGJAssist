@@ -1,0 +1,9 @@
+{
+  "slice": "F7",
+  "attempt": 2,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F7-c1 (raised 04:57:31Z, epoch 1787798898-2805445, OPEN nothing-failed / fault_class=plan). Already answered: DIRECTION-F7-a0 SKIP then north G3=[data-testid=refresh-from-session], F0 authored named-red, DIRECTION-F7-a1 RETRY unparked 05:25:16Z. F0 F1 F2 are DONE; F7 deps are F0-F6; F3 is still in-flight. Do NOT OPEN or CLOSE F7 and do not walk L2/L3. Product G1-J2 unchanged \u2014 not north. Drain continues F3 then F4-F6; this file only claims the stale re-delivery.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-27T13:18:42Z"
+}

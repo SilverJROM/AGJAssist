@@ -3,3 +3,6 @@
 {"slice": "B5", "rated": "L2", "landed": "L1", "delta": -1, "attempt": 1, "landed_model": "glimmer", "acs": "A3", "est_min": "25", "ts": 1787800099}
 {"slice": "B6", "rated": "L2", "landed": "L1", "delta": -1, "attempt": 3, "landed_model": "glimmer", "acs": "B1,B2", "est_min": "25", "ts": 1787800831}
 {"slice": "B2", "rated": "L3", "landed": "L1", "delta": -2, "attempt": 1, "landed_model": "glimmer", "acs": "A2", "est_min": "25", "ts": 1787801244}
+{"slice": "F4", "rated": "L2", "landed": "L1", "delta": -1, "attempt": 1, "landed_model": "glimmer", "acs": "H1,H2", "est_min": "35", "ts": 1787904989}
+{"slice": "F5", "rated": "L2", "landed": "L1", "delta": -1, "attempt": 1, "landed_model": "glimmer", "acs": "J1,J2", "est_min": "30", "ts": 1787907449}
+{"slice": "F6", "rated": "L2", "landed": "L2", "delta": 0, "attempt": 4, "landed_model": "terra", "acs": "H3,J1,J2", "est_min": "35", "ts": 1787910350}

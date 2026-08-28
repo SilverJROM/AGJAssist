@@ -1,0 +1,22 @@
+{
+  "error": "TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"terminal-session-name\"]') to be visible\u001b[22m\n",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "url": "http://localhost:3210/index.html#/terminals",
+  "consoleMessages": [],
+  "pageErrors": [
+    "TypeError: i.push is not a function"
+  ],
+  "bodyText": "☰\nTerminals\n+\nAll\nLiteral F4 Group\n⋮\n+\nalpha\nready\n11:23 PM\n📁\nbravo\nready\n11:23 PM\n📁\ncharlie\nready\n11:23 PM\n📁\ndelta\nready\n11:23 PM\n📁\necho\nready\n11:23 PM\n📁\nfoxtrot\nready\n11:23 PM\n📁",
+  "rowCount": 6,
+  "rowText": [
+    "alphaready11:23 PM📁",
+    "bravoready11:23 PM📁",
+    "charlieready11:23 PM📁",
+    "deltaready11:23 PM📁",
+    "echoready11:23 PM📁",
+    "foxtrotready11:23 PM📁"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "slice": "C5",
+  "attempt": 2,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-C5-c1 re-delivery after EXIT resume (raised 06:58:11Z, epoch 3745902, codex PATH). Already answered by DIRECTION-C5-a0 (applied 07:10Z) and DIRECTION-C5-a1 SKIP. C5 is DONE at fb921dcfcd. parked=[]. Live drain is D0. Do NOT unpark or re-dispatch C5. Product C5 ACs unchanged \u2014 not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T04:31:29Z"
+}

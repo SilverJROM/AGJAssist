@@ -1,0 +1,217 @@
+D5 owner-only error probe
+URL: http://localhost:3211/index.html#/terminals
+
+BODY TEXT:
+AGJAssist
+Dashboard
+Projects
+Terminals
+Tasks
+Notes
+Agent OS
+Settings
+User
+MEMBER
+Logout
+Terminals
+←
+probe
+1 · bash
+A−
+A+
+▲
+ME
+▼
+AGENT REMINDERS
+Active reminders
+No active reminders
+NEW REMINDER
+Cadence
+15m
+30m
+60m
+Repeat limit
+Unlimited
+Stop after N
+Recipient agent
+ Include
+Save
+SUMMARY ENDPOINTS
+Existing endpoints
+140 llama3
+Edit
+Del
+NEW ENDPOINT
+Name
+Base URL
+Model
+Add
+Terminal settings
+Done
+TEXT SIZE
+Conversation size
+Also in Settings ▸ Appearance (syncs everywhere)
+A−
+17px
+A＋
+Reset to default
+Reset · 17px
+REPLY LENGTH
+Minimize agent replies
+Shows the most recent N lines · tap a reply to expand
+10
+50
+Full
+RAW TERMINAL SIZE
+A-
+Reset
+A+
+OUTPUT
+Show raw terminal output
+Reveals stripped CLI chrome
+SESSION
+Terminal Chat
+1
+ERROR
+Select a pane...
+probe · 1 · bash
++ New
+Refresh
+Disconnect
+Lines captured
+Lines
+25
+50
+100
+150
+200
+Friendly
+Raw
+New Session
+probe
+1 bash
+Today
+Unexpected token 'o', "not found" is not valid JSON
+⏎
+Esc
+^C
+⇧⇥
+↑
+↓
+Send as command
+Send raw keys
+▴ Large input
+➤
+
+ARIA SNAPSHOT:
+- banner:
+  - heading "AGJAssist" [level=1]
+  - navigation:
+    - link "Dashboard":
+      - /url: "#/"
+    - link "Projects":
+      - /url: "#/projects"
+    - link "Terminals":
+      - /url: "#/terminals"
+    - link "Tasks":
+      - /url: "#/tasks"
+    - link "Notes":
+      - /url: "#/notes"
+    - link "Agent OS":
+      - /url: "#/agent-os"
+    - link "Settings":
+      - /url: "#/settings"
+  - text: User member
+  - button "Logout"
+- main:
+  - heading "Terminals" [level=2]
+  - button "Back to terminal list": ←
+  - text: probe 1 · bash
+  - button "A−"
+  - button "A+"
+  - button "Jump to my previous message": ▲
+  - text: ME
+  - button "Jump to my next message": ▼
+  - button "Terminal settings" [expanded]
+  - menu:
+    - text: Agent Reminders Active reminders No active reminders New reminder Cadence
+    - button "15m"
+    - button "30m"
+    - button "60m"
+    - spinbutton
+    - text: Repeat limit
+    - button "Unlimited"
+    - button "Stop after N"
+    - text: Recipient agent
+    - textbox: agent-a
+    - checkbox "Include" [checked]
+    - text: Include
+    - button "Save"
+    - text: Summary Endpoints Existing endpoints
+    - radio [checked]
+    - text: 140 llama3
+    - button "Edit"
+    - button "Del"
+    - text: New endpoint Name
+    - textbox "Name": blocked-member-endpoint
+    - text: Base URL
+    - textbox "https://.../v1": https://blocked.example/v1
+    - text: Model
+    - textbox "Model": blocked-model
+    - button "Add"
+    - text: Terminal settings
+    - button "Close settings": Done
+    - text: Text size Conversation size Also in Settings ▸ Appearance (syncs everywhere)
+    - button "A−"
+    - text: 17px
+    - button "A＋"
+    - slider: "17"
+    - text: Reset to default
+    - button "Reset · 17px"
+    - text: Reply length Minimize agent replies Shows the most recent N lines · tap a reply to expand
+    - group "Reply length":
+      - button "10"
+      - button "50"
+      - button "Full"
+    - text: Raw terminal size
+    - button "A-" [disabled]
+    - button "Reset"
+    - button "A+"
+    - text: Output Show raw terminal output Reveals stripped CLI chrome
+    - switch
+    - text: Session
+    - strong: Terminal Chat
+    - text: 1 error
+    - combobox:
+      - option "Select a pane..."
+      - option "probe · 1 · bash" [selected]
+    - button "+ New"
+    - button "Refresh"
+    - button "Disconnect"
+    - text: Lines captured Lines
+    - combobox "Lines":
+      - option "25" [selected]
+      - option "50"
+      - option "100"
+      - option "150"
+      - option "200"
+    - button "Friendly"
+    - button "Raw"
+  - button "New Session"
+  - text: probe 1 bash
+  - button "Search chat"
+  - button "Refresh terminal"
+  - text: Today Unexpected token 'o', "not found" is not valid JSON
+  - group "Terminal keys":
+    - button "⏎"
+    - button "Esc"
+    - button "^C"
+    - button "⇧⇥"
+    - button "↑"
+    - button "↓"
+  - button "Send as command"
+  - button "Send raw keys"
+  - button "▴ Large input"
+  - button "Attach image"
+  - textbox "Message the agent..."
+  - button "➤" [disabled]

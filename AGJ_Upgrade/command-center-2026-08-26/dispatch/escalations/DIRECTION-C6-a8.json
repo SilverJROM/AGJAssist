@@ -1,0 +1,9 @@
+{
+  "slice": "C6",
+  "attempt": 8,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-C6-c1 re-delivery (raised 2026-08-27T08:02:10Z, epoch 1787807412-3745902 dead, plan scaffold). C6 and C0 DONE at fe98610ebf34. DIRECTION-C6-a7 SKIP already on disk. Do NOT RETRY L2/L3 or re-CLOSE F-REMINDERS. Live drain is 381861 F4. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:16:29Z"
+}

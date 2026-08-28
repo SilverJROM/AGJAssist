@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 17,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F4-c2 re-delivery (raised 2026-08-28T06:03:15Z, epoch 1787894777-3583140, TRACKED PRODUCT dirt wakeup-fence/window-fence/wakeup-routes). Dirt already landed a5a6923. HEAD now 23ff1d1. F4 PENDING not parked. PLAN_SOUND in directions-active/F4.txt. DIRECTION-F4-a8 SKIP already applied 07:25. Do NOT RETRY (not parked). Do NOT park. Live drain is 276623. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T09:45:50Z"
+}

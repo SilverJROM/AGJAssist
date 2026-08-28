@@ -1,0 +1,9 @@
+{
+  "slice": "D0",
+  "attempt": 8,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-D0-c1 re-delivery (raised 2026-08-28T04:31:29Z, epoch 1787876944-1679354, SLICE-TOO-BIG). Ruling already applied: north PLAN_SOUND (do not split, do not re-plan) + DIRECTION-D0-a4 RETRY. Standing directions-active/D0.txt (cherry-pick 8a0ebc5, sonnet5 then sol). D0 PENDING not parked, no advance-D0. DIRECTION-D0-a7 SKIP already applied 07:23. Live drain is 276623. Do NOT RETRY now (not parked; would not steer). Do NOT split. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:00:39Z"
+}

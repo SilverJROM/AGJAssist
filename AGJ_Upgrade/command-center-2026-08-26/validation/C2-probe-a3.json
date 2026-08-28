@@ -1,0 +1,15 @@
+{
+  "commit": "65b3b528577e153a4b4e90abed4b5d2d16266d20",
+  "window_open": true,
+  "nowIso": "2026-08-27T06:01:47.738Z",
+  "sqliteEod": "2026-08-27 23:59:59",
+  "trap": { "lex_due": 1, "dt_due": 0 },
+  "service_contains_sameDay": false,
+  "lexical_contains_sameDay": true,
+  "revert_would_fail_notToContain": true,
+  "service_has_2000": true,
+  "service_has_2099": false,
+  "service_has_limited": false,
+  "update_nulls_ok": true,
+  "cadence_literal_ok": true
+}

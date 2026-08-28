@@ -1,0 +1,11 @@
+AGJ_Upgrade/command-center-2026-08-26/decisions/2026-08-28-E5-c4-stale-skip.md
+AGJ_Upgrade/command-center-2026-08-26/decisions/2026-08-28-E5-c5-skip.md
+AGJ_Upgrade/command-center-2026-08-26/decisions/2026-08-28-F4-c3-stale-skip.md
+AGJ_Upgrade/command-center-2026-08-26/decisions/2026-08-28-backstop-2-stale.md
+AGJ_Upgrade/command-center-2026-08-26/decisions/2026-08-28-exit-stale-live-drain.md
+AGJ_Upgrade/command-center-2026-08-26/dispatch/escalations/DIRECTION-E5-a12.json
+AGJ_Upgrade/command-center-2026-08-26/dispatch/escalations/DIRECTION-E5-a13.json
+AGJ_Upgrade/command-center-2026-08-26/dispatch/escalations/DIRECTION-E5-a14.json
+AGJ_Upgrade/command-center-2026-08-26/dispatch/escalations/DIRECTION-F4-a10.json
+AGJ_Upgrade/command-center-2026-08-26/findings/conductor-audit/0046.json
+AGJ_Upgrade/command-center-2026-08-26/validation/F4-focused-v4-worktree.log

@@ -1,0 +1,29 @@
+{
+  "url": "http://localhost:3210/index.html#/terminals",
+  "marker": {
+    "text": "Agent RemindersActive remindersrem-1 30 minNew reminderCadence15m30m60mRepeat limitUnlimitedStop after N Include SkipSave",
+    "display": "block",
+    "visibility": "visible",
+    "childElementCount": 9,
+    "boundingBox": {
+      "x": 34,
+      "y": 126,
+      "width": 1212,
+      "height": 292,
+      "top": 126,
+      "right": 1246,
+      "bottom": 418,
+      "left": 34
+    },
+    "html": "<div data-testid=\"agent-reminder-sheet\"><div class=\"terminal-sheet-sect\">Agent Reminders</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Active reminders</div><div><div data-testid=\"active-reminder-row\">rem-1 30 min</div></div></div><div class=\"terminal-sheet-sect\">New reminder</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Cadence</div><div class=\"terminal-seg\"><button type=\"button\" data-testid=\"cadence-preset-15\">15m</button><button type=\"button\" data-testid=\"cadence-preset-30\">30m</button><button type=\"button\" data-testid=\"cadence-preset-60\">60m</button></div></div><div class=\"terminal-sheet-row\"><input data-testid=\"cadence-custom-input\" type=\"number\" placeholder=\"Custom minutes\" style=\"\"></div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Repeat limit</div><div class=\"terminal-seg\"><button type=\"button\" data-testid=\"repeat-limit-mode-unlimited\" class=\"\">Unlimited</button><button type=\"button\" data-testid=\"repeat-limit-mode-stop\" class=\"sel\">Stop after N</button></div></div><div class=\"terminal-sheet-row\"><input data-testid=\"repeat-limit-input\" type=\"number\" style=\"\"></div><div class=\"terminal-sheet-row\"><label><input type=\"checkbox\" data-testid=\"include-recipients-toggle\" style=\"\"> Include</label><label><input type=\"checkbox\" data-testid=\"skip-recipients-toggle\" style=\"\"> Skip</label></div><div class=\"terminal-sheet-row\"><button type=\"button\" data-testid=\"agent-reminder-save\">Save</button></div></div>"
+  },
+  "controls": {
+    "cadencePreset60": true,
+    "customCadence": true,
+    "repeatInput": true,
+    "includeChecked": false,
+    "skipChecked": true,
+    "activeReminderText": "rem-1 30 min"
+  },
+  "ariaSnapshot": "- text: Agent Reminders Active reminders rem-1 30 min New reminder Cadence\n- button \"15m\"\n- button \"30m\"\n- button \"60m\"\n- spinbutton\n- text: Repeat limit\n- button \"Unlimited\"\n- button \"Stop after N\"\n- spinbutton: \"3\"\n- checkbox \"Include\"\n- text: Include\n- checkbox \"Skip\" [checked]\n- text: Skip\n- button \"Save\""
+}

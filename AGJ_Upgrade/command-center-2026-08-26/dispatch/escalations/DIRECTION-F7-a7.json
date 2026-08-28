@@ -1,0 +1,9 @@
+{
+  "slice": "F7",
+  "attempt": 7,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F7-c1 re-delivery (raised 2026-08-27T04:57:31Z, epoch 1787798898-2805445 dead, OPEN vacuous). F0 DONE at d08ca352dd82. F7 PENDING waiting F4-F6. DIRECTION-F7-a6 SKIP already applied 07:27. Do NOT RETRY L2/L3 or re-CLOSE. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:03:01Z"
+}

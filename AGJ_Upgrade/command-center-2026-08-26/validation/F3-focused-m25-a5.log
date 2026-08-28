@@ -1,0 +1,31 @@
+load at start: load average: 1.97, 2.29, 2.44
+===== FOCUSED RUN 1 =====
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.4s)
+
+  1 passed (12.5s)
+FOCUSED_RUN_1_EXIT=0
+===== FOCUSED RUN 2 =====
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.6s)
+
+  1 passed (12.7s)
+FOCUSED_RUN_2_EXIT=0
+===== FOCUSED RUN 3 =====
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.4s)
+
+  1 passed (12.4s)
+FOCUSED_RUN_3_EXIT=0
+===== FOCUSED RUN 4 =====
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.2s)
+
+  1 passed (12.3s)
+FOCUSED_RUN_4_EXIT=0
+===== FOCUSED RUN 5 =====
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.4s)
+
+  1 passed (12.5s)
+FOCUSED_RUN_5_EXIT=0

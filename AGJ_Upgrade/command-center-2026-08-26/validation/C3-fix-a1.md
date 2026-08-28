@@ -1,0 +1,9 @@
+FINDING 1 of 2
+WHAT FAILED: `AgentReminderScheduler.fireDue` does not restrict due reminders to the caller's user. In `src/services/agent-reminder-scheduler.ts:26-27`, it reads all active due reminders from `AgentSolicitService.getDueReminders()` and filters only by `folder_group`, so a call for user A can send, audit, and advance user B's due reminder.
+THE FIX: In `fireDue`, build the filtered reminder list with `r.user_id === userId` before any send/advance work, then apply the optional `folderGroup` filter. Add a unit test that creates two users with due reminders, calls `fireDue(userA)`, and asserts only user A's reminder is returned/sent/audited/advanced while user B's reminder remains at `repeat_count = 0`.
+WHY THE LAST ATTEMPT MISSED IT: The spec only creates one user, so the global `getDueReminders()` call behaves as if it were user-scoped.
+
+FINDING 2 of 2
+WHAT FAILED: `AgentReminderScheduler.fireDue` resolves current group sessions but ignores them. In `src/services/agent-reminder-scheduler.ts:39-41`, `sessionNames` is computed from `TerminalGroupsService`, but `src/services/agent-reminder-scheduler.ts:57` matches any tmux pane by `recipient.agent_name`, allowing sends to panes outside the reminder's current folder group.
+THE FIX: Convert `sessionNames` to a `Set`, restrict candidate panes to sessions in that set, and only send to an included recipient when the recipient's agent name is present in the current group session set and has a matching pane. Add a unit test where `agent-outside` is an included recipient and has a live pane, but the current group sessions contain only `agent-inside`; assert `sendCommand` is not called for `agent-outside` and the result skips it.
+WHY THE LAST ATTEMPT MISSED IT: The spec's group sessions and mocked panes contain the same included agent, so deleting the group lookup would still pass.

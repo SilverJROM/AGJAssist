@@ -1,0 +1,118 @@
+{
+  "activeName": "charlie",
+  "dropdownDisplay": "none",
+  "dropdownRect": {
+    "x": 0,
+    "y": 0,
+    "width": 0,
+    "height": 0,
+    "top": 0,
+    "right": 0,
+    "bottom": 0,
+    "left": 0
+  },
+  "selectValue": "charlie:0.0",
+  "selectOptions": [
+    {
+      "text": "alpha running",
+      "value": "alpha:0.0",
+      "className": "running"
+    },
+    {
+      "text": "bravo idle • draft",
+      "value": "bravo:0.0",
+      "className": "idle"
+    },
+    {
+      "text": "charlie idle",
+      "value": "charlie:0.0",
+      "className": "active"
+    },
+    {
+      "text": "delta idle",
+      "value": "delta:0.0",
+      "className": "idle"
+    },
+    {
+      "text": "echo idle",
+      "value": "echo:0.0",
+      "className": "idle"
+    },
+    {
+      "text": "foxtrot idle",
+      "value": "foxtrot:0.0",
+      "className": "idle"
+    },
+    {
+      "text": "golf idle",
+      "value": "golf:0.0",
+      "className": "idle"
+    },
+    {
+      "text": "hotel idle",
+      "value": "hotel:0.0",
+      "className": "idle"
+    },
+    {
+      "text": "india idle",
+      "value": "india:0.0",
+      "className": "idle"
+    },
+    {
+      "text": "juliet idle",
+      "value": "juliet:0.0",
+      "className": "idle"
+    },
+    {
+      "text": "kilo idle",
+      "value": "kilo:0.0",
+      "className": "idle"
+    },
+    {
+      "text": "lima idle",
+      "value": "lima:0.0",
+      "className": "idle"
+    }
+  ],
+  "stripDisplay": "flex",
+  "stripScroll": {
+    "left": 228,
+    "clientWidth": 402,
+    "scrollWidth": 632
+  },
+  "visibleTabs": [
+    "alpha",
+    "bravo •",
+    "delta",
+    "echo",
+    "foxtrot",
+    "golf",
+    "hotel",
+    "india",
+    "juliet",
+    "kilo",
+    "lima"
+  ],
+  "scrubberDisplay": "block",
+  "scrubberRect": {
+    "x": 685.046875,
+    "y": 17.09375,
+    "width": 15.953125,
+    "height": 24,
+    "top": 17.09375,
+    "right": 701,
+    "bottom": 41.09375,
+    "left": 685.046875
+  },
+  "controlsRect": {
+    "x": 735,
+    "y": 15.09375,
+    "width": 145,
+    "height": 28,
+    "top": 15.09375,
+    "right": 880,
+    "bottom": 43.09375,
+    "left": 735
+  },
+  "headerHtml": "<div class=\"terminal-header-v2\" data-testid=\"terminal-header-v2\"><button type=\"button\" class=\"command-center-toggle\" data-testid=\"tabs-collapse\">Tabs ▲ (11)</button><div class=\"terminal-header-tabs\" data-testid=\"agent-group-switcher\"><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to alpha\">alpha</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to bravo — draft\">bravo •</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to delta\">delta</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to echo\">echo</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to foxtrot\">foxtrot</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to golf\">golf</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to hotel\">hotel</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to india\">india</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to juliet\">juliet</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to kilo\">kilo</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to lima\">lima</button></div><div class=\"agent-group-switcher-scrubber\" data-testid=\"agent-group-switcher-scrubber\"></div><div class=\"agent-group-switcher-dropdown-wrap\" data-testid=\"agent-group-switcher-dropdown\"><select aria-label=\"Agent group switcher\"><option class=\"running\" value=\"alpha:0.0\">alpha running</option><option class=\"idle\" value=\"bravo:0.0\">bravo idle • draft</option><option class=\"active\" value=\"charlie:0.0\">charlie idle</option><option class=\"idle\" value=\"delta:0.0\">delta idle</option><option class=\"idle\" value=\"echo:0.0\">echo idle</option><option class=\"idle\" value=\"foxtrot:0.0\">foxtrot idle</option><option class=\"idle\" value=\"golf:0.0\">golf idle</option><option class=\"idle\" value=\"hotel:0.0\">hotel idle</option><option class=\"idle\" value=\"india:0.0\">india idle</option><option class=\"idle\" value=\"juliet:0.0\">juliet idle</option><option class=\"idle\" value=\"kilo:0.0\">kilo idle</option><option class=\"idle\" value=\"lima:0.0\">lima idle</option></select></div></div>"
+}

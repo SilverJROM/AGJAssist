@@ -1,0 +1,11 @@
+{
+  "lensD_youTurnsBefore": 1,
+  "lensD_youTurnsAfter": 0,
+  "lensD_afterText": "Today\nAGENT\nTEST · 12:12:31 PM\ninitial output fixture\nagent replied to omega",
+  "lensD_sentMessageSurvived": false,
+  "lensD_memoryAfterRefresh": "{\"entries\":[{\"id\":\"agent-1787832751955\",\"role\":\"agent\",\"label\":\"Agent\",\"content\":\"initial output fixture\\nagent replied to omega\",\"timestamp\":\"12:12:31 PM\"}],\"updatedAt\":1787832751955}",
+  "lensE_mutationApplied": true,
+  "lensE_youTurnsAfter": 1,
+  "lensE_sentMessageSurvived": true,
+  "lensE_afterText": "Today\nAGENT\nTEST · 12:12:33 PM\ninitial output fixture\n12:12:33 PM\nYOU\nprobe live sent message omega\n⚠ Not sent · Unexpected token 'o', \"ok\" is not valid JSON\n↻ Resend\nAGENT\nTEST · 12:12:33 PM\nagent replied to omega"
+}

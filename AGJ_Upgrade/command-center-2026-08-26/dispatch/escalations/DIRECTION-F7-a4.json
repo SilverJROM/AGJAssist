@@ -1,0 +1,9 @@
+{
+  "slice": "F7",
+  "attempt": 4,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F7-c1 re-delivery (raised 2026-08-27T04:57:31Z, epoch 2805445, OPEN vacuous). Already handled: SKIP a0, F0 injected, RETRY a1, SKIP a2/a3. F0 is DONE at d08ca352dd. F7 is PENDING waiting F4-F6 (F4 PLAN_SOUND standing). parked=[]. Do NOT walk L2/L3 or re-CLOSE. Product G1-J2 unchanged \u2014 not north. Live drain is D0.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T05:39:52Z"
+}

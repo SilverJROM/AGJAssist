@@ -1,0 +1,10 @@
+command: npx vitest run tests/overmind-removal-bootstrap.test.ts --minWorkers=1 --maxWorkers=4
+exit_code: 0
+
+RUN v2.1.9 /home/agjrom/TGBOTS/AGJAssist
+
+PASS tests/overmind-removal-bootstrap.test.ts (8 tests) 2ms
+
+Test Files 1 passed (1)
+Tests 8 passed (8)
+Duration 136ms

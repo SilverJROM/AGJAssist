@@ -1,0 +1,66 @@
+[2m[WebServer] [22m(node:527147) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+
+  ✘  1 [cc] › e2e/command-center-switcher.spec.ts:128:1 › phone width presents a current-agent dropdown with draft indicators and no scrubber (5.6s)
+  ✘  2 [cc] › e2e/command-center-switcher.spec.ts:151:1 › desktop width presents the horizontal strip with a draggable scrubber (5.5s)
+
+
+  1) [cc] › e2e/command-center-switcher.spec.ts:128:1 › phone width presents a current-agent dropdown with draft indicators and no scrubber 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator:  locator('[data-testid="agent-group-switcher-dropdown"]')
+    Expected: visible
+    Received: hidden
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('[data-testid="agent-group-switcher-dropdown"]')[22m
+    [2m    14 × locator resolved to <div class="agent-group-switcher-dropdown-wrap" data-testid="agent-group-switcher-dropdown">…</div>[22m
+    [2m       - unexpected value "hidden"[22m
+
+
+      134 |   const select = dropdown.locator('select');
+      135 |
+    > 136 |   await expect(dropdown).toBeVisible();
+          |                          ^
+      137 |   await expect(strip).toBeHidden();
+      138 |   await expect(select).toHaveValue(TARGETS.alpha);
+      139 |   await expect(select.locator('option')).toHaveText([
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-switcher.spec.ts:136:26
+
+    Error Context: test-results/command-center-switcher-ph-6acf0--indicators-and-no-scrubber-cc/error-context.md
+
+  2) [cc] › e2e/command-center-switcher.spec.ts:151:1 › desktop width presents the horizontal strip with a draggable scrubber 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator:  locator('[role="scrollbar"], input[type="range"], [data-testid*="scrub"], .agent-group-switcher-scrubber, .terminal-header-tabs-scrubber').first()
+    Expected: visible
+    Received: hidden
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('[role="scrollbar"], input[type="range"], [data-testid*="scrub"], .agent-group-switcher-scrubber, .terminal-header-tabs-scrubber').first()[22m
+    [2m    14 × locator resolved to <input min="12" max="26" step="1" type="range"/>[22m
+    [2m       - unexpected value "hidden"[22m
+
+
+      160 |   await expect(strip).toBeVisible();
+      161 |   await expect(page.locator('[data-testid="terminal-header-tab"]')).toHaveText(['bravo •', 'charlie', 'delta']);
+    > 162 |   await expect(scrubber).toBeVisible();
+          |                          ^
+      163 |
+      164 |   const before = await strip.evaluate((element) => element.scrollLeft);
+      165 |   const box = await scrubber.boundingBox();
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-switcher.spec.ts:162:26
+
+    Error Context: test-results/command-center-switcher-de-e170e-p-with-a-draggable-scrubber-cc/error-context.md
+
+  2 failed
+    [cc] › e2e/command-center-switcher.spec.ts:128:1 › phone width presents a current-agent dropdown with draft indicators and no scrubber 
+    [cc] › e2e/command-center-switcher.spec.ts:151:1 › desktop width presents the horizontal strip with a draggable scrubber 

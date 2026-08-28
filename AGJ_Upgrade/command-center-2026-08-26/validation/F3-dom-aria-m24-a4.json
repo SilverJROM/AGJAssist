@@ -1,0 +1,22 @@
+{
+  "lens1_head_midsend_youTurnsAfter": 1,
+  "lens1_head_midsend_livePollRendered": true,
+  "lens1_head_midsend_afterText": "Today\nAGENT\nTEST · 1:06:10 PM\ninitial output fixture\n1:06:10 PM\nYOU\nprobe interleaved send kappa\nAGENT\nTEST · 1:06:11 PM\nPOST REFRESH AGENT TEXT kappa",
+  "lens2_m2_mutationHits": 1,
+  "lens2_m2_mutationApplied": true,
+  "lens2_m2_midsend_youTurnsAfter": 1,
+  "lens2_m2_midsend_livePollRendered": true,
+  "lens2_m2_midsend_afterText": "Today\nAGENT\nTEST · 1:06:17 PM\ninitial output fixture\n1:06:17 PM\nYOU\nprobe interleaved send kappa\nAGENT\nTEST · 1:06:19 PM\nPOST REFRESH AGENT TEXT kappa",
+  "lens3_midText": "Today\nAGENT\nTEST · 1:06:25 PM\ninitial output fixture\nAGENT REPLY ONE\n1:06:25 PM\nYOU\nprobe replace tail sigma",
+  "lens3_afterText": "Today\nAGENT\nTEST · 1:06:25 PM\ninitial output fixture\nAGENT REPLY ONE\n1:06:25 PM\nYOU\nprobe replace tail sigma\nAGENT\nTEST · 1:06:29 PM\nAGENT REPLY TWO ONLY",
+  "lens3_youTurnsAfter": 1,
+  "lens3_showsReplyTwo": true,
+  "lens3_staleReplyOneGone": false,
+  "lens3_youTextKept": true,
+  "lens4_resendBefore": 1,
+  "lens4_resendAfter": 1,
+  "lens4_failedYouSurvived": true,
+  "lens4_showsRefreshed": true,
+  "lens4_afterText": "Today\n10:00:00\nYOU\nundelivered message tau\n⚠ Not sent · Not sent\n↻ Resend\nAGENT\nTEST · 1:06:31 PM\nrefreshed output fixture tau",
+  "lens4_memoryAfter": "{\"entries\":[{\"id\":\"you-failed\",\"role\":\"user\",\"label\":\"YOU\",\"content\":\"undelivered message tau\",\"timestamp\":\"10:00:00\",\"failed\":true,\"resendText\":\"undelivered message tau\",\"failReason\":\"Not sent\"},{\"id\":\"agent-1787835991991\",\"role\":\"agent\",\"label\":\"Agent\",\"content\":\"refreshed output fixture tau\",\"timestamp\":\"1:06:31 PM\"}],\"updatedAt\":1787835991992}"
+}

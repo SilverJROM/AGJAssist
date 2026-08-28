@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 14,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "RAISE-E5-c5 watcher re-ping. Same seam fp1:4c534f69e7dd8f2fd157, raised 07:29:57Z epoch 143400. DIRECTION-E5-a13 SKIP already on disk; PLAN_SOUND a11 applied 07:27:37Z; standing directions-active/E5.txt. E5 not parked. Live drain is F4 a1 glimmer (quiet 6m). Do NOT RETRY L2/L3. Do NOT second PLAN_SOUND. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T07:39:19Z"
+}

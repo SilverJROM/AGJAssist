@@ -1,0 +1,30 @@
+[2m[WebServer] [22m(node:1404326) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+  ✘  1 [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders (1.0m)
+
+
+  1) [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ─
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: page.waitForSelector: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('[data-testid="terminal-session-name"]') to be visible[22m
+
+
+      65 |   const row = page.locator('[data-testid="terminal-session-row"]').first();
+      66 |   await row.locator('..').click({ force: true });
+    > 67 |   await page.waitForSelector('[data-testid="terminal-session-name"]', { state: 'visible' });
+         |              ^
+      68 |   await page.waitForSelector('[data-testid="command-center-header"]', { state: 'visible' });
+      69 |   await page.waitForSelector('[data-testid="terminal-header-v2"]', { state: 'visible' });
+      70 |
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:67:14
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──

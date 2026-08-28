@@ -1,0 +1,13 @@
+{
+  "type": "rollback-discarded",
+  "slice": "F5",
+  "commits": 4,
+  "shortstat": "3 files changed, 271 insertions(+)",
+  "preserved_ref": "refs/tiller/command-center-2026-08-26/F5",
+  "shas": [
+    "40ec05e feat(F5): prevent phone switcher controls overlap",
+    "ab66edf [F5] Fix phone dropdown width allocation",
+    "d4968bf [F5] Fix switcher dropdown width, full group options with status, add scrubber",
+    "238b28b [F5] AgentGroupSwitcher responsive dropdown + strip"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "slice": "F7",
+  "attempt": 9,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "RAISE-F7-c2 fault_class=plan (raised 2026-08-28T09:52:35Z). Localize failing_units=none. Journey contradicts H1 vs G2/J1/J2; G3/H3/I2 unbound to og-req; FENCE_STUB=F1 client-only so G3 negative unsatisfiable. Do NOT RETRY L2/L3. Keep parked. North must rule: PLAN_SOUND harness-only vs mint F0b harness row + server-backed F7 negative. See decisions/2026-08-28-F7-c2-plan-north.md. Product F1-F6 unchanged.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T09:55:16Z"
+}

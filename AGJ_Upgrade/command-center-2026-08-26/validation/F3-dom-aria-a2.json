@@ -1,0 +1,48 @@
+{
+  "searchOpen": {
+    "refreshCount": 1,
+    "refreshVisible": true
+  },
+  "during": {
+    "status": null,
+    "disabled": true,
+    "ariaBusy": "true",
+    "sawRefreshing": false,
+    "topbarHtml": "<div class=\"terminal-chat-topbar\"><button type=\"button\" class=\"terminal-search-toggle\" data-testid=\"terminal-search-toggle\" aria-label=\"Search chat\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><path d=\"M21 21l-4.3-4.3\"></path></svg></button><button type=\"button\" class=\"terminal-refresh-btn\" data-testid=\"terminal-refresh\" aria-label=\"Refresh terminal\" aria-busy=\"true\" disabled=\"\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M23 4v6h-6\"></path><path d=\"M1 20v-6h6\"></path><path d=\"M3.51 9a9 9 0 0 1 14.13-3.36L23 10\"></path><path d=\"M1 14a9 9 0 0 0 14.13 3.36L23 14\"></path></svg></button></div>",
+    "composerValue": "keep-me",
+    "sessionCalls": 2,
+    "outputCalls": 2
+  },
+  "prematurelyUpdated": {
+    "status": null,
+    "sawUpdated": false,
+    "conversationText": "Today",
+    "lastUpdated": "TEST:0.0 · zsh · updated 9:37:42 AM",
+    "composerValue": "keep-me",
+    "sessionCalls": 3,
+    "outputCalls": 13,
+    "outputRefreshPending": true
+  },
+  "after": {
+    "status": null,
+    "sawRefreshedOutput": true,
+    "conversationText": "TodayAGENTTEST · 9:37:53 AMrefreshed output fixture",
+    "lastUpdated": "TEST:0.0 · zsh · updated 9:37:53 AM",
+    "composerValue": "keep-me",
+    "sessionCalls": 3,
+    "outputCalls": 13,
+    "outputRefreshPending": false
+  },
+  "aria": {
+    "refreshButtons": [
+      {
+        "ariaLabel": "Refresh terminal",
+        "ariaBusy": "false",
+        "disabled": false,
+        "text": ""
+      }
+    ],
+    "refreshStatus": "",
+    "bodyText": "AGJAssistDashboardProjectsTerminalsTasksNotesAgent OSSettingsUserLogoutTerminals←TESTTEST:0.0 · zsh · updated 9:37:53 AMA−A+▲ME▼Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedStop after NRecipient agent IncludeSaveTerminal settingsDoneText sizeConversation sizeAlso in Settings ▸ Appearance (syncs everywhere)A−17pxA＋Reset to defaultReset · 17pxReply lengthMinimize agent repliesShows the most recent N lines · tap a reply to expand1050FullRaw terminal sizeA-ResetA+OutputShow raw terminal outputReveals stripped CLI chromeSessionTerminal ChatTEST:0.0loadingSelect a pane...TEST · TEST:0.0 · zsh+ NewRefreshDisconnectLines capturedLines2550100150200FriendlyRawNew SessionTESTTEST:0.0 zshTodayAGENTTEST · 9:37:53 AMrefreshed output fixture⏎Esc^C⇧⇥↑↓Send as commandSend raw keys▴ Large input➤"
+  }
+}

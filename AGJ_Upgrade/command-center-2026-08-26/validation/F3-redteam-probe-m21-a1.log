@@ -1,0 +1,22 @@
+
+Running 3 tests using 1 worker
+
+  ✓  1 [cc] › e2e/F3-redteam-probe-m21-a1.spec.ts:56:1 › LENS A mutation: reverting refreshOutput to processSnapshot leaves the stale transcript (1.4s)
+  ✓  2 [cc] › e2e/F3-redteam-probe-m21-a1.spec.ts:99:1 › LENS B history: refresh rebuild vs previously restored YOU bubbles (1.3s)
+  ✓  3 [cc] › e2e/F3-redteam-probe-m21-a1.spec.ts:139:1 › LENS C stability: transcript state 3s after refresh completes (4.3s)
+
+  3 passed (8.2s)
+
+Running 2 tests using 1 worker
+
+  ✓  1 [cc] › e2e/F3-redteam-probe-m21-a1b.spec.ts:10:1 › LENS D live send: does Refresh keep the YOU bubble the user just sent (1.9s)
+  ✓  2 [cc] › e2e/F3-redteam-probe-m21-a1b.spec.ts:73:1 › LENS E control: pre-commit refreshOutput keeps the YOU bubble (1.9s)
+
+  2 passed (5.0s)
+
+Running 2 tests using 1 worker
+
+  ✓  1 [cc] › e2e/F3-redteam-probe-m21-a1c.spec.ts:72:1 › LENS F: refresh mid-send, then does the live poll keep rendering (7.9s)
+  ✓  2 [cc] › e2e/F3-redteam-probe-m21-a1c.spec.ts:76:1 › LENS G control: same journey with the product line reverted (7.9s)
+
+  2 passed (17.0s)

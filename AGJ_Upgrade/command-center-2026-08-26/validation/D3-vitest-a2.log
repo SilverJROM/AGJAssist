@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 /home/agjrom/TGBOTS/AGJAssist
+
+ ✓ tests/unit/reply-summary-service.spec.ts (6 tests) 219ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  15:25:19
+   Duration  428ms (transform 74ms, setup 0ms, collect 86ms, tests 219ms, environment 0ms, prepare 36ms)
+
+reclaimed_bytes=7606272

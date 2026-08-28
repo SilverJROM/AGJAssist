@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders (1.3s)
+
+  1 passed (2.4s)

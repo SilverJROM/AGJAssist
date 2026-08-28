@@ -1,0 +1,124 @@
+{
+  "commit": "c5aa50963b0c07b4becd0984038632928a9d3513",
+  "failed": [],
+  "passed": [
+    "a1_colon_no_alias",
+    "a1_clear_spec_passes_real_clear",
+    "a1_clear_spec_fails_wipe_all",
+    "tmux_target_isolation",
+    "special_char_isolation",
+    "pair_set_injective",
+    "colon_free_persist_literal",
+    "overwrite",
+    "missing_null",
+    "write_null_empty_string",
+    "clear_removes"
+  ],
+  "findings": [
+    {
+      "name": "a1_colon_no_alias",
+      "ok": true,
+      "detail": {
+        "keys": [
+          "agj_terminal_draft:v:a%3Ab",
+          "agj_terminal_draft:v%3Aa:b"
+        ],
+        "x": "draft-X",
+        "y": "draft-Y"
+      }
+    },
+    {
+      "name": "a1_clear_spec_passes_real_clear",
+      "ok": true,
+      "detail": {
+        "cleared": null,
+        "other": "must-remain",
+        "wouldPass": true
+      }
+    },
+    {
+      "name": "a1_clear_spec_fails_wipe_all",
+      "ok": true,
+      "detail": {
+        "cleared": null,
+        "other": null,
+        "wouldPass": false
+      }
+    },
+    {
+      "name": "tmux_target_isolation",
+      "ok": true,
+      "detail": {
+        "keys": [
+          "agj_terminal_draft:1000000001:agj%3A0.0",
+          "agj_terminal_draft:1000000001:agj%3A0.1"
+        ]
+      }
+    },
+    {
+      "name": "special_char_isolation",
+      "ok": true,
+      "detail": {
+        "keys": [
+          "agj_terminal_draft:u%201:p%2Fq",
+          "agj_terminal_draft:u%25201:p%252Fq",
+          "agj_terminal_draft:%C3%BC:p"
+        ]
+      }
+    },
+    {
+      "name": "pair_set_injective",
+      "ok": true,
+      "detail": {
+        "keys": [
+          "agj_terminal_draft:a:b",
+          "agj_terminal_draft:a%3Ab:c",
+          "agj_terminal_draft:a:b%3Ac",
+          "agj_terminal_draft:a%253Ab:c",
+          "agj_terminal_draft:%3A:%3A",
+          "agj_terminal_draft::x",
+          "agj_terminal_draft:x:"
+        ],
+        "n": 7,
+        "expected": 7
+      }
+    },
+    {
+      "name": "colon_free_persist_literal",
+      "ok": true,
+      "detail": {
+        "raw": "persisted content"
+      }
+    },
+    {
+      "name": "overwrite",
+      "ok": true,
+      "detail": {
+        "v": "second"
+      }
+    },
+    {
+      "name": "missing_null",
+      "ok": true,
+      "detail": {
+        "v": null
+      }
+    },
+    {
+      "name": "write_null_empty_string",
+      "ok": true,
+      "detail": {
+        "raw": "",
+        "read": ""
+      }
+    },
+    {
+      "name": "clear_removes",
+      "ok": true,
+      "detail": {
+        "raw": null,
+        "read": null
+      }
+    }
+  ]
+}

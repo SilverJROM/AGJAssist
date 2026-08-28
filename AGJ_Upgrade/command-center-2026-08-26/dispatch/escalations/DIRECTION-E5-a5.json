@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 5,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "RAISE-E5-c2 is an implementation/process miss, not a plan defect. Localized failing_units=E3 after OPEN red D1,D2. Repair-author wrote no fence-report-v1.json. The E3 repair test must run WITH FENCE_ID=E5 and COPY fence-report-v1.json to BOTH the repo root AND AGJ_Upgrade/command-center-2026-08-26/ before DONE \u2014 cwd-only writes are missed. Do not invent GET /api/agent-wakeups 200 or POST /api/agent-wakeups/fire. Owner-only GET /api/agent-wakeups/pending (E3) and E2 fire-once. FENCE_ORIGIN OWNER_TOKEN. FENCE_STUB=E2 named-red on D3. Product E1-E4 unchanged.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T06:05:30Z"
+}

@@ -1,0 +1,9 @@
+{
+  "slice": "C6",
+  "attempt": 3,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-C6-c1 re-delivery after EXIT resume (raised 08:02:10Z, epoch 3745902, fault_class=plan). Already repaired by C0; C6 is DONE at fe98610ebf; fence-state.C6.json last_green=true. parked=[]. Live drain is D0. Do NOT re-CLOSE or walk L2/L3. Product C1-C6 unchanged \u2014 not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T04:31:29Z"
+}

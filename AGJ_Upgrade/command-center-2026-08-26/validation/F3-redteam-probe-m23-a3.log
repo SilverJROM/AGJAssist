@@ -1,0 +1,107 @@
+### MUTANT M1 vs the SHIPPED spec
+    Expected: [32m1[39m
+    Received: [31m0[39m
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toHaveCount" with timeout 5000ms[22m
+    [2m  - waiting for locator('[data-testid="terminal-turn-user"]')[22m
+    [2m    14 × locator resolved to 0 elements[22m
+    [2m       - unexpected value "0"[22m
+
+
+      179 |   await refreshBtn.click();
+      180 |   await expect(refreshStatus).toContainText('Updated', { timeout: 10000 });
+    > 181 |   await expect(page.locator('[data-testid="terminal-turn-user"]')).toHaveCount(1);
+          |                                                                    ^
+      182 |   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('you-turn fixture');
+      183 |
+      184 |   // Freeze prevention: background poll must still reach the transcript after refresh
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/F3-mutant-M1-m23.spec.ts:181:68
+
+    Error Context: test-results/F3-mutant-M1-m23-MUTANT-M1-reverts-Finding-1-fix-kept----cc/error-context.md
+
+
+[1A[2K  1 failed
+    [cc] › e2e/F3-mutant-M1-m23.spec.ts:3:1 › MUTANT M1: reverts Finding-1 fix (kept -> []) ────────
+
+### MUTANT M2 vs the SHIPPED spec
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M2-m23.spec.ts:3:1 › MUTANT M2: reverts Finding-2 fix (BOTH send-ref resets removed)
+[1A[2K  1 passed (13.8s)
+
+### MUTANT M2a vs the SHIPPED spec
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M2a-m23.spec.ts:3:1 › MUTANT M2a: removes ONLY openAgentAfterYouRef reset
+[1A[2K  1 passed (13.8s)
+
+### MUTANT M2b vs the SHIPPED spec
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M2b-m23.spec.ts:3:1 › MUTANT M2b: removes ONLY sendBaselineRef reset
+[1A[2K  1 passed (13.8s)
+
+### FIXCHECK head (candidate: no delay on the mid-send refresh)
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/F3-fixcheck-head-m23.spec.ts:3:1 › FIXCHECK on HEAD: candidate mid-send specimen (no delay on the mid-send refresh)
+[1A[2K  1 passed (12.6s)
+
+### FIXCHECK M2 (candidate: no delay on the mid-send refresh)
+    Call log:
+    [2m  - Expect "toContainText" with timeout 10000ms[22m
+    [2m  - waiting for locator('[data-testid="terminal-conversation"]')[22m
+    [2m    24 × locator resolved to <div class="terminal-chat-transcript" data-testid="terminal-conversation">…</div>[22m
+    [2m       - unexpected value "TodayAGENTTEST · 12:49:07 PMsearch refresh output fixture12:49:07 PMYOUyou-turn fixtureAGENTTEST · 12:49:11 PMrefreshed after you fixture[22m
+    [2mpost refresh poll fixture12:49:13 PMYOUmidsend fixtureAGENTTEST · 12:49:13 PMinitial output fixture[22m
+    [2mmidsend refresh body fixture"[22m
+
+
+      201 |   // The pane moves on; only the 1s background poll can deliver this literal.
+      202 |   nonRefreshOutput = 'initial output fixture\nmidsend refresh body fixture\nmidsend poll fixture';
+    > 203 |   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('midsend poll fixture', { timeout: 10000 });
+          |                                                                       ^
+      204 | });
+      205 |
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/F3-fixcheck-M2-m23.spec.ts:203:71
+
+    Error Context: test-results/F3-fixcheck-M2-m23-FIXCHEC-f30fd-didate-specimen-must-go-RED-cc/error-context.md
+
+
+[1A[2K  1 failed
+    [cc] › e2e/F3-fixcheck-M2-m23.spec.ts:3:1 › FIXCHECK on M2 mutant: candidate specimen must go RED 
+
+### FIXCHECK M2a (candidate: no delay on the mid-send refresh)
+      205 |
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/F3-fixcheck-M2a-m23.spec.ts:203:71
+
+    Error Context: test-results/F3-fixcheck-M2a-m23-FIXCHECK-on-M2a-mutant-cc/error-context.md
+
+
+[1A[2K  1 failed
+    [cc] › e2e/F3-fixcheck-M2a-m23.spec.ts:3:1 › FIXCHECK on M2a mutant ────────────────────────────
+
+### FIXCHECK M2b (candidate: no delay on the mid-send refresh)
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/F3-fixcheck-M2b-m23.spec.ts:3:1 › FIXCHECK on M2b mutant
+[1A[2K  1 passed (12.6s)
+
+### PRODUCT-BEHAVIOUR LENSES 1-6 at this commit
+
+Running 6 tests using 1 worker
+
+[1A[2K[1/6] [cc] › e2e/F3-redteam-probe-m23.spec.ts:81:1 › LENS 1 HEAD: refresh mid-send keeps the YOU turn and the live poll alive
+[1A[2K[2/6] [cc] › e2e/F3-redteam-probe-m23.spec.ts:85:1 › LENS 2 M2 mutant: same mid-send journey with the send-ref resets removed
+[1A[2K[3/6] [cc] › e2e/F3-redteam-probe-m23.spec.ts:92:1 › LENS 3 HEAD: refresh replaces the agent tail even when a YOU turn is kept
+[1A[2K[4/6] [cc] › e2e/F3-redteam-probe-m23.spec.ts:122:1 › LENS 4 HEAD: a failed YOU turn and its Resend affordance survive refresh
+[1A[2K[5/6] [cc] › e2e/F3-redteam-probe-m23b.spec.ts:70:1 › LENS 5 HEAD: mid-send refresh WITH new body, live poll must keep flowing
+[1A[2K[6/6] [cc] › e2e/F3-redteam-probe-m23b.spec.ts:74:1 › LENS 6 M2 mutant: same, with the send-ref resets removed
+[1A[2K  6 passed (40.7s)

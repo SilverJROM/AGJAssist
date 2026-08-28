@@ -1,0 +1,101 @@
+{
+  "specHeight": 47.1875,
+  "specCount": 3,
+  "bands": [
+    12,
+    17,
+    31
+  ],
+  "detail": [
+    {
+      "top": 12,
+      "tag": "DIV",
+      "testId": "",
+      "cls": "terminal-topbar-main"
+    },
+    {
+      "top": 15,
+      "tag": "BUTTON",
+      "testId": "terminal-back-list",
+      "cls": "terminal-topbar-icon-btn terminal-menu-trigger"
+    },
+    {
+      "top": 12,
+      "tag": "DIV",
+      "testId": "",
+      "cls": "terminal-topbar-target"
+    },
+    {
+      "top": 12,
+      "tag": "DIV",
+      "testId": "terminal-session-name",
+      "cls": "terminal-topbar-name terminal-topbar-name-stat"
+    },
+    {
+      "top": 17,
+      "tag": "SPAN",
+      "testId": "",
+      "cls": "terminal-topbar-dot on"
+    },
+    {
+      "top": 12,
+      "tag": "SPAN",
+      "testId": "",
+      "cls": "terminal-topbar-name-text"
+    },
+    {
+      "top": 31,
+      "tag": "DIV",
+      "testId": "terminal-last-updated",
+      "cls": "terminal-topbar-sub"
+    },
+    {
+      "top": 15,
+      "tag": "DIV",
+      "testId": "command-center-header",
+      "cls": "command-center-header"
+    },
+    {
+      "top": 15,
+      "tag": "DIV",
+      "testId": "terminal-header-v2",
+      "cls": "terminal-header-v2"
+    },
+    {
+      "top": 15,
+      "tag": "BUTTON",
+      "testId": "tabs-collapse",
+      "cls": "command-center-toggle"
+    },
+    {
+      "top": 15,
+      "tag": "BUTTON",
+      "testId": "bell-indicator",
+      "cls": "command-center-bell has-reminder has-wakeup"
+    },
+    {
+      "top": 18,
+      "tag": "SPAN",
+      "testId": "",
+      "cls": "cc-util-icon-dot"
+    },
+    {
+      "top": 33,
+      "tag": "SPAN",
+      "testId": "",
+      "cls": "cc-util-icon-count"
+    },
+    {
+      "top": 15,
+      "tag": "DIV",
+      "testId": "",
+      "cls": "cc-ctrlcluster collapsed"
+    },
+    {
+      "top": 15,
+      "tag": "BUTTON",
+      "testId": "controls-collapse",
+      "cls": "cc-ctrl-toggle"
+    }
+  ]
+}

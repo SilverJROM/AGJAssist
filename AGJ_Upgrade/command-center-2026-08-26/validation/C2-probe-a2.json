@@ -1,0 +1,36 @@
+{
+  "commit": "217ae6b85937426415ba9c150cb58a1161973816",
+  "update_nulls": {
+    "impl_ok": true,
+    "updated_repeat_limit": null,
+    "updated_next_fire": null,
+    "getById_repeat_limit": null,
+    "getById_next_fire": null
+  },
+  "datetime_parse": {
+    "iso_z_null": 0,
+    "dt_iso_z": "2026-08-27 23:59:59",
+    "iso_past_due": 1,
+    "iso_future_due": 0,
+    "sql_past_due": 1,
+    "sql_future_due": 0
+  },
+  "sameday": {
+    "nowIso": "2026-08-27T05:55:04.678Z",
+    "sqliteSameDayFuture": "2026-08-27 23:59:59",
+    "isoSameDayFuture": "2026-08-27T23:59:59.000Z",
+    "discriminating": true,
+    "sqlite_in_due": false,
+    "iso_in_due": false,
+    "lex_due_sqlite": 1,
+    "dt_due_sqlite": 0
+  },
+  "spec_2099_discriminates_lexical": {
+    "would_old_lexical_pass_spec": true,
+    "past_lex_due": true,
+    "future_lex_due": false
+  },
+  "iso_due_via_service": { "impl_ok": true },
+  "advance_recent": { "impl_ok": true },
+  "projection": { "impl_ok": true, "remaining": 3 }
+}

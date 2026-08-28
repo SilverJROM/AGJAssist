@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 18,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-E5-c4 re-delivery (raised 2026-08-28T07:25:32Z, epoch 1787901779-111833 dead, same seam fp1:4c534f69e7dd8f2fd157). DIRECTION-E5-a12 SKIP already on disk; PLAN_SOUND a11 stands in directions-active/E5.txt. E5 PENDING not parked. Do NOT RETRY L2/L3. Do NOT second PLAN_SOUND. Live drain is 276623. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:00:39Z"
+}

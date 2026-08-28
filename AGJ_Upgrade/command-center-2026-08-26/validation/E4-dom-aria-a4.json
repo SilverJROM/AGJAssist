@@ -1,0 +1,41 @@
+{
+  "requests": [
+    "GET /api/tmux/sessions",
+    "GET /api/terminal/groups",
+    "GET /api/tmux/panes/pane-1/output",
+    "GET /api/agent-reminders/active",
+    "GET /api/agent-wakeups/pending",
+    "GET /api/summary-endpoints",
+    "POST /api/agent-wakeups",
+    "DELETE /api/agent-wakeups/w1"
+  ],
+  "pendingRequestCount": 1,
+  "activeTarget": "pane-1",
+  "otherTarget": "pane-2",
+  "initialRows": [
+    "pane-1 · Active pane wakeup · in 70m\nCancel"
+  ],
+  "initialSummary": "1 wakeup · in 70m",
+  "collapsedSummary": "1 wakeup · in 70m",
+  "rowsWhileCollapsed": 0,
+  "postBody": {
+    "pane_target": "pane-1",
+    "manual_fire_time": "2026-08-28T00:16:00.000Z",
+    "action": "manual literal action"
+  },
+  "deleteUrl": "http://localhost:3211/api/agent-wakeups/w1",
+  "rowsAfterCancel": [
+    "pane-1 · manual literal action · in 119m\nCancel"
+  ],
+  "pass": {
+    "activeOnlyInitial": true,
+    "collapsedHasTime": true,
+    "collapsedHidesRows": true,
+    "postActivePane": true,
+    "cancelRemovedFixture": true
+  },
+  "dom": {
+    "text": "WAKEUP\nPending wakeups\nCollapse1 wakeup · in 119m\npane-1 · manual literal action · in 119m\nCancel\nSCHEDULE WAKEUP\nDate\nTime\nAction\nSave wakeup",
+    "html": "<div data-testid=\"wakeup-sheet\"><div class=\"terminal-sheet-sect\">Wakeup</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Pending wakeups</div><div><button type=\"button\" data-testid=\"wakeup-expand-toggle\">Collapse</button><span data-testid=\"wakeup-collapsed-summary\" style=\"margin-left: 8px;\">1 wakeup · in 119m</span><div data-testid=\"wakeup-pending-row\" style=\"display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px;\"><span>pane-1 · manual literal action · in 119m</span><button type=\"button\" data-testid=\"wakeup-cancel\">Cancel</button></div></div></div><div class=\"terminal-sheet-sect\">Schedule wakeup</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Date</div><input data-testid=\"wakeup-date-input\" type=\"date\" style=\"\"></div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Time</div><input data-testid=\"wakeup-time-input\" type=\"time\" style=\"\"></div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Action</div><input data-testid=\"wakeup-action-input\" type=\"text\" style=\"\"></div><div class=\"terminal-sheet-row\"><button type=\"button\" data-testid=\"wakeup-save\">Save wakeup</button></div></div>"
+  }
+}

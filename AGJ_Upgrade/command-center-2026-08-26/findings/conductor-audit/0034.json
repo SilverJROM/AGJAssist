@@ -1,0 +1,7 @@
+{
+  "type": "verdict-void-wrong-commit",
+  "slice": "F4",
+  "attempt": 1,
+  "cited": "aaa85de4e839a3763b9ada2c97c1517175bc3d1c",
+  "slice_commit": "038ac730d58b048e0c202abb01d23194b8c67658"
+}

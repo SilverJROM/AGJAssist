@@ -1,0 +1,9 @@
+{
+  "slice": "D7",
+  "attempt": 2,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-D7-c1 re-delivery (raised 19:29:40Z, fault_class=plan A0 scaffold). Already handled: SKIP a0 then D0 injected and DIRECTION-D7-a1 RETRY unparked 00:29:08Z. D7 is PENDING waiting on D0 (in-flight). parked=[]. Do NOT walk L2/L3 and do not re-CLOSE on the scaffold. Product D1-D6 unchanged \u2014 not north. Live drain is D0.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T04:31:29Z"
+}

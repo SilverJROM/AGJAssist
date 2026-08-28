@@ -1,0 +1,10 @@
+
+ RUN  v2.1.9 /home/agjrom/TGBOTS/AGJAssist
+
+ ✓ tests/unit/terminal-draft-jsdom.spec.ts (7 tests) 2ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  08:14:26
+   Duration  167ms (transform 40ms, setup 0ms, collect 43ms, tests 2ms, environment 0ms, prepare 32ms)
+

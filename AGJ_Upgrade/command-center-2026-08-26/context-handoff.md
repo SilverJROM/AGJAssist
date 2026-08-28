@@ -58,3 +58,9 @@ Tier-3 (requirements/strategy) reaches north one-way. **Only [north] has the Tel
 ## [driver] advanced B6 — verdict bc21bc78f49293578d550f0f353094efb83a8f40
 
 ## [driver] advanced B2 — verdict 59fb99d5bbabf471dbff63af4f9e131224644c03
+
+## [driver] advanced F4 — verdict 138b91fd1ea8d33b60ced74061b2d1edf21ad787
+
+## [driver] advanced F5 — verdict 40ec05e841e42289566ee9fd36224ca351c43076
+
+## [driver] advanced F6 — verdict 241b5cf3f06077953ee2d3edd79f51a7323fbea1

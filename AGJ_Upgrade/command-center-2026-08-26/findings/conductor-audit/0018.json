@@ -1,0 +1,13 @@
+{
+  "type": "rollback-discarded",
+  "slice": "F3",
+  "commits": 4,
+  "shortstat": "2 files changed, 192 insertions(+), 5 deletions(-)",
+  "preserved_ref": "refs/tiller/command-center-2026-08-26/F3",
+  "shas": [
+    "fe71264 [F3] Share search refresh lifecycle control",
+    "27e16a7 [F3] Tie refresh completion to pane output, ensure status element, discriminating test",
+    "3b7312b [F3] Add refresh lifecycle UI state, persistent button, discriminating test",
+    "0228b99 [F3] Add always-reachable refresh control to FriendlyTerminalView with test"
+  ]
+}

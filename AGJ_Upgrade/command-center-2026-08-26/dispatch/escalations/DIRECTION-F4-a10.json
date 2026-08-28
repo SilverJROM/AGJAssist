@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 14,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F4-c3 re-delivery (raised 2026-08-28T07:25:32Z, epoch 1787901779-111833 dead). TREE dirt already landed 9919e9e+72ec833+23ff1d1. DIRECTION-F4-a9 SKIP already applied 07:27:37Z. F4 is NOT parked; a1 glimmer is live on 143400 from 23ff1d1. PLAN_SOUND remains in directions-active/F4.txt. Do NOT RETRY (not parked; would not steer the in-flight a1). Do NOT park. Product tree clean. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T09:55:16Z"
+}

@@ -1,0 +1,21 @@
+{
+  "fence": "C6",
+  "green": true,
+  "passed_ids": [
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "C6"
+  ],
+  "failed_ids": [],
+  "fingerprint": "",
+  "negative_control_ok": true,
+  "superset_ok": true,
+  "test_hash": "sha256:b99d70bf6015483430f3896c64f32c3df7fb2c485aed844a188fc00e8baa3aaa",
+  "verdict": null,
+  "verdict_err": "no [FENCE-VERDICT-V1] token",
+  "negative_control_detail": "1 named assertion(s) failed: C5",
+  "measured_at_head": "fe98610ebf3444fa3d9977e4bad71eeae6a4d867"
+}

@@ -1,0 +1,9 @@
+{
+  "slice": "F7",
+  "attempt": 1,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "[north] Do NOT OPEN F7 on a vacuous baseline. OPEN nothing-failed because window-fence assertions already pass on HEAD and G3 is GET /api/agent-session/refresh 200, not the refresh-from-session surface. G3 MUST be [data-testid=refresh-from-session] visibility. FENCE_STUB=F1 must force that NAMED G3 kind=assert red on HEAD (if F1 is the wrong contributor for that control, remap negative_control_cmd / expected_negative_fail_ids in fence-contract.json). Collect ALL G1-J2 (do not abort). F0 authors the named-red journey before F1 dispatches; F7 CLOSE waits on F0-F6. Do not walk L2/L3 to rediscover vacuity. Product G1-J2 unchanged.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-27T05:25:16Z"
+}

@@ -1,0 +1,14 @@
+FINDING 1 of 3
+WHAT FAILED: `e2e/command-center-responsive.spec.ts` is improved but still not fully discriminating against wrong responsive values. The test titled `768px transcript/composer padding is 24px...` only asserts `not.toBe('12px')`; the 1024px test similarly asserts padding/search offsets are not phone defaults. A bad value such as `13px`, `999px`, or any non-12px search offset would pass.
+THE FIX: Replace the weak negative assertions with literal computed values from the chosen viewport/shell specimen. For the current shipped static-server specimen, assert the actual locked outputs observed through the public DOM path: at 390px transcript/composer padding `12px`; at 768px transcript/composer padding `16px`, control-bar padding `10px`, control buttons `flex-grow: 0`, `flex-basis: 72px`, `max-width: 88px`, topbar max-width `220px`; at 1024px transcript/composer padding `24px`, control-bar padding `16px`, search-toggle right `16px`, topbar max-width `260px`, and control buttons still capped. If the intended shell fixture changes, encode that fixture literally and update these expected literals together.
+WHY THE LAST ATTEMPT MISSED IT: It tested "changed from phone" rather than the exact locked token values.
+
+FINDING 2 of 3
+WHAT FAILED: The live summaries dropdown was not included in the responsive token port. `src/web/public/app.js` renders `[data-testid="agent-summaries-dropdown"]` with inline `right:12px;width:320px`, while the locked mockup has a responsive `.cc-popover` token. Since the live selector is inline-styled and not `.cc-popover`, the new `style.css` media blocks do not center or widen that surface on tablet/desktop.
+THE FIX: Map the mockup popover token to the live selector. Either move the summaries dropdown styling out of inline `style` into a class that `style.css` can control, or add a narrowly-scoped responsive rule for `.terminal-shell [data-testid="agent-summaries-dropdown"]` using `!important` only for the inline-conflicting `left/right/width` properties. At `min-width:768px`, use `left:12px; right:auto; width:min(440px, calc(100% - 24px))`; keep the existing top/z-index/overflow/background/border/radius/padding/shadow behavior unless deliberately changed.
+WHY THE LAST ATTEMPT MISSED IT: It copied the mockup `.cc-popover` concept but did not bind it to the live dropdown selector.
+
+FINDING 3 of 3
+WHAT FAILED: Static hygiene failed: `git diff --check 6f2ae0f003b86e56ddd346b2e08dc511c04f496b^..6f2ae0f003b86e56ddd346b2e08dc511c04f496b` reports `e2e/command-center-responsive.spec.ts:118: new blank line at EOF.`
+THE FIX: Remove the extra blank line at the end of `e2e/command-center-responsive.spec.ts` so the file ends immediately after the final `});` plus a single terminating newline.
+WHY THE LAST ATTEMPT MISSED IT: The focused Playwright run does not check whitespace errors.

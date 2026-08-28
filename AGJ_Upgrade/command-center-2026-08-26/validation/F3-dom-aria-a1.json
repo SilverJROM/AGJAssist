@@ -1,0 +1,285 @@
+{
+  "before": {
+    "refreshVisible": true,
+    "composerValue": "keep-me",
+    "statusText": "",
+    "lastUpdated": "TEST:0.0 · bash · updated 9:24:44 AM",
+    "sessionCalls": 1,
+    "outputCalls": 1
+  },
+  "whileSearchOpen": {
+    "refreshCount": 0,
+    "searchBarVisible": true
+  },
+  "after": {
+    "refreshVisible": true,
+    "composerValue": "keep-me",
+    "statusText": "",
+    "lastUpdated": "TEST:0.0 · zsh · updated 9:24:44 AM",
+    "sessionCalls": 2,
+    "outputCalls": 2
+  },
+  "aria": {
+    "buttons": [
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Logout"
+      },
+      {
+        "testid": "terminal-back-list",
+        "ariaLabel": "Back to terminal list",
+        "disabled": false,
+        "text": "←"
+      },
+      {
+        "testid": "terminal-font-decrease",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "A−"
+      },
+      {
+        "testid": "terminal-font-increase",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "A+"
+      },
+      {
+        "testid": "terminal-mynav-up",
+        "ariaLabel": "Jump to my previous message",
+        "disabled": false,
+        "text": "▲"
+      },
+      {
+        "testid": "terminal-mynav-down",
+        "ariaLabel": "Jump to my next message",
+        "disabled": false,
+        "text": "▼"
+      },
+      {
+        "testid": "terminal-menu",
+        "ariaLabel": "Terminal settings",
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "testid": "cadence-preset-15",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "15m"
+      },
+      {
+        "testid": "cadence-preset-30",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "30m"
+      },
+      {
+        "testid": "cadence-preset-60",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "60m"
+      },
+      {
+        "testid": "repeat-limit-mode-unlimited",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Unlimited"
+      },
+      {
+        "testid": "repeat-limit-mode-stop",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Stop after N"
+      },
+      {
+        "testid": "agent-reminder-save",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Save"
+      },
+      {
+        "testid": "terminal-menu-done",
+        "ariaLabel": "Close settings",
+        "disabled": false,
+        "text": "Done"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "A−"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "A＋"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Reset · 17px"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "10"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "50"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Full"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": true,
+        "text": "A-"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Reset"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "A+"
+      },
+      {
+        "testid": "terminal-show-raw",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "+ New"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Refresh"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Disconnect"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Friendly"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Raw"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "New Session"
+      },
+      {
+        "testid": "terminal-search-toggle",
+        "ariaLabel": "Search chat",
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "testid": "terminal-refresh",
+        "ariaLabel": "Refresh terminal",
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "testid": "ctl-enter",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "⏎"
+      },
+      {
+        "testid": "ctl-esc",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Esc"
+      },
+      {
+        "testid": "ctl-ctrlc",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "^C"
+      },
+      {
+        "testid": "ctl-mode",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "⇧⇥"
+      },
+      {
+        "testid": "ctl-up",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "↑"
+      },
+      {
+        "testid": "ctl-down",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "↓"
+      },
+      {
+        "testid": null,
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Send as command"
+      },
+      {
+        "testid": "terminal-send-enter",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "Send raw keys"
+      },
+      {
+        "testid": "terminal-size-toggle",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "▴ Large input"
+      },
+      {
+        "testid": "terminal-attach-image",
+        "ariaLabel": "Attach image",
+        "disabled": false,
+        "text": ""
+      },
+      {
+        "testid": "terminal-send-command",
+        "ariaLabel": null,
+        "disabled": false,
+        "text": "➤"
+      }
+    ],
+    "text": "AGJAssistDashboardProjectsTerminalsTasksNotesAgent OSSettingsUserLogoutTerminals←TESTTEST:0.0 · zsh · updated 9:24:44 AMA−A+▲ME▼Agent RemindersActive remindersNo active remindersNew reminderCadence15m30m60mRepeat limitUnlimitedStop after NRecipient agent IncludeSaveTerminal settingsDoneText sizeConversation sizeAlso in Settings ▸ Appearance (syncs everywhere)A−17pxA＋Reset to defaultReset · 17pxReply lengthMinimize agent repliesShows the most recent N lines · tap a reply to expand1050FullRaw terminal sizeA-ResetA+OutputShow raw terminal outputReveals stripped CLI chromeSessionTerminal ChatTEST:0.0connectedSelect a pane...TEST · TEST:0.0 · zsh+ NewRefreshDisconnectLines capturedLines2550100150200FriendlyRawNew SessionTESTTEST:0.0 zshTodayAGENTTEST · 9:24:44 AMinitial output fixture⏎Esc^C⇧⇥↑↓Send as commandSend raw keys▴ Large input➤"
+  }
+}

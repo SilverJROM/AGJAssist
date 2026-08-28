@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 10,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "RAISE-E5-c3 re-delivery (same seam fp1:4c534f69e7dd8f2fd157). Ruling already given: north PLAN_SOUND harness distinct named-reds (directions-active/E5.txt). F4 gate has not landed (no advance-F4.marker). This SKIP only claims the re-ping and keeps E5 from an L2/L3 impl walk. DIRECTION-E5 PLAN_SOUND RETRY to fence-author after F4. Product E1-E4 unchanged. Not a new north question.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T07:29:57Z"
+}

@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 10,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F4-c2 re-delivery (raised 2026-08-28T06:03:15Z, epoch 3583140, TRACKED PRODUCT dirt). Already answered: PREPARE files committed a5a6923; DIRECTION-F4-a5 SKIP applied. F4 is PENDING not parked. PLAN_SOUND in directions-active/F4.txt. Live drain is E5 localize. Do NOT park F4. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T06:07:58Z"
+}

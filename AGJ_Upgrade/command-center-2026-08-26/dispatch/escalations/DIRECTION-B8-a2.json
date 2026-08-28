@@ -1,0 +1,9 @@
+{
+  "slice": "B8",
+  "attempt": 2,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-B8-c1 (raised 04:57:30Z, driver_epoch 1787798898-2805445). Already answered by DIRECTION-B8-a0 (applied 05:10:16Z, unparked) + H8 + DIRECTION-B8-a1. B8 is DONE at 78fe35e10e. fence-close.B8.json green=true, passed_ids includes B2, failed_ids=[], negative_control_ok (named A2 red), measured_at_head=78fe35e10e. parked=[]. Do NOT unpark or re-dispatch B8. Product A1-A5/B1/B2 unchanged \u2014 not north. Drain continues F3; this file only claims the stale re-delivery.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-27T13:18:42Z"
+}

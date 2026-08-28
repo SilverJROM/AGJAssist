@@ -1,0 +1,868 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "url": "http://localhost:3210/index.html#/terminals",
+  "consoleMessages": [
+    {
+      "type": "error",
+      "text": "WebSocket connection to 'ws://localhost:3210/ws/tmux/t1?token=f4-ui-probe-token' failed: Error during WebSocket handshake: Unexpected response code: 404"
+    }
+  ],
+  "pageErrors": [],
+  "steps": [
+    {
+      "label": "list",
+      "selectorCounts": {
+        "commandCenterHeader": 0,
+        "terminalHeaderV2": 0,
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0
+      },
+      "visibleCounts": {
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 0,
+        "terminalMynav": 0,
+        "summariesToggle": 0,
+        "terminalMenu": 0
+      },
+      "text": {
+        "commandCenterHeader": "",
+        "body": "☰\nTerminals\n+\nAll\ngroup1\n⋮\n+\nalpha\nready\nYesterday\n📁\nbravo\nready\nYesterday\n📁\ncharlie\nready\nYesterday\n📁\ndelta\nready\nYesterday\n📁\necho\nready\nYesterday\n📁\nfoxtrot\nready\nYesterday\n📁"
+      },
+      "headerRows": {
+        "error": "TimeoutError: locator.evaluate: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"command-center-header\"]').first()\u001b[22m\n"
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 46
+        },
+        "commandCenterHeader": {
+          "error": "TimeoutError: locator.evaluate: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"command-center-header\"]').first()\u001b[22m\n"
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-sectionnav",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "☰",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "Terminals",
+            "x": 62,
+            "y": 19,
+            "width": 266,
+            "height": 18
+          },
+          {
+            "testId": "terminal-new-session",
+            "className": "terminal-topbar-icon-btn terminal-new-session-trigger",
+            "text": "+",
+            "x": 338,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "label": "detail-default",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 1,
+        "terminalMynav": 1,
+        "summariesToggle": 1,
+        "terminalMenu": 1
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▼ (5)\nControls ▲\nReminder: rem-1\nWakeup: wake-1\nSummary: Summary signal test\nHide utilities",
+        "body": "←\nalpha\nt1 · bash · updated 6:40:43 AM\nTabs ▼ (5)\nControls ▲\nReminder: rem-1\nWakeup: wake-1\nSummary: Summary signal test\nHide utilities\nA−\nA+\n▲\nME\n▼\nToday\nAGENT\nalpha · 6:40:42 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 56,
+            "bottom": 84,
+            "members": [
+              "tabs-collapse",
+              "controls-collapse",
+              "reminder-chip",
+              "wakeup-chip",
+              "summary-chip",
+              "utilities-collapse"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 131
+        },
+        "commandCenterHeader": {
+          "x": 20,
+          "y": 56,
+          "width": 350,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 6:40:43 AM",
+            "x": 62,
+            "y": 12,
+            "width": 137,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▼ (5)bravocharliedeltaechofoxtrotControls ▲Reminder: rem-1Wakeup: wake-1Summary: Summary signal",
+            "x": 20,
+            "y": 56,
+            "width": 350,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "terminal-fontpill",
+            "text": "A−A+",
+            "x": 20,
+            "y": 94,
+            "width": 68,
+            "height": 36
+          },
+          {
+            "testId": "terminal-mynav",
+            "className": "terminal-mynav-header",
+            "text": "▲ME▼",
+            "x": 98,
+            "y": 94,
+            "width": 27,
+            "height": 36
+          },
+          {
+            "testId": "summaries-toggle",
+            "className": "terminal-topbar-icon-btn",
+            "text": "",
+            "x": 135,
+            "y": 96,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "terminal-menu",
+            "className": "terminal-topbar-icon-btn terminal-settings-trigger",
+            "text": "",
+            "x": 177,
+            "y": 96,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-utilities-collapse",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 1,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 1,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 1,
+        "terminalMynav": 1,
+        "summariesToggle": 1,
+        "terminalMenu": 1
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▼ (5)\nControls ▲\n🔔",
+        "body": "←\nalpha\nt1 · bash · updated 6:40:43 AM\nTabs ▼ (5)\nControls ▲\n🔔\nA−\nA+\n▲\nME\n▼\nToday\nAGENT\nalpha · 6:40:42 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 60,
+            "bottom": 88,
+            "members": [
+              "tabs-collapse",
+              "controls-collapse",
+              "bell-indicator"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 135
+        },
+        "commandCenterHeader": {
+          "x": 20,
+          "y": 60,
+          "width": 200,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 6:40:43 AM",
+            "x": 62,
+            "y": 12,
+            "width": 137,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▼ (5)bravocharliedeltaechofoxtrotControls ▲🔔",
+            "x": 20,
+            "y": 60,
+            "width": 200,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "terminal-fontpill",
+            "text": "A−A+",
+            "x": 230,
+            "y": 56,
+            "width": 68,
+            "height": 36
+          },
+          {
+            "testId": "terminal-mynav",
+            "className": "terminal-mynav-header",
+            "text": "▲ME▼",
+            "x": 308,
+            "y": 56,
+            "width": 27,
+            "height": 36
+          },
+          {
+            "testId": "summaries-toggle",
+            "className": "terminal-topbar-icon-btn",
+            "text": "",
+            "x": 20,
+            "y": 102,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "terminal-menu",
+            "className": "terminal-topbar-icon-btn terminal-settings-trigger",
+            "text": "",
+            "x": 62,
+            "y": 102,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-bell-restore",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 1,
+        "terminalMynav": 1,
+        "summariesToggle": 1,
+        "terminalMenu": 1
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▼ (5)\nControls ▲\nReminder: rem-1\nWakeup: wake-1\nSummary: Summary signal test\nHide utilities",
+        "body": "←\nalpha\nt1 · bash · updated 6:40:43 AM\nTabs ▼ (5)\nControls ▲\nReminder: rem-1\nWakeup: wake-1\nSummary: Summary signal test\nHide utilities\nA−\nA+\n▲\nME\n▼\nToday\nAGENT\nalpha · 6:40:42 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 56,
+            "bottom": 84,
+            "members": [
+              "tabs-collapse",
+              "controls-collapse",
+              "reminder-chip",
+              "wakeup-chip",
+              "summary-chip",
+              "utilities-collapse"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 131
+        },
+        "commandCenterHeader": {
+          "x": 20,
+          "y": 56,
+          "width": 350,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 6:40:43 AM",
+            "x": 62,
+            "y": 12,
+            "width": 137,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▼ (5)bravocharliedeltaechofoxtrotControls ▲Reminder: rem-1Wakeup: wake-1Summary: Summary signal",
+            "x": 20,
+            "y": 56,
+            "width": 350,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "terminal-fontpill",
+            "text": "A−A+",
+            "x": 20,
+            "y": 94,
+            "width": 68,
+            "height": 36
+          },
+          {
+            "testId": "terminal-mynav",
+            "className": "terminal-mynav-header",
+            "text": "▲ME▼",
+            "x": 98,
+            "y": 94,
+            "width": 27,
+            "height": 36
+          },
+          {
+            "testId": "summaries-toggle",
+            "className": "terminal-topbar-icon-btn",
+            "text": "",
+            "x": 135,
+            "y": 96,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "terminal-menu",
+            "className": "terminal-topbar-icon-btn terminal-settings-trigger",
+            "text": "",
+            "x": 177,
+            "y": 96,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-tabs-expand",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5,
+        "terminalFontDecrease": 1,
+        "terminalMynav": 1,
+        "summariesToggle": 1,
+        "terminalMenu": 1
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▲ (5)\nbravo\ncharlie\ndelta\necho\nfoxtrot\nControls ▲\nReminder: rem-1\nWakeup: wake-1\nSummary: Summary signal test\nHide utilities",
+        "body": "←\nalpha\nt1 · bash · updated 6:40:43 AM\nTabs ▲ (5)\nbravo\ncharlie\ndelta\necho\nfoxtrot\nControls ▲\nReminder: rem-1\nWakeup: wake-1\nSummary: Summary signal test\nHide utilities\nA−\nA+\n▲\nME\n▼\nToday\nAGENT\nalpha · 6:40:42 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 56,
+            "bottom": 84,
+            "members": [
+              "tabs-collapse",
+              "terminal-header-tab",
+              "terminal-header-tab",
+              "terminal-header-tab",
+              "terminal-header-tab",
+              "terminal-header-tab",
+              "controls-collapse",
+              "reminder-chip",
+              "wakeup-chip",
+              "summary-chip",
+              "utilities-collapse"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 131
+        },
+        "commandCenterHeader": {
+          "x": 20,
+          "y": 56,
+          "width": 350,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 6:40:43 AM",
+            "x": 62,
+            "y": 12,
+            "width": 137,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▲ (5)bravocharliedeltaechofoxtrotControls ▲Reminder: rem-1Wakeup: wake-1Summary: Summary signal",
+            "x": 20,
+            "y": 56,
+            "width": 350,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "terminal-fontpill",
+            "text": "A−A+",
+            "x": 20,
+            "y": 94,
+            "width": 68,
+            "height": 36
+          },
+          {
+            "testId": "terminal-mynav",
+            "className": "terminal-mynav-header",
+            "text": "▲ME▼",
+            "x": 98,
+            "y": 94,
+            "width": 27,
+            "height": 36
+          },
+          {
+            "testId": "summaries-toggle",
+            "className": "terminal-topbar-icon-btn",
+            "text": "",
+            "x": 135,
+            "y": 96,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "terminal-menu",
+            "className": "terminal-topbar-icon-btn terminal-settings-trigger",
+            "text": "",
+            "x": 177,
+            "y": 96,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "label": "fully-collapsed",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 1,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 1,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 0,
+        "terminalMynav": 0,
+        "summariesToggle": 0,
+        "terminalMenu": 0
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▼ (5)\nControls ▼\n🔔",
+        "body": "←\nalpha\nt1 · bash · updated 6:40:43 AM\nTabs ▼ (5)\nControls ▼\n🔔\nToday\nAGENT\nalpha · 6:40:42 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 56,
+            "bottom": 84,
+            "members": [
+              "tabs-collapse",
+              "controls-collapse",
+              "bell-indicator"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 85
+        },
+        "commandCenterHeader": {
+          "x": 20,
+          "y": 56,
+          "width": 200,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 6:40:43 AM",
+            "x": 62,
+            "y": 12,
+            "width": 137,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▼ (5)bravocharliedeltaechofoxtrotControls ▼🔔",
+            "x": 20,
+            "y": 56,
+            "width": 200,
+            "height": 28
+          }
+        ]
+      }
+    },
+    {
+      "label": "restored-default",
+      "selectorCounts": {
+        "commandCenterHeader": 1,
+        "terminalHeaderV2": 1,
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 1,
+        "terminalHeaderTab": 5
+      },
+      "visibleCounts": {
+        "tabsCollapse": 1,
+        "controlsCollapse": 1,
+        "utilities": 1,
+        "utilitiesCollapse": 1,
+        "bellIndicator": 0,
+        "reminderChip": 1,
+        "wakeupChip": 1,
+        "summaryChip": 1,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 1,
+        "terminalMynav": 1,
+        "summariesToggle": 1,
+        "terminalMenu": 1
+      },
+      "text": {
+        "commandCenterHeader": "Tabs ▼ (5)\nControls ▲\nReminder: rem-1\nWakeup: wake-1\nSummary: Summary signal test\nHide utilities",
+        "body": "←\nalpha\nt1 · bash · updated 6:40:43 AM\nTabs ▼ (5)\nControls ▲\nReminder: rem-1\nWakeup: wake-1\nSummary: Summary signal test\nHide utilities\nA−\nA+\n▲\nME\n▼\nToday\nAGENT\nalpha · 6:40:42 AM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤"
+      },
+      "headerRows": {
+        "rowCount": 1,
+        "bands": [
+          {
+            "top": 56,
+            "bottom": 84,
+            "members": [
+              "tabs-collapse",
+              "controls-collapse",
+              "reminder-chip",
+              "wakeup-chip",
+              "summary-chip",
+              "utilities-collapse"
+            ]
+          }
+        ]
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 131
+        },
+        "commandCenterHeader": {
+          "x": 20,
+          "y": 56,
+          "width": 350,
+          "height": 28
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-back-list",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "←",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "alphat1 · bash · updated 6:40:43 AM",
+            "x": 62,
+            "y": 12,
+            "width": 137,
+            "height": 34
+          },
+          {
+            "testId": "command-center-header",
+            "className": "command-center-header",
+            "text": "Tabs ▼ (5)bravocharliedeltaechofoxtrotControls ▲Reminder: rem-1Wakeup: wake-1Summary: Summary signal",
+            "x": 20,
+            "y": 56,
+            "width": 350,
+            "height": 28
+          },
+          {
+            "testId": "",
+            "className": "terminal-fontpill",
+            "text": "A−A+",
+            "x": 20,
+            "y": 94,
+            "width": 68,
+            "height": 36
+          },
+          {
+            "testId": "terminal-mynav",
+            "className": "terminal-mynav-header",
+            "text": "▲ME▼",
+            "x": 98,
+            "y": 94,
+            "width": 27,
+            "height": 36
+          },
+          {
+            "testId": "summaries-toggle",
+            "className": "terminal-topbar-icon-btn",
+            "text": "",
+            "x": 135,
+            "y": 96,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "terminal-menu",
+            "className": "terminal-topbar-icon-btn terminal-settings-trigger",
+            "text": "",
+            "x": 177,
+            "y": 96,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    }
+  ],
+  "summariesFreshness": {
+    "beforeOpen": 1,
+    "afterOpen": 2,
+    "refetchedOnOpen": true
+  },
+  "remindersFreshness": {
+    "beforeMenuOpen": 1,
+    "afterMenuOpen": 1,
+    "refetchedOnMenuOpen": false
+  },
+  "ariaSnapshot": "- main:\n  - button \"Back to terminal list\": ←\n  - text: alpha t1 · bash · updated 6:40:43 AM\n  - button \"Tabs ▼ (5)\"\n  - button \"Controls ▲\"\n  - text: \"Reminder: rem-1 Wakeup: wake-1 Summary: Summary signal test\"\n  - button \"Hide utilities\"\n  - button \"A−\"\n  - button \"A+\"\n  - button \"Jump to my previous message\": ▲\n  - text: ME\n  - button \"Jump to my next message\": ▼\n  - button \"Agent summaries\":\n    - img\n  - button \"Terminal settings\"\n  - button \"Search chat\"\n  - button \"Refresh terminal\"\n  - text: Today AGENT alpha · 6:40:42 AM alpha ready $\n  - group \"Terminal keys\":\n    - button \"⏎\"\n    - button \"Esc\"\n    - button \"^C\"\n    - button \"⇧⇥\"\n    - button \"↑\"\n    - button \"↓\"\n  - button \"Send as command\"\n  - button \"Send raw keys\"\n  - button \"▴ Large input\"\n  - button \"Attach image\"\n  - textbox \"Message the agent...\"\n  - button \"➤\" [disabled]"
+}

@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/F3-redteam-probe-a4.spec.ts:7:1 › F3 validation probe captures normal and search-open refresh lifecycle (7.6s)
+
+  1 passed (8.8s)

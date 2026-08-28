@@ -1,0 +1,148 @@
+{
+  "commit": "fa77ed72a0d3d195644a0fb92c73ff7686161c8e",
+  "findings": [
+    {
+      "name": "jsdom_roundtrip",
+      "ok": true,
+      "detail": {
+        "read": "export const x = 1;",
+        "raw": "export const x = 1;"
+      }
+    },
+    {
+      "name": "write_isolation",
+      "ok": true,
+      "detail": {
+        "v1_00": "draft A",
+        "v1_01": "draft B",
+        "v2_00": "draft C",
+        "v2_01": null
+      }
+    },
+    {
+      "name": "clear_key_scoped_impl",
+      "ok": true,
+      "detail": {
+        "cleared": null,
+        "other": "must-remain"
+      }
+    },
+    {
+      "name": "spec_clear_passes_with_real_clear",
+      "ok": true,
+      "detail": {
+        "afterClear": null,
+        "afterOtherWrite": "still here",
+        "wouldPass": true
+      }
+    },
+    {
+      "name": "spec_clear_passes_with_wipe_all",
+      "ok": true,
+      "detail": {
+        "afterClear": null,
+        "afterOtherWrite": "still here",
+        "wouldPass": true,
+        "meaning": "If true, the focused spec cannot fail a clearTerminalDraft that localStorage.clear()s everything"
+      }
+    },
+    {
+      "name": "colon_join_is_injective",
+      "ok": false,
+      "detail": {
+        "read_v_ab": "draft-Y",
+        "read_va_b": "draft-Y",
+        "keys": [
+          "agj_terminal_draft:v:a:b"
+        ],
+        "leaked": true
+      }
+    },
+    {
+      "name": "tmux_target_pane_isolation",
+      "ok": true,
+      "detail": {
+        "a": "pane-A",
+        "b": "pane-B",
+        "keys": [
+          "agj_terminal_draft:1000000001:agj:0.0",
+          "agj_terminal_draft:1000000001:agj:0.1"
+        ]
+      }
+    },
+    {
+      "name": "colon_vs_underscore_distinct",
+      "ok": true,
+      "detail": {
+        "colon": "colon",
+        "us": "underscore"
+      }
+    },
+    {
+      "name": "same_window_raw_getItem",
+      "ok": true,
+      "detail": {
+        "raw": "colon"
+      }
+    },
+    {
+      "name": "new_jsdom_does_not_share",
+      "ok": true,
+      "detail": {
+        "other": null
+      }
+    },
+    {
+      "name": "write_null_stores_empty_string_not_remove",
+      "ok": true,
+      "detail": {
+        "raw": "",
+        "read": ""
+      }
+    },
+    {
+      "name": "clear_removes_key",
+      "ok": true,
+      "detail": {
+        "raw": null,
+        "read": null
+      }
+    },
+    {
+      "name": "number_coercion_key",
+      "ok": true,
+      "detail": {
+        "keys": [
+          "agj_terminal_draft:12:0.1"
+        ],
+        "read": "n"
+      }
+    },
+    {
+      "name": "persist_literal_key_matches",
+      "ok": true,
+      "detail": {
+        "specKey": "agj_terminal_draft:viewer-persist:1.2",
+        "raw": "persisted content"
+      }
+    }
+  ],
+  "failed": [
+    "colon_join_is_injective"
+  ],
+  "passed": [
+    "jsdom_roundtrip",
+    "write_isolation",
+    "clear_key_scoped_impl",
+    "spec_clear_passes_with_real_clear",
+    "spec_clear_passes_with_wipe_all",
+    "tmux_target_pane_isolation",
+    "colon_vs_underscore_distinct",
+    "same_window_raw_getItem",
+    "new_jsdom_does_not_share",
+    "write_null_stores_empty_string_not_remove",
+    "clear_removes_key",
+    "number_coercion_key",
+    "persist_literal_key_matches"
+  ]
+}

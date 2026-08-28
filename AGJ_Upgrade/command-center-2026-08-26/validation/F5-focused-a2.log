@@ -1,0 +1,39 @@
+[2m[WebServer] [22m(node:614945) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+
+  ✘  1 [cc] › e2e/command-center-switcher.spec.ts:120:1 › phone width uses a visible full-group dropdown with current status and draft markers (5.6s)
+  ✓  2 [cc] › e2e/command-center-switcher.spec.ts:146:1 › desktop width uses the strip and a pointer-drag scrubber that scrolls the strip (824ms)
+
+
+  1) [cc] › e2e/command-center-switcher.spec.ts:120:1 › phone width uses a visible full-group dropdown with current status and draft markers 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator:  locator('[data-testid="agent-group-switcher-dropdown"]')
+    Expected: visible
+    Received: hidden
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('[data-testid="agent-group-switcher-dropdown"]')[22m
+    [2m    14 × locator resolved to <div class="agent-group-switcher-dropdown-wrap" data-testid="agent-group-switcher-dropdown">…</div>[22m
+    [2m       - unexpected value "hidden"[22m
+
+
+      126 |   const select = dropdown.locator('select');
+      127 |
+    > 128 |   await expect(dropdown).toBeVisible();
+          |                          ^
+      129 |   expect(await dropdown.evaluate((el) => (el as HTMLElement).offsetWidth)).toBeGreaterThan(80);
+      130 |   await expect(page.locator('[data-testid="agent-group-switcher"]')).toBeHidden();
+      131 |   await expect(header.locator('[data-testid="agent-group-switcher-scrubber"]')).toBeHidden();
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-switcher.spec.ts:128:26
+
+    Error Context: test-results/command-center-switcher-ph-f8160-nt-status-and-draft-markers-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-switcher.spec.ts:120:1 › phone width uses a visible full-group dropdown with current status and draft markers 
+  1 passed (8.1s)

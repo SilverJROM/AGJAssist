@@ -1,0 +1,9 @@
+{
+  "slice": "D7",
+  "attempt": 7,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-D7-c1 re-delivery (raised 2026-08-27T19:29:40Z, epoch 1787824829-1201168 dead, A0 scaffold). D7 PENDING parked waiting D0 PLAN_SOUND. DIRECTION-D7-a6 SKIP already on disk. Do NOT RETRY L2/L3 (would unpark into the scaffold). Do NOT re-CLOSE. Live drain is 381861 F4. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:51:07Z"
+}

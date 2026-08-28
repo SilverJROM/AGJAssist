@@ -1,0 +1,9 @@
+{
+  "slice": "F3",
+  "attempt": 5,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "[north] PLAN_SOUND: I1/I2 (refresh re-renders transcript AND never blocks the composer) is correct and SATISFIABLE — not criterion drift, do not re-plan, do not re-raise as plan-defect. Carry validation/F3-fix-a4.md only: (1) refreshOutput() must not use incremental applyConversationSnapshot that preserves prior rendered output; add processRefreshSnapshot(latest) that rebuilds snapshot/entries/statusLine/lastUpdatedAt from applyAgentPatch(conversationSeed(...), latest) and call it from refreshOutput(); (2) focused test initial /output fixture must be non-empty 'initial output fixture'; after refresh assert transcript contains 'refreshed output fixture' and not the initial (repeat for search-open). Cherry-pick refs/tiller/command-center-2026-08-26/F3 (fe71264) first. Plan budget now 6, impl_tier L4 so after L1 the informed attempts are sol. Engine still enters L1 (JROM-locked measurement) then resumes at sol.",
+  "applied": true,
+  "outcome": "superseded-by-DIRECTION-F3-a2.json (stale RAISE-F3-c1 re-delivery; F3 a3 already in-flight under budget 6)",
+  "applied_at": "2026-08-27T12:51:00Z"
+}

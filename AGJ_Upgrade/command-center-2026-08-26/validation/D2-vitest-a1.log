@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 /home/agjrom/TGBOTS/AGJAssist
+
+ ✓ tests/unit/summary-endpoint-service.spec.ts (6 tests) 115ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  15:05:33
+   Duration  308ms (transform 61ms, setup 0ms, collect 69ms, tests 115ms, environment 0ms, prepare 31ms)
+
+reclaimed_bytes=7606272

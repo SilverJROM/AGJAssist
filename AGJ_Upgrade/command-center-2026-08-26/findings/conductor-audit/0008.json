@@ -1,0 +1,5 @@
+{
+  "type": "seat-failure",
+  "slice": "C5",
+  "error": "spawn_seat: x-tlre7cd71a78feb_validator_codex55 launch FAILED \u2014 `codex` not on the seat PATH (env broken, e.g. an interrupted self-update). Fix the env, then resume."
+}

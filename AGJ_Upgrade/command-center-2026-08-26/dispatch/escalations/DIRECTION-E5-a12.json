@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 12,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-E5-c4 re-delivery (raised 2026-08-28T07:25:32Z, epoch 1787901779-111833 dead). Same seam fp1:4c534f69e7dd8f2fd157. Ruling already applied: DIRECTION-E5-a11 PLAN_SOUND 07:27:37Z (harness named-reds, fence-author sonnet5/opus5, product E1-E4 unchanged). Standing directions-active/E5.txt. E5 not parked. Live drain is F4 a1 glimmer. Do NOT RETRY L2/L3. Do NOT second PLAN_SOUND. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T10:05:49Z"
+}

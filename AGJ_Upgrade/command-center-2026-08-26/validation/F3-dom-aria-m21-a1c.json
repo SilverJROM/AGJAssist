@@ -1,0 +1,9 @@
+{
+  "lensF_head_youTurnsAfter": 0,
+  "lensF_head_livePollRendered": false,
+  "lensF_head_afterText": "Today\nAGENT\nTEST · 12:13:34 PM\ninitial output fixture",
+  "lensG_precommit_mutationApplied": true,
+  "lensG_precommit_youTurnsAfter": 1,
+  "lensG_precommit_livePollRendered": true,
+  "lensG_precommit_afterText": "Today\nAGENT\nTEST · 12:13:41 PM\ninitial output fixture\n12:13:41 PM\nYOU\nprobe interleaved send kappa\nAGENT\nTEST · 12:13:43 PM\nPOST REFRESH AGENT TEXT kappa"
+}

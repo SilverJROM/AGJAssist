@@ -1,0 +1,9 @@
+FINDING 1 of 2
+WHAT FAILED: `AgentWakeupService.fire()` is not a fire-once claim under concurrent callers. The method reads a pending row, then runs safety/tmux/audit side effects, and only afterward updates `status = 'fired' WHERE status = 'pending'`. An adversarial probe with two simultaneous `service.fire(w.id)` calls produced `{"results":[true,false],"sends":2,"status":"fired"}`: the loser returned false but still sent the action.
+THE FIX: Move the claim ahead of side effects. Use a single conditional write before tmux send, e.g. `UPDATE agent_one_time_wakeups SET status = 'fired', updated_at = ? WHERE id = ? AND status = 'pending' AND manual_fire_time <= ? RETURNING *` or an equivalent transaction that conditionally flips the row and returns the claimed row. If the claim changes zero rows, return false before calling SafetyService, TmuxService, or AuditService. Keep blocked/send-failed handling as explicit terminal status changes after the claimed row is known.
+WHY THE LAST ATTEMPT MISSED IT: The implementation treated the final pending-guarded update as the claim, but it occurs after the external send.
+
+FINDING 2 of 2
+WHAT FAILED: `tests/unit/agent-wakeup-service.spec.ts` does not discriminate the atomic claim requirement. Its "fire is fire-once" case calls `fire()` sequentially, so a post-send status update passes even though concurrent callers can both execute `sendCommand`.
+THE FIX: Add a unit test that creates one due wakeup, stubs `tmux.sendCommand` to increment a counter and await a short promise, then starts two `service.fire(w.id)` promises without awaiting the first before starting the second. Assert exactly one result is `true`, the final status is `fired`, and the send counter or spy call count is exactly `1`.
+WHY THE LAST ATTEMPT MISSED IT: The specimen did not overlap the two fire attempts, so it could not expose the read-before-claim race.

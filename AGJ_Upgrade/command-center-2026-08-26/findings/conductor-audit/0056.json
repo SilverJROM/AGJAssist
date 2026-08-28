@@ -1,0 +1,6 @@
+{
+  "type": "vacuous-test-suspected",
+  "slice": "F6",
+  "attempt": 1,
+  "note": "[projcore callback] validator F6 STATUS: DONE \u2014 FAIL vacuous test; incomplete locked responsive token port"
+}

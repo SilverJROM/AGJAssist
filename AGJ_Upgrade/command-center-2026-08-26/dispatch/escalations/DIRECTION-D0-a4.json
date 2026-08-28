@@ -1,0 +1,10 @@
+{
+  "slice": "D0",
+  "attempt": 4,
+  "action": "RETRY_WITH_DIRECTION",
+  "what_validator_missed": "HARNESS-SMOKE is satisfiable. a3 named two concrete harness bugs, not AC drift: (1) dropdown only READS summaries \u2014 E1 must fire closed-C6 into a temp pane, capture the pane reply, run ReplySummaryService via a real app-owned hook against the deterministic OpenAI-compatible fixture returning LITERAL_SUMMARY_FOR_TEST, persist, then poll only GET /api/summary-agents/<agent>/summaries; no Playwright-local import. (2) E1 named assert is masked by Playwright 60000ms \u2014 set an explicit per-test timeout or trim the 10s+120-poll budget so kind=assert fails first; keep the outer command-timeout wrapper.",
+  "note": "[north] PLAN_SOUND: F-SUMMARIES ACs SATISFIABLE \u2014 do not re-plan, do not re-suspect, do not split. Carry validation/D0-fix-a3.md in full. Park rolled HEAD to b1d8258; cherry-pick refs/tiller/command-center-2026-08-26/D0 (8a0ebc5, includes e88a200 and 5a54514) first. Stay on sonnet5 for this retry (a4). ONLY: (1) trigger the REAL create-path \u2014 fire closed-C6 reminder solicit into a temp pane, capture pane reply, ReplySummaryService via app-owned hook/route (not Playwright-local import) against the deterministic OpenAI-compatible fixture returning LITERAL_SUMMARY_FOR_TEST, persist, THEN poll only public GET /api/summary-agents/<agent>/summaries for that literal; (2) set explicit Playwright per-test timeout large enough OR trim E1 poll budget so named E1 kind=assert fails BEFORE 60000ms test timeout; keep outer command-timeout wrapper unchanged. Keep FENCE_STUB=D3 named-red on E1. Do not add product routes. Commit with [D0] tag then callback DONE immediately \u2014 a4 parked SLICE-TOO-BIG at 1800s still-working; do not sit at the prompt. If this FULL a3 direction still fails, escalate to sol/opus5 (a5) with budget 8. Do not re-plan ACs.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T04:56:36Z"
+}

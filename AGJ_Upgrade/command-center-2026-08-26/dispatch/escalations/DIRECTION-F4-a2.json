@@ -1,0 +1,10 @@
+{
+  "slice": "F4",
+  "attempt": 6,
+  "action": "RETRY_WITH_DIRECTION",
+  "what_validator_missed": "H1/H2 header collapse is satisfiable. a3 validator named 5 concrete fixable issues, not AC drift.",
+  "note": "[north] PLAN_SOUND: H1/H2 (header collapse) SATISFIABLE \u2014 do not re-plan. Carry validation/F4-fix-a3.md in full at a STRONG tier (sol after L1; IMPL L4). Budget now 8. Park rolled HEAD to b1d8258; cherry-pick refs/tiller/command-center-2026-08-26/F4 (4d32468) first. Then ONLY: (F2) fix app.js htm/preact header template so children are a valid array \u2014 public row click must not throw i.push is not a function and must reach terminal-session-name; (F4) fully-collapsed util is BELL-ONLY \u2014 render utilities-collapse only when expanded, collapsed = only bell-indicator that restores; (F5) port header-v2 chrome to style.css (one-row layout classes; selectors exist, no CSS); (F1) click the actual terminal-session-row at a non-control coordinate, not row.locator('..'); (F3) assert visibility not DOM-count for collapsed tabs. Wrap Playwright timeout 180s. Callback DONE immediately after commit \u2014 do not hang at the prompt. If this full a3 direction STILL fails, SPLIT into F4a (render/htm structure) + F4b (collapse states + bell + CSS). Do not re-plan ACs.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T07:39:19Z"
+}

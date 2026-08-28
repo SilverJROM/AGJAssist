@@ -1,0 +1,194 @@
+# F4 mutation battery — commit under test 23ff1d1b3c304afbaa5315af2719760ac5c0ae30
+# harness: mutate one product line -> run `npx playwright test e2e/command-center-header.spec.ts --project=cc` -> restore -> git diff --quiet
+# exit 1 = CAUGHT (the assertion discriminates). exit 0 = NOT CAUGHT (vacuous).
+
+########## M1-default-tabs-expanded ##########
+      81 |   await expect(switchers).toHaveCount(1);
+    > 82 |   await expect(switchers.first()).toBeHidden();
+         |                                   ^
+      83 |   // No visible tab buttons when collapsed
+      84 |   expect(await page.locator('[data-testid="terminal-header-tab"]').evaluateAll(
+      85 |     elements => elements.filter((element) => (element as HTMLElement).offsetParent !== null).length
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:82:35
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M2b-collapse-btn-stays ##########
+       97 |   await expect(page.locator('[data-testid="utilities"]')).toBeHidden();
+    >  98 |   await expect(page.locator('[data-testid="utilities-collapse"]')).toHaveCount(0);
+          |                                                                    ^
+       99 |   await expect(page.locator('[data-testid="bell-indicator"]')).toBeVisible();
+      100 |   await expect(page.locator('.cc-util-icon-dot')).toBeVisible();
+      101 |   await expect(page.locator('.cc-util-icon-count')).toHaveText('1');
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:98:68
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M2-collapse-btn-stays ##########
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders (1.4s)
+
+  1 passed (2.4s)
+
+########## M4-collapsed-header-wraps ##########
+      185 |   });
+    > 186 |   expect(geometry.bands).toHaveLength(1);
+          |                          ^
+      187 |   expect(geometry.height).toBeLessThanOrEqual(48);
+      188 |   for (const rect of geometry.rects) {
+      189 |     expect(rect.left).toBeGreaterThanOrEqual(-1);
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:186:26
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M5-controls-never-visible ##########
+      110 |   const summariesBefore = countRequests(/\/api\/summary-agents\/.*\/summaries/);
+    > 111 |   await page.locator('[data-testid="summaries-toggle"]').click();
+          |                                                          ^
+      112 |   await page.waitForSelector('[data-testid="agent-summaries-dropdown"]', { state: 'visible' });
+      113 |   await page.waitForTimeout(200);
+      114 |   const summariesAfter = countRequests(/\/api\/summary-agents\/.*\/summaries/);
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:111:58
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M6-overflow-right ##########
+      128 |   // Expand tabs and assert exactly one switcher with literal names
+    > 129 |   await tabsCollapse.click();
+          |                      ^
+      130 |   await expect(switchers).toHaveCount(1);
+      131 |   await expect(switchers.first()).toBeVisible();
+      132 |   const tabs = page.locator('[data-testid="terminal-header-tab"]');
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:129:22
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M7-revert-reminders-deps ##########
+      123 |   const remindersAfter = countRequests(/\/api\/agent-reminders\/active/);
+    > 124 |   expect(remindersAfter).toBeGreaterThan(remindersBefore);
+          |                          ^
+      125 |   await page.locator('.terminal-menu-overlay').click({ position: { x: 8, y: 8 } });
+      126 |   await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'false');
+      127 |
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:124:26
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M8-revert-summaries-deps ##########
+      114 |   const summariesAfter = countRequests(/\/api\/summary-agents\/.*\/summaries/);
+    > 115 |   expect(summariesAfter).toBeGreaterThan(summariesBefore);
+          |                          ^
+      116 |   await page.locator('[data-testid="summaries-toggle"]').click();
+      117 |   await expect(page.locator('[data-testid="agent-summaries-dropdown"]')).toBeHidden();
+      118 |
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:115:26
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M9-drop-has-reminder ##########
+       99 |   await expect(page.locator('[data-testid="bell-indicator"]')).toBeVisible();
+    > 100 |   await expect(page.locator('.cc-util-icon-dot')).toBeVisible();
+          |                                                   ^
+      101 |   await expect(page.locator('.cc-util-icon-count')).toHaveText('1');
+      102 |
+      103 |   // Restore utilities via bell
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:100:51
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M10-bell-count-wrong ##########
+      100 |   await expect(page.locator('.cc-util-icon-dot')).toBeVisible();
+    > 101 |   await expect(page.locator('.cc-util-icon-count')).toHaveText('1');
+          |                                                     ^
+      102 |
+      103 |   // Restore utilities via bell
+      104 |   await page.locator('[data-testid="bell-indicator"]').click();
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:101:53
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M11-tuck-label ##########
+      157 |   await expect(page.locator('[data-testid="terminal-mynav"]')).toBeHidden();
+    > 158 |   await expect(controlsCollapse).toHaveText('...');
+          |                                  ^
+      159 |   // handle visible while items hidden
+      160 |   await expect(controlsCollapse).toBeVisible();
+      161 |   // expand again
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:158:34
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M12-no-util-collapsed-class ##########
+       96 |   await page.locator('[data-testid="utilities-collapse"]').click();
+    >  97 |   await expect(page.locator('[data-testid="utilities"]')).toBeHidden();
+          |                                                           ^
+       98 |   await expect(page.locator('[data-testid="utilities-collapse"]')).toHaveCount(0);
+       99 |   await expect(page.locator('[data-testid="bell-indicator"]')).toBeVisible();
+      100 |   await expect(page.locator('.cc-util-icon-dot')).toBeVisible();
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:97:59
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M13-no-hidden-attr ##########
+      81 |   await expect(switchers).toHaveCount(1);
+    > 82 |   await expect(switchers.first()).toBeHidden();
+         |                                   ^
+      83 |   // No visible tab buttons when collapsed
+      84 |   expect(await page.locator('[data-testid="terminal-header-tab"]').evaluateAll(
+      85 |     elements => elements.filter((element) => (element as HTMLElement).offsetParent !== null).length
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:82:35
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M14-bell-always ##########
+      92 |   await expect(page.locator('[data-testid="utilities"]')).toBeVisible();
+    > 93 |   await expect(page.locator('[data-testid="bell-indicator"]')).toBeHidden();
+         |                                                                ^
+      94 |
+      95 |   // Collapse utilities
+      96 |   await page.locator('[data-testid="utilities-collapse"]').click();
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:93:64
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+

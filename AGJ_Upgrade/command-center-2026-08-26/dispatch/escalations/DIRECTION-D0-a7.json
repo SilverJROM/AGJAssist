@@ -1,0 +1,9 @@
+{
+  "slice": "D0",
+  "attempt": 7,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-D0-c1 re-delivery (raised 2026-08-28T04:31:29Z, SLICE-TOO-BIG). Already answered: north PLAN_SOUND + DIRECTION-D0-a4 RETRY unparked. D0 is PENDING not parked. Standing brief in directions-active/D0.txt. Live drain is F4. Do NOT park, split, or re-plan. Not a new north question.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T07:23:02Z"
+}

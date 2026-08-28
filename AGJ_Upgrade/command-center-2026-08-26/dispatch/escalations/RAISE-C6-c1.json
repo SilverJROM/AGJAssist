@@ -1,0 +1,15 @@
+{
+  "slice": "C6",
+  "cycle": 1,
+  "attempt": 0,
+  "why": "C6_journey_asserts_endpoints_no_slice_was_asked_to_build_api_agent-reminders_schema_due_fired_absent_from_C4_scope_and_from_HEAD_and_probes_owner_gated_routes_with_no_session_so_acceptance_C1_cannot_pass_against_correctly_built_C1_C5_needs_harness_repair_row_like_H8_F0",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787807412-3745902",
+  "raised_at": "2026-08-27T08:02:10Z",
+  "note": "fault_class=plan means the implementer seat ladder is SKIPPED entirely \u2014 do not answer RETRY_WITH_DIRECTION into L2/L3. Walking the ladder on a broken plan burns three seats to rediscover the plan is broken. Re-plan the fence, or return a DIRECTION with action=PLAN_SOUND carrying `what_validator_missed`."
+}

@@ -1,0 +1,9 @@
+{
+  "slice": "F5",
+  "attempt": 2,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "RAISE-F5-c1 re-ping (raised 2026-08-28T08:51:07Z, epoch 381882). GATE disagreement after PASS at 40ec05e. DIRECTION-F5-a1 PLAN_SOUND already applied 08:53:08Z and unparked. F5 a1 glimmer live on 685355 from 40ec05e (no rebuild). Do NOT RETRY (would rebuild PASS work, U29b). Do NOT second PLAN_SOUND. Standing F5.txt. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:57:29Z"
+}

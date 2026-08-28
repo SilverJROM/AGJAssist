@@ -1,0 +1,9 @@
+{
+  "slice": "B8",
+  "attempt": 0,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "fault_class=implementation, not plan. Product B1-B7 stay DONE. CLOSE was vacuous: fence-close.B8.json green=true but passed_ids=[] so OPEN-failed B2 looked dropped; verdict_line missing verdict= and fault_class=; FENCE_STUB=B2 negative nothing-failed because Fastify preHandler never runs on an unregistered /api/overmind/status. H8 is injected as a B8 dep to land a HEAD-changing harness commit (E2 stash otherwise reuses this CLOSE). Do not un-remove OVM. After H8, driver CLOSE must list B2 in passed and keep A2 kind=assert named-red under FENCE_STUB=B2. Not a north issue: A1-A5/B1/B2 unchanged.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-27T05:10:16Z"
+}

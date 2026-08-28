@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 17,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-E5-c3 re-delivery (raised 2026-08-28T06:07:58Z, epoch 1787897126-3851501, same seam fp1:4c534f69e7dd8f2fd157). Ruling already applied: north PLAN_SOUND named-reds (DIRECTION-E5-a11, directions-active/E5.txt). E5 PENDING not parked. Do NOT RETRY L2/L3. Do NOT second PLAN_SOUND. Live drain is 276623. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T09:52:35Z"
+}

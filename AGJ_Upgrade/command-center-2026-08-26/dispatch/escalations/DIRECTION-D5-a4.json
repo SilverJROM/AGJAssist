@@ -1,0 +1,9 @@
+{
+  "slice": "D5",
+  "attempt": 5,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-D5-c1 re-delivery (raised 2026-08-27T16:26:46Z, epoch 1201168). D5 is DONE at 5990791a08. parked=[]. Live drain is F4. Do NOT unpark or re-dispatch D5. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T07:23:02Z"
+}

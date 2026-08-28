@@ -1,0 +1,152 @@
+### SHIPPED SPEC, 3 CONSECUTIVE RUNS (flake: run 2 failed)
+===== FOCUSED RUN 1 =====
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.3s)
+
+  1 passed (12.4s)
+FOCUSED_RUN_1_EXIT=0
+===== FOCUSED RUN 2 =====
+
+Running 1 test using 1 worker
+
+  ✘  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (30.0s)
+
+
+  1) [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('[data-testid="terminal-conversation"]')
+    [32m- Expected substring  - 1[39m
+    [31m+ Received string     + 3[39m
+
+    [32m- [7mmidsend poll[27m fixture[39m
+    [31m+ TodayAGENTTEST · 12:57:08 PMsearch refresh output fixture12:57:08 PMYOUyou-turn fixtureAGENTTEST · 12:57:12 PMrefreshed after you fixture[39m
+    [31m+ post refresh poll fixture12:57:14 PMYOUmidsend fixtureAGENTTEST · 12:57:14 PMinitial output fixture[39m
+    [31m+ [7mmidsend refresh body[27m fixture[39m
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 10000ms[22m
+    [2m  - waiting for locator('[data-testid="terminal-conversation"]')[22m
+    [2m    6 × locator resolved to <div class="terminal-chat-transcript" data-testid="terminal-conversation">…</div>[22m
+    [2m      - unexpected value "TodayAGENTTEST · 12:57:08 PMsearch refresh output fixture12:57:08 PMYOUyou-turn fixtureAGENTTEST · 12:57:12 PMrefreshed after you fixture[22m
+    [2mpost refresh poll fixture12:57:14 PMYOUmidsend fixtureAGENTTEST · 12:57:14 PMinitial output fixture[22m
+    [2mmidsend refresh body fixture"[22m
+
+
+      183 |   // The pane moves on; only the 1s background poll can deliver this literal.
+      184 |   nonRefreshOutput = 'initial output fixture\nmidsend refresh body fixture\nmidsend poll fixture';
+    > 185 |   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('midsend poll fixture', { timeout: 10000 });
+          |                                                                       ^
+      186 | });
+      187 |
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-refresh.spec.ts:185:71
+
+    Error Context: test-results/command-center-refresh-com-da54c-output-and-session-metadata-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata 
+FOCUSED_RUN_2_EXIT=1
+===== FOCUSED RUN 3 =====
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (29.9s)
+
+  1 passed (30.9s)
+FOCUSED_RUN_3_EXIT=0
+
+### MUTANT M1 vs the shipped spec (timeout raised so a failure means the MUTATION)
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M1-m24.spec.ts:3:1 › MUTANT M1: kept -> []
+[1A[2K  1) [cc] › e2e/F3-mutant-M1-m24.spec.ts:3:1 › MUTANT M1: kept -> [] ───────────────────────────────
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCount[2m([22m[32mexpected[39m[2m)[22m failed
+    > 182 |   await expect(page.locator('[data-testid="terminal-turn-user"]')).toHaveCount(1);
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/F3-mutant-M1-m24.spec.ts:182:68
+[1A[2K  1 failed
+    [cc] › e2e/F3-mutant-M1-m24.spec.ts:3:1 › MUTANT M1: kept -> [] ────────────────────────────────
+MUTANT_M1_EXIT=1
+
+### MUTANT M2 vs the shipped spec (timeout raised so a failure means the MUTATION)
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M2-m24.spec.ts:3:1 › MUTANT M2: both resets removed
+[1A[2K  1) [cc] › e2e/F3-mutant-M2-m24.spec.ts:3:1 › MUTANT M2: both resets removed ──────────────────────
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+    > 204 |   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('midsend poll fixture', { timeout: 10000 });
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/F3-mutant-M2-m24.spec.ts:204:71
+[1A[2K  1 failed
+    [cc] › e2e/F3-mutant-M2-m24.spec.ts:3:1 › MUTANT M2: both resets removed ───────────────────────
+MUTANT_M2_EXIT=1
+
+### MUTANT M2a vs the shipped spec (timeout raised so a failure means the MUTATION)
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M2a-m24.spec.ts:3:1 › MUTANT M2a: only openAgentAfterYouRef reset removed
+[1A[2K  1) [cc] › e2e/F3-mutant-M2a-m24.spec.ts:3:1 › MUTANT M2a: only openAgentAfterYouRef reset removed 
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+    > 204 |   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('midsend poll fixture', { timeout: 10000 });
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/F3-mutant-M2a-m24.spec.ts:204:71
+[1A[2K  1 failed
+    [cc] › e2e/F3-mutant-M2a-m24.spec.ts:3:1 › MUTANT M2a: only openAgentAfterYouRef reset removed ─
+MUTANT_M2a_EXIT=1
+
+### MUTANT M2b vs the shipped spec (timeout raised so a failure means the MUTATION)
+[1A[2K[1/1] [cc] › e2e/F3-mutant-M2b-m24.spec.ts:3:1 › MUTANT M2b: only sendBaselineRef reset removed
+[1A[2K  1 passed (12.5s)
+MUTANT_M2b_EXIT=0
+
+### TIMING MARKS, 5 RUNS (all waits after mount are stable; only mount varies)
+
+[1A[2K[1/1] [cc] › e2e/F3-timing-m24.spec.ts:7:1 › TIMING: command-center refresh journey with milestone marks
+[1A[2K  1 passed (24.9s)
+RUN_1_EXIT=0
+
+[1A[2K[1/1] [cc] › e2e/F3-timing-m24.spec.ts:7:1 › TIMING: command-center refresh journey with milestone marks
+[1A[2K  1 passed (12.4s)
+RUN_2_EXIT=0
+
+[1A[2K[1/1] [cc] › e2e/F3-timing-m24.spec.ts:7:1 › TIMING: command-center refresh journey with milestone marks
+[1A[2K  1 passed (13.7s)
+RUN_3_EXIT=0
+
+[1A[2K[1/1] [cc] › e2e/F3-timing-m24.spec.ts:7:1 › TIMING: command-center refresh journey with milestone marks
+[1A[2K  1 passed (16.0s)
+RUN_4_EXIT=0
+
+[1A[2K[1/1] [cc] › e2e/F3-timing-m24.spec.ts:7:1 › TIMING: command-center refresh journey with milestone marks
+[1A[2K  1 passed (28.1s)
+RUN_5_EXIT=0
+{"view-mounted":13515,"initial-fixture-rendered":13518,"normal-refresh-done":14862,"search-refresh-done":16230,"you-turn-refresh-done":20572,"settled-poll-done":21858,"midsend-400ms-elapsed":22305,"midsend-refresh-clicked":22336,"midsend-refresh-updated":22361,"midsend-refresh-body-rendered":22364,"midsend-poll-rendered":23650}
+{"view-mounted":1207,"initial-fixture-rendered":1211,"normal-refresh-done":2547,"search-refresh-done":3906,"you-turn-refresh-done":8246,"settled-poll-done":9533,"midsend-400ms-elapsed":9981,"midsend-refresh-clicked":10013,"midsend-refresh-updated":10039,"midsend-refresh-body-rendered":10044,"midsend-poll-rendered":11333}
+{"view-mounted":2470,"initial-fixture-rendered":2473,"normal-refresh-done":3822,"search-refresh-done":5192,"you-turn-refresh-done":9532,"settled-poll-done":10817,"midsend-400ms-elapsed":11264,"midsend-refresh-clicked":11295,"midsend-refresh-updated":11320,"midsend-refresh-body-rendered":11322,"midsend-poll-rendered":12608}
+{"view-mounted":4801,"initial-fixture-rendered":4806,"normal-refresh-done":6145,"search-refresh-done":7510,"you-turn-refresh-done":11853,"settled-poll-done":13140,"midsend-400ms-elapsed":13586,"midsend-refresh-clicked":13618,"midsend-refresh-updated":13641,"midsend-refresh-body-rendered":13644,"midsend-poll-rendered":14932}
+{"view-mounted":16893,"initial-fixture-rendered":16897,"normal-refresh-done":18242,"search-refresh-done":19613,"you-turn-refresh-done":23954,"settled-poll-done":25241,"midsend-400ms-elapsed":25685,"midsend-refresh-clicked":25715,"midsend-refresh-updated":25740,"midsend-refresh-body-rendered":25742,"midsend-poll-rendered":27031}
+
+### NETPROBE (mount-phase external fetches)
+{"tGoto":7,"tDomContentLoaded":1080,"tListRendered":1156,"tViewMounted":1189,"external":{"https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css":109,"https://telegram.org/js/telegram-web-app.js":843,"https://esm.sh/htm@3.1.1":140,"https://esm.sh/preact@10.19.3":144,"https://esm.sh/preact@10.19.3/hooks":150,"https://esm.sh/preact@10.19.3/es2022/preact.mjs":49,"https://esm.sh/preact@10.19.3/es2022/hooks.mjs":49,"https://esm.sh/htm@3.1.1/es2022/htm.mjs":66}}
+{"tGoto":7,"tDomContentLoaded":1064,"tListRendered":1127,"tViewMounted":1167,"external":{"https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css":102,"https://telegram.org/js/telegram-web-app.js":851,"https://esm.sh/htm@3.1.1":122,"https://esm.sh/preact@10.19.3":127,"https://esm.sh/preact@10.19.3/hooks":128,"https://esm.sh/htm@3.1.1/es2022/htm.mjs":53,"https://esm.sh/preact@10.19.3/es2022/hooks.mjs":51,"https://esm.sh/preact@10.19.3/es2022/preact.mjs":55}}
+{"tGoto":6,"tDomContentLoaded":1066,"tListRendered":1134,"tViewMounted":1178,"external":{"https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css":115,"https://telegram.org/js/telegram-web-app.js":856,"https://esm.sh/htm@3.1.1":125,"https://esm.sh/preact@10.19.3":126,"https://esm.sh/preact@10.19.3/hooks":130,"https://esm.sh/htm@3.1.1/es2022/htm.mjs":52,"https://esm.sh/preact@10.19.3/es2022/preact.mjs":54,"https://esm.sh/preact@10.19.3/es2022/hooks.mjs":52}}
+{"tGoto":7,"tDomContentLoaded":1100,"tListRendered":1176,"tViewMounted":1209,"external":{"https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css":108,"https://telegram.org/js/telegram-web-app.js":859,"https://esm.sh/htm@3.1.1":130,"https://esm.sh/preact@10.19.3":131,"https://esm.sh/preact@10.19.3/hooks":162,"https://esm.sh/htm@3.1.1/es2022/htm.mjs":53,"https://esm.sh/preact@10.19.3/es2022/preact.mjs":54,"https://esm.sh/preact@10.19.3/es2022/hooks.mjs":50}}
+
+### FIXCHECK: shipped journey + test.setTimeout(90000), 5 runs
+[1A[2K[1/1] [cc] › e2e/F3-fixcheck-timeout-m24.spec.ts:3:1 › FIXCHECK: shipped journey with a per-test timeout override
+[1A[2K  1 passed (12.6s)
+FIXCHECK_RUN_1_EXIT=0
+[1A[2K[1/1] [cc] › e2e/F3-fixcheck-timeout-m24.spec.ts:3:1 › FIXCHECK: shipped journey with a per-test timeout override
+[1A[2K  1 passed (12.4s)
+FIXCHECK_RUN_2_EXIT=0
+[1A[2K[1/1] [cc] › e2e/F3-fixcheck-timeout-m24.spec.ts:3:1 › FIXCHECK: shipped journey with a per-test timeout override
+[1A[2K  1 passed (12.4s)
+FIXCHECK_RUN_3_EXIT=0
+[1A[2K[1/1] [cc] › e2e/F3-fixcheck-timeout-m24.spec.ts:3:1 › FIXCHECK: shipped journey with a per-test timeout override
+[1A[2K  1 passed (12.4s)
+FIXCHECK_RUN_4_EXIT=0
+[1A[2K[1/1] [cc] › e2e/F3-fixcheck-timeout-m24.spec.ts:3:1 › FIXCHECK: shipped journey with a per-test timeout override
+[1A[2K  1 passed (12.4s)
+FIXCHECK_RUN_5_EXIT=0
+
+### PRODUCT-BEHAVIOUR LENSES 1-6 at this commit
+[1A[2K[4/6] [cc] › e2e/F3-redteam-probe-m24.spec.ts:122:1 › LENS 4 HEAD: a failed YOU turn and its Resend affordance survive refresh
+[1A[2K[5/6] [cc] › e2e/F3-redteam-probe-m24b.spec.ts:70:1 › LENS 5 HEAD: mid-send refresh WITH new body, live poll must keep flowing
+[1A[2K[6/6] [cc] › e2e/F3-redteam-probe-m24b.spec.ts:74:1 › LENS 6 M2 mutant: same, with the send-ref resets removed
+[1A[2K  6 passed (40.9s)

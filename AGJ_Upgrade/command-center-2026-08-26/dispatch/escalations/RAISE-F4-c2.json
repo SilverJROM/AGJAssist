@@ -1,0 +1,14 @@
+{
+  "slice": "F4",
+  "cycle": 2,
+  "attempt": 0,
+  "why": "pre-dispatch: TRACKED PRODUCT dirt at slice entry \u2014 refusing to dispatch, tree preserved: M e2e/command-center-wakeup-fence.spec.ts; M e2e/command-center-window-fence.spec.ts; M tests/agent-wakeup-routes.test.ts",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787894777-3583140",
+  "raised_at": "2026-08-28T06:03:15Z"
+}

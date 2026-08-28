@@ -1,0 +1,476 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "url": "http://localhost:3210/index.html#/terminals",
+  "consoleMessages": [],
+  "pageErrors": [
+    "TypeError: i.push is not a function"
+  ],
+  "steps": [
+    {
+      "label": "list",
+      "selectorCounts": {
+        "commandCenterHeader": 0,
+        "terminalHeaderV2": 0,
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0
+      },
+      "visibleCounts": {
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 0,
+        "terminalMynav": 0,
+        "summariesToggle": 0,
+        "terminalMenu": 0
+      },
+      "text": {
+        "commandCenterHeader": "",
+        "body": "☰\nTerminals\n+\nAll\ngroup1\n⋮\n+\nalpha\nready\n11:40 PM\n📁\nbravo\nready\n11:39 PM\n📁\ncharlie\nready\n11:39 PM\n📁\ndelta\nready\n11:39 PM\n📁\necho\nready\n11:39 PM\n📁\nfoxtrot\nready\n11:39 PM\n📁"
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 46
+        },
+        "commandCenterHeader": {
+          "error": "TimeoutError: locator.evaluate: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"command-center-header\"]').first()\u001b[22m\n"
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-sectionnav",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "☰",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "Terminals",
+            "x": 62,
+            "y": 19,
+            "width": 266,
+            "height": 18
+          },
+          {
+            "testId": "terminal-new-session",
+            "className": "terminal-topbar-icon-btn terminal-new-session-trigger",
+            "text": "+",
+            "x": 338,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "label": "detail-default",
+      "selectorCounts": {
+        "commandCenterHeader": 0,
+        "terminalHeaderV2": 0,
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0
+      },
+      "visibleCounts": {
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 0,
+        "terminalMynav": 0,
+        "summariesToggle": 0,
+        "terminalMenu": 0
+      },
+      "text": {
+        "commandCenterHeader": "",
+        "body": "☰\nTerminals\n+\nAll\ngroup1\n⋮\n+\nalpha\nready\n11:40 PM\n📁\nbravo\nready\n11:39 PM\n📁\ncharlie\nready\n11:39 PM\n📁\ndelta\nready\n11:39 PM\n📁\necho\nready\n11:39 PM\n📁\nfoxtrot\nready\n11:39 PM\n📁"
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 46
+        },
+        "commandCenterHeader": {
+          "error": "TimeoutError: locator.evaluate: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"command-center-header\"]').first()\u001b[22m\n"
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-sectionnav",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "☰",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "Terminals",
+            "x": 62,
+            "y": 19,
+            "width": 266,
+            "height": 18
+          },
+          {
+            "testId": "terminal-new-session",
+            "className": "terminal-topbar-icon-btn terminal-new-session-trigger",
+            "text": "+",
+            "x": 338,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-utilities-collapse",
+      "selectorCounts": {
+        "commandCenterHeader": 0,
+        "terminalHeaderV2": 0,
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0
+      },
+      "visibleCounts": {
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 0,
+        "terminalMynav": 0,
+        "summariesToggle": 0,
+        "terminalMenu": 0
+      },
+      "text": {
+        "commandCenterHeader": "",
+        "body": "☰\nTerminals\n+\nAll\ngroup1\n⋮\n+\nalpha\nready\n11:40 PM\n📁\nbravo\nready\n11:39 PM\n📁\ncharlie\nready\n11:39 PM\n📁\ndelta\nready\n11:39 PM\n📁\necho\nready\n11:39 PM\n📁\nfoxtrot\nready\n11:39 PM\n📁"
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 46
+        },
+        "commandCenterHeader": {
+          "error": "TimeoutError: locator.evaluate: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"command-center-header\"]').first()\u001b[22m\n"
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-sectionnav",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "☰",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "Terminals",
+            "x": 62,
+            "y": 19,
+            "width": 266,
+            "height": 18
+          },
+          {
+            "testId": "terminal-new-session",
+            "className": "terminal-topbar-icon-btn terminal-new-session-trigger",
+            "text": "+",
+            "x": 338,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-bell-restore",
+      "selectorCounts": {
+        "commandCenterHeader": 0,
+        "terminalHeaderV2": 0,
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0
+      },
+      "visibleCounts": {
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 0,
+        "terminalMynav": 0,
+        "summariesToggle": 0,
+        "terminalMenu": 0
+      },
+      "text": {
+        "commandCenterHeader": "",
+        "body": "☰\nTerminals\n+\nAll\ngroup1\n⋮\n+\nalpha\nready\n11:40 PM\n📁\nbravo\nready\n11:39 PM\n📁\ncharlie\nready\n11:39 PM\n📁\ndelta\nready\n11:39 PM\n📁\necho\nready\n11:39 PM\n📁\nfoxtrot\nready\n11:39 PM\n📁"
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 46
+        },
+        "commandCenterHeader": {
+          "error": "TimeoutError: locator.evaluate: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"command-center-header\"]').first()\u001b[22m\n"
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-sectionnav",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "☰",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "Terminals",
+            "x": 62,
+            "y": 19,
+            "width": 266,
+            "height": 18
+          },
+          {
+            "testId": "terminal-new-session",
+            "className": "terminal-topbar-icon-btn terminal-new-session-trigger",
+            "text": "+",
+            "x": 338,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "label": "after-tabs-expand",
+      "selectorCounts": {
+        "commandCenterHeader": 0,
+        "terminalHeaderV2": 0,
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0
+      },
+      "visibleCounts": {
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 0,
+        "terminalMynav": 0,
+        "summariesToggle": 0,
+        "terminalMenu": 0
+      },
+      "text": {
+        "commandCenterHeader": "",
+        "body": "☰\nTerminals\n+\nAll\ngroup1\n⋮\n+\nalpha\nready\n11:40 PM\n📁\nbravo\nready\n11:39 PM\n📁\ncharlie\nready\n11:39 PM\n📁\ndelta\nready\n11:39 PM\n📁\necho\nready\n11:39 PM\n📁\nfoxtrot\nready\n11:39 PM\n📁"
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 46
+        },
+        "commandCenterHeader": {
+          "error": "TimeoutError: locator.evaluate: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"command-center-header\"]').first()\u001b[22m\n"
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-sectionnav",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "☰",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "Terminals",
+            "x": 62,
+            "y": 19,
+            "width": 266,
+            "height": 18
+          },
+          {
+            "testId": "terminal-new-session",
+            "className": "terminal-topbar-icon-btn terminal-new-session-trigger",
+            "text": "+",
+            "x": 338,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "label": "fully-collapsed",
+      "selectorCounts": {
+        "commandCenterHeader": 0,
+        "terminalHeaderV2": 0,
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0
+      },
+      "visibleCounts": {
+        "tabsCollapse": 0,
+        "controlsCollapse": 0,
+        "utilities": 0,
+        "utilitiesCollapse": 0,
+        "bellIndicator": 0,
+        "reminderChip": 0,
+        "wakeupChip": 0,
+        "summaryChip": 0,
+        "agentGroupSwitcher": 0,
+        "terminalHeaderTab": 0,
+        "terminalFontDecrease": 0,
+        "terminalMynav": 0,
+        "summariesToggle": 0,
+        "terminalMenu": 0
+      },
+      "text": {
+        "commandCenterHeader": "",
+        "body": "☰\nTerminals\n+\nAll\ngroup1\n⋮\n+\nalpha\nready\n11:40 PM\n📁\nbravo\nready\n11:39 PM\n📁\ncharlie\nready\n11:39 PM\n📁\ndelta\nready\n11:39 PM\n📁\necho\nready\n11:39 PM\n📁\nfoxtrot\nready\n11:39 PM\n📁"
+      },
+      "rects": {
+        "topbar": {
+          "x": 10,
+          "y": 6,
+          "width": 370,
+          "height": 46
+        },
+        "commandCenterHeader": {
+          "error": "TimeoutError: locator.evaluate: Timeout 1500ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"command-center-header\"]').first()\u001b[22m\n"
+        },
+        "topbarChildren": [
+          {
+            "testId": "terminal-sectionnav",
+            "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+            "text": "☰",
+            "x": 20,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          },
+          {
+            "testId": "",
+            "className": "terminal-topbar-target",
+            "text": "Terminals",
+            "x": 62,
+            "y": 19,
+            "width": 266,
+            "height": 18
+          },
+          {
+            "testId": "terminal-new-session",
+            "className": "terminal-topbar-icon-btn terminal-new-session-trigger",
+            "text": "+",
+            "x": 338,
+            "y": 13,
+            "width": 32,
+            "height": 32
+          }
+        ]
+      }
+    }
+  ],
+  "ariaSnapshot": "- main:\n  - button \"Sections\": ☰\n  - text: Terminals\n  - button \"New session\": +\n  - tablist \"Session groups\":\n    - tab \"All\"\n    - tab \"group1 Manage group1\" [selected]:\n      - text: group1\n      - button \"Manage group1\": ⋮\n    - button \"Create group\": +\n  - button \"alpha ready 11:40 PM Assign alpha to groups\":\n    - text: alpha ready 11:40 PM\n    - button \"Assign alpha to groups\": 📁\n  - button \"bravo ready 11:39 PM Assign bravo to groups\":\n    - text: bravo ready 11:39 PM\n    - button \"Assign bravo to groups\": 📁\n  - button \"charlie ready 11:39 PM Assign charlie to groups\":\n    - text: charlie ready 11:39 PM\n    - button \"Assign charlie to groups\": 📁\n  - button \"delta ready 11:39 PM Assign delta to groups\":\n    - text: delta ready 11:39 PM\n    - button \"Assign delta to groups\": 📁\n  - button \"echo ready 11:39 PM Assign echo to groups\":\n    - text: echo ready 11:39 PM\n    - button \"Assign echo to groups\": 📁\n  - button \"foxtrot ready 11:39 PM Assign foxtrot to groups\":\n    - text: foxtrot ready 11:39 PM\n    - button \"Assign foxtrot to groups\": 📁"
+}

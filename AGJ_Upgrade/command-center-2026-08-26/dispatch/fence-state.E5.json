@@ -1,0 +1,14 @@
+{
+  "fence": "E5",
+  "fingerprints": [
+    "fp1:789e9419ade03537b1bb",
+    "fp1:4c534f69e7dd8f2fd157",
+    "fp1:4c534f69e7dd8f2fd157",
+    "fp1:4c534f69e7dd8f2fd157",
+    "fp1:4c534f69e7dd8f2fd157"
+  ],
+  "rounds": 4,
+  "last_green": false,
+  "reprepare_attempts": 1,
+  "plan_sound_rounds": 1
+}

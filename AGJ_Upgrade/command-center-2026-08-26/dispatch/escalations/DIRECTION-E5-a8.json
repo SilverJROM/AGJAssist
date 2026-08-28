@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 8,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-E5-c1 re-delivery (raised 2026-08-27T22:23:31Z, epoch 1201168, A0 scaffold). Not the ruling. North PLAN_SOUND on c3 is harness named-reds after F4 gate (directions-active/E5.txt). F4 still in flight, no advance-F4.marker. Do NOT RETRY L2/L3 on the scaffold. Do NOT unpark for impl. Live drain is F4. Not a new north question.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T07:25:32Z"
+}

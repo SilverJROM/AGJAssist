@@ -1,0 +1,36 @@
+{
+  "requests": [
+    "GET /api/tmux/sessions",
+    "GET /api/terminal/groups",
+    "GET /api/tmux/panes/ACTIVE%3A0/output",
+    "GET /api/agent-reminders/active",
+    "GET /api/agent-wakeups/pending",
+    "GET /api/summary-endpoints",
+    "POST /api/agent-wakeups",
+    "GET /api/tmux/panes/ACTIVE%3A0/output",
+    "DELETE /api/agent-wakeups/101"
+  ],
+  "activeTarget": "ACTIVE:0",
+  "otherTarget": "OTHER:0",
+  "expandedRows": [
+    "ACTIVE:0 · active literal action · in 70m\nCancel",
+    "OTHER:0 · other pane action should not render · in 130m\nCancel"
+  ],
+  "summaryExpanded": "2 wakeups · in 70m",
+  "collapsedText": "WAKEUP\nPending wakeups\nExpand2 wakeups · in 70m\nSCHEDULE WAKEUP\nDate\nTime\nAction\nSave wakeup",
+  "summaryCollapsed": "2 wakeups · in 70m",
+  "postBody": {
+    "pane_target": "ACTIVE:0",
+    "manual_fire_time": "2026-08-27T23:49:00.000Z",
+    "action": "manual literal action"
+  },
+  "deleteUrl": "http://localhost:3211/api/agent-wakeups/101",
+  "rowsAfterCancel": [
+    "OTHER:0 · other pane action should not render · in 130m\nCancel",
+    "ACTIVE:0 · manual literal action · in 120m\nCancel"
+  ],
+  "dom": {
+    "text": "WAKEUP\nPending wakeups\nCollapse2 wakeups · in 120m\nOTHER:0 · other pane action should not render · in 130m\nCancel\nACTIVE:0 · manual literal action · in 120m\nCancel\nSCHEDULE WAKEUP\nDate\nTime\nAction\nSave wakeup",
+    "html": "<div data-testid=\"wakeup-sheet\"><div class=\"terminal-sheet-sect\">Wakeup</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Pending wakeups</div><div><button type=\"button\" data-testid=\"wakeup-expand-toggle\">Collapse</button><span data-testid=\"wakeup-collapsed-summary\" style=\"margin-left: 8px;\">2 wakeups · in 120m</span><div data-testid=\"wakeup-pending-row\" style=\"display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px;\"><span>OTHER:0 · other pane action should not render · in 130m</span><button type=\"button\" data-testid=\"wakeup-cancel\">Cancel</button></div><div data-testid=\"wakeup-pending-row\" style=\"display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px;\"><span>ACTIVE:0 · manual literal action · in 120m</span><button type=\"button\" data-testid=\"wakeup-cancel\">Cancel</button></div></div></div><div class=\"terminal-sheet-sect\">Schedule wakeup</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Date</div><input data-testid=\"wakeup-date-input\" type=\"date\" style=\"\"></div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Time</div><input data-testid=\"wakeup-time-input\" type=\"time\" style=\"\"></div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Action</div><input data-testid=\"wakeup-action-input\" type=\"text\" style=\"\"></div><div class=\"terminal-sheet-row\"><button type=\"button\" data-testid=\"wakeup-save\">Save wakeup</button></div></div>"
+  }
+}

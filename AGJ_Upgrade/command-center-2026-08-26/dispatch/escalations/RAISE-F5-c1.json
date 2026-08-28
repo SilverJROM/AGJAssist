@@ -1,0 +1,17 @@
+{
+  "slice": "F5",
+  "cycle": 1,
+  "attempt": 4,
+  "why": "PLAN REVIEW REQUIRED \u2014 the driver itself judged this not implementer-fixable. hard-edge/gate-input (not implementer-fixable). THE QUESTION IS NOT \"which model next\" \u2014 it is: **is the acceptance criterion still true of the product?** Re-read the AC text against what the product actually does now. A criterion that has drifted fails IDENTICALLY at every tier, so a retry or an escalation buys more failures at higher cost. Answer the question before offering an action; RETRY_WITH_DIRECTION is NOT the default here.",
+  "gate_failed": [
+    "commit: PRODUCT dirt at verdict commit (inside this slice's own diff): [' M e2e/command-center-switcher.spec.ts']"
+  ],
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787904177-381882",
+  "raised_at": "2026-08-28T08:51:07Z",
+  "note": "THE VALIDATOR RECORDED **PASS** \u2014 this park is a GATE disagreement, not failed work. Do NOT answer RETRY_WITH_DIRECTION: another implementer attempt re-does work that already succeeded and burns the budget (U29b, lokalAI). The gate objected to: [\"commit: PRODUCT dirt at verdict commit (inside this slice's own diff): [' M e2e/command-center-switcher.spec.ts']\"]. Resolve THAT \u2014 usually a missing/renamed evidence file or a commit the gate could not bind \u2014 then re-gate the existing commit rather than rebuilding it."
+}

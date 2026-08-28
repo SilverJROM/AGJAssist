@@ -1,0 +1,11 @@
+{
+  "slice": "E5",
+  "attempt": 11,
+  "action": "PLAN_SOUND",
+  "what_validator_missed": "ACCEPTANCE_IDS D1/D2/D3 for four contributors (E1 schema, E2 service, E3 route, E4 UI). D1 is asserted by both test_e1 (LITERAL_ACTION_D1_SCHEMA) and test_e3 (LITERAL_ACTION_D1_ROUTE); D2 by both test_e3 and test_e4 (LITERAL_ACTION_D2_UI). Schema-break and route-break share fingerprint fp1:4c534f69. D3 is unique to E2 (that id stays green). The F-WAKEUP ACs and E1-E4 product are satisfiable. The journey must give EACH contributor its own distinct named-red (E1/E2/E3/E4 or D1/D2/D3/D4), own LITERAL, and own FENCE_STUB so FENCE_STUB=E1|E2|E3|E4 each forces a unique id red and four distinct fingerprints. Do not collapse two layers onto one id. Fence-author at sonnet5/opus5. Not an L2/L3 impl retry.",
+  "plan_level_fingerprint": "fp1:4c534f69e7dd8f2fd157",
+  "note": "[north] PLAN_SOUND: F-WAKEUP ACs SATISFIABLE \u2014 do not re-plan product E1-E4. HARNESS-CORRECTNESS rewrite of e2e/command-center-wakeup-fence.spec.ts: one distinct named-red per E1/E2/E3/E4 layer, own LITERAL token, own FENCE_STUB target, four fingerprints. Positive journey still composes all four; CLOSE requires all four named-reds independently. Dispatch INTEGRATION fence-author sonnet5/opus5. Product E1-E4 unchanged.",
+  "applied": true,
+  "outcome": "PLAN_SOUND accepted \u2014 counts as a repair round",
+  "applied_at": "2026-08-28T07:27:37Z"
+}

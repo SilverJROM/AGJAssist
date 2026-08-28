@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 15,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "RAISE-F4-c4 spawn_seat refused validator_opus5 exists but not in tiller ledger. Infra, not AC. Stale DIRECTION-F4-a2 RETRY already unparked 07:39:19; F4 a1 glimmer is live from 23ff1d1. Reaped orphan x-tlre7cd71a78feb_validator_opus5 and impl_sol (this-run leftovers, idle DONE) so the in-flight a1 can spawn a fresh validator. Do NOT park. Do NOT second RETRY (not parked; would not steer a1). Park-rollback saved a62de6d at refs/tiller/command-center-2026-08-26/F4 \u2014 cherry-pick if this a1 parks. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T07:49:07Z"
+}

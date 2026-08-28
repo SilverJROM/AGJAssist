@@ -1,0 +1,14 @@
+{
+  "slice": "E5",
+  "cycle": 2,
+  "attempt": 0,
+  "why": "could not establish a validator-authored repair test for E3: the repair test produced no fence-report-v1.json: no fence-report-v1.json produced (looked in run-dir, repo root, repo/.tiller)",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787894777-3583140",
+  "raised_at": "2026-08-28T05:44:28Z"
+}

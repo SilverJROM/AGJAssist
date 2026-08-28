@@ -1,0 +1,35 @@
+# F4 mutation results — commit under test 282a84f87e3aa4ca0e21348858f21b0726d2c988
+# harness: mutate one product line -> run `npx playwright test e2e/command-center-header.spec.ts --project=cc` -> restore -> git diff --quiet
+
+########## M4-collapsed-header-wraps ##########
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders (648ms)
+
+  1 passed (1.7s)
+
+########## M5-controls-never-render ##########
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders (650ms)
+
+  1 passed (1.7s)
+
+########## M7-revert-reminders-deps ##########
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders (763ms)
+
+  1 passed (1.8s)
+
+########## M8-revert-summaries-deps ##########
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders (725ms)
+
+  1 passed (1.8s)
+

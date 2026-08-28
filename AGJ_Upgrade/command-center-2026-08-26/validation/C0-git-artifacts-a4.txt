@@ -1,0 +1,11 @@
+git ls-files scripts/cc-fire-due.mts:
+git status --short scripts/cc-fire-due.mts:
+?? scripts/cc-fire-due.mts
+commit under test:
+6811b3f [C0] fix C0 correction attempt 3 token bootstrap, real fireDue, unique tmux sessions, C5 UI negative control
+M	e2e/command-center-reminders-fence.spec.ts
+M	e2e/run-command-center-playwright-fence.mjs
+M	playwright.cc.config.ts
+M	scripts/cc-run-isolated.mjs
+M	src/api/server.ts
+M	src/web/public/app.js

@@ -1,0 +1,60 @@
+===== FOCUSED RUN 1 =====
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (11.3s)
+
+  1 passed (12.4s)
+FOCUSED_RUN_1_EXIT=0
+===== FOCUSED RUN 2 =====
+
+Running 1 test using 1 worker
+
+  ✘  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (30.0s)
+
+
+  1) [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('[data-testid="terminal-conversation"]')
+    [32m- Expected substring  - 1[39m
+    [31m+ Received string     + 3[39m
+
+    [32m- [7mmidsend poll[27m fixture[39m
+    [31m+ TodayAGENTTEST · 12:57:08 PMsearch refresh output fixture12:57:08 PMYOUyou-turn fixtureAGENTTEST · 12:57:12 PMrefreshed after you fixture[39m
+    [31m+ post refresh poll fixture12:57:14 PMYOUmidsend fixtureAGENTTEST · 12:57:14 PMinitial output fixture[39m
+    [31m+ [7mmidsend refresh body[27m fixture[39m
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 10000ms[22m
+    [2m  - waiting for locator('[data-testid="terminal-conversation"]')[22m
+    [2m    6 × locator resolved to <div class="terminal-chat-transcript" data-testid="terminal-conversation">…</div>[22m
+    [2m      - unexpected value "TodayAGENTTEST · 12:57:08 PMsearch refresh output fixture12:57:08 PMYOUyou-turn fixtureAGENTTEST · 12:57:12 PMrefreshed after you fixture[22m
+    [2mpost refresh poll fixture12:57:14 PMYOUmidsend fixtureAGENTTEST · 12:57:14 PMinitial output fixture[22m
+    [2mmidsend refresh body fixture"[22m
+
+
+      183 |   // The pane moves on; only the 1s background poll can deliver this literal.
+      184 |   nonRefreshOutput = 'initial output fixture\nmidsend refresh body fixture\nmidsend poll fixture';
+    > 185 |   await expect(page.locator('[data-testid="terminal-conversation"]')).toContainText('midsend poll fixture', { timeout: 10000 });
+          |                                                                       ^
+      186 | });
+      187 |
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-refresh.spec.ts:185:71
+
+    Error Context: test-results/command-center-refresh-com-da54c-output-and-session-metadata-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata 
+FOCUSED_RUN_2_EXIT=1
+===== FOCUSED RUN 3 =====
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (29.9s)
+
+  1 passed (30.9s)
+FOCUSED_RUN_3_EXIT=0

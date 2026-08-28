@@ -1,0 +1,124 @@
+########## M1-default-tabs-expanded ##########
+    Locator:  locator('[data-testid="agent-group-switcher"]').first()
+    Expected: hidden
+    Received: visible
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeHidden" with timeout 5000ms[22m
+    [2m  - waiting for locator('[data-testid="agent-group-switcher"]').first()[22m
+    [2m    14 × locator resolved to <div class="terminal-header-tabs" data-testid="agent-group-switcher">…</div>[22m
+    [2m       - unexpected value "visible"[22m
+
+
+      76 |   const switchers = page.locator('[data-testid="agent-group-switcher"]');
+      77 |   await expect(switchers).toHaveCount(1);
+    > 78 |   await expect(switchers.first()).toBeHidden();
+         |                                   ^
+      79 |   // No visible tab buttons when collapsed
+      80 |   expect(await page.locator('[data-testid="terminal-header-tab"]').evaluateAll(
+      81 |     elements => elements.filter((element) => (element as HTMLElement).offsetParent !== null).length
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:78:35
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M2-collapse-btn-stays ##########
+    Locator:  locator('[data-testid="utilities-collapse"]')
+    Expected: [32m0[39m
+    Received: [31m1[39m
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toHaveCount" with timeout 5000ms[22m
+    [2m  - waiting for locator('[data-testid="utilities-collapse"]')[22m
+    [2m    14 × locator resolved to 1 element[22m
+    [2m       - unexpected value "1"[22m
+
+
+      92 |   await page.locator('[data-testid="utilities-collapse"]').click();
+      93 |   await expect(page.locator('[data-testid="utilities"]')).toBeHidden();
+    > 94 |   await expect(page.locator('[data-testid="utilities-collapse"]')).toHaveCount(0);
+         |                                                                    ^
+      95 |   await expect(page.locator('[data-testid="bell-indicator"]')).toBeVisible();
+      96 |
+      97 |   // Restore utilities via bell
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:94:68
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M3-no-hidden-attr ##########
+    Locator:  locator('[data-testid="agent-group-switcher"]').first()
+    Expected: hidden
+    Received: visible
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeHidden" with timeout 5000ms[22m
+    [2m  - waiting for locator('[data-testid="agent-group-switcher"]').first()[22m
+    [2m    14 × locator resolved to <div data-collapsed="true" class="terminal-header-tabs" data-testid="agent-group-switcher">…</div>[22m
+    [2m       - unexpected value "visible"[22m
+
+
+      76 |   const switchers = page.locator('[data-testid="agent-group-switcher"]');
+      77 |   await expect(switchers).toHaveCount(1);
+    > 78 |   await expect(switchers.first()).toBeHidden();
+         |                                   ^
+      79 |   // No visible tab buttons when collapsed
+      80 |   expect(await page.locator('[data-testid="terminal-header-tab"]').evaluateAll(
+      81 |     elements => elements.filter((element) => (element as HTMLElement).offsetParent !== null).length
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:78:35
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+
+########## M4-collapsed-header-wraps ##########
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders (672ms)
+
+  1 passed (1.7s)
+
+########## M5-controls-never-render ##########
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders (660ms)
+
+  1 passed (1.7s)
+
+########## M6-overflow-right ##########
+    [2m      - <button type="button" class="command-center-toggle" data-testid="utilities-collapse">Hide utilities</button> intercepts pointer events[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    115 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is visible, enabled and stable[22m
+    [2m        - scrolling into view if needed[22m
+    [2m        - done scrolling[22m
+    [2m        - <button type="button" class="command-center-toggle" data-testid="utilities-collapse">Hide utilities</button> intercepts pointer events[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+      102 |
+      103 |   // Expand tabs and assert exactly one switcher with literal names
+    > 104 |   await tabsCollapse.click();
+          |                      ^
+      105 |   await expect(switchers).toHaveCount(1);
+      106 |   await expect(switchers.first()).toBeVisible();
+      107 |   const tabs = page.locator('[data-testid="terminal-header-tab"]');
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:104:22
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──
+

@@ -1,0 +1,10 @@
+{
+  "type": "rollback-discarded",
+  "slice": "D5",
+  "commits": 1,
+  "shortstat": "1 file changed, 33 insertions(+)",
+  "preserved_ref": "refs/tiller/command-center-2026-08-26/D5",
+  "shas": [
+    "05ec7a5 [D5] placeholder commit for SummaryEndpointSettings UI port"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "slice": "F6",
+  "first_seen_attempt": 2,
+  "signature": "IMPL_INCOMPLETE|H3,J1,J2",
+  "requirements": "H3,J1,J2",
+  "defect_class": "IMPL_INCOMPLETE",
+  "argument": "An acceptance criterion that no implementation can satisfy fails IDENTICALLY at every tier, so another attempt or a stronger seat buys more of the same failure at higher cost. This is the plan review, already written.",
+  "answer": null,
+  "how_to_answer": "Decompose or repair the criterion, OR write `answer` here saying why the row is sound and the repeats are coincidental. \"Noted and continued\" is not an answer.",
+  "raised_at": 1787909296
+}

@@ -1,0 +1,64 @@
+[1A[2K[2m[WebServer] [22m(node:2749601) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/command-center-reminders-fence.spec.ts:14:1 › command-center reminders fence journey
+[1A[2K  1 passed (7.7s)
+[1A[2K[2m[WebServer] [22m(node:2750592) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/command-center-reminders-fence.spec.ts:14:1 › command-center reminders fence journey
+[1A[2K  1) [cc] › e2e/command-center-reminders-fence.spec.ts:14:1 › command-center reminders fence journey 
+
+    Error: FENCE failures: [{"id":"C5","kind":"assert","message":"\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContain\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // indexOf\u001b[22m\n\nExpected substring: \u001b[32m\"120 min\"\u001b[39m\nReceived string:    \u001b[31m\"AGENT REMINDERS\u001b[39m\n\u001b[31mActive reminders\u001b[39m\n\u001b[31mNo active reminders\u001b[39m\n\u001b[31mNEW REMINDER\u001b[39m\n\u001b[31mCadence\u001b[39m\n\u001b[31m15m\u001b[39m\n\u001b[31m30m\u001b[39m\n\u001b[31m60m\u001b[39m\n\u001b[31mRepeat limit\u001b[39m\n\u001b[31mUnlimited\u001b[39m\n\u001b[31mStop after N\u001b[39m\n\u001b[31mRecipient agent\u001b[39m\n\u001b[31m Include\u001b[39m\n\u001b[31mSave\"\u001b[39m"}]
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoEqual[2m([22m[32mexpected[39m[2m) // deep equality[22m
+
+    [32m- Expected  -  1[39m
+    [31m+ Received  + 23[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C5",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+     "message": "[2mexpect([22m[31mreceived[39m[31m[2m).[22mtoContain[2m([22m[32mexpected[39m[31m[2m) // indexOf[22m[39m
+    [31m+[39m
+    [31m+ Expected substring: [32m\"120 min\"[39m[31m[39m
+    [31m+ Received string:    [31m\"AGENT REMINDERS[39m[31m[39m
+    [31m+ [31mActive reminders[39m[31m[39m
+    [31m+ [31mNo active reminders[39m[31m[39m
+    [31m+ [31mNEW REMINDER[39m[31m[39m
+    [31m+ [31mCadence[39m[31m[39m
+    [31m+ [31m15m[39m[31m[39m
+    [31m+ [31m30m[39m[31m[39m
+    [31m+ [31m60m[39m[31m[39m
+    [31m+ [31mRepeat limit[39m[31m[39m
+    [31m+ [31mUnlimited[39m[31m[39m
+    [31m+ [31mStop after N[39m[31m[39m
+    [31m+ [31mRecipient agent[39m[31m[39m
+    [31m+ [31m Include[39m[31m[39m
+    [31m+ [31mSave\"[39m[31m",[39m
+    [31m+   },[39m
+    [31m+ ][39m
+
+      226 |
+      227 |     try {
+    > 228 |       expect(failed, `FENCE failures: ${JSON.stringify(failed)}`).toEqual([]);
+          |                                                                   ^
+      229 |     } finally {
+      230 |       cleanupSessions();
+      231 |       writeReport();
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-reminders-fence.spec.ts:228:67
+
+    Error Context: test-results/command-center-reminders-f-a1774-ter-reminders-fence-journey-cc/error-context.md
+
+
+[1A[2K  1 failed
+    [cc] › e2e/command-center-reminders-fence.spec.ts:14:1 › command-center reminders fence journey 
+fence=C6 verdict=PASS fault_class=none

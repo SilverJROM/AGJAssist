@@ -1,0 +1,28 @@
+{
+  "requests": [
+    "GET /api/tmux/sessions",
+    "GET /api/terminal/groups",
+    "GET /api/tmux/panes/VAL%3A0/output",
+    "GET /api/agent-reminders/active",
+    "GET /api/agent-wakeups/pending",
+    "GET /api/summary-endpoints",
+    "POST /api/agent-wakeups",
+    "GET /api/tmux/panes/VAL%3A0/output",
+    "DELETE /api/agent-wakeups/42"
+  ],
+  "pendingCountBefore": 1,
+  "rowBefore": "VAL:0 · literal pending action · in 70m\nCancel",
+  "collapsedText": "WAKEUP\nPending wakeups\nExpand\nSCHEDULE WAKEUP\nDate\nTime\nAction\nSave wakeup",
+  "postBody": {
+    "pane_target": "VAL:0",
+    "manual_fire_time": "2026-08-27T23:16:00.000Z",
+    "action": "manual literal action"
+  },
+  "deleteUrl": "http://localhost:3211/api/agent-wakeups/42",
+  "rowsAfterSave": 2,
+  "rowsAfterCancel": 1,
+  "dom": {
+    "text": "WAKEUP\nPending wakeups\nCollapse\nVAL:0 · manual literal action · in 120m\nCancel\nSCHEDULE WAKEUP\nDate\nTime\nAction\nSave wakeup",
+    "html": "<div data-testid=\"wakeup-sheet\"><div class=\"terminal-sheet-sect\">Wakeup</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Pending wakeups</div><div><button type=\"button\" data-testid=\"wakeup-expand-toggle\">Collapse</button><div data-testid=\"wakeup-pending-row\" style=\"display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px;\"><span>VAL:0 · manual literal action · in 120m</span><button type=\"button\" data-testid=\"wakeup-cancel\">Cancel</button></div></div></div><div class=\"terminal-sheet-sect\">Schedule wakeup</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Date</div><input data-testid=\"wakeup-date-input\" type=\"date\" style=\"\"></div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Time</div><input data-testid=\"wakeup-time-input\" type=\"time\" style=\"\"></div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Action</div><input data-testid=\"wakeup-action-input\" type=\"text\" style=\"\"></div><div class=\"terminal-sheet-row\"><button type=\"button\" data-testid=\"wakeup-save\">Save wakeup</button></div></div>"
+  }
+}

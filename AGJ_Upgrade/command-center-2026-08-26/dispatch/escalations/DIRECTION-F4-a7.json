@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 11,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F4-c1 re-delivery (raised 2026-08-28T00:25:10Z, epoch 1201168, HUNG 1800s). F4 is PENDING not parked. PLAN_SOUND in directions-active/F4.txt. HEAD already bb82a57 F4 work; no advance-F4.marker yet. Do NOT park. Live drain is E5 localize. Not a new north question.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T07:29:57Z"
+}

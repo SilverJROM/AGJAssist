@@ -1,0 +1,9 @@
+{
+  "slice": "F7",
+  "attempt": 3,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F7-c1 re-delivery after EXIT resume (raised 04:57:31Z, epoch 2805445, OPEN nothing-failed). Already answered: F0 named-red, F7 unparked to CLOSE after F0-F6. F0 is DONE; F4 F5 F6 still PENDING. parked=[]. Do NOT OPEN F7 and do not walk L2/L3. Product G1-J2 unchanged \u2014 not north. Live drain is D0.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T04:31:29Z"
+}

@@ -1,0 +1,121 @@
+[1A[2K[2m[WebServer] [22m(node:1439215) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/command-center-reminders-fence.spec.ts:13:1 › command-center reminders fence journey
+[1A[2K  1) [cc] › e2e/command-center-reminders-fence.spec.ts:13:1 › command-center reminders fence journey 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: FENCE failures: [{"id":"C1","kind":"assert"},{"id":"C2","kind":"assert"},{"id":"C3","kind":"assert"},{"id":"C4","kind":"assert"},{"id":"C5","kind":"assert"},{"id":"C6","kind":"assert"}]
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoEqual[2m([22m[32mexpected[39m[2m) // deep equality[22m
+
+    [32m- Expected  -  1[39m
+    [31m+ Received  + 26[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C1",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C2",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C3",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C4",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C5",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C6",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+ ][39m
+
+      150 |
+      151 |   try {
+    > 152 |     expect(failed, `FENCE failures: ${JSON.stringify(failed)}`).toEqual([]);
+          |                                                                 ^
+      153 |   } finally {
+      154 |     writeReport();
+      155 |   }
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-reminders-fence.spec.ts:152:65
+
+    Error Context: test-results/command-center-reminders-f-a1774-ter-reminders-fence-journey-cc/error-context.md
+
+
+[1A[2K  1 failed
+    [cc] › e2e/command-center-reminders-fence.spec.ts:13:1 › command-center reminders fence journey 
+[1A[2K[2m[WebServer] [22m(node:1442250) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 1 test using 1 worker
+
+[1A[2K[1/1] [cc] › e2e/command-center-reminders-fence.spec.ts:13:1 › command-center reminders fence journey
+[1A[2K  1) [cc] › e2e/command-center-reminders-fence.spec.ts:13:1 › command-center reminders fence journey 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: FENCE failures: [{"id":"C1","kind":"assert"},{"id":"C2","kind":"assert"},{"id":"C3","kind":"assert"},{"id":"C4","kind":"assert"},{"id":"C5","kind":"assert"},{"id":"C6","kind":"assert"}]
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoEqual[2m([22m[32mexpected[39m[2m) // deep equality[22m
+
+    [32m- Expected  -  1[39m
+    [31m+ Received  + 26[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C1",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C2",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C3",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C4",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C5",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+   Object {[39m
+    [31m+     "id": "C6",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+   },[39m
+    [31m+ ][39m
+
+      150 |
+      151 |   try {
+    > 152 |     expect(failed, `FENCE failures: ${JSON.stringify(failed)}`).toEqual([]);
+          |                                                                 ^
+      153 |   } finally {
+      154 |     writeReport();
+      155 |   }
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-reminders-fence.spec.ts:152:65
+
+    Error Context: test-results/command-center-reminders-f-a1774-ter-reminders-fence-journey-cc/error-context.md
+
+
+[1A[2K  1 failed
+    [cc] › e2e/command-center-reminders-fence.spec.ts:13:1 › command-center reminders fence journey 
+fence=C6 verdict=FAIL fault_class=implementation

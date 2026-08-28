@@ -1,0 +1,10 @@
+[2m[WebServer] [22m(node:886680) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 3 tests using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-responsive.spec.ts:57:1 › 390px transcript padding stays phone value (874ms)
+  ✓  2 [cc] › e2e/command-center-responsive.spec.ts:67:1 › 768px transcript/composer padding is 24px and control bar centered (824ms)
+  ✓  3 [cc] › e2e/command-center-responsive.spec.ts:87:1 › 1024px transcript/composer/control-bar padding matches 880px column and search offset moves (957ms)
+
+  3 passed (3.7s)

@@ -1,0 +1,9 @@
+{
+  "slice": "F3",
+  "attempt": 6,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F3-c1 (raised 09:56:46Z, epoch 1787807412-3745902, TOP RUNG I1/I2). Already answered: north PLAN_SOUND (I1/I2 satisfiable), DIRECTION-F3-a0 unparked 10:00:32Z, budget 6. F3 is IN-FLIGHT on current driver 1201168: a2 FAIL TEST_NOT_DISCRIMINATING I2, a3 impl e00ed40, validator opus5 running, no advance marker, parked=[]. Do NOT unpark or STOP. Do not dispatch a competing seat. If a3 PASSes, advance. If a3 FAILs inside budget 6, let the driver RE_DISPATCH. A new RAISE-F3-c2 is the only later claim. Product I1/I2 unchanged \u2014 not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-27T13:18:42Z"
+}

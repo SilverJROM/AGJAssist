@@ -1,0 +1,9 @@
+{
+  "slice": "D5",
+  "attempt": 1,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "Not plan-defect and not north. Glimmer BLOCKED after ~20m claiming the UI port is too large. D5 is ONE settings sheet: port SummaryEndpointSettings (add/edit/remove, radio default, seeded 140, owner-only errors) after C5. Follow the C5 AgentReminderSheet pattern in src/web/public/app.js only for this sheet \u2014 do not rewrite unrelated app.js. Author e2e/command-center-endpoints.spec.ts with literal fixtures (not values read from the mechanism). Wrap Playwright in timeout --signal=TERM --kill-after=15s 180s. Commit feat(D5): ... then callback DONE. Do NOT emit a placeholder commit. Park rolled HEAD to 6a11ee0; ignore refs/tiller/command-center-2026-08-26/D5 (05ec7a5 is callbacks-only). Engine still enters L1 then the next informed rung.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-27T16:41:51Z"
+}

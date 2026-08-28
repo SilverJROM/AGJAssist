@@ -1,0 +1,13 @@
+{
+  "slice": "F4",
+  "first_seen_attempt": 2,
+  "signature": "IMPL_INCOMPLETE|H1,H2",
+  "requirements": "H1,H2",
+  "defect_class": "IMPL_INCOMPLETE",
+  "argument": "An acceptance criterion that no implementation can satisfy fails IDENTICALLY at every tier, so another attempt or a stronger seat buys more of the same failure at higher cost. This is the plan review, already written.",
+  "answer": "Criterion is sound. H1/H2 (independent header collapse, default tabs-collapsed plus utilities-expanded) is the mockup chrome and is satisfiable. a1-a3 IMPL_INCOMPLETE was incomplete chrome/e2e, not an unsatisfiable AC. a4 HUNG is a static-pane/callback stall after commit 4d32468, not criterion drift. RETRY cherry-picks that commit. No plan edit, no north.",
+  "answered_at": "2026-08-28T00:26:00Z",
+  "answered_by": "projcore",
+  "how_to_answer": "Decompose or repair the criterion, OR write `answer` here saying why the row is sound and the repeats are coincidental. \"Noted and continued\" is not an answer.",
+  "raised_at": 1787873801
+}

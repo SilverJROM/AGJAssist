@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 12,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F4-c2 re-delivery (raised 2026-08-28T06:03:15Z, TRACKED PRODUCT dirt). Dirt already committed a5a6923. F4 is PENDING not parked. PLAN_SOUND in directions-active/F4.txt. HEAD bb82a57. Do NOT park. Live drain is E5. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T07:25:32Z"
+}

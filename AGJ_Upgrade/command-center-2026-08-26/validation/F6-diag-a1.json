@@ -1,0 +1,45 @@
+{
+  "pageErrors": [],
+  "consoleMessages": [
+    "error: Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "error: Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "error: Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "error: Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "requests": [
+    "http://localhost:3217/index.html",
+    "https://telegram.org/js/telegram-web-app.js",
+    "https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css",
+    "http://localhost:3217/style.css?v=__ASSET_VERSION__",
+    "http://localhost:3217/app.js?v=__ASSET_VERSION__",
+    "https://esm.sh/preact@10.19.3",
+    "https://esm.sh/preact@10.19.3/hooks",
+    "https://esm.sh/htm@3.1.1",
+    "http://localhost:3217/terminal-chat-state.js",
+    "http://localhost:3217/nav-helpers.js",
+    "http://localhost:3217/overmind-helpers.js",
+    "https://esm.sh/preact@10.19.3/es2022/preact.mjs",
+    "https://esm.sh/preact@10.19.3/es2022/hooks.mjs",
+    "https://esm.sh/htm@3.1.1/es2022/htm.mjs",
+    "http://localhost:3217/api/tmux/sessions",
+    "http://localhost:3217/api/agent-reminders/active",
+    "http://localhost:3217/api/agent-wakeups/pending",
+    "http://localhost:3217/api/terminal/groups",
+    "http://localhost:3217/api/summary-agents/t1/summaries",
+    "http://localhost:3217/api/summary-endpoints"
+  ],
+  "failed": [],
+  "snapshot": {
+    "url": "http://localhost:3217/index.html#/terminals",
+    "title": "AGJAssist",
+    "bodyText": "☰\nTerminals\n+\nAll\ngroup1\n⋮\n+\nalpha\nready\n1/1/70\n📁",
+    "rows": 1,
+    "html": "\n  <div id=\"app\"><main class=\"main\"><div><div class=\"terminal-shell terminal-shell-friendly\"><div class=\"terminal-shell-header\" data-term-topbar=\"true\"><div class=\"terminal-topbar-main\"><button class=\"terminal-topbar-icon-btn terminal-menu-trigger\" data-testid=\"terminal-sectionnav\" aria-label=\"Sections\" aria-expanded=\"false\">☰</button><div class=\"terminal-topbar-target\"><div class=\"terminal-topbar-name terminal-topbar-name-static\" data-testid=\"terminal-list-title\"><span class=\"terminal-topbar-name-text\">Terminals</span></div></div><button type=\"button\" class=\"terminal-topbar-icon-btn terminal-new-session-trigger\" data-testid=\"terminal-new-session\" aria-label=\"New session\">+</button></div></div><div class=\"terminal-sectionnav-overlay\" hidden=\"\"></div><div class=\"terminal-menu-overlay\" hidden=\"\"></div><div class=\"terminal-menu-sheet\" data-term-menu-sheet=\"true\" data-testid=\"terminal-menu-sheet\" role=\"menu\" inert=\"\"><div class=\"terminal-sheet-inner\"><div data-testid=\"agent-reminder-sheet\"><div class=\"terminal-sheet-sect\">Agent Reminders</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Active reminders</div><div><div>No active reminders</div></div></div><div class=\"terminal-sheet-sect\">New reminder</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Cadence</div><div class=\"terminal-seg\"><button type=\"button\" data-testid=\"cadence-preset-15\">15m</button><button type=\"button\" data-testid=\"cadence-preset-30\">30m</button><button type=\"button\" data-testid=\"cadence-preset-60\">60m</button></div></div><div class=\"terminal-sheet-row\"><input data-testid=\"cadence-custom-input\" type=\"number\" placeholder=\"Custom minutes\" style=\"\"></div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Repeat limit</div><div class=\"terminal-seg\"><button type=\"button\" data-testid=\"repeat-limit-mode-unlimited\" class=\"sel\">Unlimited</button><button type=\"button\" data-testid=\"repeat-limit-mode-stop\" class=\"\">Stop after N</button></div></div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Recipient agent</div><input data-testid=\"recipient-agent-name-input\" type=\"text\" style=\"\"></div><div class=\"terminal-sheet-row\"><label><input type=\"checkbox\" data-testid=\"recipient-include-toggle\" style=\"\"> Include</label></div><div class=\"terminal-sheet-row\"><button type=\"button\" data-testid=\"agent-reminder-save\">Save</button></div></div><div data-testid=\"wakeup-sheet\"><div class=\"terminal-sheet-sect\">Wakeup</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Pending wakeups</div><div><button type=\"button\" data-testid=\"wakeup-expand-toggle\">Collapse</button><span data-testid=\"wakeup-collapsed-summary\" style=\"margin-left: 8px;\">No pending wakeups</span><div>No pending wakeups</div></div></div><div class=\"terminal-sheet-sect\">Schedule wakeup</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Date</div><input data-testid=\"wakeup-date-input\" type=\"date\" style=\"\"></div><div class=\"terminal-sheet-row\"><div",
+    "localKeys": [
+      "agj_terminal_groups",
+      "agj_terminal_active_group",
+      "agj_user",
+      "agj_token"
+    ]
+  }
+}

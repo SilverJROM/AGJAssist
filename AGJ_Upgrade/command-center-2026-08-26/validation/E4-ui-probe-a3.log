@@ -1,0 +1,21 @@
+{
+  "requests": [
+    "GET /api/tmux/sessions",
+    "GET /api/terminal/groups",
+    "GET /api/tmux/sessions"
+  ],
+  "info": {
+    "url": "http://localhost:3211/index.html#/terminals",
+    "title": "AGJAssist",
+    "hasTerminalMenu": false,
+    "hasSectionNav": true,
+    "sessionRows": [
+      {
+        "target": "pane-1",
+        "text": "s1ready📁"
+      }
+    ],
+    "bodyText": "AGJAssist\nDashboard\nProjects\nTerminals\nTasks\nNotes\nAgent OS\nSettings\nMCP Access\nUser\nOWNER\nLogout\nTerminals\n☰\nTerminals\n+\nAll\n+\ns1\nready\n📁",
+    "bodyHtml": "[truncated in console]"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "slice": "B8",
+  "attempt": 0,
+  "action": "RETRY_WITH_DIRECTION",
+  "applied": true,
+  "outcome": "superseded-by-DIRECTION-B8-a0.json (watcher claim filename is a<n> not c<n>)",
+  "applied_at": "2026-08-27T05:15:00Z",
+  "note": "superseded — see DIRECTION-B8-a0.json"
+}

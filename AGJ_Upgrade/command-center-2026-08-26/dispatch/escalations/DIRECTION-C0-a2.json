@@ -1,0 +1,9 @@
+{
+  "slice": "C0",
+  "attempt": 6,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-C0-c1 re-delivery after EXIT resume (raised 11:42:46Z, TOP RUNG HARNESS-SMOKE). Already answered by DIRECTION-C0-a1 (applied 13:18Z, unparked). C0 is DONE at fe98610ebf, C6 CLOSE green. parked=[]. Live drain is D0. Do NOT unpark or re-dispatch C0. Product C1-C6 unchanged \u2014 not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T04:31:29Z"
+}

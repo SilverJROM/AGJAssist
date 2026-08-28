@@ -1,0 +1,22 @@
+{
+  "fence": "B8",
+  "green": true,
+  "passed_ids": [
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "A5",
+    "B1",
+    "B2"
+  ],
+  "failed_ids": [],
+  "fingerprint": "",
+  "negative_control_ok": true,
+  "superset_ok": true,
+  "test_hash": "sha256:e50dfe15f794dcf205e45c68ff8a5e50cb07f1a303aa855939e39d5ad0728444",
+  "verdict": null,
+  "verdict_err": "no [FENCE-VERDICT-V1] token",
+  "negative_control_detail": "1 named assertion(s) failed: A2",
+  "measured_at_head": "78fe35e10ee05ad7bdae57c5e881d30bb2c02a0b"
+}

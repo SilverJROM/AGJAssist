@@ -1,0 +1,16 @@
+D6 independent UI probe a2
+summaryGets=["/api/summary-agents/sessA%3A0.0/summaries","/api/summary-agents/sessB%3A0.0/summaries"]
+cardCount=2
+newestFirst=true
+card0=8/27/2026, 10:00:00 AM via test-ep Second summary
+card1=8/27/2026, 9:00:00 AM via 140 First summary <b>RAW</b>
+styles={"overflow":"auto","overflowY":"auto","maxHeight":"400px","width":"320px"}
+aria={"testid":"agent-summaries-dropdown","role":null,"ariaLabel":null,"text":"Summaries\n✕\n8/27/2026, 10:00:00 AM\nvia test-ep\nSecond summary\n8/27/2026, 9:00:00 AM\nvia 140\nFirst summary <b>RAW</b>"}
+browserStamps={"newest":"8/27/2026, 10:00:00 AM","oldest":"8/27/2026, 9:00:00 AM"}
+nodeStamps={"newest":"8/27/2026, 10:00:00 AM","oldest":"8/27/2026, 9:00:00 AM"}
+stampsMatch=true
+isolated=true
+bText=Summaries ✕ 8/27/2026, 12:00:00 PM via 140 B-only summary
+emptyText=No summaries yet
+html0_has_raw_b=false
+findings=[]

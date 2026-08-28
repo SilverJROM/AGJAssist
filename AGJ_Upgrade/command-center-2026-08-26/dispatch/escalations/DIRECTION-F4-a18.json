@@ -1,0 +1,9 @@
+{
+  "slice": "F4",
+  "attempt": 22,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F4-c2 re-delivery (raised 2026-08-28T06:03:15Z, epoch 1787894777-3583140, TRACKED PRODUCT dirt wakeup/window fence + wakeup-routes). Dirt already landed a5a6923. F4 PENDING not parked; a1 glimmer live on 381861. DIRECTION-F4-a8/a13 SKIP already on disk. Do NOT RETRY (not parked). Do NOT park. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:53:08Z"
+}

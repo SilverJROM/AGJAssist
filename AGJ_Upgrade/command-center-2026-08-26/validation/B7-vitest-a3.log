@@ -1,0 +1,152 @@
+=== B7 validation attempt 3 — commit under test 6b19e7245ae0a34a574a199590515125a3e43863 ===
+
+--- [0] a2's failure mode is closed: working tree is CLEAN and matches the commit ---
+$ git status --porcelain src/ tests/
+(empty = nothing uncommitted)
+$ git diff --name-only 6b19e72^..6b19e72
+src/db/database.ts
+tests/mcp-migration.test.ts
+tests/unit/database.spec.ts
+
+--- [1] FOCUSED ROW COMMAND AT PRISTINE COMMIT (git worktree @ 6b19e72) ---
+
+ RUN  v2.1.9 /tmp/claude-1000/-home-agjrom-TGBOTS-AGJAssist/fa55a2d0-877b-4a4d-a6fc-366a5bb7d760/scratchpad/b7-a3-commit
+
+ ✓ tests/unit/command-center-migration.spec.ts (3 tests) 146ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  04:36:56
+   Duration  333ms (transform 56ms, setup 0ms, collect 66ms, tests 146ms, environment 0ms, prepare 31ms)
+
+reclaimed_bytes=0
+focused_exit_at_commit=0
+
+--- [2] BROAD REGRESSION SWEEP AT PRISTINE COMMIT (all schema-touching specs) ---
+
+ RUN  v2.1.9 /tmp/claude-1000/-home-agjrom-TGBOTS-AGJAssist/fa55a2d0-877b-4a4d-a6fc-366a5bb7d760/scratchpad/b7-a3-commit
+
+ ✓ tests/unit/agent-assignment-service.spec.ts (7 tests) 465ms
+ ❯ tests/overmind-project-migration.test.ts (3 tests | 1 failed) 77ms
+   × propose-overmind-projects > derives app paths, groups completed workflows, marks slug conflicts, and ignores non-completed rows 50ms
+     → no such table: overmind_workflows
+ ✓ tests/unit/database.spec.ts (12 tests) 931ms
+ ✓ tests/mcp-migration.test.ts (3 tests) 1093ms
+   ✓ MCP schema v36 migration parity > upgrades a v34 fixture through groups and MCP with fresh-schema parity 427ms
+   ✓ MCP schema v36 migration parity > is a schema no-op when an already-v36 database is reopened 347ms
+   ✓ MCP schema v36 migration parity > skips the audit rebuild when a partial v35 database already has the mcp CHECK 318ms
+ ✓ tests/notes-folders.test.ts (26 tests) 1099ms
+ ✓ tests/unit/terminal-groups.spec.ts (7 tests) 268ms
+ ✓ tests/unit/command-center-migration.spec.ts (3 tests) 179ms
+ ❯ tests/notes-migration.test.ts (1 test | 1 failed) 33ms
+   × v22 → v23 upgrade regression > migrates an OLD notes table (no folder_id/pinned/position) without throwing 33ms
+     → expected [Function] to not throw an error but 'SqliteError: no such table: overmind_…' was thrown
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/notes-migration.test.ts > v22 → v23 upgrade regression > migrates an OLD notes table (no folder_id/pinned/position) without throwing
+AssertionError: expected [Function] to not throw an error but 'SqliteError: no such table: overmind_…' was thrown
+
+- Expected: 
+undefined
+
++ Received: 
+"SqliteError: no such table: overmind_workflows"
+
+ ❯ tests/notes-migration.test.ts:80:12
+     78|     expect(() => {
+     79|       db = new DatabaseService(TEST_DB);
+     80|     }).not.toThrow();
+       |            ^
+     81| 
+     82|     try {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/overmind-project-migration.test.ts > propose-overmind-projects > derives app paths, groups completed workflows, marks slug conflicts, and ignores non-completed rows
+SqliteError: no such table: overmind_workflows
+ ❯ Database.prepare ../../../../../../home/agjrom/TGBOTS/AGJAssist/node_modules/better-sqlite3/lib/methods/wrappers.js:5:21
+ ❯ DatabaseService.prepare src/db/database.ts:928:20
+    926| 
+    927|   prepare(sql: string): Database.Statement {
+    928|     return this.db.prepare(sql);
+       |                    ^
+    929|   }
+    930| 
+ ❯ insertWorkflow tests/overmind-project-migration.test.ts:230:6
+ ❯ tests/overmind-project-migration.test.ts:37:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  2 failed | 6 passed (8)
+      Tests  2 failed | 60 passed (62)
+   Start at  04:36:57
+   Duration  1.78s (transform 218ms, setup 0ms, collect 456ms, tests 4.15s, environment 1ms, prepare 270ms)
+
+sweep_exit_at_commit=1
+
+--- [3] BASELINE: tests/notes-migration.test.ts AT THE B7 PARENT 251129b (pre-B7) ---
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  04:36:59
+   Duration  247ms (transform 65ms, setup 0ms, collect 77ms, tests 49ms, environment 0ms, prepare 32ms)
+
+
+--- [4] BLAST RADIUS at the commit: which legacy DB versions now CRASH on upgrade? ---
+(legacy DB = schema_version + users only, i.e. no OVM tables — SCHEMA_SQL used to create them for free)
+v22 DB (no OVM tables) -> THROWS: no such table: overmind_workflows
+v24 DB (no OVM tables) -> THROWS: no such table: overmind_workflows
+v27 DB (no OVM tables) -> THROWS: no such table: overmind_workflows
+v28 DB (no OVM tables) -> THROWS: no such table: overmind_workflows
+v30 DB (no OVM tables) -> THROWS: no such table: overmind_workflows
+v31 DB (no OVM tables) -> OK -> v37
+v33 DB (no OVM tables) -> OK -> v37
+v36 DB (no OVM tables) -> OK -> v37
+
+--- [5] a1 Findings 2+3 VERIFIED FIXED at this commit ---
+A: main_size = 4096  wal_size = 24752
+A: backup name = agjassist.db.pre-ovm-drop-20260827043711-3480148.bak
+A: backup rows = [{"slug":"precious-data"}]
+
+B: constructor_threw   = unable to open database: /tmp/verifyB-IXI5ab/agjassist.db.pre-ovm-drop
+B: ovm_table_survived  = true  (must be true = fail-closed)
+B: version_left_at     = {"version":36}
+
+--- [6] full-fidelity fresh-vs-upgraded parity on a TRUE v36 DB built by the B7 parent's own code ---
+upgraded version = {"version":37}
+fresh version    = {"version":37}
+upgraded objects = 81  fresh objects = 81
+
+PRESENT ONLY IN UPGRADED (leftovers): []
+
+PRESENT ONLY IN FRESH (missing after upgrade): []
+
+DDL TEXT DIFFERS: []
+
+B7-spec-style TABLE-NAME comparison equal? -> true
+
+--- [7] THE PRESCRIBED FIX, VERIFIED IN A THROWAWAY WORKTREE (no product code written to the repo) ---
+Mechanism: append an existence check to each OVM legacy-migration guard, e.g.
+  if (current && current.version < 24 && this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='overmind_workflows'").get()) {
+applied to the OVM blocks at v<10..v<31; the v<37 drop block is deliberately NOT guarded.
+
+blast radius WITH the guard:
+v22 DB (no OVM tables) -> OK -> v37
+v24 DB (no OVM tables) -> OK -> v37
+v27 DB (no OVM tables) -> OK -> v37
+v28 DB (no OVM tables) -> OK -> v37
+v30 DB (no OVM tables) -> OK -> v37
+v31 DB (no OVM tables) -> OK -> v37
+v33 DB (no OVM tables) -> OK -> v37
+v36 DB (no OVM tables) -> OK -> v37
+
+spec sweep WITH the guard:
+   ✓ MCP schema v36 migration parity > skips the audit rebuild when a partial v35 database already has the mcp CHECK 366ms
+ ✓ tests/notes-migration.test.ts (1 test) 61ms
+
+ Test Files  5 passed (5)
+      Tests  45 passed (45)
+   Start at  04:37:26
+   Duration  1.50s (transform 128ms, setup 0ms, collect 268ms, tests 3.46s, environment 1ms, prepare 170ms)
+

@@ -6,3 +6,10 @@
 2026-08-27T02:52:50+00:00 solicit OK — issues/raises none, north stays asleep
 2026-08-27T03:22:53+00:00 projcore pane is CHURNING — skipping this tick (it is working, not wedged)
 2026-08-27T03:28:57+00:00 solicit OK — issues/raises none, north stays asleep
+2026-08-28T07:51:00+00:00 another pulse owns this run — exiting
+2026-08-28T08:09:28+00:00 projcore pane is CHURNING — skipping this tick (it is working, not wedged)
+2026-08-28T08:14:31+00:00 projcore pane is CHURNING — skipping this tick (it is working, not wedged)
+2026-08-28T08:20:20+00:00 solicit reports: issues: none. Monitor 381861 + driver 381882 live. Pulse LIVE. parked=[D7,E5]; raises: all ACKED. E5 PLAN_SOUND a11 stands (parked). D7 parked waiting D0. — waking north
+2026-08-28T08:50:55+00:00 solicit reports: issues: none owed. F5 a4 in flight; not 3 failed rounds. Monitor 381861 live. ; raises: all ACKED. E5 PLAN_SOUND a11 parked. D7 parked waiting D0. — waking north
+2026-08-28T09:21:30+00:00 solicit reports: issues: none owed. F6 a2 in flight (budget 1/4). Monitor 685355 live. Pulse LI; raises: all ACKED. F5 DONE (advance-F5, 40ec05e). E5 PLAN_SOUND parked. D7/D0  — waking north
+2026-08-28T09:52:06+00:00 solicit reports: issues: none. Monitor 685355 live. Pulse LIVE. parked=[D0,D7,E5]; raises: all ACKED. E5 PLAN_SOUND parked. D7/D0 parked waiting D0 PLAN_SOUND. — waking north

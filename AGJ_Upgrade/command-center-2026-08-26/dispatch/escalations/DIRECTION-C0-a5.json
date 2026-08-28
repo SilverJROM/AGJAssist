@@ -1,0 +1,9 @@
+{
+  "slice": "C0",
+  "attempt": 5,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-C0-c1 re-delivery (raised 2026-08-27T11:42:46Z, epoch 1201168). C0 is DONE at fe98610ebf. Security APPROVED. parked=[]. Live drain is F4. Do NOT unpark or re-dispatch C0. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T07:23:02Z"
+}

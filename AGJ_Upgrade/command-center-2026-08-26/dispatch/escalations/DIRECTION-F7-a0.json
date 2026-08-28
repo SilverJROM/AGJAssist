@@ -1,0 +1,9 @@
+{
+  "slice": "F7",
+  "attempt": 0,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "fault_class=plan: F7 OPEN nothing-failed because window-fence.spec.ts assertions already pass on HEAD (vacuous). Do not walk the impl ladder. F0 was injected to make G1-J2 named-red on current UI. Keep F7 parked until F0-F6 land, then RETRY CLOSE. Not a product-scope change.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-27T05:10:16Z"
+}

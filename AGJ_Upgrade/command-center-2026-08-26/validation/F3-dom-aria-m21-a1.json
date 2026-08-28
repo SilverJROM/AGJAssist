@@ -1,0 +1,18 @@
+{
+  "lensA_mutationApplied": true,
+  "lensA_refreshCalls": 1,
+  "lensA_conversationText": "Today\nAGENT\nTEST · 12:11:02 PM\ninitial output fixture",
+  "lensA_stillStale": true,
+  "lensA_showsRefreshed": false,
+  "lensB_userTurnsBefore": 1,
+  "lensB_userTurnsAfter": 0,
+  "lensB_beforeText": "Today\n10:00:00\nYOU\nprobe user message zeta\nAGENT\nTEST · 10:00:01\nprobe earlier agent reply zeta",
+  "lensB_afterText": "Today\nAGENT\nTEST · 12:11:03 PM\nrefreshed output fixture",
+  "lensB_youBubbleSurvived": false,
+  "lensB_memoryAfterRefresh": "{\"entries\":[{\"id\":\"agent-1787832663632\",\"role\":\"agent\",\"label\":\"Agent\",\"content\":\"refreshed output fixture\",\"timestamp\":\"12:11:03 PM\"}],\"updatedAt\":1787832663632}",
+  "lensC_immediateHasInitial": false,
+  "lensC_settledHasInitial": false,
+  "lensC_settledHasRefreshed": true,
+  "lensC_settledText": "Today\nAGENT\nTEST · 12:11:04 PM\nrefreshed output fixture",
+  "lensC_outputCalls": 5
+}

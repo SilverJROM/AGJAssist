@@ -1,0 +1,9 @@
+{
+  "slice": "C6",
+  "attempt": 1,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "C0 injected as a C6 dep: rewrite e2e/command-center-reminders-fence.spec.ts to the real C4 owner-gated contract (folder_group, cadence_minutes, recipients array, GET /active, fireDue into a temp pane). Do not invent /schema /due /fired. Collect ALL ids. FENCE_STUB=C3 named-red on C5 kind=assert. After C0, driver CLOSE. Product C1-C6 unchanged.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-27T10:00:32Z"
+}

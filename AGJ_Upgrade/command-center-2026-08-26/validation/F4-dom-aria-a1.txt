@@ -1,0 +1,26 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "url": "http://localhost:3210/index.html#/terminals",
+  "selectorCounts": {
+    "terminal-header-v2": 0,
+    "command-center-header": 0,
+    "tabs-collapse": 0,
+    "agent-group-switcher": 1,
+    "terminal-header-tab": 5,
+    "reminder-chip": 0,
+    "wakeup-chip": 0,
+    "summaries-toggle": 1
+  },
+  "topbarRect": {
+    "x": 10,
+    "y": 6,
+    "width": 370,
+    "height": 49
+  },
+  "bodyText": "←\nalpha\n1 · bash · updated 10:48:26 PM\nbravo\ncharlie\ndelta\necho\nfoxtrot\nA−\nA+\n▲\nME\n▼\nToday\nAGENT\nalpha · 10:48:26 PM\nalpha ready\n$\n⏎\nEsc\n^C\n⇧⇥\n↑\n↓\nSend as command\nSend raw keys\n▴ Large input\n➤",
+  "topbarHtml": "<div class=\"terminal-shell-header\" data-term-topbar=\"true\"><div class=\"terminal-topbar-main\"><button class=\"terminal-topbar-icon-btn terminal-menu-trigger\" data-testid=\"terminal-back-list\" aria-label=\"Back to terminal list\">←</button><div class=\"terminal-topbar-target\" style=\"flex: 0 1 auto;\"><div class=\"terminal-topbar-name terminal-topbar-name-static\" data-testid=\"terminal-session-name\"><span class=\"terminal-topbar-dot on\"></span><span class=\"terminal-topbar-name-text\">alpha</span></div><div class=\"terminal-topbar-sub\" data-testid=\"terminal-last-updated\" data-terminal-last-updated=\"true\">1 · bash · updated 10:48:26 PM</div></div><div class=\"terminal-header-tabs\" data-testid=\"agent-group-switcher\" data-collapsed=\"true\"><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to bravo\">bravo</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to charlie\">charlie</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to delta\">delta</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to echo\">echo</button><button type=\"button\" class=\"terminal-header-tab\" data-testid=\"terminal-header-tab\" title=\"Switch to foxtrot\">foxtrot</button></div><div class=\"terminal-fontpill\" title=\"Text size\"><button type=\"button\" class=\"am\" data-testid=\"terminal-font-decrease\">A−</button><button type=\"button\" class=\"ap\" data-testid=\"terminal-font-increase\">A+</button></div><div class=\"terminal-mynav-header\" data-testid=\"terminal-mynav\" title=\"Jump between my messages\"><button type=\"button\" class=\"terminal-mynav-hbtn\" data-testid=\"terminal-mynav-up\" aria-label=\"Jump to my previous message\">▲</button><span class=\"terminal-mynav-hlabel\">ME</span><button type=\"button\" class=\"terminal-mynav-hbtn\" data-testid=\"terminal-mynav-down\" aria-label=\"Jump to my next message\">▼</button></div><button type=\"button\" class=\"terminal-topbar-icon-btn\" data-testid=\"summaries-toggle\" aria-label=\"Agent summaries\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 4h16v13H8l-4 4V4z\"></path><path d=\"M8 9h8M8 13h5\"></path></svg></button><button type=\"button\" class=\"terminal-topbar-icon-btn terminal-settings-trigger\" data-term-menu=\"true\" data-testid=\"terminal-menu\" aria-label=\"Terminal settings\" aria-expanded=\"false\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"3\"></circle><path d=\"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z\"></path></svg></button></div></div>",
+  "ariaSnapshot": "- main:\n  - button \"Back to terminal list\": ←\n  - text: alpha 1 · bash · updated 10:48:26 PM\n  - button \"bravo\"\n  - button \"charlie\"\n  - button \"delta\"\n  - button \"echo\"\n  - button \"foxtrot\"\n  - button \"A−\"\n  - button \"A+\"\n  - button \"Jump to my previous message\": ▲\n  - text: ME\n  - button \"Jump to my next message\": ▼\n  - button \"Agent summaries\":\n    - img\n  - button \"Terminal settings\"\n  - button \"Search chat\"\n  - button \"Refresh terminal\"\n  - text: Today AGENT alpha · 10:48:26 PM alpha ready $\n  - group \"Terminal keys\":\n    - button \"⏎\"\n    - button \"Esc\"\n    - button \"^C\"\n    - button \"⇧⇥\"\n    - button \"↑\"\n    - button \"↓\"\n  - button \"Send as command\"\n  - button \"Send raw keys\"\n  - button \"▴ Large input\"\n  - button \"Attach image\"\n  - textbox \"Message the agent...\"\n  - button \"➤\" [disabled]"
+}

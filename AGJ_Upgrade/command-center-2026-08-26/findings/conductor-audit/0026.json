@@ -1,0 +1,6 @@
+{
+  "type": "repeated-failure-same-requirement",
+  "slice": "F3",
+  "attempt": 3,
+  "signature": "TEST_NOT_DISCRIMINATING|I1,I2"
+}

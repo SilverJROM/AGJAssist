@@ -1,0 +1,52 @@
+{
+  "type": "escalate",
+  "slice": "C0",
+  "gate": {
+    "decision": "ESCALATE",
+    "failed": [
+      "verdict=FAIL",
+      "commit: PRODUCT dirt at verdict commit (inside this slice's own diff): [' M e2e/command-center-reminders-fence.spec.ts']",
+      "redteam: need standard-clean, got standard-failed"
+    ],
+    "verdict": {
+      "run": "command-center-2026-08-26",
+      "batch": "C0",
+      "attempt": "4",
+      "marker": "DRV-C0-21",
+      "verdict": "FAIL",
+      "req": "HARNESS-SMOKE",
+      "defect_class": "TEST_NOT_DISCRIMINATING",
+      "failed_gate": "C6",
+      "commit": "6811b3fa6ed8750a5004a0268df055831dbcb21f",
+      "redteam": "standard-failed",
+      "evidence": "e2e/command-center-reminders-fence.spec.ts:eddb1292b4eae0b0bb8f40f2fd336db3ffab6a97ac685999e6530e051ad67f59,e2e/run-command-center-playwright-fence.mjs:e08efd6ad276430a64372bc30ea6f93bd5b31522dafbdb980496d87cfd870775,playwright.cc.config.ts:4f3da94d4d2a6afcec350bdd8e2b22bb06a402bc8d8f03e93a4aedf014119cf9,scripts/cc-run-isolated.mjs:8089a5d4ceeb06af79e73c234fd4c1ff180802b369ba6130bd7fcc645aac1e55,src/api/server.ts:5d13946a58a7d7a0dc17bac6a82107c48ea9515c48228457d62cfa63173e6d75,src/web/public/app.js:738f1c951f75fe66022e44434fe9a6321522c93446aa7363c78d99bcc4d72550,validation/C0-focused-a4.log:f5e4815efb38e9709e4323cb8ce72f2791c1c1def9bd4cbc8e5da8fb6e0d6065,validation/C0-redteam-a4.md:400d62d4d2db47149fc0e8a4070487abb409893ada6921cf9bb4fe8ace844049,validation/C0-fix-a4.md:5cd3a018ef6ab65b320e1280d1d77f010a6a3b8627a6dede48e9654990bcc160,validation/C0-ui-a4.png:c0815884975ca4044026e054b7202dbcf92f9130d8620a4e8bb7dff1b9d22914,validation/C0-dom-aria-a4.txt:583c938d1798067931ff9821c6e935c30df1916f23600c5219e1e4893860b0b6,validation/C0-git-artifacts-a4.txt:d12bc27e484d73ec07c0cf12c50761bd88029d0d68f2632a0fedd235531e1608,fence-report-v1.json:b98480c7653e99858ccf0f87c7251b6962dbd4fc8a04ef811ac2df686a23dcd5,.fence-gate-pos.json:3609849d08e0bc238f136679e574f82bcd121018038f8f74ce27ea4106531ac6,.fence-gate-neg.json:b98480c7653e99858ccf0f87c7251b6962dbd4fc8a04ef811ac2df686a23dcd5,test-results/command-center-reminders-f-a1774-ter-reminders-fence-journey-cc/error-context.md:0a867ae376566f0a5ee2de082492c9ff32315b36844595c2240536f5dddd28d1"
+    },
+    "gate_review": false,
+    "release_review": false,
+    "validator_note": "[projcore callback] validator C0 STATUS: DONE \u2014 FAIL gate red; missing committed fire helper and negative not C5-only"
+  },
+  "edge_packet": {
+    "run_id": "command-center-2026-08-26",
+    "batch": "C0",
+    "trigger": "gate:ESCALATE",
+    "failed_conjuncts": [
+      "verdict=FAIL",
+      "commit: PRODUCT dirt at verdict commit (inside this slice's own diff): [' M e2e/command-center-reminders-fence.spec.ts']",
+      "redteam: need standard-clean, got standard-failed"
+    ],
+    "defect_class": "TEST_NOT_DISCRIMINATING",
+    "row_tiers": {
+      "impl": "L2",
+      "val": "L3",
+      "deliberation": "no",
+      "redteam": "standard"
+    },
+    "available_destinations": [
+      "RE_DISPATCH",
+      "CO_PLANNERS",
+      "NORTH",
+      "PANEL",
+      "JROM"
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+[1A[2K[2m[WebServer] [22m
+[2m[WebServer] [22mnode:internal/modules/run_main:123
+[2m[WebServer] [22m    triggerUncaughtException(
+[2m[WebServer] [22m    ^
+
+[1A[2K[2m[WebServer] [22mError [ERR_MODULE_NOT_FOUND]: Cannot find module '/home/agjrom/TGBOTS/AGJAssist/src/services/overmind/pane-utils.js' imported from /home/agjrom/TGBOTS/AGJAssist/src/services/ovm-session.ts
+[2m[WebServer] [22m[90m    at finalizeResolution (node:internal/modules/esm/resolve:283:11)[39m
+[2m[WebServer] [22m[90m    at moduleResolve (node:internal/modules/esm/resolve:952:10)[39m
+[2m[WebServer] [22m[90m    at defaultResolve (node:internal/modules/esm/resolve:1188:11)[39m
+[2m[WebServer] [22m[90m    at nextResolve (node:internal/modules/esm/hooks:864:28)[39m
+[2m[WebServer] [22m    at resolveBase [90m(file:///home/agjrom/TGBOTS/AGJAssist/[39mnode_modules/[4mtsx[24m/dist/esm/index.mjs?1787837790218:2:3744[90m)[39m
+[2m[WebServer] [22m    at async resolveDirectory [90m(file:///home/agjrom/TGBOTS/AGJAssist/[39mnode_modules/[4mtsx[24m/dist/esm/index.mjs?1787837790218:2:4237[90m)[39m
+[2m[WebServer] [22m    at async resolve [90m(file:///home/agjrom/TGBOTS/AGJAssist/[39mnode_modules/[4mtsx[24m/dist/esm/index.mjs?1787837790218:2:5355[90m)[39m
+[2m[WebServer] [22m[90m    at async nextResolve (node:internal/modules/esm/hooks:864:22)[39m
+[2m[WebServer] [22m[90m    at async Hooks.resolve (node:internal/modules/esm/hooks:306:24)[39m
+[2m[WebServer] [22m[90m    at async handleMessage (node:internal/modules/esm/worker:196:18)[39m {
+[2m[WebServer] [22m  code: [32m'ERR_MODULE_NOT_FOUND'[39m,
+[2m[WebServer] [22m  url: [32m'file:///home/agjrom/TGBOTS/AGJAssist/src/services/overmind/pane-utils.js'[39m
+[2m[WebServer] [22m}
+[2m[WebServer] [22m
+[2m[WebServer] [22mNode.js v20.20.1
+
+Error: Process from config.webServer exited early.
+
+[1A[2K[1A[2K[2m[WebServer] [22m
+[2m[WebServer] [22mnode:internal/modules/run_main:123
+[2m[WebServer] [22m    triggerUncaughtException(
+[2m[WebServer] [22m    ^
+
+[1A[2K[2m[WebServer] [22mError [ERR_MODULE_NOT_FOUND]: Cannot find module '/home/agjrom/TGBOTS/AGJAssist/src/services/overmind/pane-utils.js' imported from /home/agjrom/TGBOTS/AGJAssist/src/services/ovm-session.ts
+[2m[WebServer] [22m[90m    at finalizeResolution (node:internal/modules/esm/resolve:283:11)[39m
+[2m[WebServer] [22m[90m    at moduleResolve (node:internal/modules/esm/resolve:952:10)[39m
+[2m[WebServer] [22m[90m    at defaultResolve (node:internal/modules/esm/resolve:1188:11)[39m
+[2m[WebServer] [22m[90m    at nextResolve (node:internal/modules/esm/hooks:864:28)[39m
+[2m[WebServer] [22m    at resolveBase [90m(file:///home/agjrom/TGBOTS/AGJAssist/[39mnode_modules/[4mtsx[24m/dist/esm/index.mjs?1787837791344:2:3744[90m)[39m
+[2m[WebServer] [22m    at async resolveDirectory [90m(file:///home/agjrom/TGBOTS/AGJAssist/[39mnode_modules/[4mtsx[24m/dist/esm/index.mjs?1787837791344:2:4237[90m)[39m
+[2m[WebServer] [22m    at async resolve [90m(file:///home/agjrom/TGBOTS/AGJAssist/[39mnode_modules/[4mtsx[24m/dist/esm/index.mjs?1787837791344:2:5355[90m)[39m
+[2m[WebServer] [22m[90m    at async nextResolve (node:internal/modules/esm/hooks:864:22)[39m
+[2m[WebServer] [22m[90m    at async Hooks.resolve (node:internal/modules/esm/hooks:306:24)[39m
+[2m[WebServer] [22m[90m    at async handleMessage (node:internal/modules/esm/worker:196:18)[39m {
+[2m[WebServer] [22m  code: [32m'ERR_MODULE_NOT_FOUND'[39m,
+[2m[WebServer] [22m  url: [32m'file:///home/agjrom/TGBOTS/AGJAssist/src/services/overmind/pane-utils.js'[39m
+[2m[WebServer] [22m}
+[2m[WebServer] [22m
+[2m[WebServer] [22mNode.js v20.20.1
+
+Error: Process from config.webServer exited early.
+
+[1A[2Kfence=C6 verdict=FAIL fault_class=implementation

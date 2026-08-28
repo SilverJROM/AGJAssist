@@ -1,0 +1,9 @@
+{
+  "slice": "C5",
+  "attempt": 0,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "[north] Transient: codex CLI self-update 0.149.0->0.150.1 (~06:55-06:58) briefly removed `codex` from PATH at C5 validator spawn. Update COMPLETED \u2014 codex-cli 0.150.1 is on PATH in a login shell. Re-dispatch VAL_L3=codex55; it launches now. NOT a persistent env break; no repair. If a codex seat-spawn fails again this run, wait ~60s, verify `codex --version`, then retry \u2014 do not escalate. Park rolled HEAD to 3bde8f4; cherry-pick refs/tiller/command-center-2026-08-26/C5 (1b1e45a) before re-validating so the impl is not rewritten. Product C5 ACs unchanged.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-27T07:10:29Z"
+}

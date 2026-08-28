@@ -1,0 +1,9 @@
+{
+  "slice": "C0",
+  "attempt": 4,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-C0-c1 re-delivery (raised 2026-08-27T11:42:46Z, epoch 1201168, TOP RUNG HARNESS-SMOKE). C0 is DONE at fe98610ebf. Security APPROVED. parked=[]. Live drain is D0. Do NOT unpark or re-dispatch C0. Product C1-C6 unchanged \u2014 not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T05:26:21Z"
+}

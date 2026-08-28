@@ -1,0 +1,14 @@
+{
+  "slice": "B8",
+  "cycle": 1,
+  "attempt": 0,
+  "why": "integration reports green but 1 OPEN acceptance id(s) still do not pass: B2",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787798898-2805445",
+  "raised_at": "2026-08-27T04:57:30Z"
+}

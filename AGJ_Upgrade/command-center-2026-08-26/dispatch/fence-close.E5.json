@@ -1,0 +1,25 @@
+{
+  "fence": "E5",
+  "green": false,
+  "passed_ids": [
+    "D3"
+  ],
+  "failed_ids": [
+    "D1",
+    "D2"
+  ],
+  "fingerprint": "fp1:4c534f69e7dd8f2fd157",
+  "negative_control_ok": true,
+  "superset_ok": true,
+  "test_hash": "sha256:b57c5b9d6cb0b4cd239ecf3814fdc483ed6fa9d1c66e9f16e1beeabe65dc63ee",
+  "verdict": {
+    "fence": "E5",
+    "verdict": "FAIL",
+    "fault_class": "implementation",
+    "failing_units": "E3",
+    "plan_defect": "false",
+    "plan_defect_reason": "none"
+  },
+  "verdict_err": "no [FENCE-VERDICT-V1] token",
+  "measured_at_head": "23ff1d1b3c304afbaa5315af2719760ac5c0ae30"
+}

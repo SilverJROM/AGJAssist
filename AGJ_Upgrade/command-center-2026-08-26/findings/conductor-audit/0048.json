@@ -1,0 +1,10 @@
+{
+  "type": "rollback-discarded",
+  "slice": "F4",
+  "commits": 1,
+  "shortstat": "1 file changed, 12 insertions(+), 7 deletions(-)",
+  "preserved_ref": "refs/tiller/command-center-2026-08-26/F4",
+  "shas": [
+    "a62de6d [F4] fix spec one-row assertion and menu close"
+  ]
+}

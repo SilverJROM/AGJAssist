@@ -1,0 +1,192 @@
+{
+  "contract": [
+    "H1",
+    "H2"
+  ],
+  "mechanism": "mock non-empty reminder/wakeup/summary, collapse utilities, tuck controls, assert visible state and topbar bands",
+  "defaultState": {
+    "tabsToggle": "Tabs ▼ (5)",
+    "tabsSwitcherVisible": false,
+    "visibleTabCount": 0,
+    "utilitiesVisible": true,
+    "bellCount": 0,
+    "bellVisible": false,
+    "reminderChip": "Reminder: drv21-reminder",
+    "wakeupChip": "Wakeup: drv21-wakeup",
+    "summaryChip": "Summary: DRV21 summary signal"
+  },
+  "collapsedState": {
+    "bellVisible": true,
+    "bellAriaLabel": "Show utilities",
+    "dotVisible": true,
+    "countText": "1",
+    "controlsToggleText": "...",
+    "fontDecreaseVisible": false,
+    "myNavVisible": false,
+    "topbarGeometry": {
+      "headerHeight": 47,
+      "bands": [
+        15
+      ],
+      "children": [
+        {
+          "testid": "terminal-back-list",
+          "className": "terminal-topbar-icon-btn terminal-menu-trigger",
+          "text": "←",
+          "ariaLabel": "Back to terminal list",
+          "left": 20,
+          "right": 48,
+          "top": 15,
+          "bottom": 43
+        },
+        {
+          "testid": "",
+          "className": "terminal-topbar-target",
+          "text": "alphat1 · bash",
+          "ariaLabel": "",
+          "left": 53,
+          "right": 105,
+          "top": 12,
+          "bottom": 46
+        },
+        {
+          "testid": "command-center-header",
+          "className": "command-center-header",
+          "text": "Tabs ▼ (5)bravocharliedeltaechofoxtrot",
+          "ariaLabel": "",
+          "left": 110,
+          "right": 191,
+          "top": 15,
+          "bottom": 43
+        },
+        {
+          "testid": "bell-indicator",
+          "className": "command-center-bell has-reminder has-wakeup",
+          "text": "🔔1",
+          "ariaLabel": "Show utilities",
+          "left": 196,
+          "right": 224,
+          "top": 15,
+          "bottom": 43
+        },
+        {
+          "testid": "",
+          "className": "cc-ctrlcluster collapsed",
+          "text": "A−A+▲ME▼...",
+          "ariaLabel": "",
+          "left": 229,
+          "right": 257,
+          "top": 15,
+          "bottom": 43
+        }
+      ]
+    }
+  },
+  "accessibleButtons": [
+    {
+      "testid": "terminal-back-list",
+      "ariaLabel": "Back to terminal list",
+      "title": "",
+      "text": "←",
+      "visible": true
+    },
+    {
+      "testid": "tabs-collapse",
+      "ariaLabel": "",
+      "title": "",
+      "text": "Tabs ▼ (5)",
+      "visible": true
+    },
+    {
+      "testid": "terminal-header-tab",
+      "ariaLabel": "",
+      "title": "Switch to bravo",
+      "text": "bravo",
+      "visible": false
+    },
+    {
+      "testid": "terminal-header-tab",
+      "ariaLabel": "",
+      "title": "Switch to charlie",
+      "text": "charlie",
+      "visible": false
+    },
+    {
+      "testid": "terminal-header-tab",
+      "ariaLabel": "",
+      "title": "Switch to delta",
+      "text": "delta",
+      "visible": false
+    },
+    {
+      "testid": "terminal-header-tab",
+      "ariaLabel": "",
+      "title": "Switch to echo",
+      "text": "echo",
+      "visible": false
+    },
+    {
+      "testid": "terminal-header-tab",
+      "ariaLabel": "",
+      "title": "Switch to foxtrot",
+      "text": "foxtrot",
+      "visible": false
+    },
+    {
+      "testid": "bell-indicator",
+      "ariaLabel": "Show utilities",
+      "title": "",
+      "text": "🔔1",
+      "visible": true
+    },
+    {
+      "testid": "terminal-font-decrease",
+      "ariaLabel": "",
+      "title": "",
+      "text": "A−",
+      "visible": false
+    },
+    {
+      "testid": "terminal-font-increase",
+      "ariaLabel": "",
+      "title": "",
+      "text": "A+",
+      "visible": false
+    },
+    {
+      "testid": "terminal-mynav-up",
+      "ariaLabel": "Jump to my previous message",
+      "title": "",
+      "text": "▲",
+      "visible": false
+    },
+    {
+      "testid": "terminal-mynav-down",
+      "ariaLabel": "Jump to my next message",
+      "title": "",
+      "text": "▼",
+      "visible": false
+    },
+    {
+      "testid": "summaries-toggle",
+      "ariaLabel": "Agent summaries",
+      "title": "",
+      "text": "",
+      "visible": false
+    },
+    {
+      "testid": "terminal-menu",
+      "ariaLabel": "Terminal settings",
+      "title": "",
+      "text": "",
+      "visible": false
+    },
+    {
+      "testid": "controls-collapse",
+      "ariaLabel": "Show controls",
+      "title": "",
+      "text": "...",
+      "visible": true
+    }
+  ]
+}

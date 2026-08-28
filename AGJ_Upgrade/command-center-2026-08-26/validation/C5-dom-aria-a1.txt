@@ -1,0 +1,24 @@
+{
+  "url": "http://localhost:3210/index.html#/terminals",
+  "marker": {
+    "attached": true,
+    "text": "",
+    "display": "none",
+    "visibility": "hidden",
+    "ariaHidden": null,
+    "childElementCount": 0,
+    "boundingBox": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    }
+  },
+  "ariaSnapshot": "",
+  "visibleText": "",
+  "menuOuterHTML": "<div class=\"terminal-menu-sheet\" data-term-menu-sheet=\"true\" data-testid=\"terminal-menu-sheet\" role=\"menu\" inert=\"\"><div class=\"terminal-sheet-inner\"><div data-testid=\"agent-reminder-sheet\" style=\"display: none;\"></div><div class=\"terminal-sheet-topbar\"><span class=\"terminal-sheet-title\">Terminal settings</span><button type=\"button\" class=\"terminal-sheet-done\" data-testid=\"terminal-menu-done\" aria-label=\"Close settings\">Done</button></div><div class=\"terminal-sheet-sect\">Text size</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Conversation size<small>Also in Settings ▸ Appearance (syncs everywhere)</small></div><div class=\"terminal-sheet-stepper\"><button type=\"button\">A−</button><span class=\"val\">17px</span><button type=\"button\">A＋</button></div></div><div class=\"terminal-sheet-row\"><input type=\"range\" min=\"12\" max=\"26\" step=\"1\" style=\"\"></div><div class=\"terminal-sheet-row\" style=\"margin-bottom: 16px;\"><div class=\"terminal-sheet-lbl\">Reset to default</div><button type=\"button\" class=\"terminal-sheet-chip\">Reset · 17px</button></div><div class=\"terminal-sheet-sect\">Reply length</div><div class=\"terminal-sheet-row\" style=\"margin-bottom: 16px;\"><div class=\"terminal-sheet-lbl\">Minimize agent replies<small>Shows the most recent N lines · tap a reply to expand</small></div><div class=\"terminal-seg\" role=\"group\" aria-label=\"Reply length\" data-testid=\"terminal-reply-limit\"><button type=\"button\" class=\"terminal-seg-btn\">10</button><button type=\"button\" class=\"terminal-seg-btn sel\">50</button><button type=\"button\" class=\"terminal-seg-btn\">Full</button></div></div><div class=\"terminal-sheet-sect\">Output</div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Show raw terminal output<small>Reveals stripped CLI chrome</small></div><button type=\"button\" class=\"terminal-switch\" data-testid=\"terminal-show-raw\" data-show-raw=\"true\" role=\"switch\" aria-checked=\"false\" disabled=\"\"></button></div><div class=\"terminal-sheet-sect\">Session</div><div class=\"terminal-menu-section\"><div style=\"display: flex; gap: 8px; align-items: center; flex-wrap: wrap;\"><strong>Raw Terminal</strong></div></div><div class=\"terminal-sheet-picker\"><div style=\"color: var(--danger,#f85149); font-size: 12px; flex: 1 1 0%;\">Unexpected token 'o', \"not found\" is not valid JSON <button class=\"btn btn-sm\">Retry</button></div></div><div class=\"terminal-sheet-chips\" style=\"margin-bottom: 12px;\"><button type=\"button\" class=\"terminal-sheet-chip\">+ New</button><button type=\"button\" class=\"terminal-sheet-chip\">Refresh</button><button type=\"button\" class=\"terminal-sheet-chip danger\">Disconnect</button></div><div class=\"terminal-sheet-row\"><div class=\"terminal-sheet-lbl\">Lines captured</div><label class=\"terminal-chat-line-picker\"><span>Lines</span><select data-testid=\"terminal-lines\"><option value=\"25\">25</option><option value=\"50\">50</option><option value=\"100\">100</option><option value=\"150\">150</option><option value=\"200\">200</option></select></label></div><div class=\"terminal-sheet-chips\"></div></div></div>"
+}

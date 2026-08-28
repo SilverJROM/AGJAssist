@@ -1,0 +1,7 @@
+{
+  "pendingCalls": 2,
+  "before": "WAKEUP\nPending wakeups\nCollapse1 wakeup · in 0m\npane-fire · soon fires · in 0m\nCancel\nSCHEDULE WAKEUP\nDate\nTime\nAction\nSave wakeup",
+  "after": "WAKEUP\nPending wakeups\nCollapseNo pending wakeups\nNo pending wakeups\nSCHEDULE WAKEUP\nDate\nTime\nAction\nSave wakeup",
+  "rowsAfter": 0,
+  "passed": true
+}

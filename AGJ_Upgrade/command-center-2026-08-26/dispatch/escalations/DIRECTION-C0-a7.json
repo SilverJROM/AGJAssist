@@ -1,0 +1,9 @@
+{
+  "slice": "C0",
+  "attempt": 7,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-C0-c1 re-delivery (raised 2026-08-27T11:42:46Z, epoch 1787824829-1201168 dead). C0 DONE at fe98610ebf34. North SECURITY APPROVED. DIRECTION-C0-a6 SKIP already on disk. Do NOT RETRY or re-OPEN F-REMINDERS. Live drain is 381861 F4. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:16:29Z"
+}

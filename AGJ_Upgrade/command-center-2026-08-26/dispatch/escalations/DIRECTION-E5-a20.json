@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 20,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "RAISE-E5-c6 same seam fp1:4c534f69e7dd8f2fd157 (raised 08:00:39Z epoch 276663). PLAN_SOUND a11 stands in directions-active/E5.txt. E5 is parked; this SKIP ACKs the echo without walking L2/L3 or a second PLAN_SOUND. Fence-author named-reds ride next E5 PREPARE. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:03:01Z"
+}

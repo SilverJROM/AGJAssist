@@ -1,0 +1,15 @@
+{
+  "slice": "E5",
+  "cycle": 1,
+  "attempt": 0,
+  "why": "E5_journey_is_still_the_A0_scaffold_not_an_authored_journey__D1_asserts_unauthenticated_GET_api_agent-wakeups_eq_200_but_that_route_does_not_exist_measured_404_both_unauth_and_owner_and_no_plan_row_asked_for_it__the_read_route_the_plan_DID_ask_E3_for_is_owner-only_GET_api_agent-wakeups_pending_measured_401_unauth_and_200_owner_returning_wakeups_so_D1_is_unsatisfiable_by_any_plan-conformant_impl_because_row_E3_mandates_owner-only_non-owner_fail-closed_and_og-req_D1_is_schedule-from-agent-chat_not_a_status_probe__D3_targets_POST_api_agent-wakeups_fire_measured_404_which_no_row_asked_for_either_since_E2_is_service-level_due-time_fire_through_SafetyService_TmuxService_and_og-req_D3_is_server-side_firing_not_an_HTTP_fire_endpoint__spec_hardcodes_origin_3210_and_ignores_FENCE_ORIGIN_and_never_reads_OWNER_TOKEN_unlike_the_authored_C6_journey__check_throws_on_first_failure_so_while_D1_is_red_D2_and_D3_never_execute_making_contract_expected_negative_fail_ids_D3_unreachable_and_the_FENCE_STUB_E2_negative_control_vacuous_it_stubs_a_404_path_whose_preHandler_never_fires__fingerprint_fp1_789e9419ade03537b1bb_with_failed_id_D1_and_test_hash_fcb7d5f7_were_already_recorded_at_fence-open_2026-08-27T16-26-53Z_before_the_first_E1_commit_599012e_at_16-34-54Z_and_are_byte-identical_at_close_head_b1d8258_so_no_contributing_unit_moved_it",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787824829-1201168",
+  "raised_at": "2026-08-27T22:23:31Z",
+  "note": "fault_class=plan means the implementer seat ladder is SKIPPED entirely \u2014 do not answer RETRY_WITH_DIRECTION into L2/L3. Walking the ladder on a broken plan burns three seats to rediscover the plan is broken. Re-plan the fence, or return a DIRECTION with action=PLAN_SOUND carrying `what_validator_missed`."
+}

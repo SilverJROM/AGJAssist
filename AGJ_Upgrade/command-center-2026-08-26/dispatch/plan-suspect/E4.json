@@ -1,0 +1,13 @@
+{
+  "slice": "E4",
+  "first_seen_attempt": 2,
+  "signature": "IMPL_INCOMPLETE|D1,D2,D3",
+  "requirements": "D1,D2,D3",
+  "defect_class": "IMPL_INCOMPLETE",
+  "argument": "An acceptance criterion that no implementation can satisfy fails IDENTICALLY at every tier, so another attempt or a stronger seat buys more of the same failure at higher cost. This is the plan review, already written.",
+  "answer": "Criterion is sound. E4 a1-a3 IMPL_INCOMPLETE on D1/D2 (sheet vs active terminal chat, pending time) was incomplete UI/e2e, not an unsatisfiable AC. a4 terra PASS b1d8258 and the slice advanced. Repeats were coincidental. No plan edit, no north.",
+  "answered_at": "2026-08-27T22:46:18Z",
+  "answered_by": "projcore",
+  "how_to_answer": "Decompose or repair the criterion, OR write `answer` here saying why the row is sound and the repeats are coincidental. \"Noted and continued\" is not an answer.",
+  "raised_at": 1787867412
+}

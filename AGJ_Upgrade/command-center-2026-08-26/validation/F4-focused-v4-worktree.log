@@ -1,0 +1,51 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders (1.0m)
+
+
+  1) [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ─
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('[data-testid="terminal-menu"]')[22m
+    [2m    - locator resolved to <button type="button" aria-expanded="true" data-term-menu="true" data-testid="terminal-menu" aria-label="Terminal settings" class="terminal-topbar-icon-btn terminal-settings-trigger">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is visible, enabled and stable[22m
+    [2m      - scrolling into view if needed[22m
+    [2m      - done scrolling[22m
+    [2m      - <div class="terminal-menu-overlay"></div> intercepts pointer events[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is visible, enabled and stable[22m
+    [2m      - scrolling into view if needed[22m
+    [2m      - done scrolling[22m
+    [2m      - <div class="terminal-menu-overlay"></div> intercepts pointer events[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    114 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is visible, enabled and stable[22m
+    [2m        - scrolling into view if needed[22m
+    [2m        - done scrolling[22m
+    [2m        - <div class="terminal-menu-overlay"></div> intercepts pointer events[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+      123 |   const remindersAfter = countRequests(/\/api\/agent-reminders\/active/);
+      124 |   expect(remindersAfter).toBeGreaterThan(remindersBefore);
+    > 125 |   await page.locator('.terminal-menu-overlay').dispatchEvent('pointerdown');
+          |                                                       ^
+      126 |   await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'false');
+      127 |
+      128 |   // Expand tabs and assert exactly one switcher with literal names
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-header.spec.ts:125:55
+
+    Error Context: test-results/command-center-header-comm-50831-der-collapse-chrome-renders-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-header.spec.ts:21:1 › command-center header collapse chrome renders ──

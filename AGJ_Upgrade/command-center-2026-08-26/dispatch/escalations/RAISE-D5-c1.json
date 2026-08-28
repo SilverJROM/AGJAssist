@@ -1,0 +1,15 @@
+{
+  "slice": "D5",
+  "cycle": 1,
+  "attempt": 1,
+  "why": "impl [projcore callback] implementer D5 STATUS: BLOCKED \u2014 UI port requires extensive app.js changes and test authoring not completed in session",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787824829-1201168",
+  "raised_at": "2026-08-27T16:26:46Z",
+  "note": "TILLER ALREADY TRIED TO SELF-HEAL THIS. Seat `x-tlre7cd71a78feb_impl_glimmer` for D5 was respawned 0x and re-dispatched automatically before this RAISE. callback received A plain RETRY_WITH_DIRECTION will repeat exactly what already failed \u2014 fix the underlying condition (env, PATH, quota, or the slice itself) first, or answer STOP_TRUE_BLOCKED."
+}

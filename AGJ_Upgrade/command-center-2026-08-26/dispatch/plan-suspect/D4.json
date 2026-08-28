@@ -1,0 +1,13 @@
+{
+  "slice": "D4",
+  "first_seen_attempt": 2,
+  "signature": "IMPL_INCOMPLETE|E2,F1,F2,F3",
+  "requirements": "E2,F1,F2,F3",
+  "defect_class": "IMPL_INCOMPLETE",
+  "argument": "An acceptance criterion that no implementation can satisfy fails IDENTICALLY at every tier, so another attempt or a stronger seat buys more of the same failure at higher cost. This is the plan review, already written.",
+  "answer": "Criterion is sound. D4 a1/a2 IMPL_INCOMPLETE on PATCH base_url presence vs truthiness was incomplete implementation, not an unsatisfiable AC. a3 glimmer PASS 6a11ee0 and slice advanced. Repeats were coincidental. No plan edit, no north.",
+  "answered_at": "2026-08-27T16:36:00Z",
+  "answered_by": "projcore",
+  "how_to_answer": "Decompose or repair the criterion, OR write `answer` here saying why the row is sound and the repeats are coincidental. \"Noted and continued\" is not an answer.",
+  "raised_at": 1787845263
+}

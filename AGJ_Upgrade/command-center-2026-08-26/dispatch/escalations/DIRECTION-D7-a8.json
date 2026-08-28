@@ -1,0 +1,9 @@
+{
+  "slice": "D7",
+  "attempt": 8,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "RAISE-D7-c2 OPEN vacuous (raised 2026-08-28T08:00:39Z, epoch 276663). D7 parked waiting D0 PLAN_SOUND (directions-active/D0.txt; PREPARE landed 12b6391+d643c37). D7.txt: CLOSE after D0 against real D4 + C6 arrival. Do NOT RETRY L2/L3 (would unpark into vacuous OPEN). Do NOT re-CLOSE on the scaffold. Live drain is 381861 F4. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:16:29Z"
+}

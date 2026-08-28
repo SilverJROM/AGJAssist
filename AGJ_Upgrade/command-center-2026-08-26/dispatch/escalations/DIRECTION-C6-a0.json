@@ -1,0 +1,9 @@
+{
+  "slice": "C6",
+  "attempt": 0,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "fault_class=plan: do not walk L2/L3. e2e/command-center-reminders-fence.spec.ts asserts invented unauthenticated endpoints GET /api/agent-reminders/schema, /due, /fired and POST {cadence:30m} 201. C4 built owner-gated POST /api/agent-reminders (folder_group + cadence_minutes + recipients array) and GET /active. OPEN C1 is named-red for the wrong reason (missing /schema, not missing tables). Product ACs C1-C6 unchanged. Keep C6 parked. Next TILLER-EXIT/boundary: inject C0 (HARNESS, like F0/H8) to rewrite the journey against the real C4 contract + owner session + fireDue into a temp pane; FENCE_STUB=C3 must force named C5 kind=assert red; collect ALL ids. Then RETRY C6 CLOSE. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-27T08:15:27Z"
+}

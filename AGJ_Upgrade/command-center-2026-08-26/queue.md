@@ -1,38 +1,43 @@
 # queue — agjassist-command-center
 
-- [DONE] 1: A0 — Prove the fence harness smoke: named-red on HEAD and FENCE_STUB=B2 named-red on A2.  <!-- driver-advanced dc38330155 -->
-- [DONE] 2: B1 — Hide Overmind screens and nav without breaking the ordinary terminal chat.  <!-- driver-advanced 8a2ca9e767 -->
-- [DONE] 3: B2 — Remove every Overmind API and stream entry point.  <!-- driver-advanced 59fb99d5bb -->
-- [PENDING] 4: B3 — Remove the autonomous Overmind service subsystem instead of disabling it.
-- [PENDING] 5: B4 — Boot AGJAssist without constructing or starting any Overmind service.
-- [DONE] 6: B5 — Make every retired Overmind bot command follow the normal unknown-command path.  <!-- driver-advanced ccc0bdde52 -->
-- [DONE] 7: B6 — Remove guardian escalation without breaking ordinary reminder paging.  <!-- driver-advanced bc21bc78f4 -->
-- [PENDING] 8: B7 — Back up the database before the authorized OVM-table drop and preserve schema parity.
-- [PENDING] 9: B8 — Prove the OVM teardown composes safely before any attended release.
-- [PENDING] 10: C1 — Persist folder reminders and per-agent inclusion without overloading calendar reminders.
-- [PENDING] 11: C2 — Let the owner configure cadence, repeat limits, and included agents reliably.
-- [PENDING] 12: C3 — Fire due reminder solicits server-side through safety checks and audit.
-- [PENDING] 13: C4 — Expose owner-only reminder controls and active state through the API.
-- [PENDING] 14: C5 — Let the owner configure and inspect active folder reminders from an agent window.
-- [PENDING] 15: C6 — Prove a persisted reminder reaches only included agent panes while the app is closed.
-- [PENDING] 16: D1 — Persist summary endpoints and endpoint-attributed agent summaries safely.
-- [PENDING] 17: D2 — Let the owner manage named summary endpoints with 140 as the seeded default.
-- [PENDING] 18: D3 — Summarize a reminder reply without letting LLM failure break the solicit.
-- [PENDING] 19: D4 — Expose owner-only endpoint management and per-agent summary history.
-- [PENDING] 20: D5 — Let the owner add, edit, remove, and select summary endpoints in Settings.
-- [PENDING] 21: D6 — Show each agent's newest summaries in a useful scrollable dropdown.
+- [DONE] 1: A0 — Prove the fence harness smoke: named-red on HEAD and FENCE_STUB=B2 named-red on A2.  <!-- driver-advanced dc3833015586 -->
+- [DONE] 2: B1 — Hide Overmind screens and nav without breaking the ordinary terminal chat.  <!-- driver-advanced 8a2ca9e76743 -->
+- [DONE] 3: B2 — Remove every Overmind API and stream entry point.  <!-- driver-advanced 59fb99d5bbab -->
+- [DONE] 4: B3 — Remove the autonomous Overmind service subsystem instead of disabling it.  <!-- driver-advanced c288020a4b86 -->
+- [DONE] 5: B4 — Boot AGJAssist without constructing or starting any Overmind service.  <!-- driver-advanced 251129b762e1 -->
+- [DONE] 6: B5 — Make every retired Overmind bot command follow the normal unknown-command path.  <!-- driver-advanced ccc0bdde524b -->
+- [DONE] 7: B6 — Remove guardian escalation without breaking ordinary reminder paging.  <!-- driver-advanced bc21bc78f492 -->
+- [DONE] 8: B7 — Back up the database before the authorized OVM-table drop and preserve schema parity.  <!-- driver-advanced 78e8448e8dbf -->
+- [DONE] 9: B8 — Prove the OVM teardown composes safely before any attended release.  <!-- driver-advanced 78fe35e10ee0 -->
+- [DONE] 10: C1 — Persist folder reminders and per-agent inclusion without overloading calendar reminders.  <!-- driver-advanced 87117c7ac3f9 -->
+- [DONE] 11: C2 — Let the owner configure cadence, repeat limits, and included agents reliably.  <!-- driver-advanced 65b3b528577e -->
+- [DONE] 12: C3 — Fire due reminder solicits server-side through safety checks and audit.  <!-- driver-advanced 22c4ae4c92ca -->
+- [DONE] 13: C4 — Expose owner-only reminder controls and active state through the API.  <!-- driver-advanced 3bde8f4fd6b8 -->
+- [DONE] 14: C5 — Let the owner configure and inspect active folder reminders from an agent window.  <!-- driver-advanced fb921dcfcdd3 -->
+- [DONE] 15: C6 — Prove a persisted reminder reaches only included agent panes while the app is closed.  <!-- driver-advanced fe98610ebf34 -->
+- [DONE] 16: D1 — Persist summary endpoints and endpoint-attributed agent summaries safely.  <!-- driver-advanced e1c0cca2cb7c -->
+- [DONE] 17: D2 — Let the owner manage named summary endpoints with 140 as the seeded default.  <!-- driver-advanced 37567aeb8c21 -->
+- [DONE] 18: D3 — Summarize a reminder reply without letting LLM failure break the solicit.  <!-- driver-advanced 6144ea00896d -->
+- [DONE] 19: D4 — Expose owner-only endpoint management and per-agent summary history.  <!-- driver-advanced 6a11ee027c1e -->
+- [DONE] 20: D5 — Let the owner add, edit, remove, and select summary endpoints in Settings.  <!-- driver-advanced 5990791a082b -->
+- [DONE] 21: D6 — Show each agent's newest summaries in a useful scrollable dropdown.  <!-- driver-advanced b687e58a439e -->
 - [PENDING] 22: D7 — Prove an answered solicit becomes a stored local-LLM summary in the dropdown.
-- [PENDING] 23: E1 — Let the owner persist one-time wakeups independently of the retired OVM scheduler.
-- [PENDING] 24: E2 — Fire each due wakeup once through safety checks and audit, then clear it.
-- [PENDING] 25: E3 — Expose owner-only wakeup scheduling, pending state, and cancellation.
-- [PENDING] 26: E4 — Show and manage a one-time wakeup from expanded or collapsed agent headers.
+- [DONE] 23: E1 — Let the owner persist one-time wakeups independently of the retired OVM scheduler.  <!-- driver-advanced 245e1293ff1c -->
+- [DONE] 24: E2 — Fire each due wakeup once through safety checks and audit, then clear it.  <!-- driver-advanced 5dfa879526e3 -->
+- [DONE] 25: E3 — Expose owner-only wakeup scheduling, pending state, and cancellation.  <!-- driver-advanced 2e2c18f91eef -->
+- [DONE] 26: E4 — Show and manage a one-time wakeup from expanded or collapsed agent headers.  <!-- driver-advanced b1d8258c5d4d -->
 - [PENDING] 27: E5 — Prove a scheduled wakeup appears, fires once, sends its action, and clears.
-- [PENDING] 28: F1 — Keep unsent composer text isolated by viewer and agent across reloads.
-- [PENDING] 29: F2 — Restore drafts on agent switches and clear only the successfully sent draft.
-- [PENDING] 30: F3 — Refresh transcript and live session details without blocking the composer.
-- [PENDING] 31: F4 — Match the mockup's compact independently collapsible command-center header.
-- [PENDING] 32: F5 — Switch agents by dropdown on narrow screens and scrubber on wide screens.
-- [PENDING] 33: F6 — Keep the locked window readable and theme-adaptive from phone through desktop.
+- [DONE] 28: F1 — Keep unsent composer text isolated by viewer and agent across reloads.  <!-- driver-advanced c5aa50963b0c -->
+- [DONE] 29: F2 — Restore drafts on agent switches and clear only the successfully sent draft.  <!-- driver-advanced afa783f35e13 -->
+- [DONE] 30: F3 — Refresh transcript and live session details without blocking the composer.  <!-- driver-advanced 41459b9897b7 -->
+- [DONE] 31: F4 — Match the mockup's compact independently collapsible command-center header.  <!-- driver-advanced 138b91fd1e -->
+- [DONE] 32: F5 — Switch agents by dropdown on narrow screens and scrubber on wide screens.  <!-- driver-advanced 40ec05e841 -->
+- [DONE] 33: F6 — Keep the locked window readable and theme-adaptive from phone through desktop.  <!-- driver-advanced 241b5cf3f0 -->
 - [PENDING] 34: F7 — Prove the complete agent window matches the mockup without terminal regressions.
 - [PENDING] 35: G1 — Remove dead OVM and mockup scratch artifacts while preserving the locked design record.
 - [PENDING] 36: G2 — Keep live backup and restart unreachable from tiller; only a confirmed human may execute.
+- [DONE] 37: H8 — Make B8 CLOSE measurement collect every F-OVM id and named-red A2 under FENCE_STUB=B2.  <!-- driver-advanced 78fe35e10ee0 -->
+- [DONE] 38: C0 — Make the reminders fence journey measure the real C4 contract plus C1-C6 collection.  <!-- driver-advanced fe98610ebf34 -->
+- [DONE] 39: F0 — Make the window fence journey named-red on G1-J2 against current HEAD without product UI.  <!-- driver-advanced d08ca352dd82 -->
+- [PENDING] 40: D0 — Make the summaries fence journey measure the real owner-gated D4 contract plus C6 arrival.
+- [DONE] 41: E0 — Make the wakeup fence journey measure real E3 pending routes and E2 fire-once.  <!-- driver-advanced 88d17608cca3 -->

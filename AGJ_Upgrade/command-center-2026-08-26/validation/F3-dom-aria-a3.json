@@ -1,0 +1,37 @@
+{
+  "before": {
+    "refreshCount": 1,
+    "statusCount": 1,
+    "refreshStatus": "",
+    "topbarHtml": "<div class=\"terminal-chat-topbar\"><button type=\"button\" class=\"terminal-search-toggle\" data-testid=\"terminal-search-toggle\" aria-label=\"Search chat\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><path d=\"M21 21l-4.3-4.3\"></path></svg></button><button type=\"button\" class=\"terminal-refresh-btn\" data-testid=\"terminal-refresh\" aria-label=\"Refresh terminal\" aria-busy=\"false\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M23 4v6h-6\"></path><path d=\"M1 20v-6h6\"></path><path d=\"M3.51 9a9 9 0 0 1 14.13-3.36L23 10\"></path><path d=\"M1 14a9 9 0 0 0 14.13 3.36L23 14\"></path></svg></button><span aria-live=\"polite\" class=\"terminal-refresh-status\" data-testid=\"terminal-refresh-status\"></span></div>",
+    "composerValue": "keep-me"
+  },
+  "during": {
+    "refreshDisabled": true,
+    "ariaBusy": "true",
+    "refreshStatus": "Refreshing",
+    "conversationText": "TodayAGENTTEST · 9:45:39 AMinitial output fixture",
+    "composerValue": "keep-me",
+    "sessionCalls": null
+  },
+  "after": {
+    "refreshDisabled": false,
+    "ariaBusy": "false",
+    "refreshStatus": "Updated",
+    "lastUpdated": "TEST:0.0 · zsh · updated 9:45:40 AM",
+    "conversationText": "TodayAGENTTEST · 9:45:40 AMrefreshed output fixture",
+    "composerValue": "keep-me"
+  },
+  "searchOpen": {
+    "refreshCount": 1,
+    "statusCount": 0,
+    "refreshVisible": true,
+    "refreshDisabled": false,
+    "refreshStatus": "",
+    "searchBarHtml": "<div class=\"terminal-search-bar\" data-testid=\"terminal-search-bar\"><svg class=\"terminal-search-glass\" width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><path d=\"M21 21l-4.3-4.3\"></path></svg><input class=\"terminal-search-input\" data-testid=\"terminal-search-input\" type=\"text\" placeholder=\"Search this chat…\" autofocus=\"\"><span class=\"terminal-search-count\" data-testid=\"terminal-search-count\">0/0</span><button type=\"button\" class=\"terminal-search-btn\" data-testid=\"terminal-search-prev\" aria-label=\"Previous match\" disabled=\"\">▲</button><button type=\"button\" class=\"terminal-search-btn\" data-testid=\"terminal-search-next\" aria-label=\"Next match\" disabled=\"\">▼</button><button type=\"button\" class=\"terminal-search-btn terminal-search-close\" data-testid=\"terminal-search-close\" aria-label=\"Close search\">✕</button><button type=\"button\" class=\"terminal-refresh-btn\" data-testid=\"terminal-refresh\" aria-label=\"Refresh terminal\" aria-busy=\"false\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M23 4v6h-6\"></path><path d=\"M1 20v-6h6\"></path><path d=\"M3.51 9a9 9 0 0 1 14.13-3.36L23 10\"></path><path d=\"M1 14a9 9 0 0 0 14.13 3.36L23 14\"></path></svg></button></div>"
+  },
+  "counts": {
+    "sessionCalls": 2,
+    "outputCalls": 4
+  }
+}

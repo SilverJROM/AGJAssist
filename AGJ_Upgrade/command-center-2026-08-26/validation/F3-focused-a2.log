@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-refresh.spec.ts:3:1 › command-center refresh control is always reachable and re-pulls output and session metadata (1.3s)
+
+  1 passed (2.3s)

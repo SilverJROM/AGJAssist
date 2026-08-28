@@ -1,0 +1,3 @@
+AGJ_Upgrade/command-center-2026-08-26/findings/conductor-audit/0008.json
+AGJ_Upgrade/command-center-2026-08-26/prompts/drv-C5-impl-a1.md
+AGJ_Upgrade/command-center-2026-08-26/prompts/drv-C5-val-a1.md

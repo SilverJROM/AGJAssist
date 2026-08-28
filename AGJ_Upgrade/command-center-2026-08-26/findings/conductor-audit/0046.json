@@ -1,0 +1,5 @@
+{
+  "type": "seat-failure",
+  "slice": "F4",
+  "error": "spawn_seat refused: x-tlre7cd71a78feb_validator_opus5 exists but is NOT in this run ledger (another run owns it)"
+}

@@ -1,0 +1,30 @@
+[2m[WebServer] [22m(node:639274) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+
+  ✘  1 [cc] › e2e/command-center-switcher.spec.ts:121:1 › phone width uses a visible full-group dropdown with current status and draft markers (465ms)
+  ✓  2 [cc] › e2e/command-center-switcher.spec.ts:156:1 › desktop width uses the strip and a pointer-drag scrubber that scrolls the strip (596ms)
+
+
+  1) [cc] › e2e/command-center-switcher.spec.ts:121:1 › phone width uses a visible full-group dropdown with current status and draft markers 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeLessThanOrEqual[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected: <= [32m221[39m
+    Received:    [31m328.90625[39m
+
+      137 |   });
+      138 |   expect(narrowGeometry.dropdownWidth).toBeGreaterThan(80);
+    > 139 |   expect(narrowGeometry.dropdownRight).toBeLessThanOrEqual(narrowGeometry.controlsLeft - 4);
+          |                                        ^
+      140 |   await expect(page.locator('[data-testid="agent-group-switcher"]')).toBeHidden();
+      141 |   await expect(header.locator('[data-testid="agent-group-switcher-scrubber"]')).toBeHidden();
+      142 |
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-switcher.spec.ts:139:40
+
+    Error Context: test-results/command-center-switcher-ph-f8160-nt-status-and-draft-markers-cc/error-context.md
+
+  1 failed
+    [cc] › e2e/command-center-switcher.spec.ts:121:1 › phone width uses a visible full-group dropdown with current status and draft markers 
+  1 passed (2.7s)

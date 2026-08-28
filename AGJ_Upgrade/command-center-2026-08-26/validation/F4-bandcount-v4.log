@@ -1,0 +1,5 @@
+{"specHeight":47.1875,"specCount":3,"bands":[12,17,31]}
+band members:
+  top=12 : terminal-topbar-main, terminal-back-list, terminal-topbar-target, terminal-session-name, terminal-topbar-name-text, command-center-header, terminal-header-v2, tabs-collapse, bell-indicator, cc-ctrlcluster collapsed, cont
+  top=17 : terminal-back-list, terminal-topbar-dot on, command-center-header, terminal-header-v2, tabs-collapse, bell-indicator, cc-util-icon-dot, cc-ctrlcluster collapsed, controls-collapse
+  top=31 : terminal-last-updated, cc-util-icon-count

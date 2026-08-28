@@ -1,0 +1,9 @@
+{
+  "slice": "D0",
+  "attempt": 5,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-D0-c1 re-delivery (raised 2026-08-28T04:31:29Z, SLICE-TOO-BIG a4 sonnet5). Already answered: north PLAN_SOUND + DIRECTION-D0-a4 RETRY applied/unparked 04:56:36Z. D0 is PENDING in-flight (glimmer working). parked=[]. Do NOT park, split, or re-plan. Live drain IS D0. Not a new north question.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T05:39:52Z"
+}

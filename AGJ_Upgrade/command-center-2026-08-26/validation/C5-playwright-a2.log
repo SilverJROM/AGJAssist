@@ -1,0 +1,7 @@
+
+Running 2 tests using 1 worker
+
+  ✓  1 [cc] › e2e/command-center-reminders.spec.ts:10:1 › C5 ActiveRemindersView renders mocked reminder (1.3s)
+  ✓  2 [cc] › e2e/command-center-reminders.spec.ts:42:1 › C5 create reminder flow posts correct payload (1.3s)
+
+  2 passed (3.6s)

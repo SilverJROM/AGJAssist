@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 22,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-E5-c2 re-delivery (raised 2026-08-28T05:44:28Z, epoch 1787894777-3583140, missing fence-report). PLAN_SOUND a11 stands in directions-active/E5.txt. E5 parked. DIRECTION-E5-a16 SKIP already on disk. Do NOT RETRY L2/L3. Do NOT second PLAN_SOUND. Live drain is 381861 F4. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T08:57:29Z"
+}

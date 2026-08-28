@@ -1,0 +1,9 @@
+FINDING 1 of 2
+WHAT FAILED: The focused edit test at `e2e/command-center-endpoints.spec.ts:104` still does not discriminate the edited endpoint id. It waits for any PATCH request whose URL includes `/api/summary-endpoints/`, and the route fixture accepts any PATCH path. A wrong UI that PATCHes `/api/summary-endpoints/1` after clicking Edit on row 2 would still set `patched = true`, assert the correct payload, receive the edited row fixture, and pass.
+THE FIX: In the edit test route, parse `new URL(route.request().url()).pathname` for the PATCH request and assert it equals the literal path `/api/summary-endpoints/2`. Also change the `page.waitForRequest` predicate to `req.url().endsWith('/api/summary-endpoints/2') && req.method() === 'PATCH'`. Keep the existing literal payload assertions and edited-row assertion.
+WHY THE LAST ATTEMPT MISSED IT: It fixed payload assertions but left endpoint identity as a broad URL substring.
+
+FINDING 2 of 2
+WHAT FAILED: The focused delete test at `e2e/command-center-endpoints.spec.ts:155` still does not discriminate the deleted endpoint id. The route fixture sets `deleted = true` for any DELETE path, and the wait predicate accepts any DELETE under `/api/summary-endpoints/`. A wrong UI that DELETEs `/api/summary-endpoints/1` after clicking Del on row 2 would still get a one-row follow-up fixture and pass the visible row-count assertions.
+THE FIX: In the delete test route, parse `new URL(route.request().url()).pathname` for DELETE and assert it equals the literal path `/api/summary-endpoints/2` before setting `deleted = true`. Also change the `page.waitForRequest` predicate to `req.url().endsWith('/api/summary-endpoints/2') && req.method() === 'DELETE'`. Keep the stateful follow-up GET and visible absence assertions.
+WHY THE LAST ATTEMPT MISSED IT: It fixed the post-delete visible row assertions but left the DELETE target as any summary endpoint path.

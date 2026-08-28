@@ -1,0 +1,10 @@
+{
+  "type": "rollback-discarded",
+  "slice": "C5",
+  "commits": 1,
+  "shortstat": "2 files changed, 26 insertions(+)",
+  "preserved_ref": "refs/tiller/command-center-2026-08-26/C5",
+  "shas": [
+    "1b1e45a [C5] Port AgentReminderSheet stub + ActiveRemindersView test"
+  ]
+}
