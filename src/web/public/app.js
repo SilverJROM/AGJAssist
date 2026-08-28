@@ -2969,6 +2969,25 @@ function TerminalTab({ projectId, projectName } = {}) {
       .filter((x) => x.session && x.session.panes && x.session.panes.length && x.session.panes[0].target)
       .map((x) => ({ name: x.name, target: x.session.panes[0].target }));
   })();
+
+  const fullGroupMembers = (() => {
+    const activeName = activePane?.session_name;
+    if (!activeName) return [];
+    const group = (resolvedActiveGroupTab !== 'all' && activeGroup)
+      || terminalGroups.find((g) => Array.isArray(g.sessions) && g.sessions.includes(activeName));
+    if (!group || !Array.isArray(group.sessions)) return [];
+    return group.sessions
+      .map((name) => ({ name, session: sessions.find((s) => s.session_name === name) }))
+      .filter((x) => x.session && x.session.panes && x.session.panes.length && x.session.panes[0].target)
+      .map((x) => {
+        const target = x.session.panes[0].target;
+        const pane = x.session.panes[0];
+        const isActive = target === activeTarget;
+        const hasDraft = Boolean(readTerminalDraft('friendly-terminal', target));
+        const status = pane.busy ? 'running' : 'idle';
+        return { name: x.name, target, isActive, hasDraft, status };
+      });
+  })();
   const editingGroup = editingGroupId
     ? terminalGroups.find((group) => group.id === editingGroupId) || null
     : null;
@@ -3030,12 +3049,22 @@ function TerminalTab({ projectId, projectName } = {}) {
                               title=${'Switch to ' + sib.name + (hasDraft ? ' — draft' : '')} onclick=${() => switchActiveTarget(sib.target)}>${sib.name}${hasDraft ? ' •' : ''}</button>
                     `})}
                   </div>
+                  <div class="agent-group-switcher-scrubber" data-testid="agent-group-switcher-scrubber" hidden=${tabsCollapsed} onPointerDown=${e => {
+                    const tabs = document.querySelector('[data-testid="agent-group-switcher"]');
+                    if (!tabs) return;
+                    const startX = e.clientX;
+                    const startScroll = tabs.scrollLeft;
+                    const onMove = ev => { tabs.scrollLeft = startScroll + (startX - ev.clientX); };
+                    const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
+                    window.addEventListener('pointermove', onMove);
+                    window.addEventListener('pointerup', onUp);
+                  }}></div>
                   <div class="agent-group-switcher-dropdown-wrap" data-testid="agent-group-switcher-dropdown" hidden=${tabsCollapsed}>
-                    <select onchange=${e => switchActiveTarget(e.target.value)} aria-label="Agent group switcher">
-                      ${headerGroupSiblings.map((sib) => {
-                        const hasDraft = Boolean(readTerminalDraft('friendly-terminal', sib.target));
-                        const label = `${sib.name}${hasDraft ? ' • draft' : ''}`;
-                        return html`<option value=${sib.target}>${label}</option>`;
+                    <select value=${activeTarget || ''} onchange=${e => switchActiveTarget(e.target.value)} aria-label="Agent group switcher">
+                      ${fullGroupMembers.map((m) => {
+                        const label = `${m.name} ${m.status}${m.hasDraft ? ' • draft' : ''}`;
+                        const className = m.isActive ? 'active' : m.status === 'running' ? 'running' : 'idle';
+                        return html`<option value=${m.target} class=${className}>${label}</option>`;
                       })}
                     </select>
                   </div>

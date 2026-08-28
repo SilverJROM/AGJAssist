@@ -1039,13 +1039,27 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
   font-size: 11.5px;
   font-weight: 600;
 }
+.agent-group-switcher-scrubber {
+  display: none;
+  width: 24px;
+  height: 24px;
+  margin-left: 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  cursor: ew-resize;
+}
 @media (max-width: 899px) {
-  .terminal-header-tabs { display: none !important; }
+  .terminal-header-v2 { flex:1 1 auto; }
+  .command-center-header { flex:1 1 auto; }
   .agent-group-switcher-dropdown-wrap { display: flex !important; }
+  .terminal-header-tabs { display: none !important; }
+  .agent-group-switcher-scrubber { display: none !important; }
 }
 @media (min-width: 900px) {
   .terminal-header-tabs { display: flex !important; }
   .agent-group-switcher-dropdown-wrap { display: none !important; }
+  .agent-group-switcher-scrubber { display: block !important; }
 }
 
 /* Command-center terminal chrome stays inside the 390px Telegram topbar. */
