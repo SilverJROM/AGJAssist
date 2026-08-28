@@ -44,7 +44,7 @@ describe("Telegram startup resilience", () => {
     expect(started).toBe(false);
     expect(telegram.start).toHaveBeenCalledOnce();
     expect(log.error).toHaveBeenCalledWith(
-      "Telegram bot startup failed; API, dashboard, and Overmind watcher remain online:",
+      "Telegram bot startup failed; API and dashboard remain online:",
       expect.stringContaining("RequestError")
     );
   });

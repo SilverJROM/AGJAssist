@@ -1,9 +1,7 @@
 import { DatabaseService } from "../db/database.js";
 import { TmuxService } from "../tmux/tmux-service.js";
 import { AgentEventsService } from "./agent-events-service.js";
-function hasBusySignal(pane: string): boolean {
-  return /esc to interrupt|Working \(|Worked for\s+/i.test(pane);
-}
+import { hasBusySignal } from "./pane-utils.js";
 
 export type AgentWakeKind = "poke-pane" | "wake-coordinator";
 export type AgentWakeOutcome =

@@ -37,7 +37,7 @@ async function installTransport(page: import('@playwright/test').Page) {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ output: '● hi\n▌ Type a message', target: TARGET, lines: 200 }) });
   });
   // catch-all for other sections we may navigate to
-  await page.route(/\/api\/(notes|tasks|projects|reminders|overmind|conversations|settings)/, async (route) => {
+  await page.route(/\/api\/(notes|tasks|projects|reminders|conversations|settings)/, async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
   });
 }

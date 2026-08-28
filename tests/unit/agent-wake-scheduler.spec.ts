@@ -42,7 +42,7 @@ describe("AgentWakeScheduler", () => {
 
     expect(send).toHaveBeenCalledWith(
       "agent:0.0",
-      "overmind: Scheduled wake is due for batch A3b. Report STATUS or continue the current task."
+      "Scheduled wake is due for batch A3b. Report STATUS or continue the current task."
     );
     expect(processed).toHaveLength(1);
     const row = getWake(wake.id);

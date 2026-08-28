@@ -11,7 +11,7 @@ import {
   removeBottomNavTab,
   serializeBottomNavTabIds,
   writeBottomNavTabIds
-} from "../src/web/public/overmind-helpers.js";
+} from "../src/web/public/nav-helpers.js";
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const store = { ...initial };
@@ -44,23 +44,21 @@ describe("bottom nav helpers", () => {
   });
 
   it("adds hidden known tabs and ignores duplicates or unknown ids", () => {
-    expect(addBottomNavTab(["/", "/tasks"], "/overmind")).toEqual(["/", "/tasks", "/overmind"]);
-    expect(addBottomNavTab(["/", "/overmind"], "/overmind")).toEqual(["/", "/overmind"]);
+    expect(addBottomNavTab(["/", "/tasks"], "/overmind")).toEqual(["/", "/tasks"]);
+    expect(addBottomNavTab(["/", "/terminals"], "/terminals")).toEqual(["/", "/terminals"]);
     expect(addBottomNavTab(["/"], "/missing")).toEqual(["/"]);
   });
 
   it("serializes, deserializes, and maps visible tab metadata", () => {
-    const serialized = serializeBottomNavTabIds(["/settings", "/overmind", "/settings", "/missing"]);
-    expect(deserializeBottomNavTabIds(serialized)).toEqual(["/settings", "/overmind"]);
-    expect(getBottomNavTabs(["/overmind"])).toEqual([
-      { id: "/overmind", icon: "\u{25B6}", label: "Workflows" }
-    ]);
+    const serialized = serializeBottomNavTabIds(["/settings", "/terminals", "/settings", "/missing"]);
+    expect(deserializeBottomNavTabIds(serialized)).toEqual(["/settings", "/terminals"]);
+    expect(getBottomNavTabs(["/overmind"])).toEqual(getBottomNavTabs(DEFAULT_BOTTOM_NAV_TAB_IDS));
   });
 
   it("persists normalized tab ids to localStorage-compatible storage", () => {
     const storage = fakeStorage();
-    expect(writeBottomNavTabIds(["/notes", "/overmind"], storage)).toEqual(["/notes", "/overmind"]);
-    expect(storage.snapshot()[BOTTOM_NAV_STORAGE_KEY]).toBe(JSON.stringify(["/notes", "/overmind"]));
-    expect(readBottomNavTabIds(storage)).toEqual(["/notes", "/overmind"]);
+    expect(writeBottomNavTabIds(["/notes", "/terminals"], storage)).toEqual(["/notes", "/terminals"]);
+    expect(storage.snapshot()[BOTTOM_NAV_STORAGE_KEY]).toBe(JSON.stringify(["/notes", "/terminals"]));
+    expect(readBottomNavTabIds(storage)).toEqual(["/notes", "/terminals"]);
   });
 });

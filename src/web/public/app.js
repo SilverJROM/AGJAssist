@@ -467,6 +467,8 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+const MCP_OAUTH_RETURN_KEY = 'mcp_oauth_return';
+
 function oauthAuthorizeReturnPath(raw) {
   if (typeof raw !== 'string' || !raw) return null;
   try {

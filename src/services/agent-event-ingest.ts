@@ -1,15 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { AgentEventRow, AgentEventsService } from "./agent-events-service.js";
-import { createHash } from "node:crypto";
-
-function hashPane(pane: string): string {
-  return createHash("sha256").update(pane).digest("hex");
-}
-
-function hasBusySignal(pane: string): boolean {
-  return /esc to interrupt|Working \(|Worked for\s+/i.test(pane);
-}
+import { hashPane, hasBusySignal } from "./pane-utils.js";
 import { TmuxService } from "../tmux/tmux-service.js";
 
 export interface AgentEventIngestRun {
