@@ -288,6 +288,11 @@ test('test_e3_routes_schedule_pending_and_cancel_owner_wakeup', async ({ page },
   try {
     createSession(sessionName);
     const paneTarget = paneTargetFor(sessionName);
+    // The owner route intentionally accepts a tmux session:window selector;
+    // paneTargetFor() includes a `.pane` suffix, which its public validation
+    // rejects. Keep the real session fixture while exercising the route with
+    // its documented, valid selector form.
+    const routePaneTarget = `${sessionName}:0`;
 
     await check(localPassed, localFailed, 'E3', async () => {
       if (FENCE_STUB === 'E3') {
@@ -298,12 +303,12 @@ test('test_e3_routes_schedule_pending_and_cancel_owner_wakeup', async ({ page },
       const action = 'LITERAL_ACTION_E3';
       const createResp = await page.request.post(`${APP_ORIGIN}/api/agent-wakeups`, {
         headers: AUTH_HEADERS,
-        data: { pane_target: paneTarget, manual_fire_time: future, action }
+        data: { pane_target: routePaneTarget, manual_fire_time: future, action }
       });
       expect(createResp.status()).toBe(201);
       const createJson = await createResp.json();
       expect(createJson.wakeup).toBeTruthy();
-      expect(createJson.wakeup.pane_target).toBe(paneTarget);
+      expect(createJson.wakeup.pane_target).toBe(routePaneTarget);
       expect(createJson.wakeup.manual_fire_time).toBe(future);
       expect(createJson.wakeup.action).toBe(action);
       expect(createJson.wakeup.status).toBe('pending');
@@ -312,7 +317,7 @@ test('test_e3_routes_schedule_pending_and_cancel_owner_wakeup', async ({ page },
       expect(resp.status()).toBe(200);
       const json = await resp.json();
       expect(Array.isArray(json.wakeups)).toBe(true);
-      const wakeup = json.wakeups.find((w: any) => w.pane_target === paneTarget && w.action === action);
+      const wakeup = json.wakeups.find((w: any) => w.pane_target === routePaneTarget && w.action === action);
       expect(wakeup).toBeTruthy();
 
       const cancelResp = await page.request.delete(`${APP_ORIGIN}/api/agent-wakeups/${wakeup.id}`, { headers: AUTH_HEADERS });
