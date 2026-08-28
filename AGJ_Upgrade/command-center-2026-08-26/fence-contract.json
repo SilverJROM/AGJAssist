@@ -55,7 +55,7 @@
       "negative_control_cmd": "FENCE_STUB=F1 FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
       "gate_cmd": "FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs --gate",
       "acceptance_ids": ["G1", "G2", "G3", "H1", "H2", "H3", "I1", "I2", "J1", "J2"],
-      "expected_negative_fail_ids": ["G3"],
+      "expected_negative_fail_ids": ["I1"],
       "expected_negative_kind": "assert",
       "test_path": "e2e/command-center-window-fence.spec.ts",
       "authored_by": "coplanner:sol+grok46; rev2-projcore",
