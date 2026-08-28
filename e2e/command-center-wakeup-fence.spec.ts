@@ -50,12 +50,6 @@ function writeReport() {
   fs.writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2) + '\n');
 }
 
-function cleanupShards() {
-  for (const testName of CONTRIBUTOR_TESTS) {
-    try { fs.unlinkSync(shardPath(testName)); } catch {}
-  }
-}
-
 function recordFailure(localFailed: Failure[], id: AcceptanceId, e: unknown) {
   localFailed.push({ id, kind: 'assert', message: e instanceof Error ? e.message : String(e) });
 }
@@ -141,11 +135,10 @@ test.beforeEach(async ({}, testInfo) => {
 });
 
 test.afterAll(() => {
-  try {
-    writeReport();
-  } finally {
-    cleanupShards();
-  }
+  // A failed test makes Playwright discard its worker and run this hook before
+  // continuing in a replacement worker. Keep completed contributor shards so
+  // the replacement worker's final aggregation cannot erase that failure.
+  writeReport();
 });
 
 test('test_e1_schema_persists_one_time_wakeup_fields', async ({ page }, testInfo) => {
