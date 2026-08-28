@@ -3031,11 +3031,11 @@ function TerminalTab({ projectId, projectName } = {}) {
                     `})}
                   </div>
                 ` : ''}
-                <button type="button" class="command-center-toggle" data-testid="controls-collapse" onclick=${() => setControlsTucked(c => !c)}>${controlsTucked ? 'Controls ▼' : 'Controls ▲'}</button>
+                <button type="button" class="cc-ctrl-toggle" data-testid="controls-collapse" onclick=${() => setControlsTucked(c => !c)}>${controlsTucked ? '...' : '‹'}</button>
               </div>
               ${utilitiesCollapsed ? html`
-                <button type="button" class="command-center-bell" data-testid="bell-indicator"
-                        aria-label="Show utilities" onclick=${() => setUtilitiesCollapsed(false)}>🔔</button>
+                <button type="button" class=${'command-center-bell' + (agentReminders.length > 0 ? ' has-reminder' : '') + (wakeups.length > 0 ? ' has-wakeup' : '')} data-testid="bell-indicator"
+                        aria-label="Show utilities" onclick=${() => setUtilitiesCollapsed(false)}>🔔<span class="cc-util-icon-dot"></span><span class="cc-util-icon-count">${wakeups.length}</span></button>
               ` : html`
                 <div class="command-center-utilities" data-testid="utilities">
                   <span data-testid="reminder-chip">Reminder: ${agentReminders.length > 0 ? agentReminders[0].id : 'none'}</span>

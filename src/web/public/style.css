@@ -1023,8 +1023,6 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
 .terminal-header-tab:hover { color: var(--text); border-color: var(--accent); }
 .terminal-header-tab:active { color: var(--accent); border-color: var(--accent); }
 /* Command-center terminal chrome stays inside the 390px Telegram topbar. */
-.terminal-topbar-main:has(.command-center-header) { flex-wrap:wrap; }
-.command-center-header { display:flex; align-items:center; gap:4px; min-width:0; flex:1 0 100%; white-space:nowrap; }
 .terminal-header-v2, .command-center-utilities { display:flex; align-items:center; gap:4px; min-width:0; }
 .terminal-header-v2 { flex:0 1 auto; }
 .command-center-utilities { flex:0 1 auto; overflow:hidden; }
@@ -4803,3 +4801,21 @@ body.tg-miniapp {
   .header { flex-wrap: wrap; gap: 8px; }
   .header .nav-links { flex-wrap: wrap; gap: 6px; }
 }
+
+/* F4 header row split: util area separate, bell hints */
+.cc-utilarea { display:flex; align-items:center; gap:4px; padding:4px 12px; border-bottom:1px solid var(--border); background:var(--surface); }
+.terminal-shell-header.util-collapsed .cc-utilarea { display:none; }
+.command-center-bell { position:relative; }
+.cc-util-icon-dot { position:absolute; top:-2px; right:-2px; width:8px; height:8px; border-radius:50%; background:var(--danger); border:2px solid var(--surface); display:none; }
+.command-center-bell.has-reminder .cc-util-icon-dot { display:block; }
+.cc-util-icon-count { position:absolute; top:-6px; right:-6px; font-size:9px; font-weight:700; background:var(--accent); color:var(--on-accent); border-radius:999px; padding:0 4px; line-height:1.2; display:none; }
+.command-center-bell.has-wakeup .cc-util-icon-count { display:block; }
+
+/* Controls tuck */
+.cc-ctrlcluster { display:flex; align-items:center; gap:4px; }
+.cc-ctrlcluster .cc-ctrl-items { display:flex; align-items:center; gap:4px; }
+.cc-ctrlcluster.collapsed .cc-ctrl-items { display:none; }
+.cc-ctrl-toggle { width:28px; height:28px; flex:0 0 auto; border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text); font-weight:600; cursor:pointer; display:none; align-items:center; justify-content:center; }
+.terminal-shell-header.util-collapsed .cc-ctrl-toggle,
+.cc-ctrlcluster.collapsed .cc-ctrl-toggle { display:flex; }
+.cc-ctrl-toggle[data-testid="controls-collapse"] { display:flex; }
