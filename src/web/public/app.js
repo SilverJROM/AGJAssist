@@ -3220,7 +3220,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                   }, {diff: Infinity});
                   const nearestMin = count ? Math.max(0, Math.round(nearest.diff/60000)) : null;
                   return html`
-                    <button type="button" data-testid="wakeup-expand-toggle" onclick=${() => setWakeupExpanded(e => !e)}>${wakeupExpanded ? 'Collapse' : 'Expand'}</button>
+                    <button type="button" data-testid="wakeup-expand-toggle" onclick=${() => setWakeupExpanded(e => !e)}>${wakeupExpanded ? 'Hide wakeups' : 'Show wakeups'}</button>
                     <span data-testid="wakeup-collapsed-summary" style="margin-left:8px">${count === 0 ? 'No pending wakeups' : `${count} wakeup${count!==1?'s':''} · in ${nearestMin}m`}</span>
                     ${wakeupExpanded ? html`
                       ${count === 0 ? html`<div>No pending wakeups</div>` : html`
