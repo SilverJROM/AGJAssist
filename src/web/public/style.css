@@ -1022,6 +1022,32 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
 }
 .terminal-header-tab:hover { color: var(--text); border-color: var(--accent); }
 .terminal-header-tab:active { color: var(--accent); border-color: var(--accent); }
+
+/* AgentGroupSwitcher responsive */
+.agent-group-switcher-dropdown-wrap {
+  display: none;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.agent-group-switcher-dropdown-wrap select {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+@media (max-width: 899px) {
+  .terminal-header-tabs { display: none !important; }
+  .agent-group-switcher-dropdown-wrap { display: flex !important; }
+}
+@media (min-width: 900px) {
+  .terminal-header-tabs { display: flex !important; }
+  .agent-group-switcher-dropdown-wrap { display: none !important; }
+}
+
 /* Command-center terminal chrome stays inside the 390px Telegram topbar. */
 .terminal-shell-header:has(.command-center-header) { flex-direction:column; align-items:stretch; gap:0; padding:10px 12px 0; }
 .terminal-topbar-main:has(.command-center-header) { gap:5px; padding-bottom:8px; }

@@ -3030,6 +3030,15 @@ function TerminalTab({ projectId, projectName } = {}) {
                               title=${'Switch to ' + sib.name + (hasDraft ? ' — draft' : '')} onclick=${() => switchActiveTarget(sib.target)}>${sib.name}${hasDraft ? ' •' : ''}</button>
                     `})}
                   </div>
+                  <div class="agent-group-switcher-dropdown-wrap" data-testid="agent-group-switcher-dropdown" hidden=${tabsCollapsed}>
+                    <select onchange=${e => switchActiveTarget(e.target.value)} aria-label="Agent group switcher">
+                      ${headerGroupSiblings.map((sib) => {
+                        const hasDraft = Boolean(readTerminalDraft('friendly-terminal', sib.target));
+                        const label = `${sib.name}${hasDraft ? ' • draft' : ''}`;
+                        return html`<option value=${sib.target}>${label}</option>`;
+                      })}
+                    </select>
+                  </div>
                 ` : ''}
               </div>
             </div>
