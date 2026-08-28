@@ -2406,7 +2406,7 @@ function TerminalTab({ projectId, projectName } = {}) {
         setWakeups(Array.isArray(data?.wakeups) ? data.wakeups : []);
       })
       .catch(() => setWakeups([]));
-  }, []);
+  }, [menuOpen]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -2456,7 +2456,7 @@ function TerminalTab({ projectId, projectName } = {}) {
       setDefaultEndpointId(def ? def.id : null);
     }).catch(() => setSummaries([]))
       .finally(() => setSummariesLoading(false));
-  }, [activeTarget]);
+  }, [summariesOpen, activeTarget]);
 
   const handleSaveReminder = async () => {
     const folderGroup = resolvedActiveGroupTab === 'all' ? 'all' : (activeGroup?.id || resolvedActiveGroupTab);
