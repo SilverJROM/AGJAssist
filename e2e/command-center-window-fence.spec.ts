@@ -11,6 +11,7 @@ const REPORT_PATH = path.resolve(process.env.FENCE_REPORT_PATH || 'fence-report-
 const APP_ORIGIN = process.env.FENCE_ORIGIN || 'http://localhost:3210';
 const OWNER_TOKEN = process.env.OWNER_TOKEN || 'test-token';
 const AUTH_HEADERS = { authorization: `Bearer ${OWNER_TOKEN}` };
+const FENCE_STUB = process.env.FENCE_STUB || '';
 
 // Literal Telegram WebApp themeParams fixtures for H3 — distinct, product-owned
 // inputs driven through the real applyTgTheme() path (src/web/public/app.js),
@@ -286,6 +287,16 @@ test('test_f3_refresh_action_and_draft_reload_keep_composer_usable', async ({ pa
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
+    if (FENCE_STUB === 'I1') {
+      await page.route('**/api/tmux/panes/*/output*', async (route) => {
+        const url = new URL(route.request().url());
+        if (url.searchParams.has('refresh')) {
+          await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'fence-stub I1' }) });
+        } else {
+          await route.continue();
+        }
+      });
+    }
     try {
       await openAgentWindow(page, testInfo, 'f3', sessions);
     } catch (e) {
@@ -293,6 +304,9 @@ test('test_f3_refresh_action_and_draft_reload_keep_composer_usable', async ({ pa
     }
 
     await check(localPassed, localFailed, 'I1', async () => {
+      if (FENCE_STUB === 'I1') {
+        throw new Error('FENCE_STUB=I1 forces I1 failure');
+      }
       const refreshBtn = page.locator('[data-testid="terminal-refresh"]');
       await expect(refreshBtn).toBeVisible();
       await refreshBtn.click();
