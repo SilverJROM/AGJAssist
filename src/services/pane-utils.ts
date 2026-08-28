@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+export const SPINNER_GLYPHS = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷";
+
 export function hashPane(pane: string): string {
   return createHash("sha256").update(extractBody(pane)).digest("hex");
 }
@@ -28,8 +30,7 @@ export function extractBody(pane: string): string {
 
 export function isPaneChromeLine(line: string): boolean {
   const trimmed = line.trim();
-  const spinnerGlyphs = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷";
-  const leadingSpinnerRe = new RegExp(`^\\s*[${spinnerGlyphs}]`, "u");
+  const leadingSpinnerRe = new RegExp(`^\\s*[${SPINNER_GLYPHS}]`, "u");
   const statusChromeRe = /bypass permissions|ctrl\+t|to manage|for agents|\/ps to view|\/stop|\bshells?\b|\bmonitors?\b|\/model/i;
   const modelFooterRe = /^\s*(gpt-5|sonnet|opus|haiku|claude)\b.*[·•]\s*~\//i;
   const cwdFooterRe = /[·•]\s*~\/\S*\s*$/;

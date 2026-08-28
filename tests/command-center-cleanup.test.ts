@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { SPINNER_GLYPHS, hashPane, isPaneChromeLine } from "../src/services/pane-utils.js";
 
 const root = process.cwd();
 
@@ -61,11 +62,9 @@ describe("command-center promotion cleanup", () => {
     }
 
     const app = readFileSync(resolve(root, "src/web/public/app.js"), "utf8");
-    const identifiers = [...new Set(app.match(/\b[A-Z][A-Z0-9_]{2,}\b/g) ?? [])];
-    for (const identifier of identifiers) {
-      const declaration = new RegExp(`(?:^|\\n)\\s*(?:const|let|var)\\s+${identifier}\\b|import[\\s\\S]*?\\b${identifier}\\b`, "m");
-      expect(declaration.test(app), identifier).toBe(true);
-    }
+    expect(undeclaredModuleConstants(app)).toEqual([]);
+    expect(undeclaredModuleConstants(app.replace("const MCP_OAUTH_RETURN_KEY", "const REMOVED_OAUTH_RETURN_KEY")))
+      .toContain("MCP_OAUTH_RETURN_KEY");
   });
 
   it("keeps only terminal-chat OVM compatibility selectors", () => {
@@ -83,6 +82,12 @@ describe("command-center promotion cleanup", () => {
       ".ovm-chat-text"
     ]);
   });
+
+  it("keeps the complete neutral spinner filter used by pane ingestion", () => {
+    expect([...SPINNER_GLYPHS]).toHaveLength(26);
+    expect(isPaneChromeLine("  ⠧ Working (12s)")).toBe(true);
+    expect(hashPane("same body\n⠧ Working (12s)")).toBe("8f6372a8b1509601faa57ff3a292cfcccb95aa2325c18b8e50b0c035ea1648fe");
+  });
 });
 
 function listFiles(directory: string): string[] {
@@ -95,4 +100,17 @@ function listFiles(directory: string): string[] {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function undeclaredModuleConstants(source: string): string[] {
+  const importedNames = new Set(
+    [...source.matchAll(/^import\s+\{([^}]*)\}\s+from/gm)]
+      .flatMap((match) => match[1].split(",").map((name) => name.trim().split(/\s+as\s+/).pop()!.trim()))
+  );
+  const declaredNames = new Set(
+    [...source.matchAll(/(?:^|\n)\s*(?:const|let|var)\s+([A-Z][A-Z0-9_]{2,})\b/g)].map((match) => match[1])
+  );
+  const allowlist = new Set(["DAY_YYMMDD_DT", "DAY_YYMMDD_WT"]);
+  const identifiers = [...new Set(source.match(/\b[A-Z][A-Z0-9]*_[A-Z0-9_]*\b/g) ?? [])];
+  return identifiers.filter((id) => !declaredNames.has(id) && !importedNames.has(id) && !allowlist.has(id));
 }
