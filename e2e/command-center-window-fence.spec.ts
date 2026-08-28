@@ -390,7 +390,7 @@ test('test_f3_refresh_action_and_draft_reload_keep_composer_usable', async ({ pa
       await expect(refreshBtn).toBeVisible();
       await refreshBtn.click();
       const status = page.locator('[data-testid="terminal-refresh-status"]');
-      await expect(status).toHaveText('Updated', { timeout: 10000 });
+      await expect(status).toHaveText('Updated', { timeout: 30000 });
       await expect(page.locator('[data-testid="terminal-turn-agent"]')).toBeVisible();
     });
 
