@@ -13,6 +13,80 @@ const OWNER_TOKEN = process.env.OWNER_TOKEN || 'test-token';
 const AUTH_HEADERS = { authorization: `Bearer ${OWNER_TOKEN}` };
 const FENCE_STUB = process.env.FENCE_STUB || '';
 
+async function installFenceStub(page) {
+  if (!FENCE_STUB) return;
+  switch (FENCE_STUB) {
+    case 'G1':
+      await page.addInitScript(() => {
+        const style = document.createElement('style');
+        style.textContent = '[data-testid="terminal-draft"]{display:none !important}';
+        document.head.appendChild(style);
+      });
+      break;
+    case 'G2':
+      await page.addInitScript(() => {
+        const style = document.createElement('style');
+        style.textContent = '[data-testid="agent-group-switcher"]{display:none !important}';
+        document.head.appendChild(style);
+      });
+      break;
+    case 'G3':
+      await page.addInitScript(() => {
+        const style = document.createElement('style');
+        style.textContent = '[data-testid="terminal-refresh"]{display:none !important}';
+        document.head.appendChild(style);
+      });
+      break;
+    case 'H1':
+      await page.addInitScript(() => {
+        const observer = new MutationObserver(() => {
+          document.querySelectorAll('[data-testid="agent-group-switcher"]').forEach(el => el.removeAttribute('hidden'));
+        });
+        observer.observe(document.documentElement, { childList:true, subtree:true });
+      });
+      break;
+    case 'H2':
+      await page.addInitScript(() => {
+        const style = document.createElement('style');
+        style.textContent = '[data-testid="command-center-header"]{height:0 !important}';
+        document.head.appendChild(style);
+      });
+      break;
+    case 'H3':
+      await page.addInitScript(() => {
+        const origAdd = DOMTokenList.prototype.add;
+        DOMTokenList.prototype.add = function(...tokens) {
+          if (tokens.includes('tg-light')) return;
+          return origAdd.apply(this, tokens);
+        };
+      });
+      break;
+    case 'I2':
+      await page.addInitScript(() => {
+        const origGetItem = localStorage.getItem.bind(localStorage);
+        localStorage.getItem = (key) => {
+          if (key.startsWith('agj_terminal_draft')) return null;
+          return origGetItem(key);
+        };
+      });
+      break;
+    case 'J1':
+      await page.addInitScript(() => {
+        const style = document.createElement('style');
+        style.textContent = '[data-testid="agent-group-switcher-dropdown"]{display:none !important}';
+        document.head.appendChild(style);
+      });
+      break;
+    case 'J2':
+      await page.addInitScript(() => {
+        const style = document.createElement('style');
+        style.textContent = '[data-testid="terminal-header-tab"]{display:none !important}';
+        document.head.appendChild(style);
+      });
+      break;
+  }
+}
+
 // Literal Telegram WebApp themeParams fixtures for H3 — distinct, product-owned
 // inputs driven through the real applyTgTheme() path (src/web/public/app.js),
 // never inferred from the mechanism under test.
@@ -233,6 +307,7 @@ test('test_f1_refresh_from_session_surface_visible', async ({ page }, testInfo) 
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
+    await installFenceStub(page);
     try {
       await openAgentWindow(page, testInfo, 'f1', sessions);
     } catch (e) {
@@ -257,6 +332,7 @@ test('test_f2_draft_and_switcher_surfaces_are_rendered', async ({ page }, testIn
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
+    await installFenceStub(page);
     try {
       await openAgentWindow(page, testInfo, 'f2', sessions);
     } catch (e) {
@@ -287,10 +363,11 @@ test('test_f3_refresh_action_and_draft_reload_keep_composer_usable', async ({ pa
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
+    await installFenceStub(page);
     if (FENCE_STUB === 'I1') {
-      await page.route('**/api/tmux/panes/*/output*', async (route) => {
+      await page.route('**/api/tmux/panes/**', async (route) => {
         const url = new URL(route.request().url());
-        if (url.searchParams.has('refresh')) {
+        if (url.pathname.includes('/output') && url.searchParams.has('refresh')) {
           await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'fence-stub I1' }) });
         } else {
           await route.continue();
@@ -304,12 +381,11 @@ test('test_f3_refresh_action_and_draft_reload_keep_composer_usable', async ({ pa
     }
 
     await check(localPassed, localFailed, 'I1', async () => {
-      if (FENCE_STUB === 'I1') {
-        throw new Error('FENCE_STUB=I1 forces I1 failure');
-      }
       const refreshBtn = page.locator('[data-testid="terminal-refresh"]');
       await expect(refreshBtn).toBeVisible();
       await refreshBtn.click();
+      const status = page.locator('[data-testid="terminal-refresh-status"]');
+      await expect(status).toHaveText('Updated', { timeout: 10000 });
       await expect(page.locator('[data-testid="terminal-turn-agent"]')).toBeVisible();
     });
 
@@ -343,6 +419,7 @@ test('test_f4_header_v2_collapses_without_losing_command_center_chrome', async (
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
+    await installFenceStub(page);
     try {
       await openAgentWindow(page, testInfo, 'f4', sessions);
     } catch (e) {
@@ -379,6 +456,7 @@ test('test_f5_phone_dropdown_and_wide_switcher_are_available', async ({ page }, 
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
+    await installFenceStub(page);
     try {
       // extraSiblingCount forces the wide tab strip to overflow — J2 needs a
       // real draggable scrubber, which a single non-overflowing tab never has.
@@ -448,6 +526,7 @@ test('test_f6_window_theme_attribute_is_applied', async ({ page }, testInfo) => 
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
+    await installFenceStub(page);
     try {
       // Drive the real Telegram device-theme path (window.Telegram.WebApp),
       // not a matchMedia/class-absence fallback — must be registered before
