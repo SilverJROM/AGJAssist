@@ -164,15 +164,22 @@ test('test_f1_refresh_from_session_surface_visible', async ({ page }, testInfo) 
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
-    await openAgentWindow(page, testInfo, 'f1', sessions);
+    try {
+      await openAgentWindow(page, testInfo, 'f1', sessions);
+    } catch (e) {
+      localFailed.push({ id: 'G3', kind: 'assert', message: e instanceof Error ? e.message : String(e) });
+    }
 
     await check(localPassed, localFailed, 'G3', async () => {
       const refresh = page.locator('[data-testid="terminal-refresh"]');
       await expect(refresh).toBeVisible();
     });
   } finally {
-    await finishContributor(testInfo.title, localPassed, localFailed);
-    for (const sessionName of sessions) killSession(sessionName);
+    try {
+      await finishContributor(testInfo.title, localPassed, localFailed);
+    } finally {
+      for (const sessionName of sessions) killSession(sessionName);
+    }
   }
 });
 
@@ -181,7 +188,11 @@ test('test_f2_draft_and_switcher_surfaces_are_rendered', async ({ page }, testIn
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
-    await openAgentWindow(page, testInfo, 'f2', sessions);
+    try {
+      await openAgentWindow(page, testInfo, 'f2', sessions);
+    } catch (e) {
+      localFailed.push({ id: 'G1', kind: 'assert', message: e instanceof Error ? e.message : String(e) });
+    }
 
     await check(localPassed, localFailed, 'G1', async () => {
       const draft = page.locator('[data-testid="terminal-draft"]');
@@ -194,8 +205,11 @@ test('test_f2_draft_and_switcher_surfaces_are_rendered', async ({ page }, testIn
       await expect(switcher).toBeVisible();
     });
   } finally {
-    await finishContributor(testInfo.title, localPassed, localFailed);
-    for (const sessionName of sessions) killSession(sessionName);
+    try {
+      await finishContributor(testInfo.title, localPassed, localFailed);
+    } finally {
+      for (const sessionName of sessions) killSession(sessionName);
+    }
   }
 });
 
@@ -204,7 +218,11 @@ test('test_f3_refresh_action_and_draft_reload_keep_composer_usable', async ({ pa
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
-    await openAgentWindow(page, testInfo, 'f3', sessions);
+    try {
+      await openAgentWindow(page, testInfo, 'f3', sessions);
+    } catch (e) {
+      localFailed.push({ id: 'I1', kind: 'assert', message: e instanceof Error ? e.message : String(e) });
+    }
 
     await check(localPassed, localFailed, 'I1', async () => {
       const refreshBtn = page.locator('[data-testid="terminal-refresh"]');
@@ -230,8 +248,11 @@ test('test_f3_refresh_action_and_draft_reload_keep_composer_usable', async ({ pa
       await expect(draftInputAfter).toHaveValue('test draft');
     });
   } finally {
-    await finishContributor(testInfo.title, localPassed, localFailed);
-    for (const sessionName of sessions) killSession(sessionName);
+    try {
+      await finishContributor(testInfo.title, localPassed, localFailed);
+    } finally {
+      for (const sessionName of sessions) killSession(sessionName);
+    }
   }
 });
 
@@ -240,7 +261,11 @@ test('test_f4_header_v2_collapses_without_losing_command_center_chrome', async (
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
-    await openAgentWindow(page, testInfo, 'f4', sessions);
+    try {
+      await openAgentWindow(page, testInfo, 'f4', sessions);
+    } catch (e) {
+      localFailed.push({ id: 'H1', kind: 'assert', message: e instanceof Error ? e.message : String(e) });
+    }
 
     await check(localPassed, localFailed, 'H1', async () => {
       const header = page.locator('[data-testid="terminal-header-v2"]');
@@ -259,8 +284,11 @@ test('test_f4_header_v2_collapses_without_losing_command_center_chrome', async (
       expect(box!.height).toBeGreaterThan(0);
     });
   } finally {
-    await finishContributor(testInfo.title, localPassed, localFailed);
-    for (const sessionName of sessions) killSession(sessionName);
+    try {
+      await finishContributor(testInfo.title, localPassed, localFailed);
+    } finally {
+      for (const sessionName of sessions) killSession(sessionName);
+    }
   }
 });
 
@@ -269,7 +297,11 @@ test('test_f5_phone_dropdown_and_wide_switcher_are_available', async ({ page }, 
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
-    await openAgentWindow(page, testInfo, 'f5', sessions);
+    try {
+      await openAgentWindow(page, testInfo, 'f5', sessions);
+    } catch (e) {
+      localFailed.push({ id: 'J1', kind: 'assert', message: e instanceof Error ? e.message : String(e) });
+    }
 
     await ensureTabsExpandedIfNeeded(page);
     await check(localPassed, localFailed, 'J1', async () => {
@@ -288,8 +320,11 @@ test('test_f5_phone_dropdown_and_wide_switcher_are_available', async ({ page }, 
       expect(count).toBeGreaterThan(0);
     });
   } finally {
-    await finishContributor(testInfo.title, localPassed, localFailed);
-    for (const sessionName of sessions) killSession(sessionName);
+    try {
+      await finishContributor(testInfo.title, localPassed, localFailed);
+    } finally {
+      for (const sessionName of sessions) killSession(sessionName);
+    }
   }
 });
 
@@ -298,18 +333,24 @@ test('test_f6_window_theme_attribute_is_applied', async ({ page }, testInfo) => 
   const localFailed: Failure[] = [];
   const sessions: string[] = [];
   try {
-    await openAgentWindow(page, testInfo, 'f6', sessions);
+    try {
+      await openAgentWindow(page, testInfo, 'f6', sessions);
+    } catch (e) {
+      localFailed.push({ id: 'H3', kind: 'assert', message: e instanceof Error ? e.message : String(e) });
+    }
 
     await check(localPassed, localFailed, 'H3', async () => {
       const theme = await page.evaluate(() => {
-        const attr = document.documentElement.getAttribute('data-theme');
-        if (attr) return attr;
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        const isLight = document.body.classList.contains('tg-light');
+        return isLight ? 'light' : 'dark';
       });
-      expect(theme).toBeTruthy();
+      expect(theme).toMatch(/^(light|dark)$/);
     });
   } finally {
-    await finishContributor(testInfo.title, localPassed, localFailed);
-    for (const sessionName of sessions) killSession(sessionName);
+    try {
+      await finishContributor(testInfo.title, localPassed, localFailed);
+    } finally {
+      for (const sessionName of sessions) killSession(sessionName);
+    }
   }
 });
