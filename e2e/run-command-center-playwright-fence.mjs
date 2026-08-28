@@ -148,11 +148,16 @@ if (gate) {
   const failedNeg = negCode !== 0
     && negFails.length === expectedFailures.length
     && expectedFailures.every(expected => negFails.some(actual => actual?.id === expected.id && actual?.kind === expected.kind));
-  const negFailedIds = failedNeg ? expectedFailures : [];
+  const posPassed = posReport?.passed || [];
+  const posFailed = posReport?.failed || [];
+  const mergedFailed = [...posFailed];
+  if (failedNeg) {
+    mergedFailed.push(...expectedFailures.map(f => ({ ...f, kind: f.kind + '-negative' })));
+  }
   const overallPass = passed && failedNeg;
   const verdict = overallPass ? 'PASS' : 'FAIL';
   const faultClass = overallPass ? 'none' : 'implementation';
-  writeReport(fence.acceptance_ids, passed ? fence.acceptance_ids : [], failedNeg ? negFailedIds : [], verdict, faultClass);
+  writeReport(fence.acceptance_ids, posPassed, mergedFailed, verdict, faultClass);
   console.log(verdictLine(verdict, faultClass));
   process.exit(overallPass ? 0 : 1);
 }

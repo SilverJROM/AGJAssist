@@ -336,8 +336,9 @@ test('test_d5_settings_ui_manages_endpoints_and_surfaces_owner_errors', async ({
       expect(shell(`tmux new-session -d -s ${sessionName} bash`).status).toBe(0);
       await openTerminalSession(page, sessionName);
 
-      await expect(page.locator('[data-testid="terminal-menu"]')).toBeVisible();
+      await page.waitForSelector('[data-testid="terminal-menu"]', { state: 'visible', timeout: 10000 });
       await page.locator('[data-testid="terminal-menu"]').click({ force: true });
+      await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'true');
       const sheet = page.locator('[data-testid="summary-endpoint-sheet"]');
       await expect(sheet).toBeVisible();
       await expect(sheet).toContainText('140');
