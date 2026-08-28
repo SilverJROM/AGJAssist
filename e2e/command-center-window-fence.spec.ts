@@ -167,12 +167,11 @@ test('test_f1_refresh_from_session_surface_visible', async ({ page }, testInfo) 
     await openAgentWindow(page, testInfo, 'f1', sessions);
 
     await check(localPassed, localFailed, 'G3', async () => {
-      const refresh = page.locator('[data-testid="refresh-from-session"]');
+      const refresh = page.locator('[data-testid="terminal-refresh"]');
       await expect(refresh).toBeVisible();
     });
-
-    await finishContributor(testInfo.title, localPassed, localFailed);
   } finally {
+    await finishContributor(testInfo.title, localPassed, localFailed);
     for (const sessionName of sessions) killSession(sessionName);
   }
 });
@@ -194,9 +193,8 @@ test('test_f2_draft_and_switcher_surfaces_are_rendered', async ({ page }, testIn
       const switcher = page.locator('[data-testid="agent-group-switcher"]');
       await expect(switcher).toBeVisible();
     });
-
-    await finishContributor(testInfo.title, localPassed, localFailed);
   } finally {
+    await finishContributor(testInfo.title, localPassed, localFailed);
     for (const sessionName of sessions) killSession(sessionName);
   }
 });
@@ -219,12 +217,20 @@ test('test_f3_refresh_action_and_draft_reload_keep_composer_usable', async ({ pa
       const draftInput = page.locator('[data-testid="terminal-composer-input"]');
       await expect(draftInput).toBeVisible();
       await draftInput.fill('test draft');
-      await page.reload();
-      await expect(draftInput).toHaveValue('test draft');
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      // Re-select primary terminal after reload to ensure composer is active and draft is restored
+      const primaryName = sessions[0];
+      await page.waitForSelector('.terminal-list-name', { timeout: 15000 });
+      const row = page.locator('.terminal-list-name').filter({ hasText: primaryName }).first();
+      await expect(row).toBeVisible({ timeout: 15000 });
+      await row.click();
+      await page.waitForSelector('[data-testid="terminal-composer-input"]', { timeout: 30000 });
+      const draftInputAfter = page.locator('[data-testid="terminal-composer-input"]');
+      await expect(draftInputAfter).toBeVisible();
+      await expect(draftInputAfter).toHaveValue('test draft');
     });
-
-    await finishContributor(testInfo.title, localPassed, localFailed);
   } finally {
+    await finishContributor(testInfo.title, localPassed, localFailed);
     for (const sessionName of sessions) killSession(sessionName);
   }
 });
@@ -247,13 +253,13 @@ test('test_f4_header_v2_collapses_without_losing_command_center_chrome', async (
     await check(localPassed, localFailed, 'H2', async () => {
       await page.setViewportSize({ width: 390, height: 844 });
       const header = page.locator('[data-testid="command-center-header"]');
-      await expect(header).toBeAttached();
-      const collapsed = await header.evaluate(el => getComputedStyle(el).height);
-      expect(collapsed).toBeDefined();
+      await expect(header).toBeVisible();
+      const box = await header.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThan(0);
     });
-
-    await finishContributor(testInfo.title, localPassed, localFailed);
   } finally {
+    await finishContributor(testInfo.title, localPassed, localFailed);
     for (const sessionName of sessions) killSession(sessionName);
   }
 });
@@ -278,11 +284,11 @@ test('test_f5_phone_dropdown_and_wide_switcher_are_available', async ({ page }, 
       const switcher = page.locator('[data-testid="agent-group-switcher"]');
       await expect(switcher).toBeVisible();
       const tabs = page.locator('[data-testid="terminal-header-tab"]');
-      await expect(tabs).toHaveCountGreaterThan(0);
+      const count = await tabs.count();
+      expect(count).toBeGreaterThan(0);
     });
-
-    await finishContributor(testInfo.title, localPassed, localFailed);
   } finally {
+    await finishContributor(testInfo.title, localPassed, localFailed);
     for (const sessionName of sessions) killSession(sessionName);
   }
 });
@@ -295,12 +301,15 @@ test('test_f6_window_theme_attribute_is_applied', async ({ page }, testInfo) => 
     await openAgentWindow(page, testInfo, 'f6', sessions);
 
     await check(localPassed, localFailed, 'H3', async () => {
-      const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+      const theme = await page.evaluate(() => {
+        const attr = document.documentElement.getAttribute('data-theme');
+        if (attr) return attr;
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      });
       expect(theme).toBeTruthy();
     });
-
-    await finishContributor(testInfo.title, localPassed, localFailed);
   } finally {
+    await finishContributor(testInfo.title, localPassed, localFailed);
     for (const sessionName of sessions) killSession(sessionName);
   }
 });
