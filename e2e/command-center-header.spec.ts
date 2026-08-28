@@ -117,12 +117,12 @@ test('command-center header collapse chrome renders', async ({ page }) => {
   await expect(page.locator('[data-testid="agent-summaries-dropdown"]')).toBeHidden();
 
   const remindersBefore = countRequests(/\/api\/agent-reminders\/active/);
-  await page.locator('.terminal-menu-overlay').click({ position: { x: 8, y: 8 } });
+  await page.locator('[data-testid="terminal-menu"]').click();
   await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'true');
   await page.waitForTimeout(200);
   const remindersAfter = countRequests(/\/api\/agent-reminders\/active/);
   expect(remindersAfter).toBeGreaterThan(remindersBefore);
-  await page.locator('[data-testid="terminal-menu"]').click();
+  await page.locator('.terminal-menu-overlay').click({ position: { x: 8, y: 8 } });
   await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'false');
 
   // Expand tabs and assert exactly one switcher with literal names
