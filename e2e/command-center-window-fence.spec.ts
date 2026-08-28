@@ -93,6 +93,17 @@ function paneTargetFor(sessionName: string): string {
   return result.stdout.trim();
 }
 
+async function ensureTabsExpandedIfNeeded(page) {
+  const switcher = page.locator('[data-testid="agent-group-switcher"]');
+  const isHidden = await switcher.evaluate(el => el?.hasAttribute('hidden')).catch(() => true);
+  if (isHidden) {
+    const btn = page.locator('[data-testid="tabs-collapse"]');
+    if (await btn.isVisible().catch(() => false)) {
+      await btn.click();
+    }
+  }
+}
+
 async function installOwnerSession(page, primaryName: string, secondaryName: string, primaryTarget: string, secondaryTarget: string) {
   await page.addInitScript(({ ownerToken, primaryName, secondaryName, primaryTarget, secondaryTarget }) => {
     localStorage.setItem('agj_token', ownerToken);
@@ -119,7 +130,8 @@ async function openAgentWindow(page, testInfo, prefix: string, sessions: string[
   await expect.poll(async () => {
     const resp = await page.request.get(`${APP_ORIGIN}/api/tmux/sessions`, { headers: AUTH_HEADERS });
     const json = await resp.json().catch(() => ({}));
-    return Array.isArray(json.sessions) && json.sessions.some((session) => session.session_name === primaryName);
+    const names = new Set((json.sessions || []).map((s: any) => s.session_name));
+    return names.has(primaryName) && names.has(secondaryName);
   }, { timeout: 10000 }).toBe(true);
 
   await installOwnerSession(page, primaryName, secondaryName, primaryTarget, secondaryTarget);
@@ -177,6 +189,7 @@ test('test_f2_draft_and_switcher_surfaces_are_rendered', async ({ page }, testIn
       await expect(draft).toBeVisible();
     });
 
+    await ensureTabsExpandedIfNeeded(page);
     await check(localPassed, localFailed, 'G2', async () => {
       const switcher = page.locator('[data-testid="agent-group-switcher"]');
       await expect(switcher).toBeVisible();
@@ -226,6 +239,9 @@ test('test_f4_header_v2_collapses_without_losing_command_center_chrome', async (
     await check(localPassed, localFailed, 'H1', async () => {
       const header = page.locator('[data-testid="terminal-header-v2"]');
       await expect(header).toBeVisible();
+      const switcher = page.locator('[data-testid="agent-group-switcher"]');
+      const isHidden = await switcher.evaluate(el => el.hasAttribute('hidden'));
+      expect(isHidden).toBe(true);
     });
 
     await check(localPassed, localFailed, 'H2', async () => {
@@ -249,16 +265,20 @@ test('test_f5_phone_dropdown_and_wide_switcher_are_available', async ({ page }, 
   try {
     await openAgentWindow(page, testInfo, 'f5', sessions);
 
+    await ensureTabsExpandedIfNeeded(page);
     await check(localPassed, localFailed, 'J1', async () => {
       await page.setViewportSize({ width: 390, height: 844 });
       const dropdown = page.locator('[data-testid="agent-group-switcher-dropdown"]');
       await expect(dropdown).toBeVisible();
     });
 
+    await ensureTabsExpandedIfNeeded(page);
     await check(localPassed, localFailed, 'J2', async () => {
       await page.setViewportSize({ width: 1024, height: 800 });
       const switcher = page.locator('[data-testid="agent-group-switcher"]');
       await expect(switcher).toBeVisible();
+      const tabs = page.locator('[data-testid="terminal-header-tab"]');
+      await expect(tabs).toHaveCountGreaterThan(0);
     });
 
     await finishContributor(testInfo.title, localPassed, localFailed);
