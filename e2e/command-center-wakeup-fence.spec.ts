@@ -4,7 +4,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import Database from 'better-sqlite3';
 
-const ACCEPTANCE_IDS = ['D1', 'D2', 'D3'] as const;
+const ACCEPTANCE_IDS = ['E1', 'E2', 'E3', 'E4'] as const;
 type AcceptanceId = typeof ACCEPTANCE_IDS[number];
 type Failure = { id: AcceptanceId; kind: 'assert'; message?: string };
 
@@ -140,13 +140,25 @@ test.beforeEach(async ({}, testInfo) => {
   try { fs.unlinkSync(shardPath(testInfo.title)); } catch {}
 });
 
+test.afterAll(() => {
+  try {
+    writeReport();
+  } finally {
+    cleanupShards();
+  }
+});
+
 test('test_e1_schema_persists_one_time_wakeup_fields', async ({ page }, testInfo) => {
   const localPassed = new Set<AcceptanceId>();
   const localFailed: Failure[] = [];
   await installOwnerSession(page);
   await page.goto(`${APP_ORIGIN}/index.html`, { waitUntil: 'domcontentloaded' });
 
-  await check(localPassed, localFailed, 'D1', async () => {
+  await check(localPassed, localFailed, 'E1', async () => {
+    if (FENCE_STUB === 'E1') {
+      throw new Error('FENCE_STUB=E1 forces E1 failure');
+    }
+
     const dbPath = requireDbPath();
     const db = new Database(dbPath);
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row: { name: string }) => row.name);
@@ -154,7 +166,7 @@ test('test_e1_schema_persists_one_time_wakeup_fields', async ({ page }, testInfo
 
     const paneTarget = `schema-${testInfo.workerIndex}-${Date.now()}`;
     const manualFireTime = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    const action = 'LITERAL_ACTION_D1_SCHEMA';
+    const action = 'LITERAL_ACTION_E1';
     const result = db.prepare(
       `INSERT INTO agent_one_time_wakeups (pane_target, manual_fire_time, action)
        VALUES (?, ?, ?)`
@@ -191,13 +203,13 @@ test('test_e2_service_fires_due_wakeup_once_into_temp_pane', async ({ page }, te
     createSession(sessionName);
     const paneTarget = paneTargetFor(sessionName);
 
-    await check(localPassed, localFailed, 'D3', async () => {
+    await check(localPassed, localFailed, 'E2', async () => {
       if (FENCE_STUB === 'E2') {
-        throw new Error('FENCE_STUB=E2 forces D3 failure');
+        throw new Error('FENCE_STUB=E2 forces E2 failure');
       }
 
       const dbPath = requireDbPath();
-      const actionToken = `LITERAL_ACTION_D3_${testInfo.workerIndex}_${Date.now()}`;
+      const actionToken = 'LITERAL_ACTION_E2';
       const action = `printf ${JSON.stringify(actionToken)}; printf '\\n'`;
       const past = new Date(Date.now() - 60_000).toISOString();
       const db = new Database(dbPath);
@@ -277,30 +289,30 @@ test('test_e3_routes_schedule_pending_and_cancel_owner_wakeup', async ({ page },
     createSession(sessionName);
     const paneTarget = paneTargetFor(sessionName);
 
-    await check(localPassed, localFailed, 'D1', async () => {
-      const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      const resp = await page.request.post(`${APP_ORIGIN}/api/agent-wakeups`, {
-        headers: AUTH_HEADERS,
-        data: {
-          pane_target: paneTarget,
-          manual_fire_time: future,
-          action: 'LITERAL_ACTION_D1_ROUTE'
-        }
-      });
-      expect(resp.status()).toBe(201);
-      const json = await resp.json();
-      expect(json.wakeup).toBeTruthy();
-      expect(json.wakeup.pane_target).toBe(paneTarget);
-      expect(json.wakeup.manual_fire_time).toBe(future);
-      expect(json.wakeup.status).toBe('pending');
-    });
+    await check(localPassed, localFailed, 'E3', async () => {
+      if (FENCE_STUB === 'E3') {
+        throw new Error('FENCE_STUB=E3 forces E3 failure');
+      }
 
-    await check(localPassed, localFailed, 'D2', async () => {
+      const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const action = 'LITERAL_ACTION_E3';
+      const createResp = await page.request.post(`${APP_ORIGIN}/api/agent-wakeups`, {
+        headers: AUTH_HEADERS,
+        data: { pane_target: paneTarget, manual_fire_time: future, action }
+      });
+      expect(createResp.status()).toBe(201);
+      const createJson = await createResp.json();
+      expect(createJson.wakeup).toBeTruthy();
+      expect(createJson.wakeup.pane_target).toBe(paneTarget);
+      expect(createJson.wakeup.manual_fire_time).toBe(future);
+      expect(createJson.wakeup.action).toBe(action);
+      expect(createJson.wakeup.status).toBe('pending');
+
       const resp = await page.request.get(`${APP_ORIGIN}/api/agent-wakeups/pending`, { headers: AUTH_HEADERS });
       expect(resp.status()).toBe(200);
       const json = await resp.json();
       expect(Array.isArray(json.wakeups)).toBe(true);
-      const wakeup = json.wakeups.find((w: any) => w.pane_target === paneTarget);
+      const wakeup = json.wakeups.find((w: any) => w.pane_target === paneTarget && w.action === action);
       expect(wakeup).toBeTruthy();
 
       const cancelResp = await page.request.delete(`${APP_ORIGIN}/api/agent-wakeups/${wakeup.id}`, { headers: AUTH_HEADERS });
@@ -330,14 +342,18 @@ test('test_e4_ui_shows_pending_indicator_in_expanded_and_collapsed_headers', asy
     const dbPath = requireDbPath();
     const db = new Database(dbPath);
     const future = new Date(Date.now() + 65 * 60 * 1000).toISOString();
-    const action = 'LITERAL_ACTION_D2_UI';
+    const action = 'LITERAL_ACTION_E4';
     const result = db.prepare(
       `INSERT INTO agent_one_time_wakeups (pane_target, manual_fire_time, action, status)
        VALUES (?, ?, ?, 'pending')`
     ).run(paneTarget, future, action);
     db.close();
 
-    await check(localPassed, localFailed, 'D2', async () => {
+    await check(localPassed, localFailed, 'E4', async () => {
+      if (FENCE_STUB === 'E4') {
+        throw new Error('FENCE_STUB=E4 forces E4 failure');
+      }
+
       await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'networkidle' });
       await choosePane(page, paneTarget);
 
@@ -382,5 +398,4 @@ test('test_e4_ui_shows_pending_indicator_in_expanded_and_collapsed_headers', asy
   }
 
   await finishContributor(testInfo.title, localPassed, localFailed);
-  cleanupShards();
 });
