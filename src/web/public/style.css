@@ -1050,9 +1050,11 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
   cursor: ew-resize;
 }
 @media (max-width: 899px) {
+  .terminal-topbar-target { flex:1 1 auto !important; min-width:0; }
   .terminal-header-v2 { flex:1 1 auto; }
-  .command-center-header { flex:1 1 auto; }
-  .agent-group-switcher-dropdown-wrap { display: flex !important; }
+  .command-center-header { flex:1 1 auto; min-width:0; }
+  .agent-group-switcher-dropdown-wrap { display: flex !important; flex:1 1 auto; min-width:120px; }
+  .agent-group-switcher-dropdown-wrap select { width:100%; }
   .terminal-header-tabs { display: none !important; }
   .agent-group-switcher-scrubber { display: none !important; }
 }
