@@ -97,6 +97,8 @@ test('command-center header collapse chrome renders', async ({ page }) => {
   await expect(page.locator('[data-testid="utilities"]')).toBeHidden();
   await expect(page.locator('[data-testid="utilities-collapse"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="bell-indicator"]')).toBeVisible();
+  await expect(page.locator('.cc-util-icon-dot')).toBeVisible();
+  await expect(page.locator('.cc-util-icon-count')).toHaveText('1');
 
   // Restore utilities via bell
   await page.locator('[data-testid="bell-indicator"]').click();
@@ -111,13 +113,17 @@ test('command-center header collapse chrome renders', async ({ page }) => {
   await page.waitForTimeout(200);
   const summariesAfter = countRequests(/\/api\/summary-agents\/.*\/summaries/);
   expect(summariesAfter).toBeGreaterThan(summariesBefore);
+  await page.locator('[data-testid="summaries-toggle"]').click();
+  await expect(page.locator('[data-testid="agent-summaries-dropdown"]')).toBeHidden();
 
   const remindersBefore = countRequests(/\/api\/agent-reminders\/active/);
-  await page.locator('[data-testid="terminal-menu"]').click();
+  await page.locator('.terminal-menu-overlay').click({ position: { x: 8, y: 8 } });
   await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'true');
   await page.waitForTimeout(200);
   const remindersAfter = countRequests(/\/api\/agent-reminders\/active/);
   expect(remindersAfter).toBeGreaterThan(remindersBefore);
+  await page.locator('[data-testid="terminal-menu"]').click();
+  await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'false');
 
   // Expand tabs and assert exactly one switcher with literal names
   await tabsCollapse.click();
@@ -133,6 +139,10 @@ test('command-center header collapse chrome renders', async ({ page }) => {
   await tabsCollapse.click();
   await expect(switchers.first()).toBeHidden();
 
+  // The mockup reveals the control tuck handle in the one-row utilities-collapsed state.
+  await page.locator('[data-testid="utilities-collapse"]').click();
+  await expect(page.locator('[data-testid="utilities"]')).toBeHidden();
+
   // Controls collapse
   const controlsCollapse = page.locator('[data-testid="controls-collapse"]');
   await expect(controlsCollapse).toBeVisible();
@@ -145,32 +155,38 @@ test('command-center header collapse chrome renders', async ({ page }) => {
   // Font pill and mynav should be hidden
   await expect(page.locator('[data-testid="terminal-font-decrease"]')).toBeHidden();
   await expect(page.locator('[data-testid="terminal-mynav"]')).toBeHidden();
+  await expect(controlsCollapse).toHaveText('...');
   // handle visible while items hidden
   await expect(controlsCollapse).toBeVisible();
   // expand again
   await controlsCollapse.click();
   await expect(page.locator('[data-testid="terminal-font-decrease"]')).toBeVisible();
   await expect(page.locator('[data-testid="terminal-mynav"]')).toBeVisible();
+  await controlsCollapse.click();
+  await expect(page.locator('[data-testid="terminal-font-decrease"]')).toBeHidden();
   // Fully collapsed chrome stays on one row inside the actual topbar at 390px.
-  await page.locator('[data-testid="utilities-collapse"]').click();
   const geometry = await page.locator('[data-term-topbar]').evaluate((topbar) => {
     const topRect = topbar.getBoundingClientRect();
-    const leaves = [...topbar.querySelectorAll('*')].filter(el => {
-      const rect = el.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0 && getComputedStyle(el).display !== 'none';
-    });
-    const rects = leaves.map(el => el.getBoundingClientRect());
+    const main = topbar.querySelector('.terminal-topbar-main');
+    if (!main) throw new Error('terminal topbar row is missing');
+    const rows = [...main.children]
+      .map(element => element.getBoundingClientRect())
+      .filter(rect => rect.width > 0 && rect.height > 0);
     const bands: number[] = [];
-    for (const r of rects) {
-      const top = Math.round(r.top);
+    for (const row of rows) {
+      const top = Math.round(row.top);
       if (!bands.some(b => Math.abs(b - top) <= 4)) bands.push(top);
     }
-    return { top: topRect.top, bottom: topRect.bottom, height: topRect.height, bands, count: bands.length };
+    return {
+      height: topRect.height,
+      bands,
+      rects: rows.map(row => ({ left: row.left, right: row.right })),
+    };
   });
-  expect(geometry.count).toBe(1);
+  expect(geometry.bands).toHaveLength(1);
   expect(geometry.height).toBeLessThanOrEqual(48);
-  for (const child of geometry.children ?? []) {
-    expect(child.left).toBeGreaterThanOrEqual(-1);
-    expect(child.right).toBeLessThanOrEqual(391);
+  for (const rect of geometry.rects) {
+    expect(rect.left).toBeGreaterThanOrEqual(-1);
+    expect(rect.right).toBeLessThanOrEqual(391);
   }
 });

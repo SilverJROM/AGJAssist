@@ -2986,7 +2986,7 @@ function TerminalTab({ projectId, projectName } = {}) {
 
   const shell = html`
     <div class=${'terminal-shell' + (fullScreen ? ' terminal-shell-fullscreen' : '') + (friendlyMode ? ' terminal-shell-friendly' : '')}>
-      <div class="terminal-shell-header" data-term-topbar>
+      <div class=${'terminal-shell-header' + (!isListView && utilitiesCollapsed ? ' util-collapsed' : '')} data-term-topbar>
         <div class="terminal-topbar-main">
           ${isTgMiniAppContext && fullScreen && html`
             <button class="terminal-topbar-icon-btn" onclick=${exitFullScreen} aria-label="Back">←</button>
@@ -3031,51 +3031,57 @@ function TerminalTab({ projectId, projectName } = {}) {
                     `})}
                   </div>
                 ` : ''}
-                <button type="button" class="cc-ctrl-toggle" data-testid="controls-collapse" onclick=${() => setControlsTucked(c => !c)}>${controlsTucked ? '...' : '‹'}</button>
               </div>
-              ${utilitiesCollapsed ? html`
-                <button type="button" class=${'command-center-bell' + (agentReminders.length > 0 ? ' has-reminder' : '') + (wakeups.length > 0 ? ' has-wakeup' : '')} data-testid="bell-indicator"
-                        aria-label="Show utilities" onclick=${() => setUtilitiesCollapsed(false)}>🔔<span class="cc-util-icon-dot"></span><span class="cc-util-icon-count">${wakeups.length}</span></button>
-              ` : html`
-                <div class="command-center-utilities" data-testid="utilities">
-                  <span data-testid="reminder-chip">Reminder: ${agentReminders.length > 0 ? agentReminders[0].id : 'none'}</span>
-                  <span data-testid="wakeup-chip">Wakeup: ${wakeups.length > 0 ? wakeups[0].id : 'none'}</span>
-                  <span data-testid="summary-chip">Summary: ${summaries.length > 0 ? summaries[0].summary_text?.slice(0,20) : 'none'}</span>
+            </div>
+            ${utilitiesCollapsed ? html`
+              <button type="button" class=${'command-center-bell' + (agentReminders.length > 0 ? ' has-reminder' : '') + (wakeups.length > 0 ? ' has-wakeup' : '')} data-testid="bell-indicator"
+                      aria-label="Show utilities" onclick=${() => setUtilitiesCollapsed(false)}>🔔<span class="cc-util-icon-dot"></span><span class="cc-util-icon-count">${wakeups.length}</span></button>
+            ` : html`
+              <button type="button" class="cc-util-toggle" data-testid="utilities-collapse"
+                      aria-label="Hide utilities" onclick=${() => setUtilitiesCollapsed(true)}>‹</button>
+            `}
+            <div class=${'cc-ctrlcluster' + (controlsTucked ? ' collapsed' : '')}>
+              <div class="cc-ctrl-items">
+                <div class="terminal-fontpill" title="Text size">
+                  <button type="button" class="am" data-testid="terminal-font-decrease"
+                          onclick=${() => updateConvFontSize(convFontSize - 1)}
+                          disabled=${convFontSize <= TERMINAL_CONV_FONT_MIN}>A−</button>
+                  <button type="button" class="ap" data-testid="terminal-font-increase"
+                          onclick=${() => updateConvFontSize(convFontSize + 1)}
+                          disabled=${convFontSize >= TERMINAL_CONV_FONT_MAX}>A+</button>
                 </div>
-                <button type="button" class="command-center-toggle" data-testid="utilities-collapse"
-                        onclick=${() => setUtilitiesCollapsed(true)}>Hide utilities</button>
-              `}
+                <div class="terminal-mynav-header" data-testid="terminal-mynav" title="Jump between my messages">
+                  <button type="button" class="terminal-mynav-hbtn" data-testid="terminal-mynav-up"
+                          aria-label="Jump to my previous message" onclick=${() => jumpToMyMessage(-1)}>▲</button>
+                  <span class="terminal-mynav-hlabel">ME</span>
+                  <button type="button" class="terminal-mynav-hbtn" data-testid="terminal-mynav-down"
+                          aria-label="Jump to my next message" onclick=${() => jumpToMyMessage(1)}>▼</button>
+                </div>
+                <button type="button" class="terminal-topbar-icon-btn" data-testid="summaries-toggle" aria-label="Agent summaries" onclick=${() => setSummariesOpen(s => !s)}>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H8l-4 4V4z"/><path d="M8 9h8M8 13h5"/></svg>
+                </button>
+                <button type="button" class="terminal-topbar-icon-btn terminal-settings-trigger"
+                        data-term-menu data-testid="terminal-menu" aria-label="Terminal settings" aria-expanded=${menuOpen}
+                        onclick=${() => { setSectionNavOpen(false); setMenuOpen((current) => !current); }}>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                  </svg>
+                </button>
+              </div>
+              <button type="button" class="cc-ctrl-toggle" data-testid="controls-collapse"
+                      aria-label=${controlsTucked ? 'Show controls' : 'Hide controls'}
+                      onclick=${() => setControlsTucked(c => !c)}>${controlsTucked ? '...' : '‹'}</button>
             </div>
-            ${!controlsTucked ? html`
-            <div class="terminal-fontpill" title="Text size">
-              <button type="button" class="am" data-testid="terminal-font-decrease"
-                      onclick=${() => updateConvFontSize(convFontSize - 1)}
-                      disabled=${convFontSize <= TERMINAL_CONV_FONT_MIN}>A−</button>
-              <button type="button" class="ap" data-testid="terminal-font-increase"
-                      onclick=${() => updateConvFontSize(convFontSize + 1)}
-                      disabled=${convFontSize >= TERMINAL_CONV_FONT_MAX}>A+</button>
-            </div>
-            <div class="terminal-mynav-header" data-testid="terminal-mynav" title="Jump between my messages">
-              <button type="button" class="terminal-mynav-hbtn" data-testid="terminal-mynav-up"
-                      aria-label="Jump to my previous message" onclick=${() => jumpToMyMessage(-1)}>▲</button>
-              <span class="terminal-mynav-hlabel">ME</span>
-              <button type="button" class="terminal-mynav-hbtn" data-testid="terminal-mynav-down"
-                      aria-label="Jump to my next message" onclick=${() => jumpToMyMessage(1)}>▼</button>
-            </div>
-            <button type="button" class="terminal-topbar-icon-btn" data-testid="summaries-toggle" aria-label="Agent summaries" onclick=${() => setSummariesOpen(s => !s)}>
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H8l-4 4V4z"/><path d="M8 9h8M8 13h5"/></svg>
-            </button>
-            <button type="button" class="terminal-topbar-icon-btn terminal-settings-trigger"
-                    data-term-menu data-testid="terminal-menu" aria-label="Terminal settings" aria-expanded=${menuOpen}
-                    onclick=${() => { setSectionNavOpen(false); setMenuOpen((current) => !current); }}>
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-            </button>
-            ` : ''}
           `}
         </div>
+        ${!isListView ? html`
+          <div class="cc-utilarea" data-testid="utilities">
+            <span data-testid="reminder-chip">Reminder: ${agentReminders.length > 0 ? agentReminders[0].id : 'none'}</span>
+            <span data-testid="wakeup-chip">Wakeup: ${wakeups.length > 0 ? wakeups[0].id : 'none'}</span>
+            <span data-testid="summary-chip">Summary: ${summaries.length > 0 ? summaries[0].summary_text?.slice(0,20) : 'none'}</span>
+          </div>
+        ` : ''}
       </div>
       ${summariesOpen && html`
         <div key="summaries-dropdown" data-testid="agent-summaries-dropdown" style="position:absolute;top:60px;right:12px;z-index:250;width:320px;max-height:400px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3)">
