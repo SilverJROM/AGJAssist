@@ -39,8 +39,13 @@ async function installFenceStub(page) {
       break;
     case 'H1':
       await page.addInitScript(() => {
-        const observer = new MutationObserver(() => {
+        const removeHidden = () => {
           document.querySelectorAll('[data-testid="agent-group-switcher"]').forEach(el => el.removeAttribute('hidden'));
+        };
+        removeHidden();
+        const observer = new MutationObserver(() => {
+          removeHidden();
+          observer.disconnect();
         });
         observer.observe(document.documentElement, { childList:true, subtree:true });
       });
