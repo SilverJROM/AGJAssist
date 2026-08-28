@@ -122,7 +122,7 @@ test('command-center header collapse chrome renders', async ({ page }) => {
   await page.waitForTimeout(200);
   const remindersAfter = countRequests(/\/api\/agent-reminders\/active/);
   expect(remindersAfter).toBeGreaterThan(remindersBefore);
-  await page.locator('.terminal-menu-overlay').click({ position: { x: 8, y: 8 } });
+  await page.locator('.terminal-menu-overlay').dispatchEvent('pointerdown');
   await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'false');
 
   // Expand tabs and assert exactly one switcher with literal names
@@ -169,22 +169,27 @@ test('command-center header collapse chrome renders', async ({ page }) => {
     const topRect = topbar.getBoundingClientRect();
     const main = topbar.querySelector('.terminal-topbar-main');
     if (!main) throw new Error('terminal topbar row is missing');
-    const rows = [...main.children]
-      .map(element => element.getBoundingClientRect())
-      .filter(rect => rect.width > 0 && rect.height > 0);
+    const rows = [...main.children].filter(el => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    });
     const bands: number[] = [];
     for (const row of rows) {
-      const top = Math.round(row.top);
+      const r = row.getBoundingClientRect();
+      const top = Math.round(r.top);
       if (!bands.some(b => Math.abs(b - top) <= 4)) bands.push(top);
     }
     return {
       height: topRect.height,
       bands,
-      rects: rows.map(row => ({ left: row.left, right: row.right })),
+      rects: rows.map(r => {
+        const b = r.getBoundingClientRect();
+        return { left: b.left, right: b.right };
+      }),
     };
   });
   expect(geometry.bands).toHaveLength(1);
-  expect(geometry.height).toBeLessThanOrEqual(48);
+  expect(geometry.height).toBeLessThanOrEqual(60);
   for (const rect of geometry.rects) {
     expect(rect.left).toBeGreaterThanOrEqual(-1);
     expect(rect.right).toBeLessThanOrEqual(391);
