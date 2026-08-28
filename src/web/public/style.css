@@ -1055,8 +1055,12 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
   .command-center-header { flex:1 1 auto; min-width:0; }
   .agent-group-switcher-dropdown-wrap { display: flex !important; flex:1 1 auto; min-width:120px; }
   .agent-group-switcher-dropdown-wrap select { width:100%; }
+  .command-center-toggle { display:none; }
   .terminal-header-tabs { display: none !important; }
   .agent-group-switcher-scrubber { display: none !important; }
+  /* Keep the phone switcher and terminal controls in separate flex boxes. */
+  .terminal-topbar-main:has(.command-center-header) .cc-ctrl-items { display:none; }
+  .terminal-topbar-main:has(.command-center-header) .cc-ctrl-toggle { display:flex; width:28px; height:28px; border-radius:8px; font-size:16px; }
 }
 @media (min-width: 900px) {
   .terminal-header-tabs { display: flex !important; }
