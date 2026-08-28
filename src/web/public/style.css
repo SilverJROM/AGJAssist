@@ -1011,6 +1011,7 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
   padding: 0 2px; scrollbar-width: none; -ms-overflow-style: none;
 }
 .terminal-header-tabs::-webkit-scrollbar { display: none; }
+.terminal-header-tabs[hidden] { display: none !important; }
 .terminal-header-tab {
   flex: 0 0 auto; max-width: 130px;
   padding: 4px 11px;
@@ -1021,6 +1022,22 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
 }
 .terminal-header-tab:hover { color: var(--text); border-color: var(--accent); }
 .terminal-header-tab:active { color: var(--accent); border-color: var(--accent); }
+/* Command-center terminal chrome stays inside the 390px Telegram topbar. */
+.terminal-topbar-main:has(.command-center-header) { flex-wrap:wrap; }
+.command-center-header { display:flex; align-items:center; gap:4px; min-width:0; flex:1 0 100%; white-space:nowrap; }
+.terminal-header-v2, .command-center-utilities { display:flex; align-items:center; gap:4px; min-width:0; }
+.terminal-header-v2 { flex:0 1 auto; }
+.command-center-utilities { flex:0 1 auto; overflow:hidden; }
+.command-center-utilities [data-testid$="-chip"] { display:inline-block; max-width:74px; overflow:hidden; text-overflow:ellipsis; padding:3px 6px; border:1px solid var(--border); border-radius:999px; background:var(--surface-2); color:var(--text-secondary); font-size:10px; }
+.command-center-toggle, .command-center-bell { box-sizing:border-box; height:28px; flex:0 0 auto; border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text); font:600 10px/1 inherit; cursor:pointer; }
+.command-center-toggle { padding:0 7px; }
+.command-center-bell { width:28px; padding:0; font-size:14px; }
+.command-center-header:has(.command-center-bell) { flex:0 0 auto; }
+@media (max-width:420px) {
+  .terminal-topbar-target:has(+ .command-center-header) { flex:0 1 86px; }
+  .command-center-utilities { max-width:112px; }
+  .command-center-utilities [data-testid$="-chip"] { max-width:62px; }
+}
 .terminal-chat-hit .terminal-chat-bubble { box-shadow: 0 0 0 1.5px var(--accent); }
 .terminal-chat-hit-current .terminal-chat-bubble { box-shadow: 0 0 0 2.5px var(--accent); }
 .terminal-chat-focus-flash .terminal-chat-bubble { animation: terminalChatFlash 0.7s ease-out; }

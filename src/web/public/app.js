@@ -2288,6 +2288,9 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [summariesOpen, setSummariesOpen] = useState(false);
   const [summaries, setSummaries] = useState([]);
   const [summariesLoading, setSummariesLoading] = useState(false);
+  const [tabsCollapsed, setTabsCollapsed] = useState(true);
+  const [utilitiesCollapsed, setUtilitiesCollapsed] = useState(false);
+  const [controlsTucked, setControlsTucked] = useState(false);
   const menuRef = useRef(null);
   const sectionNavRef = useRef(null);
   const terminalGroupsRef = useRef(terminalGroups);
@@ -2393,7 +2396,6 @@ function TerminalTab({ projectId, projectName } = {}) {
   }, [menuOpen]);
 
   useEffect(() => {
-    if (!menuOpen) return;
     api('/api/agent-reminders/active')
       .then(data => {
         setAgentReminders(Array.isArray(data?.reminders) ? data.reminders : []);
@@ -2404,7 +2406,7 @@ function TerminalTab({ projectId, projectName } = {}) {
         setWakeups(Array.isArray(data?.wakeups) ? data.wakeups : []);
       })
       .catch(() => setWakeups([]));
-  }, [menuOpen]);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -2437,7 +2439,6 @@ function TerminalTab({ projectId, projectName } = {}) {
   }, [menuOpen]);
 
   useEffect(() => {
-    if (!summariesOpen) return;
     if (!activeTarget) {
       setSummaries([]);
       return;
@@ -2455,7 +2456,7 @@ function TerminalTab({ projectId, projectName } = {}) {
       setDefaultEndpointId(def ? def.id : null);
     }).catch(() => setSummaries([]))
       .finally(() => setSummariesLoading(false));
-  }, [summariesOpen, activeTarget]);
+  }, [activeTarget]);
 
   const handleSaveReminder = async () => {
     const folderGroup = resolvedActiveGroupTab === 'all' ? 'all' : (activeGroup?.id || resolvedActiveGroupTab);
@@ -3017,16 +3018,35 @@ function TerminalTab({ projectId, projectName } = {}) {
                 ${hasTarget ? (targetSubtitle || activeTarget) : 'Select a pane'}
               </div>
             </div>
-            ${headerGroupSiblings.length ? html`
-              <div class="terminal-header-tabs" data-testid="agent-group-switcher">
-                ${headerGroupSiblings.map((sib) => {
-                  const hasDraft = Boolean(readTerminalDraft('friendly-terminal', sib.target));
-                  return html`
-                  <button type="button" class="terminal-header-tab" data-testid="terminal-header-tab"
-                          title=${'Switch to ' + sib.name + (hasDraft ? ' — draft' : '')} onclick=${() => switchActiveTarget(sib.target)}>${sib.name}${hasDraft ? ' •' : ''}</button>
-                `})}
+            <div class="command-center-header" data-testid="command-center-header">
+              <div class="terminal-header-v2" data-testid="terminal-header-v2">
+                <button type="button" class="command-center-toggle" data-testid="tabs-collapse" onclick=${() => setTabsCollapsed(c => !c)}>${tabsCollapsed ? 'Tabs ▼' : 'Tabs ▲'} (${headerGroupSiblings.length})</button>
+                ${headerGroupSiblings.length ? html`
+                  <div class="terminal-header-tabs" data-testid="agent-group-switcher" hidden=${tabsCollapsed}>
+                    ${headerGroupSiblings.map((sib) => {
+                      const hasDraft = Boolean(readTerminalDraft('friendly-terminal', sib.target));
+                      return html`
+                      <button type="button" class="terminal-header-tab" data-testid="terminal-header-tab"
+                              title=${'Switch to ' + sib.name + (hasDraft ? ' — draft' : '')} onclick=${() => switchActiveTarget(sib.target)}>${sib.name}${hasDraft ? ' •' : ''}</button>
+                    `})}
+                  </div>
+                ` : ''}
+                <button type="button" class="command-center-toggle" data-testid="controls-collapse" onclick=${() => setControlsTucked(c => !c)}>${controlsTucked ? 'Controls ▼' : 'Controls ▲'}</button>
               </div>
-            ` : ''}
+              ${utilitiesCollapsed ? html`
+                <button type="button" class="command-center-bell" data-testid="bell-indicator"
+                        aria-label="Show utilities" onclick=${() => setUtilitiesCollapsed(false)}>🔔</button>
+              ` : html`
+                <div class="command-center-utilities" data-testid="utilities">
+                  <span data-testid="reminder-chip">Reminder: ${agentReminders.length > 0 ? agentReminders[0].id : 'none'}</span>
+                  <span data-testid="wakeup-chip">Wakeup: ${wakeups.length > 0 ? wakeups[0].id : 'none'}</span>
+                  <span data-testid="summary-chip">Summary: ${summaries.length > 0 ? summaries[0].summary_text?.slice(0,20) : 'none'}</span>
+                </div>
+                <button type="button" class="command-center-toggle" data-testid="utilities-collapse"
+                        onclick=${() => setUtilitiesCollapsed(true)}>Hide utilities</button>
+              `}
+            </div>
+            ${!controlsTucked ? html`
             <div class="terminal-fontpill" title="Text size">
               <button type="button" class="am" data-testid="terminal-font-decrease"
                       onclick=${() => updateConvFontSize(convFontSize - 1)}
@@ -3053,6 +3073,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
               </svg>
             </button>
+            ` : ''}
           `}
         </div>
       </div>
