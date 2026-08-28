@@ -4875,3 +4875,50 @@ body.tg-miniapp {
 .cc-ctrl-items .terminal-mynav-header { align-self:auto; width:26px; height:28px; border-radius:8px; }
 .cc-ctrl-items .terminal-mynav-hbtn { padding:0; font-size:7px; }
 .cc-ctrl-items .terminal-mynav-hlabel { font-size:6px; }
+
+/* F6 — agent-window-v2 theme/responsive tokens port */
+@media (min-width:768px) {
+  .terminal-shell .terminal-chat-transcript {
+    padding-left: max(16px, calc((100% - 720px) / 2));
+    padding-right: max(16px, calc((100% - 720px) / 2));
+  }
+  .terminal-shell .terminal-chat-composer {
+    padding-left: max(16px, calc((100% - 720px) / 2));
+    padding-right: max(16px, calc((100% - 720px) / 2));
+  }
+  .terminal-shell .terminal-control-bar {
+    justify-content: center;
+    padding-left: max(10px, calc((100% - 720px) / 2));
+    padding-right: max(10px, calc((100% - 720px) / 2));
+  }
+  .terminal-shell .terminal-menu-sheet {
+    left: 50%;
+    right: auto;
+    width: min(520px, 100%);
+    transform: translateX(-50%);
+  }
+}
+@media (min-width:1024px) {
+  .terminal-shell .terminal-chat-transcript {
+    padding-left: max(24px, calc((100% - 880px) / 2));
+    padding-right: max(24px, calc((100% - 880px) / 2));
+  }
+  .terminal-shell .terminal-chat-composer {
+    padding-left: max(24px, calc((100% - 880px) / 2));
+    padding-right: max(24px, calc((100% - 880px) / 2));
+  }
+  .terminal-shell .terminal-control-bar {
+    padding-left: max(16px, calc((100% - 880px) / 2));
+    padding-right: max(16px, calc((100% - 880px) / 2));
+  }
+  .terminal-shell .terminal-shell-header {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .terminal-shell .terminal-menu-sheet {
+    width: min(560px, 100%);
+  }
+}
+
+/* Ensure system/light/dark theme adaptation follows device setting */
+.terminal-shell { color-scheme: light dark; }
