@@ -64,24 +64,44 @@ test('390px transcript padding stays phone value', async ({ page }) => {
   expect(padLeft).toBe('12px');
 });
 
-test('768px transcript/composer padding is 24px and control bar centered', async ({ page }) => {
+test('768px transcript/composer padding is 16px and control bar centered', async ({ page }) => {
   await openTerminal(page, 768);
   const transcriptPad = await page.evaluate(() => {
     const el = document.querySelector('.terminal-chat-transcript') as HTMLElement | null;
     return getComputedStyle(el!).paddingLeft;
   });
-  // At 768px the tablet column should expand beyond phone 12px
-  expect(transcriptPad).not.toBe('12px');
+  expect(transcriptPad).toBe('16px');
   const composerPad = await page.evaluate(() => {
     const el = document.querySelector('.terminal-chat-composer') as HTMLElement | null;
     return getComputedStyle(el!).paddingLeft;
   });
-  expect(composerPad).not.toBe('12px');
+  expect(composerPad).toBe('16px');
+  const controlPad = await page.evaluate(() => {
+    const el = document.querySelector('.terminal-control-bar') as HTMLElement | null;
+    return getComputedStyle(el!).paddingLeft;
+  });
+  expect(controlPad).toBe('10px');
   const justify = await page.evaluate(() => {
     const el = document.querySelector('.terminal-control-bar') as HTMLElement | null;
     return getComputedStyle(el!).justifyContent;
   });
   expect(justify).toBe('center');
+  const btnStyle = await page.evaluate(() => {
+    const btn = document.querySelector('.terminal-control-bar button') as HTMLElement | null;
+    if (!btn) return null;
+    const s = getComputedStyle(btn);
+    return { flexGrow: s.flexGrow, flexBasis: s.flexBasis, maxWidth: s.maxWidth };
+  });
+  expect(btnStyle).not.toBeNull();
+  expect(btnStyle!.flexGrow).toBe('0');
+  expect(btnStyle!.flexBasis).toBe('72px');
+  expect(btnStyle!.maxWidth).toBe('88px');
+  const topbarMax = await page.evaluate(() => {
+    const el = document.querySelector('.terminal-topbar-target') as HTMLElement | null;
+    if (!el) return null;
+    return getComputedStyle(el).maxWidth;
+  });
+  expect(topbarMax).toBe('220px');
 });
 
 test('1024px transcript/composer/control-bar padding matches 880px column and search offset moves', async ({ page }) => {
@@ -90,29 +110,37 @@ test('1024px transcript/composer/control-bar padding matches 880px column and se
     const el = document.querySelector('.terminal-chat-transcript') as HTMLElement | null;
     return getComputedStyle(el!).paddingLeft;
   });
-  // Desktop column should be wider than tablet/phone
-  expect(transcriptPad).not.toBe('12px');
+  expect(transcriptPad).toBe('24px');
   const composerPad = await page.evaluate(() => {
     const el = document.querySelector('.terminal-chat-composer') as HTMLElement | null;
     return getComputedStyle(el!).paddingLeft;
   });
-  expect(composerPad).not.toBe('12px');
+  expect(composerPad).toBe('24px');
   const controlPad = await page.evaluate(() => {
     const el = document.querySelector('.terminal-control-bar') as HTMLElement | null;
     return getComputedStyle(el!).paddingLeft;
   });
-  expect(controlPad).not.toBe('10px');
+  expect(controlPad).toBe('16px');
   const searchRight = await page.evaluate(() => {
     const el = document.querySelector('.terminal-search-toggle') as HTMLElement | null;
     if (!el) return null;
     return getComputedStyle(el).right;
   });
-  expect(searchRight).not.toBe('12px');
+  expect(searchRight).toBe('16px');
   const topbarMax = await page.evaluate(() => {
     const el = document.querySelector('.terminal-topbar-target') as HTMLElement | null;
     if (!el) return null;
     return getComputedStyle(el).maxWidth;
   });
   expect(topbarMax).toBe('260px');
+  const btnStyle = await page.evaluate(() => {
+    const btn = document.querySelector('.terminal-control-bar button') as HTMLElement | null;
+    if (!btn) return null;
+    const s = getComputedStyle(btn);
+    return { flexGrow: s.flexGrow, flexBasis: s.flexBasis, maxWidth: s.maxWidth };
+  });
+  expect(btnStyle).not.toBeNull();
+  expect(btnStyle!.flexGrow).toBe('0');
+  expect(btnStyle!.flexBasis).toBe('72px');
+  expect(btnStyle!.maxWidth).toBe('88px');
 });
-

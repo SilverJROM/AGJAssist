@@ -4879,17 +4879,17 @@ body.tg-miniapp {
 /* F6 — agent-window-v2 theme/responsive tokens port */
 @media (min-width:768px) {
   .terminal-shell .terminal-chat-transcript {
-    padding-left: max(16px, calc((100% - 720px) / 2));
-    padding-right: max(16px, calc((100% - 720px) / 2));
+    padding-left: 16px;
+    padding-right: 16px;
   }
   .terminal-shell .terminal-chat-composer {
-    padding-left: max(16px, calc((100% - 720px) / 2));
-    padding-right: max(16px, calc((100% - 720px) / 2));
+    padding-left: 16px;
+    padding-right: 16px;
   }
   .terminal-shell .terminal-control-bar {
     justify-content: center;
-    padding-left: max(10px, calc((100% - 720px) / 2));
-    padding-right: max(10px, calc((100% - 720px) / 2));
+    padding-left: 10px;
+    padding-right: 10px;
   }
   .terminal-shell .terminal-menu-sheet {
     left: 50%;
@@ -4916,19 +4916,24 @@ body.tg-miniapp {
     flex: 0 1 72px;
     max-width: 88px;
   }
+  .terminal-shell [data-testid="agent-summaries-dropdown"] {
+    left: 12px !important;
+    right: auto !important;
+    width: min(440px, calc(100% - 24px)) !important;
+  }
 }
 @media (min-width:1024px) {
   .terminal-shell .terminal-chat-transcript {
-    padding-left: max(24px, calc((100% - 880px) / 2));
-    padding-right: max(24px, calc((100% - 880px) / 2));
+    padding-left: 24px;
+    padding-right: 24px;
   }
   .terminal-shell .terminal-chat-composer {
-    padding-left: max(24px, calc((100% - 880px) / 2));
-    padding-right: max(24px, calc((100% - 880px) / 2));
+    padding-left: 24px;
+    padding-right: 24px;
   }
   .terminal-shell .terminal-control-bar {
-    padding-left: max(16px, calc((100% - 880px) / 2));
-    padding-right: max(16px, calc((100% - 880px) / 2));
+    padding-left: 16px;
+    padding-right: 16px;
   }
   .terminal-shell .terminal-shell-header {
     padding-left: 16px;
@@ -4945,7 +4950,7 @@ body.tg-miniapp {
     max-width: 160px;
   }
   .terminal-shell .terminal-search-toggle {
-    right: max(16px, calc((100% - 880px) / 2));
+    right: 16px;
   }
   .terminal-shell .terminal-search-bar {
     margin-left: max(0px, calc((100% - 880px) / 2));
