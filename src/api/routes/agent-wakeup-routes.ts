@@ -71,7 +71,7 @@ export function registerAgentWakeupRoutes(
   app.delete<{ Params: { id: string } }>(
     "/api/agent-wakeups/:id",
     { preHandler: [authMiddleware, requireOwner] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const id = Number(request.params.id);
       if (!Number.isInteger(id) || id <= 0) {
         return reply.code(400).send({ error: "Invalid id" });

@@ -79,7 +79,7 @@ export function registerAgentReminderRoutes(
   } }>(
     "/api/agent-reminders/:id",
     { preHandler: [authMiddleware, requireOwner] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const id = Number(request.params.id);
       const body = request.body as any;
 
@@ -120,7 +120,7 @@ export function registerAgentReminderRoutes(
   app.delete<{ Params: { id: string } }>(
     "/api/agent-reminders/:id",
     { preHandler: [authMiddleware, requireOwner] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const id = Number(request.params.id);
       const ok = solicitService.delete(id);
       if (!ok) {
