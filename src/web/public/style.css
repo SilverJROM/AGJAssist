@@ -4805,6 +4805,7 @@ body.tg-miniapp {
 .cc-utilarea [data-testid$="-chip"] { display:inline-block; max-width:104px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 6px; border:1px solid var(--border); border-radius:999px; background:var(--surface-2); color:var(--text-secondary); font-size:10px; }
 .cc-util-toggle { flex:0 0 auto; width:24px; height:24px; border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary); border-radius:7px; cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:center; padding:0; }
 .terminal-shell-header.util-collapsed .cc-utilarea { display:none; }
+.terminal-shell-header.util-collapsed .terminal-topbar-main { padding-bottom:0; }
 .command-center-bell { position:relative; }
 .cc-util-icon-dot { position:absolute; top:2px; right:2px; width:6px; height:6px; border-radius:50%; background:var(--warning); border:1.5px solid var(--surface); display:none; pointer-events:none; }
 .command-center-bell.has-reminder .cc-util-icon-dot { display:block; }
