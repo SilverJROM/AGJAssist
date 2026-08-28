@@ -4897,6 +4897,25 @@ body.tg-miniapp {
     width: min(520px, 100%);
     transform: translateX(-50%);
   }
+  .terminal-shell .terminal-topbar-target {
+    max-width: 220px;
+    flex: 0 1 220px;
+  }
+  .terminal-shell .terminal-header-tab {
+    max-width: 140px;
+  }
+  .terminal-shell .terminal-search-toggle {
+    right: max(12px, calc((100% - 720px) / 2));
+  }
+  .terminal-shell .terminal-search-bar {
+    margin-left: max(0px, calc((100% - 720px) / 2));
+    margin-right: max(0px, calc((100% - 720px) / 2));
+    border-radius: 0 0 10px 10px;
+  }
+  .terminal-shell .terminal-control-bar button {
+    flex: 0 1 72px;
+    max-width: 88px;
+  }
 }
 @media (min-width:1024px) {
   .terminal-shell .terminal-chat-transcript {
@@ -4917,6 +4936,23 @@ body.tg-miniapp {
   }
   .terminal-shell .terminal-menu-sheet {
     width: min(560px, 100%);
+  }
+  .terminal-shell .terminal-topbar-target {
+    max-width: 260px;
+    flex: 0 1 260px;
+  }
+  .terminal-shell .terminal-header-tab {
+    max-width: 160px;
+  }
+  .terminal-shell .terminal-search-toggle {
+    right: max(16px, calc((100% - 880px) / 2));
+  }
+  .terminal-shell .terminal-search-bar {
+    margin-left: max(0px, calc((100% - 880px) / 2));
+    margin-right: max(0px, calc((100% - 880px) / 2));
+  }
+  .terminal-shell .terminal-topbar-main {
+    gap: 8px;
   }
 }
 
