@@ -106,27 +106,30 @@ test('768px transcript/composer padding is 16px and control bar centered', async
 
 test('1024px transcript/composer/control-bar padding matches 880px column and search offset moves', async ({ page }) => {
   await openTerminal(page, 1024);
-  const transcriptPad = await page.evaluate(() => {
-    const el = document.querySelector('.terminal-chat-transcript') as HTMLElement | null;
-    return getComputedStyle(el!).paddingLeft;
+  const desktopLayout = await page.evaluate(() => {
+    const transcript = document.querySelector('.terminal-chat-transcript') as HTMLElement | null;
+    const composer = document.querySelector('.terminal-chat-composer') as HTMLElement | null;
+    const controlBar = document.querySelector('.terminal-control-bar') as HTMLElement | null;
+    const searchToggle = document.querySelector('.terminal-search-toggle') as HTMLElement | null;
+    if (!transcript || !composer || !controlBar || !searchToggle) throw new Error('desktop terminal controls missing');
+
+    const paddingFor = (element: HTMLElement, minimum: number) =>
+      Math.max(minimum, (element.parentElement!.getBoundingClientRect().width - 880) / 2);
+    return {
+      transcriptPadding: parseFloat(getComputedStyle(transcript).paddingLeft),
+      composerPadding: parseFloat(getComputedStyle(composer).paddingLeft),
+      controlPadding: parseFloat(getComputedStyle(controlBar).paddingLeft),
+      searchRight: parseFloat(getComputedStyle(searchToggle).right),
+      expectedTranscriptPadding: paddingFor(transcript, 24),
+      expectedComposerPadding: paddingFor(composer, 24),
+      expectedControlPadding: paddingFor(controlBar, 16),
+      expectedSearchRight: paddingFor(searchToggle, 16),
+    };
   });
-  expect(transcriptPad).toBe('24px');
-  const composerPad = await page.evaluate(() => {
-    const el = document.querySelector('.terminal-chat-composer') as HTMLElement | null;
-    return getComputedStyle(el!).paddingLeft;
-  });
-  expect(composerPad).toBe('24px');
-  const controlPad = await page.evaluate(() => {
-    const el = document.querySelector('.terminal-control-bar') as HTMLElement | null;
-    return getComputedStyle(el!).paddingLeft;
-  });
-  expect(controlPad).toBe('16px');
-  const searchRight = await page.evaluate(() => {
-    const el = document.querySelector('.terminal-search-toggle') as HTMLElement | null;
-    if (!el) return null;
-    return getComputedStyle(el).right;
-  });
-  expect(searchRight).toBe('16px');
+  expect(desktopLayout.transcriptPadding).toBeCloseTo(desktopLayout.expectedTranscriptPadding, 2);
+  expect(desktopLayout.composerPadding).toBeCloseTo(desktopLayout.expectedComposerPadding, 2);
+  expect(desktopLayout.controlPadding).toBeCloseTo(desktopLayout.expectedControlPadding, 2);
+  expect(desktopLayout.searchRight).toBeCloseTo(desktopLayout.expectedSearchRight, 2);
   const topbarMax = await page.evaluate(() => {
     const el = document.querySelector('.terminal-topbar-target') as HTMLElement | null;
     if (!el) return null;
@@ -143,4 +146,45 @@ test('1024px transcript/composer/control-bar padding matches 880px column and se
   expect(btnStyle!.flexGrow).toBe('0');
   expect(btnStyle!.flexBasis).toBe('72px');
   expect(btnStyle!.maxWidth).toBe('88px');
+});
+
+test('1440px caps the terminal chat column at the literal 880px desktop specimen', async ({ page }) => {
+  await openTerminal(page, 1440);
+  const wideLayout = await page.evaluate(() => {
+    const transcript = document.querySelector('.terminal-chat-transcript') as HTMLElement | null;
+    const composer = document.querySelector('.terminal-chat-composer') as HTMLElement | null;
+    const controlBar = document.querySelector('.terminal-control-bar') as HTMLElement | null;
+    const searchToggle = document.querySelector('.terminal-search-toggle') as HTMLElement | null;
+    if (!transcript || !composer || !controlBar || !searchToggle) throw new Error('wide terminal controls missing');
+
+    const paddingFor = (element: HTMLElement, minimum: number) =>
+      Math.max(minimum, (element.parentElement!.getBoundingClientRect().width - 880) / 2);
+    const transcriptStyle = getComputedStyle(transcript);
+    const composerStyle = getComputedStyle(composer);
+    const controlStyle = getComputedStyle(controlBar);
+    const searchStyle = getComputedStyle(searchToggle);
+    const transcriptContentWidth = transcript.getBoundingClientRect().width
+      - parseFloat(transcriptStyle.paddingLeft) - parseFloat(transcriptStyle.paddingRight);
+
+    return {
+      transcriptPadding: parseFloat(transcriptStyle.paddingLeft),
+      composerPadding: parseFloat(composerStyle.paddingLeft),
+      controlPadding: parseFloat(controlStyle.paddingLeft),
+      searchRight: parseFloat(searchStyle.right),
+      expectedTranscriptPadding: paddingFor(transcript, 24),
+      expectedComposerPadding: paddingFor(composer, 24),
+      expectedControlPadding: paddingFor(controlBar, 16),
+      expectedSearchRight: paddingFor(searchToggle, 16),
+      transcriptContentWidth,
+    };
+  });
+
+  expect(wideLayout.transcriptPadding).toBeGreaterThan(24);
+  expect(wideLayout.composerPadding).toBeGreaterThan(24);
+  expect(wideLayout.transcriptPadding).toBeCloseTo(wideLayout.expectedTranscriptPadding, 2);
+  expect(wideLayout.composerPadding).toBeCloseTo(wideLayout.expectedComposerPadding, 2);
+  expect(wideLayout.controlPadding).toBeCloseTo(wideLayout.expectedControlPadding, 2);
+  expect(wideLayout.searchRight).toBeCloseTo(wideLayout.expectedSearchRight, 2);
+  expect(wideLayout.transcriptContentWidth).toBeCloseTo(880, 2);
+  expect(wideLayout.transcriptContentWidth).toBeLessThan(1000);
 });

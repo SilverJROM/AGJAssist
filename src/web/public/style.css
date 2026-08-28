@@ -4924,16 +4924,16 @@ body.tg-miniapp {
 }
 @media (min-width:1024px) {
   .terminal-shell .terminal-chat-transcript {
-    padding-left: 24px;
-    padding-right: 24px;
+    padding-left: max(24px, calc((100% - 880px) / 2));
+    padding-right: max(24px, calc((100% - 880px) / 2));
   }
   .terminal-shell .terminal-chat-composer {
-    padding-left: 24px;
-    padding-right: 24px;
+    padding-left: max(24px, calc((100% - 880px) / 2));
+    padding-right: max(24px, calc((100% - 880px) / 2));
   }
   .terminal-shell .terminal-control-bar {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: max(16px, calc((100% - 880px) / 2));
+    padding-right: max(16px, calc((100% - 880px) / 2));
   }
   .terminal-shell .terminal-shell-header {
     padding-left: 16px;
@@ -4950,7 +4950,7 @@ body.tg-miniapp {
     max-width: 160px;
   }
   .terminal-shell .terminal-search-toggle {
-    right: 16px;
+    right: max(16px, calc((100% - 880px) / 2));
   }
   .terminal-shell .terminal-search-bar {
     margin-left: max(0px, calc((100% - 880px) / 2));
