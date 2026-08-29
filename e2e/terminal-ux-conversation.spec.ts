@@ -375,6 +375,15 @@ async function selectPaneAndFriendly(page: import('@playwright/test').Page) {
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
 }
 
+// The control cluster (font / ME-nav / summaries / gear) tucks behind a "…"
+// overflow by default at phone width; reveal it before driving those controls,
+// exactly as a user taps "…". Guarded no-op when the controls are already shown
+// (e.g. desktop width), so the same call is safe at every viewport.
+async function revealControls(page: import('@playwright/test').Page) {
+  const toggle = page.locator('[data-testid="controls-collapse"]');
+  if (await toggle.isVisible().catch(() => false)) await toggle.click();
+}
+
 test('A3 R1b R2 production wire — YOU + AGENT bubbles and both POST shapes', async ({ page }) => {
   const posts: unknown[] = [];
   let paneOutput = INITIAL_OUTPUT;
@@ -468,6 +477,7 @@ test('A4 R1a R3 R4 R7 type and font — live Settings sync and mobile fit', asyn
   expect(metrics.family).not.toMatch(/jetbrains|fira code|monospace/);
   expect(metrics.css).toBe(`${metrics.size}px`);
 
+  await revealControls(page);
   const plus = page.locator('[data-testid="terminal-font-increase"]');
   await expect(plus).toHaveCount(1);
   const before = metrics.size;
@@ -498,6 +508,7 @@ test('A6 R6 R7 single topbar — controls still perform their functions at 390',
     onCreateSession: (body) => createdSessions.push(body),
   });
   await selectPaneAndFriendly(page);
+  await revealControls(page);
 
   const menu = page.locator('[data-testid="terminal-menu"]');
   const menuSheet = page.locator('[data-testid="terminal-menu-sheet"], [data-term-menu-sheet], .terminal-menu-sheet, [role="menu"]').first();
@@ -582,6 +593,7 @@ test('A6 R6 R7 single topbar — controls still perform their functions at 390',
     await installXtermStub(desktopPage);
     await installFrozenTransport(desktopPage, INITIAL_OUTPUT);
     await selectPaneAndFriendly(desktopPage);
+    await revealControls(desktopPage);
     const desktopMenu = desktopPage.locator('[data-testid="terminal-menu"]');
     await desktopMenu.click();
     const desktopSheet = desktopPage.locator('[data-testid="terminal-menu-sheet"], [data-term-menu-sheet], .terminal-menu-sheet, [role="menu"]').first();
@@ -599,6 +611,7 @@ test('A6 R6 R7 single topbar — controls still perform their functions at 390',
 test('A7 R8 show-raw reveals stripped chrome', async ({ page }) => {
   await installFrozenTransport(page, INITIAL_OUTPUT);
   await selectPaneAndFriendly(page);
+  await revealControls(page);
   const menu = page.locator('[data-testid="terminal-menu"]');
   const menuSheet = page.locator('[data-testid="terminal-menu-sheet"], [data-term-menu-sheet], .terminal-menu-sheet, [role="menu"]').first();
   if (!(await menuSheet.isVisible().catch(() => false))) await menu.click();

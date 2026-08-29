@@ -22,6 +22,7 @@ import { AgentAssignmentService } from "./services/agent-assignment-service.js";
 import { AgentEventsService } from "./services/agent-events-service.js";
 import { CoordinatorLaunchService } from "./services/coordinator-launch-service.js";
 import { AgentWakeScheduler } from "./services/agent-wake-scheduler.js";
+import { SelectionWatchService } from "./services/selection-watch-service.js";
 import {
   formatError,
   installTelegramProcessGuards,
@@ -86,6 +87,17 @@ async function main(): Promise<void> {
       webhookUrl: config.telegram.webhookUrl,
       webhookSecretToken: config.telegram.webhookSecretToken
     });
+
+  // Watch for agents blocked on an interactive options selection; DM the owner
+  // if one sits unanswered past 15 minutes (highlight-in-UI is handled live by
+  // the /api/tmux/sessions flag).
+  const selectionWatcher = new SelectionWatchService(
+    tmuxService,
+    telegramAssistant,
+    config.telegram.authorizedUserId
+  );
+  selectionWatcher.start();
+
   // Tmux streaming
   const tmuxStreamManager = new TmuxStreamManager(
     tmuxService,

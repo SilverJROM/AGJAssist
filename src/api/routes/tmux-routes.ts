@@ -9,6 +9,7 @@ import { SafetyService } from "../../services/safety-service.js";
 import { ProjectService } from "../../services/project-service.js";
 import { FileService, PathTraversalError } from "../../services/file-service.js";
 import { getPaneBusyStates } from "../../tmux/tmux-busy.js";
+import { detectPaneSelection, isAwaitingSelection } from "../../tmux/selection-detect.js";
 import {
   ATTACH_IMAGE_MAX_BYTES,
   decodeAttachImageBase64,
@@ -49,11 +50,28 @@ export function registerTmuxRoutes(
         tmuxService.peekPane(target, lines)
       );
 
+      // Flag panes blocked on an interactive options selection (parsed from a
+      // ~60-line peek) so the UI can highlight them — a stuck selection the user
+      // can't see is otherwise invisible in the list.
+      const awaitingByTarget = new Map<string, boolean>();
+      await Promise.all(panes.map(async (pane) => {
+        try {
+          const snapshot = await tmuxService.peekPane(pane.target, 60);
+          if (isAwaitingSelection(await detectPaneSelection(snapshot))) {
+            awaitingByTarget.set(pane.target, true);
+          }
+        } catch { /* pane peek failed — treat as not-awaiting */ }
+      }));
+
       // Group by session
-      const sessions = new Map<string, Array<(typeof panes)[number] & { busy: boolean }>>();
+      const sessions = new Map<string, Array<(typeof panes)[number] & { busy: boolean; awaiting_selection: boolean }>>();
       for (const pane of panes) {
         const existing = sessions.get(pane.session) || [];
-        existing.push({ ...pane, busy: busyByTarget.get(pane.target) ?? false });
+        existing.push({
+          ...pane,
+          busy: busyByTarget.get(pane.target) ?? false,
+          awaiting_selection: awaitingByTarget.get(pane.target) ?? false
+        });
         sessions.set(pane.session, existing);
       }
 
@@ -328,19 +346,19 @@ export function registerTmuxRoutes(
       }
 
       const relativePath = `tmp/term-${utcAttachStamp()}-${sanitized}`;
+      const pathMod = await import("node:path");
+      const absolutePath = pathMod.resolve(projectRoot, relativePath);
       try {
         if (fileService) {
           fileService.writeBinaryFile(projectRoot, relativePath, buf);
         } else {
           const fs = await import("node:fs");
-          const path = await import("node:path");
-          const dest = path.resolve(projectRoot, relativePath);
-          const root = path.resolve(projectRoot);
-          if (!dest.startsWith(root + path.sep)) {
+          const root = pathMod.resolve(projectRoot);
+          if (!absolutePath.startsWith(root + pathMod.sep)) {
             return reply.code(403).send({ error: "Access denied" });
           }
-          fs.mkdirSync(path.dirname(dest), { recursive: true });
-          fs.writeFileSync(dest, buf);
+          fs.mkdirSync(pathMod.dirname(absolutePath), { recursive: true });
+          fs.writeFileSync(absolutePath, buf);
         }
 
         auditService.log({
@@ -352,7 +370,12 @@ export function registerTmuxRoutes(
           surface: "web"
         });
 
-        return { ok: true, path: relativePath };
+        // Return the ABSOLUTE path. The terminal chat sends "[image: <path>]" to an
+        // agent whose working directory is usually NOT the app's cwd (e.g. an agent
+        // in ~/websites/HRIS), so a relative "tmp/term-…" would not resolve for that
+        // pane. An absolute path is readable from any agent's cwd. (relativePath is
+        // still returned for callers that want the app-relative form.)
+        return { ok: true, path: absolutePath, relativePath };
       } catch (error) {
         if (error instanceof PathTraversalError) {
           return reply.code(403).send({ error: "Access denied" });

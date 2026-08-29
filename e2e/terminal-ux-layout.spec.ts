@@ -76,6 +76,14 @@ async function openFriendlyTerminal(page: import('@playwright/test').Page, viewp
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
 }
 
+// The control cluster (incl. the ☰ settings gear) tucks behind a "…" overflow by
+// default at phone width; reveal it as a user taps "…". Guarded no-op when shown
+// (e.g. the desktop viewport), so the same call is safe at both viewports.
+async function revealControls(page: import('@playwright/test').Page) {
+  const toggle = page.locator('[data-testid="controls-collapse"]');
+  if (await toggle.isVisible().catch(() => false)) await toggle.click();
+}
+
 const VIEWPORTS = [
   { name: 'iPhone', width: 390, height: 844 },
   { name: 'desktop', width: 1280, height: 800 },
@@ -126,6 +134,7 @@ for (const viewport of VIEWPORTS) {
 
     // Compact topbar: hamburger menu exists; Show raw / Full Screen are NOT
     // top-level — they live inside the settings sheet.
+    await revealControls(page);
     const menuButton = page.locator('[data-testid="terminal-menu"]');
     await expect(menuButton).toBeVisible();
     const topbar = page.locator('[data-term-topbar]');

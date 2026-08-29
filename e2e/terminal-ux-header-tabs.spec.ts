@@ -37,11 +37,16 @@ test('chat header shows group siblings as quick-switch tabs and switches on tap'
   await page.route(/\/api\/terminal\/groups(?:\?.*)?$/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ groups: [{ id: 'g1', name: 'Mine', sessions: ['SA', 'SB'] }], activeGroup: 'g1' }) }));
   await page.route(/\/api\/tmux\/panes\/[^/]+\/output(?:\?.*)?$/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ output: '● hi\n▌ Type', target: TA, lines: 200 }) }));
 
-  await page.setViewportSize({ width: 640, height: 800 });
+  // Quick-switch TABS are the desktop (>=900px) affordance; at phone/tablet width
+  // the header switches via the dropdown instead (covered by
+  // command-center-switcher). Use a desktop width and open the collapsed strip.
+  await page.setViewportSize({ width: 1000, height: 800 });
   await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1500);
   await page.locator(`[data-testid="terminal-session-row"][data-session-target="${TA}"]`).click();
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
+  // The tab strip is collapsed by default; expand it via its "Tabs ▼" toggle.
+  await page.locator('[data-testid="tabs-collapse"]').click();
 
   // The header shows a tab for the OTHER group member (SB), not for SA itself.
   const tabs = page.locator('[data-testid="terminal-header-tab"]');

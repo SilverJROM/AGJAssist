@@ -43,6 +43,14 @@ async function sendMessage(page: import('@playwright/test').Page, text: string) 
   await page.waitForTimeout(400);
 }
 
+// The control cluster (font / ME-nav / summaries / gear) tucks behind a "…"
+// overflow by default at phone width; reveal it as a user taps "…". Guarded
+// no-op when already expanded.
+async function revealControls(page: import('@playwright/test').Page) {
+  const toggle = page.locator('[data-testid="controls-collapse"]');
+  if (await toggle.isVisible().catch(() => false)) await toggle.click();
+}
+
 test('chat search finds matches, navigates prev/next, and closes', async ({ page }) => {
   test.setTimeout(60_000);
   await setup(page);
@@ -92,6 +100,7 @@ test('header ME nav steps through YOU turns and clamps at the ends', async ({ pa
   await expect(page.locator('[data-testid="terminal-turn-user"]')).toHaveCount(3);
 
   // The nav lives in the header (beside settings), not floating over the chat.
+  await revealControls(page);
   await expect(page.locator('[data-testid="terminal-mynav"]')).toBeVisible();
   const up = page.locator('[data-testid="terminal-mynav-up"]');
   const down = page.locator('[data-testid="terminal-mynav-down"]');

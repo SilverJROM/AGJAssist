@@ -717,6 +717,17 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
   border-radius: 22px;
   padding: 6px;
 }
+/* The draft-persistence wrapper around the composer textarea must stretch like
+   the textarea it replaced as the flex child, else the input collapses to its
+   content and the send button floats out of position. */
+.terminal-chat-composer-row > [data-testid="terminal-draft"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+.terminal-chat-composer-row > [data-testid="terminal-draft"] > .terminal-chat-input-field {
+  width: 100%;
+}
 .terminal-chat-attach-btn {
   width: 36px;
   height: 36px;
@@ -1051,8 +1062,30 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
 }
 @media (max-width: 899px) {
   .terminal-topbar-target { flex:1 1 auto !important; min-width:0; }
+  /* Phone/tablet: show the agent name as the PROMINENT identity — a large, bold
+     name with the detail line as a small, subtler footnote below it — while the
+     switcher dropdown stays alongside for one-tap switching. Controls are tucked
+     behind "…" so there is room for the name block again. (The live "updated
+     <time>" indicator lives in the settings-menu Session section.) */
+  /* Identity block = a single grid column sized to the NAME's content. The
+     footnote is width:0 so it never widens that column, and min-width:100% makes
+     it fill — and ellipsise within — the name's width at EVERY viewport. This is
+     what stops it stretching past the name even when the header has plenty of
+     room (a plain shrink-to-fit only truncated at tight widths). */
+  .terminal-topbar-target:has(+ .command-center-header) {
+    display:grid; grid-template-columns:minmax(0, max-content); justify-items:start;
+    flex:0 1 auto !important; min-width:0;
+  }
+  .terminal-topbar-target:has(+ .command-center-header) .terminal-topbar-name { font-size:19px; font-weight:700; line-height:1.15; }
+  .terminal-topbar-target:has(+ .command-center-header) .terminal-topbar-name .terminal-topbar-dot { width:9px; height:9px; }
+  .terminal-topbar-target:has(+ .command-center-header) .terminal-topbar-sub { width:0; min-width:100%; max-width:100%; font-size:10px; opacity:0.6; margin-top:1px; line-height:1.15; }
   .terminal-header-v2 { flex:1 1 auto; }
   .command-center-header { flex:1 1 auto; min-width:0; }
+  /* min-width:0 (was 120px): the wrap's parent .command-center-header carries
+     min-width:0 and can shrink below 120, so a hard 120px floor here made the
+     dropdown overflow its parent to the right and overlap the control cluster
+     once the name line is hidden. Shrinking with the parent keeps the no-overlap
+     invariant (command-center-switcher "dropdown right < controls left"). */
   .agent-group-switcher-dropdown-wrap { display: flex !important; flex:1 1 auto; min-width:120px; }
   .agent-group-switcher-dropdown-wrap select { width:100%; }
   .command-center-toggle { display:none; }
@@ -1061,20 +1094,21 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
   /* Keep every terminal control reachable on phones without widening the
      viewport. The group switcher and the compact control cluster get their
      own cells within the one topbar, rather than hiding the cluster. */
+  /* ONE-ROW header at phone width, matching the locked mockup: a single
+     non-wrapping flex row (back · target · switcher · utilities · controls),
+     NOT the previous two-row grid. The target already carries flex-shrink +
+     min-width:0 (and its 220/260px caps live in the >=768/1024 blocks), and the
+     switcher flexes, so the row compresses to fit instead of wrapping. We do NOT
+     re-cap the target here — that would override the >=768px 220px lock the
+     responsive fence asserts. */
   .terminal-topbar-main:has(.command-center-header) {
-    display:grid;
-    grid-template-columns:28px minmax(0, 1fr) auto;
-    grid-template-areas:
-      "back target utilities"
-      "switcher switcher controls";
+    display:flex;
+    align-items:center;
+    flex-wrap:nowrap;
     gap:5px;
+    min-width:0;
   }
-  .terminal-topbar-main:has(.command-center-header) > .terminal-menu-trigger { grid-area:back; }
-  .terminal-topbar-main:has(.command-center-header) > .terminal-topbar-target { grid-area:target; }
-  .terminal-topbar-main:has(.command-center-header) > .command-center-header { grid-area:switcher; }
-  .terminal-topbar-main:has(.command-center-header) > .cc-util-toggle,
-  .terminal-topbar-main:has(.command-center-header) > .command-center-bell { grid-area:utilities; }
-  .terminal-topbar-main:has(.command-center-header) > .cc-ctrlcluster { grid-area:controls; }
+  .terminal-topbar-main:has(.command-center-header) > .command-center-header { flex:1 1 auto; min-width:0; }
   .terminal-topbar-main:has(.command-center-header) .cc-ctrl-items { display:flex; }
   .terminal-topbar-main:has(.command-center-header) .cc-ctrl-toggle { display:none; }
   .terminal-topbar-main:has(.command-center-header) .cc-ctrlcluster.collapsed .cc-ctrl-toggle { display:flex; width:28px; height:28px; border-radius:8px; font-size:16px; }
@@ -1100,6 +1134,23 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
 .terminal-chat-hit .terminal-chat-bubble { box-shadow: 0 0 0 1.5px var(--accent); }
 .terminal-chat-hit-current .terminal-chat-bubble { box-shadow: 0 0 0 2.5px var(--accent); }
 .terminal-chat-focus-flash .terminal-chat-bubble { animation: terminalChatFlash 0.7s ease-out; }
+/* Chat-search word highlight: mark the actual matched text (not just a ring
+   around the bubble) so the searched word is easy to spot. Fixed dark-on-amber
+   stays legible on both light and dark themes. */
+.terminal-search-mark {
+  background: #ffdf5d;
+  color: #1a1a1a;
+  border-radius: 2px;
+  padding: 0 1px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+/* The current match's entry pops brighter/orange so the active hit stands apart
+   from the other amber matches as you step through with the ▲/▼ nav. */
+.terminal-chat-hit-current .terminal-search-mark {
+  background: #ff9d3c;
+  color: #1a1a1a;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
 @keyframes terminalChatFlash {
   0% { box-shadow: 0 0 0 3px var(--accent); }
   100% { box-shadow: 0 0 0 0 transparent; }
@@ -3728,9 +3779,29 @@ body.tg-miniapp {
 
 /* F4 header row split: util area separate, bell hints */
 .cc-utilarea { display:flex; align-items:center; gap:6px; min-width:0; padding:0 0 9px; }
-.cc-utilarea [data-testid$="-chip"] { display:inline-block; max-width:104px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 6px; border:1px solid var(--border); border-radius:999px; background:var(--surface-2); color:var(--text-secondary); font-size:10px; }
+.cc-utilarea [data-testid$="-chip"] { display:inline-block; max-width:104px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 8px; border:1px solid var(--border); border-radius:999px; background:var(--surface-2); color:var(--text-secondary); font-size:10px; font-family:inherit; line-height:1.4; cursor:pointer; }
+.cc-utilarea button[data-testid$="-chip"]:hover { color:var(--text); border-color:var(--accent); }
+.cc-utilarea button[data-testid$="-chip"]:active { transform:scale(0.96); }
 .cc-util-toggle { flex:0 0 auto; width:24px; height:24px; border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary); border-radius:7px; cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:center; padding:0; }
 .terminal-shell-header.util-collapsed .cc-utilarea { display:none; }
+
+/* ---- Pending options-selection highlight ----
+   An agent blocked on an interactive prompt the user can't see is otherwise
+   invisible. Flag it RED in the header AND the session list so it's obvious and
+   answerable. Colour is fixed danger-red (reads on both themes). */
+@keyframes agjAwaitingPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.terminal-topbar-dot.awaiting,
+.terminal-list-dot.awaiting { background: #f85149 !important; box-shadow: 0 0 0 3px rgba(248,81,73,0.22); animation: agjAwaitingPulse 1.2s ease-in-out infinite; }
+.terminal-topbar-target.awaiting-selection .terminal-topbar-name-text { color: #f85149; }
+.terminal-header-tab.awaiting-selection { color: #f85149; border-color: #f85149; box-shadow: 0 0 0 1px rgba(248,81,73,0.5); }
+.agent-group-switcher-dropdown-wrap.has-awaiting select { border-color: #f85149 !important; box-shadow: 0 0 0 1px rgba(248,81,73,0.55); }
+.agent-group-switcher-dropdown-wrap select option.awaiting { color: #f85149; }
+.terminal-list-row.awaiting-selection { border-left: 3px solid #f85149; background: rgba(248,81,73,0.08); }
+.terminal-list-status.awaiting-selection-label { color: #f85149; font-weight: 600; }
+.tree-item.awaiting-selection { color: #f85149; }
+@media (prefers-reduced-motion: reduce) {
+  .terminal-topbar-dot.awaiting, .terminal-list-dot.awaiting { animation: none; }
+}
 .terminal-shell-header.util-collapsed .terminal-topbar-main { padding-bottom:0; }
 .command-center-bell { position:relative; }
 .cc-util-icon-dot { position:absolute; top:2px; right:2px; width:6px; height:6px; border-radius:50%; background:var(--warning); border:1.5px solid var(--surface); display:none; pointer-events:none; }

@@ -74,95 +74,75 @@ test('command-center header collapse chrome renders', async ({ page }) => {
   page.on('request', req => requests.push(req.url()));
   const countRequests = (pattern: RegExp) => requests.filter(u => pattern.test(u)).length;
 
-  const tabsCollapse = page.locator('[data-testid="tabs-collapse"]');
-  await expect(tabsCollapse).toBeVisible();
-  // Tabs collapsed by default
+  // Phone/tablet (<=899px) switches agents via the DROPDOWN, not the tab strip:
+  // the "Tabs ▼" toggle and the strip are hidden; the group dropdown is shown.
+  // (The strip is a desktop affordance — covered by terminal-ux-header-tabs and
+  // command-center-switcher at >=900px.)
+  await expect(page.locator('[data-testid="tabs-collapse"]')).toBeHidden();
   const switchers = page.locator('[data-testid="agent-group-switcher"]');
   await expect(switchers).toHaveCount(1);
   await expect(switchers.first()).toBeHidden();
-  // No visible tab buttons when collapsed
+  await expect(page.locator('[data-testid="agent-group-switcher-dropdown"]')).toBeVisible();
+  // No visible tab buttons at phone width
   expect(await page.locator('[data-testid="terminal-header-tab"]').evaluateAll(
     elements => elements.filter((element) => (element as HTMLElement).offsetParent !== null).length
   )).toBe(0);
 
-  // Utilities expanded by default with literal chips
-  await expect(page.locator('[data-testid="reminder-chip"]')).toContainText('rem-1');
-  await expect(page.locator('[data-testid="wakeup-chip"]')).toContainText('wake-1');
-  await expect(page.locator('[data-testid="summary-chip"]')).toContainText('Summary signal test');
-  await expect(page.locator('[data-testid="utilities"]')).toBeVisible();
-  await expect(page.locator('[data-testid="bell-indicator"]')).toBeHidden();
-
-  // Collapse utilities
-  await page.locator('[data-testid="utilities-collapse"]').click();
-  await expect(page.locator('[data-testid="utilities"]')).toBeHidden();
-  await expect(page.locator('[data-testid="utilities-collapse"]')).toHaveCount(0);
+  // Reminder row is COLLAPSED by default on phone -> the bell shows, chips hidden.
   await expect(page.locator('[data-testid="bell-indicator"]')).toBeVisible();
+  await expect(page.locator('[data-testid="utilities"]')).toBeHidden();
   await expect(page.locator('.cc-util-icon-dot')).toBeVisible();
   await expect(page.locator('.cc-util-icon-count')).toHaveText('1');
 
-  // Restore utilities via bell
+  // Expand utilities via the bell -> literal chips appear, bell hides.
   await page.locator('[data-testid="bell-indicator"]').click();
   await expect(page.locator('[data-testid="utilities"]')).toBeVisible();
   await expect(page.locator('[data-testid="bell-indicator"]')).toBeHidden();
   await expect(page.locator('[data-testid="reminder-chip"]')).toContainText('rem-1');
+  await expect(page.locator('[data-testid="wakeup-chip"]')).toContainText('wake-1');
+  await expect(page.locator('[data-testid="summary-chip"]')).toContainText('Summary signal test');
 
-  // Request counting for summaries and reminders
-  const summariesBefore = countRequests(/\/api\/summary-agents\/.*\/summaries/);
-  await page.locator('[data-testid="summaries-toggle"]').click();
-  await page.waitForSelector('[data-testid="agent-summaries-dropdown"]', { state: 'visible' });
-  await page.waitForTimeout(200);
-  const summariesAfter = countRequests(/\/api\/summary-agents\/.*\/summaries/);
-  expect(summariesAfter).toBeGreaterThan(summariesBefore);
-  await page.locator('[data-testid="summaries-toggle"]').click();
-  await expect(page.locator('[data-testid="agent-summaries-dropdown"]')).toBeHidden();
-
-  const remindersBefore = countRequests(/\/api\/agent-reminders\/active/);
-  await page.locator('[data-testid="terminal-menu"]').click();
-  await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'true');
-  await page.waitForTimeout(200);
-  const remindersAfter = countRequests(/\/api\/agent-reminders\/active/);
-  expect(remindersAfter).toBeGreaterThan(remindersBefore);
-  await page.locator('.terminal-menu-overlay').dispatchEvent('pointerdown');
-  await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'false');
-
-  // Expand tabs and assert exactly one switcher with literal names
-  await tabsCollapse.click();
-  await expect(switchers).toHaveCount(1);
-  await expect(switchers.first()).toBeVisible();
-  const tabs = page.locator('[data-testid="terminal-header-tab"]');
-  await expect(tabs).toHaveCount(5);
-  const tabTexts = await tabs.allTextContents();
-  for (const name of ['bravo','charlie','delta','echo','foxtrot']) {
-    expect(tabTexts).toContain(name);
-  }
-  // Collapse back
-  await tabsCollapse.click();
-  await expect(switchers.first()).toBeHidden();
-
-  // The mockup reveals the control tuck handle in the one-row utilities-collapsed state.
+  // Collapse utilities back to the bell.
   await page.locator('[data-testid="utilities-collapse"]').click();
   await expect(page.locator('[data-testid="utilities"]')).toBeHidden();
+  await expect(page.locator('[data-testid="utilities-collapse"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="bell-indicator"]')).toBeVisible();
 
-  // Controls collapse
+  // Controls are TUCKED by default on phone -> the "…" handle shows, items hidden.
   const controlsCollapse = page.locator('[data-testid="controls-collapse"]');
   await expect(controlsCollapse).toBeVisible();
-  // positive twin: controls visible before tuck
+  await expect(controlsCollapse).toHaveText('...');
+  await expect(page.locator('[data-testid="terminal-font-decrease"]')).toBeHidden();
+  await expect(page.locator('[data-testid="terminal-mynav"]')).toBeHidden();
+
+  // Reveal the controls; font pill, ME-nav, summaries and gear appear.
+  await controlsCollapse.click();
   await expect(page.locator('[data-testid="terminal-font-decrease"]')).toBeVisible();
   await expect(page.locator('[data-testid="terminal-mynav"]')).toBeVisible();
   await expect(page.locator('[data-testid="summaries-toggle"]')).toBeVisible();
   await expect(page.locator('[data-testid="terminal-menu"]')).toBeVisible();
+
+  // Summaries toggle fetches + opens its dropdown (controls now revealed).
+  const summariesBefore = countRequests(/\/api\/summary-agents\/.*\/summaries/);
+  await page.locator('[data-testid="summaries-toggle"]').click();
+  await page.waitForSelector('[data-testid="agent-summaries-dropdown"]', { state: 'visible' });
+  await page.waitForTimeout(200);
+  expect(countRequests(/\/api\/summary-agents\/.*\/summaries/)).toBeGreaterThan(summariesBefore);
+  await page.locator('[data-testid="summaries-toggle"]').click();
+  await expect(page.locator('[data-testid="agent-summaries-dropdown"]')).toBeHidden();
+
+  // Settings menu opens (aria-expanded), refetches reminders, then closes.
+  const remindersBefore = countRequests(/\/api\/agent-reminders\/active/);
+  await page.locator('[data-testid="terminal-menu"]').click();
+  await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'true');
+  await page.waitForTimeout(200);
+  expect(countRequests(/\/api\/agent-reminders\/active/)).toBeGreaterThan(remindersBefore);
+  await page.locator('.terminal-menu-overlay').dispatchEvent('pointerdown');
+  await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'false');
+
+  // Tuck the controls back behind the "…" handle.
   await controlsCollapse.click();
-  // Font pill and mynav should be hidden
-  await expect(page.locator('[data-testid="terminal-font-decrease"]')).toBeHidden();
-  await expect(page.locator('[data-testid="terminal-mynav"]')).toBeHidden();
   await expect(controlsCollapse).toHaveText('...');
-  // handle visible while items hidden
-  await expect(controlsCollapse).toBeVisible();
-  // expand again
-  await controlsCollapse.click();
-  await expect(page.locator('[data-testid="terminal-font-decrease"]')).toBeVisible();
-  await expect(page.locator('[data-testid="terminal-mynav"]')).toBeVisible();
-  await controlsCollapse.click();
   await expect(page.locator('[data-testid="terminal-font-decrease"]')).toBeHidden();
   // Fully collapsed chrome stays on one row inside the actual topbar at 390px.
   const geometry = await page.locator('[data-term-topbar]').evaluate((topbar) => {

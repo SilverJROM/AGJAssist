@@ -72,6 +72,13 @@ async function openFriendly(page: import('@playwright/test').Page) {
   await expect(page.locator('.terminal-chat-view')).toBeVisible({ timeout: 15_000 });
 }
 
+// The control cluster (incl. the ☰ settings gear) tucks behind a "…" overflow by
+// default at phone width; reveal it as a user taps "…". Guarded no-op when shown.
+async function revealControls(page: import('@playwright/test').Page) {
+  const toggle = page.locator('[data-testid="controls-collapse"]');
+  if (await toggle.isVisible().catch(() => false)) await toggle.click();
+}
+
 test('agent reply minimizes to the recent tail, expands/collapses, and the picker changes N', async ({ page }) => {
   test.setTimeout(60_000);
   await installTransport(page);
@@ -103,6 +110,7 @@ test('agent reply minimizes to the recent tail, expands/collapses, and the picke
   await expect(page.locator('[data-testid="terminal-reply-expand"]')).toBeVisible();
 
   // ☰ menu → set reply length to 10: now last 10 only (line 205 hidden).
+  await revealControls(page);
   await page.locator('[data-testid="terminal-menu"]').click();
   const seg = page.locator('[data-testid="terminal-reply-limit"]');
   await expect(seg).toBeVisible();

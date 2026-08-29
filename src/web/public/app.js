@@ -839,6 +839,13 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [sessions, setSessions] = useState([]);
   const [sessionsError, setSessionsError] = useState(null);
   const [activeTarget, setActiveTarget] = useState(null);
+  // Live ref: the 8s session poll runs a mount-time closure that captured the
+  // initial activeTarget (null) forever, so its auto-select kept re-selecting
+  // the first pane on every list change and clobbered the user's manual pick.
+  // Reading the ref (updated every render) makes the poll see the CURRENT
+  // selection.
+  const activeTargetRef = useRef(activeTarget);
+  activeTargetRef.current = activeTarget;
   const myMsgNavRef = useRef(-1); // header ▲/▼ cursor into the YOU turns
   const [viewMode, setViewMode] = useState('list');
   const [sectionNavOpen, setSectionNavOpen] = useState(false);
@@ -906,8 +913,14 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [summaries, setSummaries] = useState([]);
   const [summariesLoading, setSummariesLoading] = useState(false);
   const [tabsCollapsed, setTabsCollapsed] = useState(true);
-  const [utilitiesCollapsed, setUtilitiesCollapsed] = useState(false);
-  const [controlsTucked, setControlsTucked] = useState(false);
+  // Phone/tablet (<900px) opens as a minimal header: the reminder row collapsed
+  // to the bell AND the control cluster (font / ME-nav / summaries / gear) tucked
+  // behind its "…" overflow, so the default chrome is just the back button +
+  // session dropdown + bell + overflow. Desktop stays fully expanded. Both remain
+  // user-togglable (tap 🔔 to expand utilities, tap … to reveal the controls).
+  const initialHeaderCollapsed = typeof window !== 'undefined' && window.innerWidth < 900;
+  const [utilitiesCollapsed, setUtilitiesCollapsed] = useState(initialHeaderCollapsed);
+  const [controlsTucked, setControlsTucked] = useState(initialHeaderCollapsed);
   const menuRef = useRef(null);
   const sectionNavRef = useRef(null);
   const terminalGroupsRef = useRef(terminalGroups);
@@ -934,8 +947,9 @@ function TerminalTab({ projectId, projectName } = {}) {
             (arr || []).map(s => [s.session_name, (s.panes || []).map(p => [p.target, p.command, p.activity, p.busy].join(':')).join(',')])
           );
           if (sig(prev) === sig(next)) return prev;
-          // auto-select first pane if none active
-          if (!activeTarget && next.length > 0 && next[0].panes && next[0].panes.length > 0) {
+          // auto-select first pane if none active (read the live ref, not the
+          // stale poll-closure value, so a user's manual pick is never clobbered)
+          if (!activeTargetRef.current && next.length > 0 && next[0].panes && next[0].panes.length > 0) {
             setActiveTarget(next[0].panes[0].target);
           }
           return next;
@@ -1554,11 +1568,13 @@ function TerminalTab({ projectId, projectName } = {}) {
     const primaryPane = getPrimarySessionPane(session);
     const activity = getSessionActivity(session);
     const busy = (session.panes || []).some((pane) => pane.busy);
+    const awaiting = (session.panes || []).some((pane) => pane.awaiting_selection);
     return {
       session,
       primaryPane,
       activity,
       busy,
+      awaiting,
       connected: Boolean(primaryPane?.target)
     };
   }).sort((a, b) => b.activity - a.activity || String(a.session.session_name).localeCompare(String(b.session.session_name)));
@@ -1584,7 +1600,7 @@ function TerminalTab({ projectId, projectName } = {}) {
       .filter((name) => name !== activeName)
       .map((name) => ({ name, session: sessions.find((s) => s.session_name === name) }))
       .filter((x) => x.session && x.session.panes && x.session.panes.length && x.session.panes[0].target)
-      .map((x) => ({ name: x.name, target: x.session.panes[0].target }));
+      .map((x) => ({ name: x.name, target: x.session.panes[0].target, awaiting: x.session.panes.some((p) => p.awaiting_selection) }));
   })();
 
   const fullGroupMembers = (() => {
@@ -1602,7 +1618,8 @@ function TerminalTab({ projectId, projectName } = {}) {
         const isActive = target === activeTarget;
         const hasDraft = Boolean(readTerminalDraft('friendly-terminal', target));
         const status = pane.busy ? 'running' : 'idle';
-        return { name: x.name, target, isActive, hasDraft, status };
+        const awaiting = x.session.panes.some((p) => p.awaiting_selection);
+        return { name: x.name, target, isActive, hasDraft, status, awaiting };
       });
   })();
   const editingGroup = editingGroupId
@@ -1645,12 +1662,13 @@ function TerminalTab({ projectId, projectName } = {}) {
           ` : html`
             <button class="terminal-topbar-icon-btn terminal-menu-trigger" data-testid="terminal-back-list"
                     aria-label="Back to terminal list" onclick=${backToTerminalList}>←</button>
-            <div class="terminal-topbar-target" style=${headerGroupSiblings.length ? 'flex:0 1 auto' : ''}>
+            <div class=${'terminal-topbar-target' + (activePane?.awaiting_selection ? ' awaiting-selection' : '')} style=${headerGroupSiblings.length ? 'flex:0 1 auto' : ''}
+                 title=${activePane?.awaiting_selection ? 'This agent is waiting for you to pick an option below' : ''}>
               <div class="terminal-topbar-name terminal-topbar-name-static" data-testid="terminal-session-name">
-                <span class=${'terminal-topbar-dot' + (hasTarget && (terminalStatus === 'connected' || terminalStatus === 'running') ? ' on' : '')}></span>
-                <span class="terminal-topbar-name-text">${activePane?.session_name || (friendlyMode ? 'Terminal Chat' : 'Raw Terminal')}</span>
+                <span class=${'terminal-topbar-dot' + (activePane?.awaiting_selection ? ' awaiting' : (hasTarget && (terminalStatus === 'connected' || terminalStatus === 'running') ? ' on' : ''))}></span>
+                <span class="terminal-topbar-name-text">${activePane?.awaiting_selection ? '🔴 ' : ''}${activePane?.session_name || (friendlyMode ? 'Terminal Chat' : 'Raw Terminal')}</span>
               </div>
-              <div class="terminal-topbar-sub" data-testid="terminal-last-updated" data-terminal-last-updated>
+              <div class="terminal-topbar-sub">
                 ${hasTarget ? (targetSubtitle || activeTarget) : 'Select a pane'}
               </div>
             </div>
@@ -1662,8 +1680,8 @@ function TerminalTab({ projectId, projectName } = {}) {
                     ${headerGroupSiblings.map((sib) => {
                       const hasDraft = Boolean(readTerminalDraft('friendly-terminal', sib.target));
                       return html`
-                      <button type="button" class="terminal-header-tab" data-testid="terminal-header-tab"
-                              title=${'Switch to ' + sib.name + (hasDraft ? ' — draft' : '')} onclick=${() => switchActiveTarget(sib.target)}>${sib.name}${hasDraft ? ' •' : ''}</button>
+                      <button type="button" class=${'terminal-header-tab' + (sib.awaiting ? ' awaiting-selection' : '')} data-testid="terminal-header-tab"
+                              title=${'Switch to ' + sib.name + (sib.awaiting ? ' — waiting for your selection' : '') + (hasDraft ? ' — draft' : '')} onclick=${() => switchActiveTarget(sib.target)}>${sib.awaiting ? '🔴 ' : ''}${sib.name}${hasDraft ? ' •' : ''}</button>
                     `})}
                   </div>
                   <div class="agent-group-switcher-scrubber" data-testid="agent-group-switcher-scrubber" hidden=${tabsCollapsed} onPointerDown=${e => {
@@ -1676,11 +1694,11 @@ function TerminalTab({ projectId, projectName } = {}) {
                     window.addEventListener('pointermove', onMove);
                     window.addEventListener('pointerup', onUp);
                   }}></div>
-                  <div class="agent-group-switcher-dropdown-wrap" data-testid="agent-group-switcher-dropdown" hidden=${tabsCollapsed}>
+                  <div class=${'agent-group-switcher-dropdown-wrap' + (fullGroupMembers.some((m) => m.awaiting) ? ' has-awaiting' : '')} data-testid="agent-group-switcher-dropdown" hidden=${tabsCollapsed}>
                     <select value=${activeTarget || ''} onchange=${e => switchActiveTarget(e.target.value)} aria-label="Agent group switcher">
                       ${fullGroupMembers.map((m) => {
-                        const label = `${m.name} ${m.status}${m.hasDraft ? ' • draft' : ''}`;
-                        const className = m.isActive ? 'active' : m.status === 'running' ? 'running' : 'idle';
+                        const label = `${m.awaiting ? '🔴 ' : ''}${m.name} ${m.status}${m.hasDraft ? ' • draft' : ''}`;
+                        const className = (m.awaiting ? 'awaiting ' : '') + (m.isActive ? 'active' : m.status === 'running' ? 'running' : 'idle');
                         return html`<option value=${m.target} class=${className}>${label}</option>`;
                       })}
                     </select>
@@ -1732,9 +1750,15 @@ function TerminalTab({ projectId, projectName } = {}) {
         </div>
         ${!isListView ? html`
           <div class="cc-utilarea" data-testid="utilities">
-            <span data-testid="reminder-chip">Reminder: ${agentReminders.length > 0 ? agentReminders[0].id : 'none'}</span>
-            <span data-testid="wakeup-chip">Wakeup: ${wakeups.length > 0 ? wakeups[0].id : 'none'}</span>
-            <span data-testid="summary-chip">Summary: ${summaries.length > 0 ? summaries[0].summary_text?.slice(0,20) : 'none'}</span>
+            <button type="button" class="cc-util-chip" data-testid="reminder-chip"
+                    title="Set up an agent reminder (opens ⚙ settings)"
+                    onclick=${() => { setSummariesOpen(false); setMenuOpen(true); }}>Reminder: ${agentReminders.length > 0 ? agentReminders[0].id : 'none'}</button>
+            <button type="button" class="cc-util-chip" data-testid="wakeup-chip"
+                    title="Schedule an agent wakeup (opens ⚙ settings)"
+                    onclick=${() => { setSummariesOpen(false); setMenuOpen(true); }}>Wakeup: ${wakeups.length > 0 ? wakeups[0].id : 'none'}</button>
+            <button type="button" class="cc-util-chip" data-testid="summary-chip"
+                    title="View agent summaries"
+                    onclick=${() => { setMenuOpen(false); setSummariesOpen(true); }}>Summary: ${summaries.length > 0 ? summaries[0].summary_text?.slice(0,20) : 'none'}</button>
           </div>
         ` : ''}
       </div>
@@ -1989,6 +2013,7 @@ function TerminalTab({ projectId, projectName } = {}) {
               <strong>${friendlyMode ? 'Terminal Chat' : 'Raw Terminal'}</strong>
               ${activeTarget ? html`<span class="terminal-chat-detail-pill">${activeTarget}</span>` : ''}
               ${hasTarget ? html`<span class=${menuStatusClass}>${terminalStatus}</span>` : ''}
+              ${updatedLabel ? html`<span class="terminal-chat-detail-pill" data-testid="terminal-last-updated" data-terminal-last-updated>updated ${updatedLabel}</span>` : ''}
             </div>
           </div>
           <div class="terminal-sheet-picker">
@@ -2071,9 +2096,9 @@ function TerminalTab({ projectId, projectName } = {}) {
               <div>
                 <div style="font-size:11px;color:var(--text-secondary);padding:4px 8px;margin-top:4px">${s.session_name}</div>
                 ${s.panes.map(p => html`
-                  <div class="tree-item ${activeTarget === p.target ? 'active' : ''}"
+                  <div class="tree-item ${activeTarget === p.target ? 'active' : ''}${p.awaiting_selection ? ' awaiting-selection' : ''}"
                        onclick=${() => activeTarget === p.target ? backToTerminalList() : switchActiveTarget(p.target)}>
-                    ${p.target} <span style="color:var(--text-secondary);font-size:11px">${p.command}</span>
+                    ${p.awaiting_selection ? '🔴 ' : ''}${p.target} <span style="color:var(--text-secondary);font-size:11px">${p.command}</span>
                   </div>
                 `)}
               </div>
@@ -2142,7 +2167,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                           <div role="button"
                                tabindex="0"
                                key=${row.session.session_name}
-                               class=${'terminal-list-row' + (row.busy ? ' busy' : '')}
+                               class=${'terminal-list-row' + (row.busy ? ' busy' : '') + (row.awaiting ? ' awaiting-selection' : '')}
                                data-testid="terminal-session-row"
                                data-session-target=${row.primaryPane?.target || ''}
                                onclick=${(event) => openSessionFromRow(event, row.primaryPane?.target)}
@@ -2153,10 +2178,12 @@ function TerminalTab({ projectId, projectName } = {}) {
                                    openSessionFromRow(event, row.primaryPane?.target);
                                  }
                                }}>
-                            <span class=${'terminal-list-dot ' + (row.busy ? 'busy' : row.connected ? 'connected' : 'offline')} aria-hidden="true"></span>
+                            <span class=${'terminal-list-dot ' + (row.awaiting ? 'awaiting' : row.busy ? 'busy' : row.connected ? 'connected' : 'offline')} aria-hidden="true"></span>
                             <span class="terminal-list-main">
-                              <span class="terminal-list-name">${row.session.session_name}</span>
-                              ${row.busy
+                              <span class="terminal-list-name">${row.awaiting ? '🔴 ' : ''}${row.session.session_name}</span>
+                              ${row.awaiting
+                                ? html`<span class="terminal-list-status awaiting-selection-label">waiting for your selection</span>`
+                                : row.busy
                                 ? html`<span class="terminal-list-status">working…</span>`
                                 : html`<span class="terminal-list-status">${row.connected ? 'ready' : 'not connected'}</span>`}
                             </span>
@@ -2422,21 +2449,45 @@ function rejoinWrappedUrls(text) {
 // text on a URL match and renders each URL as a safe new-tab link; everything
 // else stays plain text. Trailing punctuation is not swallowed into the link.
 const _URL_RE = /(https?:\/\/[^\s<>()[\]{}"']+[^\s<>()[\]{}"'.,;:!?])/g;
-function linkify(text) {
+// Wrap every case-insensitive occurrence of `query` in a <mark> so the searched
+// word is visibly highlighted in the transcript (a yellow marker on the actual
+// text), not merely a ring around the whole bubble. Returns the plain string
+// unchanged when there is no query or no match, so non-search rendering is
+// untouched.
+function highlightQuery(str, query) {
+  const s = typeof str === 'string' ? str : String(str == null ? '' : str);
+  const q = (query || '').trim();
+  if (!q) return s;
+  const lower = s.toLowerCase();
+  const ql = q.toLowerCase();
+  if (!lower.includes(ql)) return s;
+  const out = [];
+  let last = 0;
+  let idx;
+  while ((idx = lower.indexOf(ql, last)) !== -1) {
+    if (idx > last) out.push(s.slice(last, idx));
+    out.push(html`<mark class="terminal-search-mark">${s.slice(idx, idx + ql.length)}</mark>`);
+    last = idx + ql.length;
+  }
+  if (last < s.length) out.push(s.slice(last));
+  return out;
+}
+
+function linkify(text, query) {
   const s0 = typeof text === 'string' ? text : String(text == null ? '' : text);
   const s = rejoinWrappedUrls(s0);
-  if (!/https?:\/\//.test(s)) return s;
+  if (!/https?:\/\//.test(s)) return highlightQuery(s, query);
   const out = [];
   let last = 0;
   let m;
   _URL_RE.lastIndex = 0;
   while ((m = _URL_RE.exec(s)) !== null) {
-    if (m.index > last) out.push(s.slice(last, m.index));
+    if (m.index > last) out.push(highlightQuery(s.slice(last, m.index), query));
     const url = m[0];
     out.push(html`<a class="terminal-chat-link" href=${url} target="_blank" rel="noopener noreferrer">${url}</a>`);
     last = m.index + url.length;
   }
-  if (last < s.length) out.push(s.slice(last));
+  if (last < s.length) out.push(highlightQuery(s.slice(last), query));
   return out;
 }
 
@@ -2474,24 +2525,24 @@ function splitTableRuns(text) {
 
 // Render agent text with tappable URLs AND aligned monospace tables. Non-table
 // runs are linkified (agent) or left plain (user); table runs go in a <pre>.
-function renderRichText(text, role) {
+function renderRichText(text, role, query) {
   const s = typeof text === 'string' ? text : String(text == null ? '' : text);
   const segs = splitTableRuns(s);
   if (!segs.some((seg) => seg.type === 'table')) {
-    return role === 'agent' ? linkify(s) : s;
+    return role === 'agent' ? linkify(s, query) : highlightQuery(s, query);
   }
   return segs.map((seg) => seg.type === 'table'
     ? html`<pre class="terminal-chat-table">${seg.text}</pre>`
-    : (seg.text ? html`<span class="terminal-chat-textseg">${role === 'agent' ? linkify(seg.text) : seg.text}</span>` : ''));
+    : (seg.text ? html`<span class="terminal-chat-textseg">${role === 'agent' ? linkify(seg.text, query) : highlightQuery(seg.text, query)}</span>` : ''));
 }
 
-function renderBubbleText(text) {
+function renderBubbleText(text, query) {
   const segments = splitTaskSegments(text);
   if (!segments.some((s) => s.type === 'tasks')) return null; // no task block
   return html`<div class="ovm-chat-text terminal-chat-content">
     ${segments.map((seg) => seg.type === 'tasks'
       ? html`<${TaskBlock} items=${seg.items} />`
-      : (seg.text ? html`<span class="terminal-chat-textseg">${renderRichText(seg.text, 'agent')}</span>` : ''))}
+      : (seg.text ? html`<span class="terminal-chat-textseg">${renderRichText(seg.text, 'agent', query)}</span>` : ''))}
   </div>`;
 }
 
@@ -2502,16 +2553,17 @@ function renderBubbleText(text) {
 // avoids collapsing a reply that's only a few lines over the limit.
 const BUBBLE_COMPACT_SLACK = 4;
 
-function CollapsibleBubbleContent({ content, role, limit }) {
+function CollapsibleBubbleContent({ content, role, limit, query }) {
   const [expanded, setExpanded] = useState(false);
   const text = typeof content === 'string' ? content : String(content == null ? '' : content);
 
   // A visible task panel is collapsed in place (independent of the line-minimize).
-  const withTasks = role === 'agent' ? renderBubbleText(text) : null;
+  const withTasks = role === 'agent' ? renderBubbleText(text, query) : null;
   if (withTasks) return withTasks;
 
   // Linkify URLs in agent replies (e.g. a /login auth link); leave user text plain.
-  const rt = (s) => renderRichText(s, role);
+  // `query` (the active chat-search term) highlights matching words in a <mark>.
+  const rt = (s) => renderRichText(s, role, query);
 
   const cap = Number(limit);
   const lines = text.split('\n');
@@ -3481,7 +3533,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                     : html`<span class="terminal-chat-badge">AGENT</span><span>${sessionName || 'Agent'} · <span data-testid="terminal-turn-time">${entry.timestamp}</span></span>`}
                 </div>
                 <div class=${'ovm-chat-bubble terminal-chat-bubble ' + (isUser ? 'ovm-chat-bubble-user' : 'ovm-chat-bubble-ovm') + (isUser && entry.failed ? ' failed' : '')}>
-                  <${CollapsibleBubbleContent} content=${entry.content} role=${entry.role} limit=${replyLimit} />
+                  <${CollapsibleBubbleContent} content=${entry.content} role=${entry.role} limit=${replyLimit} query=${searchOpen && searchQuery.trim() ? searchQuery : ''} />
                 </div>
                 ${isUser && entry.failed ? html`
                   <div class="terminal-chat-failed" data-testid="terminal-turn-failed">
