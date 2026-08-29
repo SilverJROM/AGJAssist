@@ -1,0 +1,9 @@
+{
+  "slice": "F7",
+  "attempt": 11,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "advance-F0c.marker now present (F0c DONE, commit 6c7a2e6, PASS at a1) \u2014 per directions-active/F7.txt's own standing rule ('F7 stays PARKED until dispatch/advance-F0c.marker, then CLOSE'), F7 is ready to un-park and close. F0b (positive path) and F0c (named-reds + server-backed negative remap) are both done; F1-F6 stay frozen. Re-run the fence gate.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T18:40:56Z"
+}

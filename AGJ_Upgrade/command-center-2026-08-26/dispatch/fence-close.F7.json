@@ -1,32 +1,25 @@
 {
   "fence": "F7",
-  "green": false,
+  "green": true,
   "passed_ids": [
     "G1",
-    "H1",
-    "H2",
-    "I1"
-  ],
-  "failed_ids": [
     "G2",
     "G3",
+    "H1",
+    "H2",
     "H3",
+    "I1",
     "I2",
     "J1",
     "J2"
   ],
-  "fingerprint": "fp1:d6ff8c3e05e42f8c1bb9",
+  "failed_ids": [],
+  "fingerprint": "",
   "negative_control_ok": true,
   "superset_ok": true,
-  "test_hash": "sha256:b37a440ffba5d4675d94739a618fb05c71db6a69dbb8696aa155f1d77ac3c7b8",
-  "verdict": {
-    "fence": "F7",
-    "verdict": "FAIL",
-    "fault_class": "plan",
-    "failing_units": "",
-    "plan_defect": "true",
-    "plan_defect_reason": "F7_journey_asserts_surfaces_no_slice_was_asked_to_build_and_contradicts_its_own_H1_so_no_contributing_unit_owns_the_six_reds__G3_asserts_data-testid_refresh-from-session_visible_but_that_testid_exists_nowhere_under_src_and_og-req_G3_is_localStorage_draft_persistence_owned_by_F1_terminal-chat-state.js_a_client-only_module_with_no_DOM_surface__H3_asserts_document.documentElement_data-theme_truthy_measured_null_but_data-theme_appears_nowhere_in_src_web_public_and_row_F6_asked_only_for_style.css_theme_tokens_delivered_as_prefers-color-scheme_at_style.css_267_while_the_locked_agent-window-v2_mockup_puts_data-theme_on_its_own_cc-phone_harness_node__I2_asserts_terminal-composer-input_keeps_its_value_across_page.reload_which_requires_active-pane_restoration_that_no_plan_row_owns_while_og-req_I2_is_refresh_in-progress_plus_completion_never_blocking_the_composer__G2_J1_J2_assert_agent-group-switcher_and_its_dropdown_visible_although_the_journey_never_clicks_data-testid_tabs-collapse_and_never_waits_for_the_secondary_session_in_api_tmux_sessions_so_app.js_2960_headerGroupSiblings_is_empty_giving_element-not-found_for_G2_and_J1_while_app.js_2291_tabsCollapsed_useState_true_gives_the_measured_J2_div_hidden_class_terminal-header-tabs__H1_mandates_tabs-collapsed_by_default_and_H1_passed_so_H1_green_and_G2_J1_J2_green_are_mutually_exclusive_under_this_harness__F5_own_slice_spec_command-center-switcher.spec.ts_clicks_tabs-collapse_at_line_81_before_asserting_the_strip_and_asserts_it_hidden_when_collapsed_at_line_140_proving_F1_through_F6_are_plan-conformant__the_negative_control_is_unsatisfiable_as_specified_because_FENCE_STUB_is_a_fastify_preHandler_over_api_routes_only_while_contributor_F1_is_client-only_so_A0_dc38330_invented_api_agent-session_refresh_which_exists_only_inside_the_stub_block_in_src_api_server.ts_164_and_backs_the_fictional_G3_surface_meaning_fence-contract.json_expected_negative_fail_ids_G3_and_the_plan_F7_gate_clause_cannot_be_met_by_any_harness_rewrite_alone__replan_to_rebind_G1-J2_to_og-requirements_and_mint_a_D0-style_harness-correctness_row_plus_a_corrected_F7_negative_control_naming_a_server-backed_contributor"
-  },
+  "test_hash": "sha256:ebab2807511618056057b13c32ab14b5d5a28aa9be57079d1ab336e8fb31600f",
+  "verdict": null,
   "verdict_err": "no [FENCE-VERDICT-V1] token",
-  "measured_at_head": "241b5cf3f06077953ee2d3edd79f51a7323fbea1"
+  "negative_control_detail": "1 named assertion(s) failed: I1",
+  "measured_at_head": "126885a5460b6d494425f8ef450820438fcbb875"
 }

@@ -1,0 +1,10 @@
+{
+  "passed": [],
+  "failed": [
+    {
+      "id": "E1",
+      "kind": "assert",
+      "message": "DB_PATH missing"
+    }
+  ]
+}

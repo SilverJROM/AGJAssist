@@ -5,6 +5,6 @@
   ],
   "rounds": 0,
   "reprepare_attempts": 1,
-  "plan_sound_rounds": 1,
-  "last_green": false
+  "plan_sound_rounds": 2,
+  "last_green": true
 }

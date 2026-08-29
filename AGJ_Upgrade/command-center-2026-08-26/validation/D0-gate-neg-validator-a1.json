@@ -1,0 +1,22 @@
+{
+  "schema": "fence-report-v1",
+  "collected": [
+    "E1",
+    "E2",
+    "E3",
+    "F1",
+    "F2",
+    "F3"
+  ],
+  "passed": [
+    "E3",
+    "F2"
+  ],
+  "failed": [
+    {
+      "id": "E1",
+      "kind": "assert",
+      "message": "\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m200\u001b[39m\nReceived: \u001b[31m500\u001b[39m"
+    }
+  ]
+}

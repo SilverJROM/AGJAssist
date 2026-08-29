@@ -1,0 +1,6 @@
+{
+  "type": "vacuous-test-suspected",
+  "slice": "G1",
+  "attempt": 2,
+  "note": "[projcore callback] validator G1 STATUS: DONE \u2014 FAIL a1 findings fixed; live .tg-home-preferences CSS lost + vacuous new assertion"
+}

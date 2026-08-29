@@ -1,1 +1,2 @@
 x-01_projcore_grok46_agjassist # coordinator # - # command-center
+x-02_projcore_sonnet5_agjassist # coordinator # - # command-center (sonnet5 fallback, grok46 quota-dead 2026-08-28)

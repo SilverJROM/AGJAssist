@@ -1,0 +1,9 @@
+{
+  "slice": "F0c",
+  "attempt": 3,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "Clean re-drive on the fixed toolchain. F0c is a PLAIN slice (feeds no fence \u2014 only F7 has contributors). Its most recent park was the codex ENV outage at attempts=0 (spawn_seat: impl_terra launch FAILED, `codex` not on PATH from an interrupted self-update) \u2014 infrastructure, NOT an implementation verdict, so it cost a whole drive without spending an attempt. codex is restored (codex-cli 0.150.1, symlink verified), so terra spawns fine now. Retry the existing F0c brief as-is per directions-active/F0c.txt (one named-red per G1-J2 via FENCE_STUB=<AC>, remap fence-contract.json F7 negative to I1 server-backed, F1-F6 frozen). With budget 6 and impl_tier=L3 the ladder reaches sonnet5 at a4 and sol at a6 if it genuinely needs them. The prior a1 HARNESS-SMOKE fail (TEST_NOT_DISCRIMINATING) is a real signal to correct, but F0c has NOT yet had an honest drive on a working toolchain.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T16:51:17Z"
+}

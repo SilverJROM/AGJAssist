@@ -1,0 +1,9 @@
+{
+  "slice": "G1",
+  "attempt": 1,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "SUPERSEDES my own earlier draft of this file (orphaned-port theory) -- reproduced properly after cleaning that up and the failures are NOT environmental. On current HEAD (126885a, before G1 touches anything), a clean run of e2e/terminal-ux-conversation.spec.ts genuinely fails 3 tests (6 counting both chromium/cc projects): A4 (type/font live Settings sync + mobile fit), A6 (controls still perform their functions at 390px), A7 (show-raw reveals stripped chrome) -- one visible stack trace shows a terminal-menu-sheet failing to become visible. terminal-ux-conversation.spec.ts itself is untouched by this run (last commit predates it), but app.js/style.css were heavily rewritten by F4/F5/F6 (responsive/mobile agent-window-v2 work) -- strong circumstantial fit for a REAL regression introduced there, only now surfacing because nothing else in the queue runs this suite. This is not G1's fault and not in G1's stated scope (targeted cleanup + regression check, not fixing unrelated product bugs) -- holding rather than pushing G1 to either fix or paper over a pre-existing break it did not cause. Escalating to north: does this block release, who fixes it, is it in scope for G1 or a new slice.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T19:35:17Z"
+}

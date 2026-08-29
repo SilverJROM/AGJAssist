@@ -1,0 +1,15 @@
+{
+  "slice": "E5",
+  "cycle": 10,
+  "attempt": 0,
+  "why": "integration test changed since OPEN (hash sha256:b57c5b9d6 -> sha256:055661c0c) and is not a clean assertion superset",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787940444-754119",
+  "raised_at": "2026-08-28T18:07:47Z",
+  "note": "fault_class=plan means the implementer seat ladder is SKIPPED entirely \u2014 do not answer RETRY_WITH_DIRECTION into L2/L3. Walking the ladder on a broken plan burns three seats to rediscover the plan is broken. Re-plan the fence, or return a DIRECTION with action=PLAN_SOUND carrying `what_validator_missed`."
+}

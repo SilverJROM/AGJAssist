@@ -1,0 +1,47 @@
+diff --git a/src/web/public/app.js b/src/web/public/app.js
+index bffde04..d5e8c0d 100644
+--- a/src/web/public/app.js
++++ b/src/web/public/app.js
+@@ -3220,7 +3220,7 @@ function TerminalTab({ projectId, projectName } = {}) {
+                   }, {diff: Infinity});
+                   const nearestMin = count ? Math.max(0, Math.round(nearest.diff/60000)) : null;
+                   return html`
+-                    <button type="button" data-testid="wakeup-expand-toggle" onclick=${() => setWakeupExpanded(e => !e)}>${wakeupExpanded ? 'Collapse' : 'Expand'}</button>
++                    <button type="button" data-testid="wakeup-expand-toggle" onclick=${() => setWakeupExpanded(e => !e)}>${wakeupExpanded ? 'Hide wakeups' : 'Show wakeups'}</button>
+                     <span data-testid="wakeup-collapsed-summary" style="margin-left:8px">${count === 0 ? 'No pending wakeups' : `${count} wakeup${count!==1?'s':''} · in ${nearestMin}m`}</span>
+                     ${wakeupExpanded ? html`
+                       ${count === 0 ? html`<div>No pending wakeups</div>` : html`
+diff --git a/src/web/public/style.css b/src/web/public/style.css
+index 2b85b46..06a0d51 100644
+--- a/src/web/public/style.css
++++ b/src/web/public/style.css
+@@ -1058,9 +1058,26 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
+   .command-center-toggle { display:none; }
+   .terminal-header-tabs { display: none !important; }
+   .agent-group-switcher-scrubber { display: none !important; }
+-  /* Keep the phone switcher and terminal controls in separate flex boxes. */
+-  .terminal-topbar-main:has(.command-center-header) .cc-ctrl-items { display:none; }
+-  .terminal-topbar-main:has(.command-center-header) .cc-ctrl-toggle { display:flex; width:28px; height:28px; border-radius:8px; font-size:16px; }
++  /* Keep every terminal control reachable on phones without widening the
++     viewport. The group switcher and the compact control cluster get their
++     own cells within the one topbar, rather than hiding the cluster. */
++  .terminal-topbar-main:has(.command-center-header) {
++    display:grid;
++    grid-template-columns:28px minmax(0, 1fr) auto;
++    grid-template-areas:
++      "back target utilities"
++      "switcher switcher controls";
++    gap:5px;
++  }
++  .terminal-topbar-main:has(.command-center-header) > .terminal-menu-trigger { grid-area:back; }
++  .terminal-topbar-main:has(.command-center-header) > .terminal-topbar-target { grid-area:target; }
++  .terminal-topbar-main:has(.command-center-header) > .command-center-header { grid-area:switcher; }
++  .terminal-topbar-main:has(.command-center-header) > .cc-util-toggle,
++  .terminal-topbar-main:has(.command-center-header) > .command-center-bell { grid-area:utilities; }
++  .terminal-topbar-main:has(.command-center-header) > .cc-ctrlcluster { grid-area:controls; }
++  .terminal-topbar-main:has(.command-center-header) .cc-ctrl-items { display:flex; }
++  .terminal-topbar-main:has(.command-center-header) .cc-ctrl-toggle { display:none; }
++  .terminal-topbar-main:has(.command-center-header) .cc-ctrlcluster.collapsed .cc-ctrl-toggle { display:flex; width:28px; height:28px; border-radius:8px; font-size:16px; }
+ }
+ @media (min-width: 900px) {
+   .terminal-header-tabs { display: flex !important; }

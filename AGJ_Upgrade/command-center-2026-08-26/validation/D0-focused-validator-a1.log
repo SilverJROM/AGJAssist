@@ -1,0 +1,98 @@
+[1A[2K[2m[WebServer] [22m(node:1173860) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 6 tests using 1 worker
+
+[1A[2K[1/6] [cc] › e2e/command-center-summaries-fence.spec.ts:228:1 › test_d1_schema_persists_summary_provenance_and_default_endpoint
+[1A[2K[2/6] [cc] › e2e/command-center-summaries-fence.spec.ts:254:1 › test_d2_service_exposes_seeded_default_140_endpoint
+[1A[2K[3/6] [cc] › e2e/command-center-summaries-fence.spec.ts:282:1 › test_d3_reply_summary_captures_closed_c6_reply_and_persists_literal
+[1A[2K[4/6] [cc] › e2e/command-center-summaries-fence.spec.ts:298:1 › test_d4_routes_are_owner_gated_and_return_named_endpoints_and_newest_summaries
+[1A[2K[5/6] [cc] › e2e/command-center-summaries-fence.spec.ts:328:1 › test_d5_settings_ui_manages_endpoints_and_surfaces_owner_errors
+[1A[2K[cc] › e2e/command-center-summaries-fence.spec.ts:328:1 › test_d5_settings_ui_manages_endpoints_and_surfaces_owner_errors
+DIAG_F3: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+Locator:  locator('[data-testid="summary-endpoint-sheet"]')
+Expected: visible
+Received: hidden
+Timeout:  5000ms
+
+Call log:
+[2m  - Expect "toBeVisible" with timeout 5000ms[22m
+[2m  - waiting for locator('[data-testid="summary-endpoint-sheet"]')[22m
+[2m    14 × locator resolved to <div data-testid="summary-endpoint-sheet">…</div>[22m
+[2m       - unexpected value "hidden"[22m
+
+
+[1A[2K(node:1173917) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K  1) [cc] › e2e/command-center-summaries-fence.spec.ts:328:1 › test_d5_settings_ui_manages_endpoints_and_surfaces_owner_errors 
+
+    Error: FENCE_ASSERT:F3
+
+      39 |     console.error(`DIAG_${id}: ${message}`);
+      40 |     failed.set(id, { id, kind: 'assert', message });
+    > 41 |     throw new Error(`FENCE_ASSERT:${id}`);
+         |           ^
+      42 |   } finally {
+      43 |     writeReport();
+      44 |   }
+        at check (/home/agjrom/TGBOTS/AGJAssist/e2e/command-center-summaries-fence.spec.ts:41:11)
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-summaries-fence.spec.ts:331:3
+
+    Error Context: test-results/command-center-summaries-f-5da3b-s-and-surfaces-owner-errors-cc/error-context.md
+
+    Error Context: test-results/command-center-summaries-f-5da3b-s-and-surfaces-owner-errors-cc/error-context.md
+
+
+[1A[2K[6/6] [cc] › e2e/command-center-summaries-fence.spec.ts:359:1 › test_d6_summaries_dropdown_shows_newest_first_cards_with_endpoint_tags
+[1A[2K  1 failed
+    [cc] › e2e/command-center-summaries-fence.spec.ts:328:1 › test_d5_settings_ui_manages_endpoints_and_surfaces_owner_errors 
+  1 did not run
+  4 passed (11.3s)
+[1A[2K[2m[WebServer] [22m(node:1175124) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 6 tests using 1 worker
+
+[1A[2K[1/6] [cc] › e2e/command-center-summaries-fence.spec.ts:228:1 › test_d1_schema_persists_summary_provenance_and_default_endpoint
+[1A[2K[2/6] [cc] › e2e/command-center-summaries-fence.spec.ts:254:1 › test_d2_service_exposes_seeded_default_140_endpoint
+[1A[2K[3/6] [cc] › e2e/command-center-summaries-fence.spec.ts:282:1 › test_d3_reply_summary_captures_closed_c6_reply_and_persists_literal
+[1A[2K[cc] › e2e/command-center-summaries-fence.spec.ts:282:1 › test_d3_reply_summary_captures_closed_c6_reply_and_persists_literal
+DIAG_E1: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+Expected: [32m200[39m
+Received: [31m500[39m
+
+[1A[2K(node:1175182) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K  1) [cc] › e2e/command-center-summaries-fence.spec.ts:282:1 › test_d3_reply_summary_captures_closed_c6_reply_and_persists_literal 
+
+    Error: FENCE_ASSERT:E1
+
+      39 |     console.error(`DIAG_${id}: ${message}`);
+      40 |     failed.set(id, { id, kind: 'assert', message });
+    > 41 |     throw new Error(`FENCE_ASSERT:${id}`);
+         |           ^
+      42 |   } finally {
+      43 |     writeReport();
+      44 |   }
+        at check (/home/agjrom/TGBOTS/AGJAssist/e2e/command-center-summaries-fence.spec.ts:41:11)
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-summaries-fence.spec.ts:285:3
+
+    Error Context: test-results/command-center-summaries-f-08503--reply-and-persists-literal-cc/error-context.md
+
+    Error Context: test-results/command-center-summaries-f-08503--reply-and-persists-literal-cc/error-context.md
+
+
+[1A[2K[4/6] [cc] › e2e/command-center-summaries-fence.spec.ts:298:1 › test_d4_routes_are_owner_gated_and_return_named_endpoints_and_newest_summaries
+[1A[2K[5/6] [cc] › e2e/command-center-summaries-fence.spec.ts:328:1 › test_d5_settings_ui_manages_endpoints_and_surfaces_owner_errors
+[1A[2K[6/6] [cc] › e2e/command-center-summaries-fence.spec.ts:359:1 › test_d6_summaries_dropdown_shows_newest_first_cards_with_endpoint_tags
+[1A[2K  1 failed
+    [cc] › e2e/command-center-summaries-fence.spec.ts:282:1 › test_d3_reply_summary_captures_closed_c6_reply_and_persists_literal 
+  3 did not run
+  2 passed (2.0s)
+fence=D7 verdict=FAIL fault_class=implementation

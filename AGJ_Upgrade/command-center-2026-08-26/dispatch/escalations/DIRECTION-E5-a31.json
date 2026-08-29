@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 31,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "Answering RAISE-E5-c9 per north's correction: STOP sending RETRY/PLAN_SOUND/plan_level_fingerprint on the E5 fence row \u2014 units=[E3] would need a genuine validator-authored repair test (mine was a shortcut, since removed) and plan_level_fingerprint only unparks the fence with nothing to requeue. THE FIX: minted E0b (plan.md + queue.md row 44) as a real plan/queue slice to rewrite e2e/command-center-wakeup-fence.spec.ts with distinct FENCE_STUB=E1|E2|E3|E4 targets and LITERAL_ACTION_E<n> tokens, exactly mirroring F0b/F0c for F7. E5 stays parked until dispatch/advance-E0b.marker lands, then retry the gate. Do not answer further E5 RAISEs with RETRY/PLAN_SOUND before that.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T17:07:41Z"
+}

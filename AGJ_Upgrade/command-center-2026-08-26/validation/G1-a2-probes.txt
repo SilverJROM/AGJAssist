@@ -1,0 +1,29 @@
+# G1 attempt 2 — discriminating-power probes (commit 4d957a0)
+
+## Probe A — new 'undeclared module constants' assertion, mutation-tested
+as shipped (4d957a0):    identifiers scanned = 105  flagged = 0 []
+mutation applied: true  decl present after mutation: false  readers still present: 2
+with a1 defect restored: identifiers scanned = 105  flagged = 0 []
+VERDICT: assertion is VACUOUS — the a1 defect passes it.
+   alternative 1 (real declaration) matches: false
+   alternative 2 (`import` ... identifier) matches: true
+   invented TOTALLY_UNDECLARED_SENTINEL flagged: false
+
+## Probe B — new orphan-import assertion, mutation-tested
+as shipped (4d957a0): orphan-import hits = []
+mutation applied: true
+with a1 defect restored: orphan-import hits = [ 'overmind-helpers <- tests/bottom-nav-helpers.test.ts' ]
+VERDICT: orphan-import half DISCRIMINATES.
+
+## Probe C — tsc --noEmit
+src/api/routes/agent-reminder-routes.ts(83,25): error TS18046: 'request.params' is of type 'unknown'.
+src/api/routes/agent-reminder-routes.ts(124,25): error TS18046: 'request.params' is of type 'unknown'.
+src/api/routes/agent-wakeup-routes.ts(75,25): error TS18046: 'request.params' is of type 'unknown'.
+  tsc exit=0
+
+## Probe D — pane-utils.ts vs the original deleted pane-utils.js (second-path differential)
+   original: spinnerGlyphs = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷"
+   ported  : spinnerGlyphs = "◦•✻✶✢●○⎿⠋⠙⠹⠸⠼⠴⠦⠇⠏⣾⣽⣻⢿⡿⣟⣯⣷"
+   DRIFT isPaneChromeLine glyph ⠧ U+2827: orig=true new=false
+   DRIFT hashPane        glyph ⠧ U+2827: orig strips=true new strips=false
+   (all other specimens — hasBusySignal x6, hasActiveTurn, extractBody x5, 25 other glyphs — equivalent)

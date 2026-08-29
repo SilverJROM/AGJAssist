@@ -1,0 +1,134 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "fit": {
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  "topbarCount": 1,
+  "controls": {
+    "fontIncrease": [
+      {
+        "selector": "[data-testid=\"terminal-font-increase\"]",
+        "testid": "terminal-font-increase",
+        "ariaLabel": null,
+        "role": null,
+        "text": "A+",
+        "visible": true,
+        "display": "block",
+        "width": 22,
+        "height": 24,
+        "x": 249,
+        "y": 53
+      }
+    ],
+    "fontDecrease": [
+      {
+        "selector": "[data-testid=\"terminal-font-decrease\"]",
+        "testid": "terminal-font-decrease",
+        "ariaLabel": null,
+        "role": null,
+        "text": "A−",
+        "visible": true,
+        "display": "block",
+        "width": 22,
+        "height": 24,
+        "x": 227,
+        "y": 53
+      }
+    ],
+    "myNavUp": [
+      {
+        "selector": "[data-testid=\"terminal-mynav-up\"]",
+        "testid": "terminal-mynav-up",
+        "ariaLabel": "Jump to my previous message",
+        "role": null,
+        "text": "▲",
+        "visible": true,
+        "display": "flex",
+        "width": 7,
+        "height": 10,
+        "x": 288,
+        "y": 52
+      }
+    ],
+    "myNavDown": [
+      {
+        "selector": "[data-testid=\"terminal-mynav-down\"]",
+        "testid": "terminal-mynav-down",
+        "ariaLabel": "Jump to my next message",
+        "role": null,
+        "text": "▼",
+        "visible": true,
+        "display": "flex",
+        "width": 7,
+        "height": 10,
+        "x": 288,
+        "y": 68
+      }
+    ],
+    "settingsMenu": [
+      {
+        "selector": "[data-testid=\"terminal-menu\"]",
+        "testid": "terminal-menu",
+        "ariaLabel": "Terminal settings",
+        "role": null,
+        "text": "",
+        "visible": true,
+        "display": "flex",
+        "width": 28,
+        "height": 28,
+        "x": 342,
+        "y": 51
+      }
+    ],
+    "controlBar": [
+      {
+        "selector": "[data-testid=\"terminal-control-bar\"]",
+        "testid": "terminal-control-bar",
+        "ariaLabel": "Terminal keys",
+        "role": "group",
+        "text": "⏎Esc^C⇧⇥↑↓",
+        "visible": true,
+        "display": "flex",
+        "width": 368,
+        "height": 39,
+        "x": 11,
+        "y": 688
+      }
+    ],
+    "rawToggle": [
+      {
+        "selector": "[data-testid=\"terminal-show-raw\"], [data-show-raw]",
+        "testid": "terminal-show-raw",
+        "ariaLabel": null,
+        "role": "switch",
+        "text": "",
+        "visible": true,
+        "display": "block",
+        "width": 42,
+        "height": 24,
+        "x": 324,
+        "y": 134
+      }
+    ],
+    "rawChrome": [
+      {
+        "selector": "[data-testid=\"terminal-raw-chrome\"], [data-raw-chrome], .terminal-chat-raw",
+        "testid": "terminal-raw-chrome",
+        "ariaLabel": null,
+        "role": null,
+        "text": "⏵⏵ bypass permissions on · ctrl+t ▌ Type a message gpt-5.3-codex · ~/TGBOTS/AGJAssist ┌──────────────────────────────┐ │",
+        "visible": true,
+        "display": "block",
+        "width": 344,
+        "height": 127,
+        "x": 23,
+        "y": 376
+      }
+    ]
+  },
+  "rawText": "⏵⏵ bypass permissions on · ctrl+t\n▌ Type a message\ngpt-5.3-codex · ~/TGBOTS/AGJAssist\n┌──────────────────────────────┐\n│ Type a message               │\n└──────────────────────────────┘"
+}

@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 36,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "Progress: marker relabel worked (superset_ok now true, green:true, all E1-E4 pass). New blocker found: negative_control_ok still false for FENCE_STUB=E2 -- confirmed 2/2 via direct execution (including an exact replica of the driver's subprocess mechanics) that Playwright correctly fails test_e2, but the final fence-report-v1.json drops E2 entirely (report-aggregation bug in the spec's shard/writeReport mechanism, not load-timing). Minted E0c (plan.md+queue.md row 46) to fix the aggregation, mirroring E0b/F0d. Holding, not retrying -- E5 waits on advance-E0c.marker.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T19:08:18Z"
+}

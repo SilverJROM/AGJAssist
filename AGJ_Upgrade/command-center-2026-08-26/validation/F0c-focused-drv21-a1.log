@@ -1,0 +1,78 @@
+[1A[2K[2m[WebServer] [22m(node:814486) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 6 tests using 1 worker
+
+[1A[2K[1/6] [cc] › e2e/command-center-window-fence.spec.ts:310:1 › test_f1_refresh_from_session_surface_visible
+[1A[2K[2/6] [cc] › e2e/command-center-window-fence.spec.ts:335:1 › test_f2_draft_and_switcher_surfaces_are_rendered
+[1A[2K[3/6] [cc] › e2e/command-center-window-fence.spec.ts:366:1 › test_f3_refresh_action_and_draft_reload_keep_composer_usable
+[1A[2K[4/6] [cc] › e2e/command-center-window-fence.spec.ts:422:1 › test_f4_header_v2_collapses_without_losing_command_center_chrome
+[1A[2K[5/6] [cc] › e2e/command-center-window-fence.spec.ts:459:1 › test_f5_phone_dropdown_and_wide_switcher_are_available
+[1A[2K[6/6] [cc] › e2e/command-center-window-fence.spec.ts:529:1 › test_f6_window_theme_attribute_is_applied
+[1A[2K  6 passed (47.5s)
+[1A[2K[2m[WebServer] [22m(node:821211) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 6 tests using 1 worker
+
+[1A[2K[1/6] [cc] › e2e/command-center-window-fence.spec.ts:310:1 › test_f1_refresh_from_session_surface_visible
+[1A[2K[2/6] [cc] › e2e/command-center-window-fence.spec.ts:335:1 › test_f2_draft_and_switcher_surfaces_are_rendered
+[1A[2K[3/6] [cc] › e2e/command-center-window-fence.spec.ts:366:1 › test_f3_refresh_action_and_draft_reload_keep_composer_usable
+[1A[2K  1) [cc] › e2e/command-center-window-fence.spec.ts:366:1 › test_f3_refresh_action_and_draft_reload_keep_composer_usable 
+
+    Error: FENCE failures: [{"id":"I1","kind":"assert","message":"\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid=\"terminal-refresh-status\"]')\nExpected: \u001b[32m\"Updated\"\u001b[39m\nReceived: \u001b[31m\"\"\u001b[39m\nTimeout:  10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid=\"terminal-refresh-status\"]')\u001b[22m\n\u001b[2m    - locator resolved to <span aria-live=\"polite\" class=\"terminal-refresh-status\" data-testid=\"terminal-refresh-status\">Refreshing</span>\u001b[22m\n\u001b[2m    - unexpected value \"Refreshing\"\u001b[22m\n\u001b[2m    18 × locator resolved to <span aria-live=\"polite\" class=\"terminal-refresh-status\" data-testid=\"terminal-refresh-status\">Error</span>\u001b[22m\n\u001b[2m       - unexpected value \"Error\"\u001b[22m\n\u001b[2m    5 × locator resolved to <span aria-live=\"polite\" class=\"terminal-refresh-status\" data-testid=\"terminal-refresh-status\"></span>\u001b[22m\n\u001b[2m      - unexpected value \"\"\u001b[22m\n"}]
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoEqual[2m([22m[32mexpected[39m[2m) // deep equality[22m
+
+    [32m- Expected  -  1[39m
+    [31m+ Received  + 23[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   Object {[39m
+    [31m+     "id": "I1",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+     "message": "[2mexpect([22m[31mlocator[39m[31m[2m).[22mtoHaveText[2m([22m[32mexpected[39m[31m[2m)[22m failed[39m
+    [31m+[39m
+    [31m+ Locator:  locator('[data-testid=\"terminal-refresh-status\"]')[39m
+    [31m+ Expected: [32m\"Updated\"[39m[31m[39m
+    [31m+ Received: [31m\"\"[39m[31m[39m
+    [31m+ Timeout:  10000ms[39m
+    [31m+[39m
+    [31m+ Call log:[39m
+    [31m+ [2m  - Expect \"toHaveText\" with timeout 10000ms[22m[39m
+    [31m+ [2m  - waiting for locator('[data-testid=\"terminal-refresh-status\"]')[22m[39m
+    [31m+ [2m    - locator resolved to <span aria-live=\"polite\" class=\"terminal-refresh-status\" data-testid=\"terminal-refresh-status\">Refreshing</span>[22m[39m
+    [31m+ [2m    - unexpected value \"Refreshing\"[22m[39m
+    [31m+ [2m    18 × locator resolved to <span aria-live=\"polite\" class=\"terminal-refresh-status\" data-testid=\"terminal-refresh-status\">Error</span>[22m[39m
+    [31m+ [2m       - unexpected value \"Error\"[22m[39m
+    [31m+ [2m    5 × locator resolved to <span aria-live=\"polite\" class=\"terminal-refresh-status\" data-testid=\"terminal-refresh-status\"></span>[22m[39m
+    [31m+ [2m      - unexpected value \"\"[22m[39m
+    [31m+ ",[39m
+    [31m+   },[39m
+    [31m+ ][39m
+
+      297 |   );
+      298 |   writeReport();
+    > 299 |   expect(localFailed, `FENCE failures: ${JSON.stringify(localFailed)}`).toEqual([]);
+          |                                                                         ^
+      300 | }
+      301 |
+      302 | test.beforeEach(async ({}, testInfo) => {
+        at finishContributor (/home/agjrom/TGBOTS/AGJAssist/e2e/command-center-window-fence.spec.ts:299:73)
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-window-fence.spec.ts:415:13
+
+    Error Context: test-results/command-center-window-fenc-ed207-reload-keep-composer-usable-cc/error-context.md
+
+    Error Context: test-results/command-center-window-fenc-ed207-reload-keep-composer-usable-cc/error-context.md
+
+
+[1A[2K[4/6] [cc] › e2e/command-center-window-fence.spec.ts:422:1 › test_f4_header_v2_collapses_without_losing_command_center_chrome
+[1A[2K[5/6] [cc] › e2e/command-center-window-fence.spec.ts:459:1 › test_f5_phone_dropdown_and_wide_switcher_are_available
+[1A[2K[6/6] [cc] › e2e/command-center-window-fence.spec.ts:529:1 › test_f6_window_theme_attribute_is_applied
+[1A[2K  1 failed
+    [cc] › e2e/command-center-window-fence.spec.ts:366:1 › test_f3_refresh_action_and_draft_reload_keep_composer_usable 
+  5 passed (57.5s)
+fence=F7 verdict=PASS fault_class=none

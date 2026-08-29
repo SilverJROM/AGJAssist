@@ -1,0 +1,11 @@
+{
+  "slice": "F0b",
+  "first_seen_attempt": 2,
+  "signature": "TEST_NOT_DISCRIMINATING|HARNESS-SMOKE",
+  "requirements": "HARNESS-SMOKE",
+  "defect_class": "TEST_NOT_DISCRIMINATING",
+  "argument": "An acceptance criterion that no implementation can satisfy fails IDENTICALLY at every tier, so another attempt or a stronger seat buys more of the same failure at higher cost. This is the plan review, already written.",
+  "answer": "HARNESS-SMOKE IS satisfiable. North 2026-08-28: F7/F0b is harness-only; window product F1-F6 is built and validated; og-req G1-J2 are the real ACs. a1/a2 TEST_NOT_DISCRIMINATING repeats are coincidental harness bugs, not AC drift: (1) check() must await the assertion; (2) wait for primary AND secondary in /api/tmux/sessions before G2/J1/J2; (3) H1 assert default collapsed without clicking, click tabs-collapse only to reveal switcher; (4) literal fixtures not presence/truthiness; (5) FENCE_STUB=<contributor> server-backed named-red (not FENCE_STUB_G* synthetic inject); remap fence-contract if F1 cannot red G3/I1. See validation/F0b-fix-a2.md. Do not decompose. Do not open product. a3 glimmer already in flight on 6f73f87.",
+  "how_to_answer": "Decompose or repair the criterion, OR write `answer` here saying why the row is sound and the repeats are coincidental. \"Noted and continued\" is not an answer.",
+  "raised_at": 1787916747
+}

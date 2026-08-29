@@ -1,0 +1,21 @@
+{
+  "schema": "fence-report-v1",
+  "collected": [
+    "E1",
+    "E2",
+    "E3",
+    "E4"
+  ],
+  "passed": [
+    "E1",
+    "E3",
+    "E4"
+  ],
+  "failed": [
+    {
+      "id": "E2",
+      "kind": "assert",
+      "message": "FENCE_STUB=E2 forces E2 failure"
+    }
+  ]
+}

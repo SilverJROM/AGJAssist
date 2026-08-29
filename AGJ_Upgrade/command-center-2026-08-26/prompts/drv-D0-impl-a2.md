@@ -16,22 +16,24 @@ You are the IMPLEMENTER. You write product code and tests, then commit.
 
 ## ⚠ STANDING DIRECTION FROM THE COORDINATOR — applies to THIS attempt too
 
-[north] PLAN_SOUND: F-SUMMARIES ACs SATISFIABLE — do not re-plan, do not re-suspect, do not split. Carry validation/D0-fix-a3.md in full. Park rolled HEAD to b1d8258; cherry-pick refs/tiller/command-center-2026-08-26/D0 (8a0ebc5, includes e88a200 and 5a54514) first. Stay on sonnet5 for this retry (a4). ONLY: (1) trigger the REAL create-path — fire closed-C6 reminder solicit into a temp pane, capture pane reply, ReplySummaryService via app-owned hook/route (not Playwright-local import) against the deterministic OpenAI-compatible fixture returning LITERAL_SUMMARY_FOR_TEST, persist, THEN poll only public GET /api/summary-agents/<agent>/summaries for that literal; (2) set explicit Playwright per-test timeout large enough OR trim E1 poll budget so named E1 kind=assert fails BEFORE 60000ms test timeout; keep outer command-timeout wrapper unchanged. Keep FENCE_STUB=D3 named-red on E1. Do not add product routes. Commit with [D0] tag then callback DONE immediately — a4 parked SLICE-TOO-BIG at 1800s still-working; do not sit at the prompt. If this FULL a3 direction still fails, escalate to sol/opus5 (a5) with budget 8. Do not re-plan ACs.
-
-[what_validator_missed]
-HARNESS-SMOKE is satisfiable. a3 named two concrete harness bugs, not AC drift: (1) dropdown only READS summaries — E1 must fire closed-C6 into a temp pane, capture the pane reply, run ReplySummaryService via a real app-owned hook against the deterministic OpenAI-compatible fixture returning LITERAL_SUMMARY_FOR_TEST, persist, then poll only GET /api/summary-agents/<agent>/summaries; no Playwright-local import. (2) E1 named assert is masked by Playwright 60000ms — set an explicit per-test timeout or trim the 10s+120-poll budget so kind=assert fails first; keep the outer command-timeout wrapper.
+EXIT 09:55:16Z D0-a10 unparked then immediately re-parked: fences_for(D0) included D7 because D0 was in D7 plan deps, and parked fence D7 has no OPEN (retired to .pre-reprepare; post-PREPARE OPEN is vacuous because D1-D6 already landed). D0 is harness-author, not a product unit. Plan D7 deps no longer list D0; D7 stays parked until advance-D0.marker. Standing D0.txt: port summaries-fence from 8a0ebc5 / D0-fix-a3.md onto HEAD 241b5cf; do NOT wholesale cherry-pick 8a0ebc5 (would revert F4-F6). Keep cc-capture-reply.mts. FENCE_STUB=D3 named-red E1. Not a new north question.
 
 **This is a constraint, not background.** It was written after a previous attempt and it still binds: if it forbids something, the fix that does it is wrong even when the tests go green.
 The independent validator FAILed D0: defect_class=IMPL_INCOMPLETE gate=None.
-**Validator's callback summary:** [projcore callback] validator D0 STATUS: DONE — FAIL focused D7 positive still fails E1; missing real create path
+**Validator's callback summary:** [projcore callback] validator D0 STATUS: DONE — FAIL positive F3 sheet hidden; final report masks it
 
 ## THE VALIDATOR'S PRESCRIPTION (verbatim — this is the fix, not a hint)
 
 ```
-FINDING 1 of 1
-WHAT FAILED: The focused D7 gate failed its positive run in e2e/command-center-summaries-fence.spec.ts E1. After creating/firing the C6 reminder, sending a real tmux pane reply, patching the default endpoint to the local OpenAI fixture, and opening the summaries UI, GET /api/summary-agents/<unique-agent>/summaries never returned `LITERAL_SUMMARY_FOR_TEST`; .fence-gate-pos.json and fence-report-v1.json both show failed E1 kind=assert with no passed ids.
-THE FIX: Replace the "open summaries dropdown" step with an app-owned reply capture/summarization mechanism that actually exists. Mechanism: after scripts/cc-fire-due.mts sends the solicit and the test writes the reply into the same tmux pane, invoke a real project script/API/service hook that captures the pane output after the solicit marker and calls ReplySummaryService with that captured text, using the default summary endpoint already patched to the local /v1/chat/completions fixture. Then poll only GET /api/summary-agents/<unique-agent>/summaries for the literal `LITERAL_SUMMARY_FOR_TEST` row and keep the FENCE_STUB=D3 negative path red through the real /api/summary-endpoints dependency. Do not insert agent_summaries directly, do not import ReplySummaryService in the Playwright spec, and do not treat the summaries dropdown as a create path because it only reads existing summaries.
-WHY THE LAST ATTEMPT MISSED IT: It fixed the timeout/poll budget but left the prior missing create-path intact.
+FINDING 1 of 2
+WHAT FAILED: The focused D7 gate failed its positive run in e2e/command-center-summaries-fence.spec.ts F3. After opening a real tmux-backed terminal session, the test clicked [data-testid="terminal-menu"], but [data-testid="summary-endpoint-sheet"] stayed hidden for 5000ms. .fence-gate-pos.json shows passed E3,F2,E1,F1 and failed F3 kind=assert; E2 did not run.
+THE FIX: Make the F3 harness open the actual settings sheet before asserting endpoint controls. Mechanism: after openTerminalSession(page, sessionName), wait for the selected terminal view to settle, click [data-testid="terminal-menu"], then assert [data-testid="terminal-menu"] has aria-expanded="true" or [data-testid="terminal-menu-sheet"] has class "open" before checking [data-testid="summary-endpoint-sheet"]. If that state never flips, replace openTerminalSession's select-only branch with the proven session-opening path from e2e/command-center-endpoints.spec.ts so the click targets the live terminal header that owns menuOpen.
+WHY THE LAST ATTEMPT MISSED IT: It validated D5 with mocked endpoint tests but did not run the D7 positive path against the real temp-copy app/menu state.
+
+FINDING 2 of 2
+WHAT FAILED: The final fence-report-v1.json written by e2e/run-command-center-playwright-fence.mjs --gate hides the positive F3 failure. It reports verdict FAIL with failed E1 only because the negative D3 control correctly failed E1, while the real positive failure is only preserved in .fence-gate-pos.json.
+THE FIX: Change the gate report aggregation mechanism so a failed positive run carries its .fence-gate-pos.json failures into the final fence-report-v1.json, and append expected negative failures only as a separate negative_control section or distinct kind. The D3 negative specimen can still require exactly E1 kind=assert, but it must not overwrite the positive-run failed id.
+WHY THE LAST ATTEMPT MISSED IT: It treated the runner's final summary as sufficient evidence even when the positive and negative reports disagreed.
 ```
 **Do this before inventing anything.** A slice spent four attempts each inventing a different mechanism while this file sat unread, and closed on the first attempt that had it. If the prescription is WRONG, say why in your callback — that is a finding worth more than a fifth invention.
 
@@ -49,7 +51,7 @@ Address EVERY finding in the prescription — if it lists FINDING 1 of 3, all th
 ## THE SLICE (unchanged since attempt 1 — this is not the correction)
 
 ### Scope
-HARNESS-CORRECTNESS ONLY. Rewrite e2e/command-center-summaries-fence.spec.ts against the real D4 owner-gated contract plus the closed-C6 solicit-reply arrival fixture. Do not invent unauth GET /api/summary-endpoints 200, GET /api/agent-summaries, or GET /api/summary-endpoints/default. Use FENCE_ORIGIN and OWNER_TOKEN. Collect ALL of E1,E2,E3,F1,F2,F3. FENCE_STUB=D3 named-red on E1 kind=assert. Write fence-report-v1.json in finally. Do not add product routes. North 2026-08-28 PLAN_SOUND: carry validation/D0-fix-a3.md (real C6 create-path + E1 timeout).
+HARNESS-CORRECTNESS ONLY. Rewrite e2e/command-center-summaries-fence.spec.ts against the real D4 owner-gated contract plus the closed-C6 solicit-reply arrival fixture. Do not invent unauth GET /api/summary-endpoints 200, GET /api/agent-summaries, or GET /api/summary-endpoints/default. Use FENCE_ORIGIN and OWNER_TOKEN. Collect ALL of E1,E2,E3,F1,F2,F3. FENCE_STUB=D3 named-red on E1 kind=assert. Write fence-report-v1.json in finally. Do not add product routes. North 2026-08-28 PLAN_SOUND: carry validation/D0-fix-a3.md.
 
 ### Acceptance criteria — the TEXT is the contract, the id is only its name
 - **HARNESS-SMOKE** — ⚠ NO CRITERION TEXT FOUND in og-requirements.md. Treat the SCOPE above as the authority for this one, and say so in your callback if that is ambiguous. (Plan-invented ids such as `FH*` legitimately have no og-requirement.)

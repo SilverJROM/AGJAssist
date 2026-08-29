@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 27,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "Un-park per north: PLAN_SOUND a11 stands (directions-active/E5.txt) \u2014 give each E1/E2/E3/E4 contributor its own distinct named-red id/LITERAL/FENCE_STUB so FENCE_STUB=E1|E2|E3|E4 forces four distinct fingerprints; keep the composed positive journey; CLOSE requires all four independently observable. Dispatch as fence-author at sonnet5/opus5 (integration_agent path, NOT an impl L2/L3 retry) per the existing brief \u2014 this does not touch codex/terra, so it is unaffected by the current codex-cli reinstall outage blocking F0c. Do not re-litigate PLAN_SOUND.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T16:24:38Z"
+}

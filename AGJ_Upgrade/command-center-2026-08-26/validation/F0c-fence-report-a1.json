@@ -1,0 +1,29 @@
+{
+  "schema": "fence-report-v1",
+  "verdict_line": "fence=F7 verdict=FAIL fault_class=implementation",
+  "collected": [
+    "G1",
+    "G2",
+    "G3",
+    "H1",
+    "H2",
+    "H3",
+    "I1",
+    "I2",
+    "J1",
+    "J2"
+  ],
+  "passed": [
+    "G1",
+    "G2",
+    "G3",
+    "H1",
+    "H2",
+    "H3",
+    "I1",
+    "I2",
+    "J1",
+    "J2"
+  ],
+  "failed": []
+}

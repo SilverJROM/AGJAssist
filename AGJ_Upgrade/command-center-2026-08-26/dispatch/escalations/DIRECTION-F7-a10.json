@@ -2,5 +2,8 @@
   "slice": "F7",
   "attempt": 10,
   "action": "SKIP_TO_PROJCORE",
-  "note": "STALE RAISE-F7-c2 re-delivery (raised 2026-08-28T09:52:35Z, epoch 1787907184-685376 dead, fault_class=plan failing_units=none). DIRECTION-F7-a9 SKIP already applied 09:55:16Z. F7 stays parked. Do NOT RETRY L2/L3. North question already on disk: decisions/2026-08-28-F7-c2-plan-north.md (PLAN_SOUND harness-only vs mint F0b vs product). Live drain is 1125947 D0 a1 glimmer. Not a new north question."
+  "note": "STALE RAISE-F7-c2 re-delivery (raised 2026-08-28T09:52:35Z, epoch 1787907184-685376 dead, fault_class=plan failing_units=none). DIRECTION-F7-a9 SKIP already applied 09:55:16Z. F7 stays parked. Do NOT RETRY L2/L3. North question already on disk: decisions/2026-08-28-F7-c2-plan-north.md (PLAN_SOUND harness-only vs mint F0b vs product). Live drain is 1125947 D0 a1 glimmer. Not a new north question.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T10:21:02Z"
 }

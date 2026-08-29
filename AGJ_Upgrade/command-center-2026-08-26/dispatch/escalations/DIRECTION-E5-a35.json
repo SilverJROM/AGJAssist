@@ -1,0 +1,11 @@
+{
+  "slice": "E5",
+  "attempt": 35,
+  "action": "PLAN_SOUND",
+  "plan_level_fingerprint": true,
+  "plan_changed": true,
+  "what_validator_missed": "North-approved relabel applied: dispatch/fence-open.E5.marker's open_failed_ids corrected from [D1,D2] to [E1,E3,E4] -- per PLAN_SOUND a11, D1 was (test_e1 schema=E1 + test_e3 route=E3) and D2 was (test_e3 route=E3 + test_e4 UI=E4), so the originally-observed collision always involved E1/E3/E4; this names the same historical fact under E0b's new ids (an expansion 2->3, not a drop, so it does not trip assertions_weakened as a fingerprint-escape attempt). a33's intent stands but a33 itself is already consumed/historical (superseded by a34's re-park) -- this is the fresh direction to actually re-trigger. Un-park and RE-RUN the fence gate against the fixed spec and now-corrected marker.",
+  "applied": true,
+  "outcome": "PLAN_SOUND accepted \u2014 counts as a repair round",
+  "applied_at": "2026-08-28T19:01:24Z"
+}

@@ -1,0 +1,25 @@
+ROUTE #/overmind
+  hash=#/
+  bodyText="AGJAssist\n✎\n📋\nTasks\n0\nDaily & weekly\n📝\nNotes\n0\nQuick notes\n🖥\nTerminals\nTmux sessions\n📁\nProjects\n0\nDev projects\n⏰\nReminders\n0\nUpcoming events\n⚙\nSettings\nConfig & templates\nDefault landing page:\n🏠 Home (default)\n✅ Tasks\n📝 Notes\n🖥 Terminal\n⚙ Settings\nOpens here on a fresh page load. Deep links to specific pages still work.\n🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"
+  bottomNav=["🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"]
+  overmindNodes=0
+
+ROUTE #/overmind-projects
+  hash=#/overmind-projects
+  bodyText="Page not found\n🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"
+  bottomNav=["🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"]
+  overmindNodes=0
+
+ROUTE #/ovm
+  hash=#/ovm
+  bodyText="Page not found\n🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"
+  bottomNav=["🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"]
+  overmindNodes=0
+
+ROUTE #/workflows
+  hash=#/workflows
+  bodyText="Page not found\n🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"
+  bottomNav=["🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"]
+  overmindNodes=0
+
+HOME bottomNav="🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"

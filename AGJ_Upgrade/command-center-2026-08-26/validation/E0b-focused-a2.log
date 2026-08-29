@@ -1,0 +1,4 @@
+Terminated
+fence=E5 verdict=FAIL fault_class=implementation
+
+[validator-exit] 143

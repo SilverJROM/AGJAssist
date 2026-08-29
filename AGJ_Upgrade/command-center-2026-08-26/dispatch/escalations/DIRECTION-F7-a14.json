@@ -1,0 +1,9 @@
+{
+  "slice": "F7",
+  "attempt": 14,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "Holding, not retrying a 3rd time blind. My a13 fix (stale F1->I1 marker) was real and necessary but NOT sufficient: negative_control_ok is still false, identical detail, even with the corrected marker confirmed still in place. Opus5's own localizer just ran and independently concluded fault_class=plan, failing_units=(none) -- it could not name a unit either. My manual standalone runs of the exact same negative_control_cmd failed correctly twice (2/2) outside the driver; the driver's own run does not. Current load: 44 concurrent codex/claude processes, load avg ~3, 2.5Gi RAM free -- plausible but unconfirmed timing sensitivity under contention on this Playwright assertion (10s toHaveText timeout). Escalating to north: two real bugs found and fixed, one open question left (is this negative control reliably detectable under the driver's actual execution conditions, and if not, what's the right acceptance path) -- that's a call on what closing F7 requires, not mine to guess a third time.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T19:01:24Z"
+}

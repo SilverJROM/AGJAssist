@@ -1,0 +1,39 @@
+# G1 attempt 3 — A1 + regression DOM evidence (commit 28d4605)
+
+ROUTE #/overmind
+  landed hash = #/
+  bodyText    = "AGJAssist\n✎\n📋\nTasks\n0\nDaily & weekly\n📝\nNotes\n0\nQuick notes\n🖥\nTerminals\nTmux sessions\n📁\nProjects\n0\nDev projects\n⏰\nReminders\n0\nUpcoming events\n⚙\nSettings\nConfig & templates\nDefault landing page:\n🏠 Home (default)\n✅ Tasks\n📝 Notes\n🖥 Terminal\n⚙ Settings\nOpens"
+  bottomNav   = ["🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"]
+  [class*=overmind|ovm-console] node count = 0
+
+ROUTE #/overmind-projects
+  landed hash = #/overmind-projects
+  bodyText    = "Page not found\n🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"
+  bottomNav   = ["🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"]
+  [class*=overmind|ovm-console] node count = 0
+
+ROUTE #/ovm
+  landed hash = #/ovm
+  bodyText    = "Page not found\n🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"
+  bottomNav   = ["🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"]
+  [class*=overmind|ovm-console] node count = 0
+
+ROUTE #/workflows
+  landed hash = #/workflows
+  bodyText    = "Page not found\n🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"
+  bottomNav   = ["🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"]
+  [class*=overmind|ovm-console] node count = 0
+
+ROUTE #/ovm-console
+  landed hash = #/ovm-console
+  bodyText    = "Page not found\n🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"
+  bottomNav   = ["🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"]
+  [class*=overmind|ovm-console] node count = 0
+
+HOME bottomNav = "🏠\nHome\n✅\nTasks\n📝\nNotes\n🖥\nTerminal\n⚙\nSettings"
+HOME .tg-home-preferences computed = {"marginTop":"20px","paddingTop":"14px","borderTopWidth":"1px","borderTopStyle":"solid"}
+HOME expected (pre-G1 literal)     = {"marginTop":"20px","paddingTop":"14px","borderTopWidth":"1px","borderTopStyle":"solid"}
+HOME styling restored = true
+
+TERMINAL live .ovm-chat rules present in the served stylesheet = 16
+   [".ovm-chat-bubble-user.failed",".terminal-chat-view .ovm-chat-row",".terminal-chat-view .ovm-chat-row-user",".terminal-chat-view .ovm-chat-row-ovm",".terminal-chat-view .ovm-chat-row-system",".terminal-chat-view .ovm-chat-bubble, .terminal-chat-view .terminal-chat-bubble, .terminal-chat-view .terminal-chat-content",".terminal-chat-view .ovm-chat-bubble",".terminal-chat-view .ovm-chat-bubble-ovm, .terminal-chat-view .terminal-chat-bubble.ovm-chat-bubble-ovm",".terminal-chat-view .ovm-chat-bubble-ovm::after",".terminal-chat-view .ovm-chat-bubble-user, .terminal-chat-view .terminal-chat-bubble.ovm-chat-bubble-user",".terminal-chat-view .ovm-chat-bubble-user::after",".terminal-chat-view .ovm-chat-text"]

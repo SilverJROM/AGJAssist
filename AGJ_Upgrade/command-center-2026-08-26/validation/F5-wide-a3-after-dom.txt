@@ -95,14 +95,14 @@
   ],
   "scrubberDisplay": "block",
   "scrubberRect": {
-    "x": 685.046875,
+    "x": 685.0625,
     "y": 17.09375,
-    "width": 15.953125,
+    "width": 15.9375,
     "height": 24,
     "top": 17.09375,
     "right": 701,
     "bottom": 41.09375,
-    "left": 685.046875
+    "left": 685.0625
   },
   "controlsRect": {
     "x": 735,

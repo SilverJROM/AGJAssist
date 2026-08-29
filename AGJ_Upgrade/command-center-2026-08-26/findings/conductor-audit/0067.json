@@ -1,0 +1,6 @@
+{
+  "type": "repeated-failure-same-requirement",
+  "slice": "E0b",
+  "attempt": 2,
+  "signature": "ENV_INTERRUPTION|HARNESS-SMOKE"
+}

@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 32,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "E0b landed (advance-E0b.marker present, commit aab20bb, PASS at a3). Verified by reading the actual files, not just the marker: fence-contract.json's E5 entry now has acceptance_ids=[E1,E2,E3,E4] (was D1/D2/D3) and e2e/command-center-wakeup-fence.spec.ts has four distinct FENCE_STUB==='E1'|'E2'|'E3'|'E4' branches each setting its own LITERAL_ACTION_E<n> token. The fingerprint-recurrence gate should now see a genuinely different, discriminating spec. Retry the fence gate per the (unchanged) PLAN_SOUND a11 requirement \u2014 CLOSE requires all four named-reds independently observable.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T18:07:27Z"
+}

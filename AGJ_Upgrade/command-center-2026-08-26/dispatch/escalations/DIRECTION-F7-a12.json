@@ -1,0 +1,9 @@
+{
+  "slice": "F7",
+  "attempt": 12,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "Verified by direct execution, not by reading: ran the exact negative_control_cmd myself just now (FENCE_STUB=I1 FENCE_ID=F7 ... node e2e/run-command-center-playwright-fence.mjs) and it correctly FAILED as designed \u2014 result: 'fence=F7 verdict=FAIL fault_class=implementation', with the I1 assertion properly timing out on terminal-refresh-status never reaching 'Updated' (it cycled Refreshing -> Error -> empty, never Updated). So the negative control mechanism itself is sound; F0c's server-backed I1 remap works. The driver's own run recorded negative_control_ok=false ('nothing failed') under much heavier machine memory pressure (swap was ~100% full at the time) \u2014 this reads as flakiness from resource starvation on a timing-sensitive Playwright assertion, not a plan or implementation defect. Memory has since eased substantially (3.4Gi free / swap mostly free at time of this direction). Re-run the fence gate \u2014 expect it to close clean this time.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T18:46:06Z"
+}

@@ -1,0 +1,3 @@
+AGJ_Upgrade/command-center-2026-08-26/prompts/drv-G1-impl-a1.md
+src/tmux/pane-utils.ts
+tests/command-center-cleanup.test.ts

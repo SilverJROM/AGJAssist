@@ -1,0 +1,3 @@
+AGJ_Upgrade/command-center-2026-08-26/prompts/drv-G2-impl-a1.md
+scripts/release-command-center.mjs
+tests/unit/release-command-center.spec.ts

@@ -1,0 +1,6 @@
+{
+  "type": "repeated-failure-same-requirement",
+  "slice": "F0b",
+  "attempt": 2,
+  "signature": "TEST_NOT_DISCRIMINATING|HARNESS-SMOKE"
+}

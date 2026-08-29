@@ -1,0 +1,5 @@
+{
+  "type": "plan-sound-refused",
+  "slice": "E5",
+  "why": "PLAN_SOUND returns 'E3' to the implementer with no validator-authored test \u2014 that is the cheap implementer defining its own success criterion again. Author the test or set plan_level_fingerprint."
+}

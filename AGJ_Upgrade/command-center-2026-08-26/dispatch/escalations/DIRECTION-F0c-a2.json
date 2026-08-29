@@ -1,0 +1,9 @@
+{
+  "slice": "F0c",
+  "attempt": 2,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "NOT retrying blind per the RAISE's own warning ('a plain RETRY_WITH_DIRECTION will repeat exactly what already failed'). Verified live: 'free -h' shows 61Gi total / 55Gi used / 702Mi free, and swap is 8.0Gi used of 8.0Gi (effectively 0 free) machine-wide right now \u2014 not specific to this run. Two llama-server processes (14.7GB + 2GB RSS) plus dozens of concurrent 'claude --dangerously-skip-permissions' sessions across other tiller runs on this same box account for it. A Playwright gate needs headroom this box does not currently have; retrying now would very likely OOM-kill identically. This is shared-machine capacity, not an F0c defect, and not mine to fix (can't kill other runs' processes). Keeping F0c parked (not STOP_TRUE_BLOCKED \u2014 this should clear on its own as other seats cycle through). I will re-check memory directly and answer with a real RETRY_WITH_DIRECTION the moment there is headroom; flagging severity to north for visibility since it is fleet-wide, same class as the earlier codex outage.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T16:39:11Z"
+}

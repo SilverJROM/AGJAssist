@@ -2,8 +2,9 @@
   "fence": "E5",
   "fingerprint": "fp1:4c534f69e7dd8f2fd157",
   "open_failed_ids": [
-    "D1",
-    "D2"
+    "E1",
+    "E3",
+    "E4"
   ],
   "negative_control_open_executable": true,
   "negative_control_open_shape": "assertion-red",

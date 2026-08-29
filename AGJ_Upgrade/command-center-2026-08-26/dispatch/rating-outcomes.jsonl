@@ -6,3 +6,12 @@
 {"slice": "F4", "rated": "L2", "landed": "L1", "delta": -1, "attempt": 1, "landed_model": "glimmer", "acs": "H1,H2", "est_min": "35", "ts": 1787904989}
 {"slice": "F5", "rated": "L2", "landed": "L1", "delta": -1, "attempt": 1, "landed_model": "glimmer", "acs": "J1,J2", "est_min": "30", "ts": 1787907449}
 {"slice": "F6", "rated": "L2", "landed": "L2", "delta": 0, "attempt": 4, "landed_model": "terra", "acs": "H3,J1,J2", "est_min": "35", "ts": 1787910350}
+{"slice": "D0", "rated": "L3", "landed": "L1", "delta": -2, "attempt": 2, "landed_model": "glimmer", "acs": "HARNESS-SMOKE", "est_min": "25", "ts": 1787912462}
+{"slice": "F0b", "rated": "L3", "landed": "L3", "delta": 0, "attempt": 4, "landed_model": "sonnet5", "acs": "HARNESS-SMOKE", "est_min": "25", "ts": 1787924291}
+{"slice": "E0b", "rated": "L3", "landed": "L1", "delta": -2, "attempt": 3, "landed_model": "terra", "acs": "HARNESS-SMOKE", "est_min": "30", "ts": 1787940349}
+{"slice": "F0c", "rated": "L3", "landed": "L1", "delta": -2, "attempt": 1, "landed_model": "terra", "acs": "HARNESS-SMOKE", "est_min": "25", "ts": 1787941132}
+{"slice": "F0d", "rated": "L3", "landed": "L1", "delta": -2, "attempt": 1, "landed_model": "terra", "acs": "HARNESS-SMOKE", "est_min": "20", "ts": 1787944098}
+{"slice": "E0c", "rated": "L3", "landed": "L1", "delta": -2, "attempt": 1, "landed_model": "terra", "acs": "HARNESS-SMOKE", "est_min": "25", "ts": 1787944290}
+{"slice": "F8", "rated": "L3", "landed": "L1", "delta": -2, "attempt": 1, "landed_model": "terra", "acs": "A4,A6,A7", "est_min": "40", "ts": 1787946013}
+{"slice": "G1", "rated": "L3", "landed": "L1", "delta": -2, "attempt": 3, "landed_model": "terra", "acs": "A1,A2,A3,A5", "est_min": "35", "ts": 1787949022}
+{"slice": "G2", "rated": "L4", "landed": "L1", "delta": -3, "attempt": 1, "landed_model": "terra", "acs": "A4,A5", "est_min": "30", "ts": 1787949769}

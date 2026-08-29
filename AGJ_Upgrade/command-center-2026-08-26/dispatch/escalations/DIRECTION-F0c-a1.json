@@ -1,0 +1,9 @@
+{
+  "slice": "F0c",
+  "attempt": 1,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "Verified by execution (not by report) before writing this: 'codex --version' now returns codex-cli 0.150.1 in a fresh subshell, ~/.npm-global/bin/codex resolves to a real symlink. Both F0c park causes were infrastructure, not implementation: (1) glimmer weekly-limit wedge on the a2 dispatch, already cleared by killing the wedged seat; (2) terra seat-spawn failure from the codex symlink outage, now restored by north. Neither is a plan or implementation defect \u2014 retry the existing F0c brief as-is (one named-red per G1-J2 via FENCE_STUB=<AC>, remap fence-contract.json F7 negative to I1 server-backed, F1-F6 frozen) per directions-active/F0c.txt. It will dispatch to terra (IMPL_L1=terra, healthy).",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T16:24:38Z"
+}

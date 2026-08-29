@@ -1,252 +1,56 @@
-# [driver] D0 — THE COMMIT UNDER TEST IS `5a54514d1553cc6f6ce6078d682767339c502c24`
+# [driver] D0 — THE COMMIT UNDER TEST IS `7a4c7c0a77eb199995696786c3f979c2b1e1a3b4`
 
-Analyse EXACTLY that commit: `git show 5a54514d1553cc6f6ce6078d682767339c502c24`, `git diff 5a54514d1553cc6f6ce6078d682767339c502c24^..5a54514d1553cc6f6ce6078d682767339c502c24`.
-**Do NOT use `git rev-parse HEAD`** — HEAD moves when anyone commits, including the coordinator writing its own artifacts, and judging the wrong commit has already FAILed a slice whose work was correct. Report `commit=5a54514d1553cc6f6ce6078d682767339c502c24`.
+Analyse EXACTLY that commit: `git show 7a4c7c0a77eb199995696786c3f979c2b1e1a3b4`, `git diff 7a4c7c0a77eb199995696786c3f979c2b1e1a3b4^..7a4c7c0a77eb199995696786c3f979c2b1e1a3b4`.
+**Do NOT use `git rev-parse HEAD`** — HEAD moves when anyone commits, including the coordinator writing its own artifacts, and judging the wrong commit has already FAILed a slice whose work was correct. Report `commit=7a4c7c0a77eb199995696786c3f979c2b1e1a3b4`.
 
 ## The change under test (produced by the driver, not reported by the implementer)
 ```
-[D0] Rewrite summaries fence harness for closed-C6 arrival fixture and UI verification
+[D0] Fix F3 menu settle and gate report aggregation
 
 
- e2e/command-center-summaries-fence.spec.ts | 175 ++++++++++++++++++++++++-----
- 1 file changed, 149 insertions(+), 26 deletions(-)
+ e2e/command-center-summaries-fence.spec.ts  | 3 ++-
+ e2e/run-command-center-playwright-fence.mjs | 9 +++++++--
+ 2 files changed, 9 insertions(+), 3 deletions(-)
 ```
 ```diff
 diff --git a/e2e/command-center-summaries-fence.spec.ts b/e2e/command-center-summaries-fence.spec.ts
-index fb84663..1eef5c7 100644
+index fe8a042..4d7f92d 100644
 --- a/e2e/command-center-summaries-fence.spec.ts
 +++ b/e2e/command-center-summaries-fence.spec.ts
-@@ -1,6 +1,8 @@
- import { test, expect } from '@playwright/test';
- import fs from 'node:fs';
- import path from 'node:path';
-+import { spawnSync } from 'node:child_process';
-+import http from 'node:http';
+@@ -336,8 +336,9 @@ test('test_d5_settings_ui_manages_endpoints_and_surfaces_owner_errors', async ({
+       expect(shell(`tmux new-session -d -s ${sessionName} bash`).status).toBe(0);
+       await openTerminalSession(page, sessionName);
  
- const ACCEPTANCE_IDS = ['E1','E2','E3','F1','F2','F3'] as const;
- const REPORT_PATH = path.resolve(process.env.FENCE_REPORT_PATH || 'fence-report-v1.json');
-@@ -27,44 +29,169 @@ test('command-center summaries fence journey', async ({ page }) => {
-     localStorage.setItem('agj_user', JSON.stringify({ id: 1000000001, name: 'jrom', role: 'owner' }));
-   }, OWNER_TOKEN);
- 
-+  let agentName: string | null = null;
-+  let sessionName: string | null = null;
-+  let folderGroup: string | null = null;
-+  let defaultEndpointId: string | null = null;
-+  let defaultEndpointName: string | null = null;
-+  let fixtureServer: http.Server | null = null;
-+  let fixturePort: number | null = null;
-+
-+  const cleanupSessions = () => {
-+    if (sessionName) {
-+      spawnSync('bash', ['-c', `tmux kill-session -t ${sessionName} || true`]);
-+    }
-+    if (fixtureServer) {
-+      fixtureServer.close();
-+    }
-+  };
-+
-   try {
-     await page.goto(`${APP_ORIGIN}/index.html`, { waitUntil: 'domcontentloaded' });
- 
-     await check('E1', async () => {
--      // Owner-gated summary endpoints accessible and default endpoint present
-+      const pid = process.pid;
-+      const ts = Date.now();
-+      agentName = `fence-agent-${pid}-${ts}`;
-+      sessionName = agentName;
-+      folderGroup = `fence-group-${pid}-${ts}`;
-+
-+      spawnSync('bash', ['-c', `tmux new-session -d -s ${sessionName} bash`]);
-+
-+      const getGroupsResp = await page.request.get(`${APP_ORIGIN}/api/terminal/groups`, { headers: AUTH_HEADERS });
-+      expect(getGroupsResp.status()).toBe(200);
-+      const groupsData = await getGroupsResp.json();
-+      const groups = groupsData.groups || [];
-+      const updatedGroups = [...groups];
-+      const existingIdx = updatedGroups.findIndex((g:any) => g.id === folderGroup || g.name === folderGroup);
-+      if (existingIdx >= 0) {
-+        const existing = updatedGroups[existingIdx];
-+        updatedGroups[existingIdx] = { ...existing, sessions: Array.from(new Set([...(existing.sessions||[]), sessionName])) };
-+      } else {
-+        updatedGroups.push({ id: folderGroup, name: folderGroup, sessions: [sessionName] });
-+      }
-+      const putResp = await page.request.put(`${APP_ORIGIN}/api/terminal/groups`, {
-+        headers: AUTH_HEADERS,
-+        data: { groups: updatedGroups, activeGroup: groupsData.activeGroup || 'all' }
-+      });
-+      expect(putResp.status()).toBe(200);
-+
-+      const past = new Date(Date.now() - 60_000).toISOString();
-+      const reminderResp = await page.request.post(`${APP_ORIGIN}/api/agent-reminders`, {
-+        headers: AUTH_HEADERS,
-+        data: {
-+          folder_group: folderGroup!,
-+          cadence_minutes: 60,
-+          next_fire: past,
-+          solicit_message: 'LITERAL_SOLICIT_SUMMARY',
-+          recipients: [{ agent_name: sessionName!, include: 1 }]
-+        }
-+      });
-+      expect(reminderResp.status()).toBe(201);
-+
-+      // Start local OpenAI-compatible fixture server
-+      fixtureServer = http.createServer((req, res) => {
-+        if (req.method === 'POST' && req.url === '/v1/chat/completions') {
-+          res.writeHead(200, { 'Content-Type': 'application/json' });
-+          res.end(JSON.stringify({ choices: [{ message: { content: 'LITERAL_SUMMARY_FOR_TEST' } }] }));
-+        } else {
-+          res.writeHead(404);
-+          res.end();
-+        }
-+      });
-+      await new Promise<void>((resolve) => {
-+        fixtureServer!.listen(0, '127.0.0.1', () => {
-+          const addr = fixtureServer!.address() as any;
-+          fixturePort = addr.port;
-+          resolve();
-+        });
-+      });
-+
-+      // Patch existing default endpoint base_url to fixture server (preserve default 140)
-+      const epListResp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`, { headers: AUTH_HEADERS });
-+      expect(epListResp.status()).toBe(200);
-+      const epListJson = await epListResp.json();
-+      const defaultEp = epListJson.endpoints?.find((e:any)=>e.is_default);
-+      expect(defaultEp).toBeTruthy();
-+      defaultEndpointId = defaultEp.id;
-+      defaultEndpointName = defaultEp.name;
-+      const patchResp = await page.request.patch(`${APP_ORIGIN}/api/summary-endpoints/${defaultEp.id}`, {
-+        headers: AUTH_HEADERS,
-+        data: { base_url: `http://127.0.0.1:${fixturePort}/v1` }
-+      });
-+      expect(patchResp.status()).toBe(200);
-+
-+      const fireResult = spawnSync(process.execPath, [
-+        '--import', 'tsx', 'scripts/cc-fire-due.mts',
-+        '--user-id', '1', '--folder-group', folderGroup!
-+      ], { env: process.env, encoding: 'utf8' });
-+      expect(fireResult.status).toBe(0);
-+
-+      await page.waitForTimeout(500);
-+
-+      spawnSync('bash', ['-c', `tmux send-keys -t ${sessionName} "Reply: literal reply text" Enter`]);
-+
-+      // Directly invoke summary service to ensure fixture is exercised (closed-C6 arrival)
-+      const { DatabaseService } = await import('/home/agjrom/TGBOTS/AGJAssist/src/db/database.js');
-+      const { SummaryEndpointService } = await import('/home/agjrom/TGBOTS/AGJAssist/src/services/summary-endpoint-service.js');
-+      const { ReplySummaryService } = await import('/home/agjrom/TGBOTS/AGJAssist/src/services/reply-summary-service.js');
-+      const db = new DatabaseService(process.env.DB_PATH);
-+      const epService = new SummaryEndpointService(db);
-+      const svc = new ReplySummaryService(db, epService);
-+      await svc.summarize(agentName, 'Reply: literal reply text');
-+
-+      // Verify endpoint is default
-       const epResp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`, { headers: AUTH_HEADERS });
-       expect(epResp.status()).toBe(200);
--      const epJson = await epResp.json();
--      const hasDefault = epJson.endpoints?.some((e:any)=>e.name==='140' && e.is_default);
--      expect(hasDefault).toBe(true);
--      // Closed-C6 arrival fixture: summary should exist for the test agent
--      const sumResp = await page.request.get(`${APP_ORIGIN}/api/summary-agents/fence-test-agent/summaries`, { headers: AUTH_HEADERS });
--      expect(sumResp.status()).toBe(200);
--      const sumJson = await sumResp.json();
--      expect(Array.isArray(sumJson.summaries)).toBe(true);
--      expect(sumJson.summaries.length).toBeGreaterThanOrEqual(0);
-+      const epJson2 = await epResp.json();
-+      const defaultEp2 = epJson2.endpoints?.find((e:any)=>e.is_default);
-+      expect(defaultEp2).toBeTruthy();
-+      defaultEndpointId = defaultEp2.id;
-+      defaultEndpointName = defaultEp2.name;
-+
-+      // Poll for summary via public API
-+      let summary: any = null;
-+      for (let i = 0; i < 60; i++) {
-+        const sumResp = await page.request.get(`${APP_ORIGIN}/api/summary-agents/${agentName}/summaries`, { headers: AUTH_HEADERS });
-+        expect(sumResp.status()).toBe(200);
-+        const sumJson = await sumResp.json();
-+        const found = (sumJson.summaries || []).find((s:any) => s.summary_text === 'LITERAL_SUMMARY_FOR_TEST');
-+        if (found) { summary = found; break; }
-+        await page.waitForTimeout(500);
-+      }
-+      expect(summary).toBeTruthy();
-+      expect(summary.summary_text).toBe('LITERAL_SUMMARY_FOR_TEST');
-+      expect(summary.endpoint_id).toBe(defaultEndpointId);
-     });
- 
-     await check('E2', async () => {
--      await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'domcontentloaded' });
--      // Basic navigation succeeds; summaries UI is present in the app shell
--      const bodyText = await page.locator('body').innerText();
--      expect(bodyText.length).toBeGreaterThan(0);
-+      expect(agentName).toBeTruthy();
-+      // Verify UI loads and summary is accessible via API; UI checks are best-effort
-+      await page.goto(`${APP_ORIGIN}/index.html#/terminals`, { waitUntil: 'networkidle' });
-+      await page.waitForTimeout(1000);
-+      // Ensure summary exists via API as proxy for UI visibility
-+      const sumResp = await page.request.get(`${APP_ORIGIN}/api/summary-agents/${agentName}/summaries`, { headers: AUTH_HEADERS });
-+      expect(sumResp.status()).toBe(200);
-+      const sumJson = await sumResp.json();
-+      const found = (sumJson.summaries || []).find((s:any) => s.summary_text === 'LITERAL_SUMMARY_FOR_TEST');
-+      expect(found).toBeTruthy();
-     });
- 
-     await check('E3', async () => {
--      const sumResp = await page.request.get(`${APP_ORIGIN}/api/summary-agents/fence-test-agent/summaries`, { headers: AUTH_HEADERS });
-+      expect(agentName).toBeTruthy();
-+      expect(defaultEndpointId).toBeTruthy();
-+      const sumResp = await page.request.get(`${APP_ORIGIN}/api/summary-agents/${agentName}/summaries`, { headers: AUTH_HEADERS });
-       expect(sumResp.status()).toBe(200);
-       const sumJson = await sumResp.json();
--      if (sumJson.summaries && sumJson.summaries.length > 0) {
--        const s = sumJson.summaries[0];
--        expect(s).toHaveProperty('endpoint_id');
--        expect(s).toHaveProperty('summary_text');
--      }
-+      const s = (sumJson.summaries || []).find((x:any) => x.summary_text === 'LITERAL_SUMMARY_FOR_TEST');
-+      expect(s).toBeTruthy();
-+      expect(s).toHaveProperty('endpoint_id');
-+      expect(s).toHaveProperty('summary_text');
-+      expect(s.summary_text).toBe('LITERAL_SUMMARY_FOR_TEST');
-+      expect(s.endpoint_id).toBe(defaultEndpointId);
-     });
- 
-     await check('F1', async () => {
--      // Endpoints can be listed with owner token and contain required fields
-       const epResp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`, { headers: AUTH_HEADERS });
-       expect(epResp.status()).toBe(200);
-       const epJson = await epResp.json();
-@@ -75,7 +202,6 @@ test('command-center summaries fence journey', async ({ page }) => {
-     });
- 
-     await check('F2', async () => {
--      // Default endpoint labelled 140 is present via API
-       const epResp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`, { headers: AUTH_HEADERS });
-       const epJson = await epResp.json();
-       const ep = epJson.endpoints?.find((e:any)=>e.name==='140');
-@@ -84,14 +210,10 @@ test('command-center summaries fence journey', async ({ page }) => {
-     });
- 
-     await check('F3', async () => {
--      // Owner-only: unauth request must be rejected
-       const unauthResp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`);
-       expect([401,403]).toContain(unauthResp.status());
--      // Secrets are not logged in responses
-       const epResp = await page.request.get(`${APP_ORIGIN}/api/summary-endpoints`, { headers: AUTH_HEADERS });
-       const epJson = await epResp.json();
--      const hasSecret = JSON.stringify(epJson).match(/token|password|key/i);
--      // Response should not echo secrets in base_url
-       const endpoints = epJson.endpoints || [];
-       for (const e of endpoints) {
-         if (e.base_url) {
-@@ -104,6 +226,7 @@ test('command-center summaries fence journey', async ({ page }) => {
-     const isNamedAssertion = error instanceof Error && error.message.startsWith('FENCE_ASSERT:');
-     if (!isNamedAssertion) throw error;
-   } finally {
-+    cleanupSessions();
-     fs.writeFileSync(REPORT_PATH, JSON.stringify({ schema:'fence-report-v1', collected: [...ACCEPTANCE_IDS], passed, failed }, null, 2));
-   }
- 
+-      await expect(page.locator('[data-testid="terminal-menu"]')).toBeVisible();
++      await page.waitForSelector('[data-testid="terminal-menu"]', { state: 'visible', timeout: 10000 });
+       await page.locator('[data-testid="terminal-menu"]').click({ force: true });
++      await expect(page.locator('[data-testid="terminal-menu"]')).toHaveAttribute('aria-expanded', 'true');
+       const sheet = page.locator('[data-testid="summary-endpoint-sheet"]');
+       await expect(sheet).toBeVisible();
+       await expect(sheet).toContainText('140');
+diff --git a/e2e/run-command-center-playwright-fence.mjs b/e2e/run-command-center-playwright-fence.mjs
+index 9590183..fd83b27 100644
+--- a/e2e/run-command-center-playwright-fence.mjs
++++ b/e2e/run-command-center-playwright-fence.mjs
+@@ -148,11 +148,16 @@ if (gate) {
+   const failedNeg = negCode !== 0
+     && negFails.length === expectedFailures.length
+     && expectedFailures.every(expected => negFails.some(actual => actual?.id === expected.id && actual?.kind === expected.kind));
+-  const negFailedIds = failedNeg ? expectedFailures : [];
++  const posPassed = posReport?.passed || [];
++  const posFailed = posReport?.failed || [];
++  const mergedFailed = [...posFailed];
++  if (failedNeg) {
++    mergedFailed.push(...expectedFailures.map(f => ({ ...f, kind: f.kind + '-negative' })));
++  }
+   const overallPass = passed && failedNeg;
+   const verdict = overallPass ? 'PASS' : 'FAIL';
+   const faultClass = overallPass ? 'none' : 'implementation';
+-  writeReport(fence.acceptance_ids, passed ? fence.acceptance_ids : [], failedNeg ? negFailedIds : [], verdict, faultClass);
++  writeReport(fence.acceptance_ids, posPassed, mergedFailed, verdict, faultClass);
+   console.log(verdictLine(verdict, faultClass));
+   process.exit(overallPass ? 0 : 1);
+ }
 ```
 
 # tiller validator — standing contract
@@ -265,7 +69,7 @@ You are the VALIDATOR. **Write NO product code** (verifier != fixer). You judge,
 # THE SLICE — D0 (run command-center-2026-08-26)
 
 ## Scope (do ONLY this)
-HARNESS-CORRECTNESS ONLY. Rewrite e2e/command-center-summaries-fence.spec.ts against the real D4 owner-gated contract plus the closed-C6 solicit-reply arrival fixture. Do not invent unauth GET /api/summary-endpoints 200, GET /api/agent-summaries, or GET /api/summary-endpoints/default. Use FENCE_ORIGIN and OWNER_TOKEN. Collect ALL of E1,E2,E3,F1,F2,F3. FENCE_STUB=D3 named-red on E1 kind=assert. Write fence-report-v1.json in finally. Do not add product routes.
+HARNESS-CORRECTNESS ONLY. Rewrite e2e/command-center-summaries-fence.spec.ts against the real D4 owner-gated contract plus the closed-C6 solicit-reply arrival fixture. Do not invent unauth GET /api/summary-endpoints 200, GET /api/agent-summaries, or GET /api/summary-endpoints/default. Use FENCE_ORIGIN and OWNER_TOKEN. Collect ALL of E1,E2,E3,F1,F2,F3. FENCE_STUB=D3 named-red on E1 kind=assert. Write fence-report-v1.json in finally. Do not add product routes. North 2026-08-28 PLAN_SOUND: carry validation/D0-fix-a3.md.
 
 ## Acceptance criteria — the TEXT is the contract, the id is only its name
 - **HARNESS-SMOKE** — ⚠ NO CRITERION TEXT FOUND in og-requirements.md. Treat the SCOPE above as the authority for this one, and say so in your callback if that is ambiguous. (Plan-invented ids such as `FH*` legitimately have no og-requirement.)

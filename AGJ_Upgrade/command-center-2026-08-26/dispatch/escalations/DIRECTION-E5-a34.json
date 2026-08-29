@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 34,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "Holding, not retrying: restored dispatch/fence-open.E5.marker (I had retired it last cycle trying to force a fresh OPEN \u2014 wrong move, reverted). A fresh OPEN cannot work here: E1-E4 are all DONE, so the journey is already green and OPEN correctly refuses ('nothing failed') per the driver's own MODE-4 guard against a post-hoc baseline. Restoring the old marker just re-exposes the ORIGINAL blocker: do_fence_close's assertions_weakened() check (tiller_testexec.py:272) is unconditional and does not read plan_level_fingerprint, plan_changed, or any other DIRECTION field \u2014 it is a pure set-difference between the OPEN marker's open_failed_ids (['D1','D2']) and the current CLOSE ids (['E1','E2','E3','E4']). D1/D2 are gone by name (renamed, not dropped in substance) so it will ALWAYS flag 'removed or renamed since OPEN' on every future retry, regardless of what DIRECTION accompanies it. This is a deliberate anti-gaming safeguard (per its own docstring: exactly written to catch a rename used to escape a stuck fingerprint) \u2014 this driver pin has no lever to tell it 'this specific rename was north-approved, not gaming'. Escalating to north: this needs a human call on how to reconcile a legitimate, ruled-sound rename with a hardcoded integrity check, not another coordinator-side retry.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T18:12:11Z"
+}

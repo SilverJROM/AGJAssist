@@ -1,0 +1,16 @@
+{
+  "schema": "fence-report-v1",
+  "collected": [
+    "E1",
+    "E2",
+    "E3",
+    "E4"
+  ],
+  "passed": [
+    "E1",
+    "E2",
+    "E3",
+    "E4"
+  ],
+  "failed": []
+}

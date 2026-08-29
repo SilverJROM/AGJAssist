@@ -1,0 +1,15 @@
+{
+  "slice": "G1",
+  "cycle": 1,
+  "attempt": 1,
+  "why": "impl [projcore callback] implementer G1 STATUS: BLOCKED \u2014 focused terminal UX run failed: hidden controls at 390px",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787944324-1192056",
+  "raised_at": "2026-08-28T19:20:19Z",
+  "note": "TILLER ALREADY TRIED TO SELF-HEAL THIS. Seat `x-tlre7cd71a78feb_impl_terra` for G1 was respawned 0x and re-dispatched automatically before this RAISE. callback received A plain RETRY_WITH_DIRECTION will repeat exactly what already failed \u2014 fix the underlying condition (env, PATH, quota, or the slice itself) first, or answer STOP_TRUE_BLOCKED."
+}

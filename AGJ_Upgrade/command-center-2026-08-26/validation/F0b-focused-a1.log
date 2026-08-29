@@ -1,0 +1,62 @@
+[1A[2K[2m[WebServer] [22m(node:1551116) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 6 tests using 1 worker
+
+[1A[2K[1/6] [cc] › e2e/command-center-window-fence.spec.ts:176:1 › test_f1_refresh_from_session_surface_visible
+[1A[2K[2/6] [cc] › e2e/command-center-window-fence.spec.ts:202:1 › test_f2_draft_and_switcher_surfaces_are_rendered
+[1A[2K[3/6] [cc] › e2e/command-center-window-fence.spec.ts:230:1 › test_f3_refresh_action_and_draft_reload_keep_composer_usable
+[1A[2K[4/6] [cc] › e2e/command-center-window-fence.spec.ts:260:1 › test_f4_header_v2_collapses_without_losing_command_center_chrome
+[1A[2K[5/6] [cc] › e2e/command-center-window-fence.spec.ts:288:1 › test_f5_phone_dropdown_and_wide_switcher_are_available
+[1A[2K[6/6] [cc] › e2e/command-center-window-fence.spec.ts:317:1 › test_f6_window_theme_attribute_is_applied
+[1A[2K  6 passed (24.3s)
+[1A[2K[2m[WebServer] [22m(node:1554554) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 6 tests using 1 worker
+
+[1A[2K[1/6] [cc] › e2e/command-center-window-fence.spec.ts:176:1 › test_f1_refresh_from_session_surface_visible
+[1A[2K[2/6] [cc] › e2e/command-center-window-fence.spec.ts:202:1 › test_f2_draft_and_switcher_surfaces_are_rendered
+[1A[2K[3/6] [cc] › e2e/command-center-window-fence.spec.ts:230:1 › test_f3_refresh_action_and_draft_reload_keep_composer_usable
+[1A[2K  1) [cc] › e2e/command-center-window-fence.spec.ts:230:1 › test_f3_refresh_action_and_draft_reload_keep_composer_usable 
+
+    Error: FENCE failures: [{"id":"I1","kind":"assert","message":"FENCE_STUB=F1 forces red for I1: I1 refresh-control-repulls-session-regardless-of-collapse"}]
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoEqual[2m([22m[32mexpected[39m[2m) // deep equality[22m
+
+    [32m- Expected  - 1[39m
+    [31m+ Received  + 7[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   Object {[39m
+    [31m+     "id": "I1",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+     "message": "FENCE_STUB=F1 forces red for I1: I1 refresh-control-repulls-session-regardless-of-collapse",[39m
+    [31m+   },[39m
+    [31m+ ][39m
+
+      163 |   );
+      164 |   writeReport();
+    > 165 |   expect(localFailed, `FENCE failures: ${JSON.stringify(localFailed)}`).toEqual([]);
+          |                                                                         ^
+      166 | }
+      167 |
+      168 | test.beforeEach(async ({}, testInfo) => {
+        at finishContributor (/home/agjrom/TGBOTS/AGJAssist/e2e/command-center-window-fence.spec.ts:165:73)
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-window-fence.spec.ts:254:11
+
+    Error Context: test-results/command-center-window-fenc-ed207-reload-keep-composer-usable-cc/error-context.md
+
+    Error Context: test-results/command-center-window-fenc-ed207-reload-keep-composer-usable-cc/error-context.md
+
+
+[1A[2K[4/6] [cc] › e2e/command-center-window-fence.spec.ts:260:1 › test_f4_header_v2_collapses_without_losing_command_center_chrome
+[1A[2K[5/6] [cc] › e2e/command-center-window-fence.spec.ts:288:1 › test_f5_phone_dropdown_and_wide_switcher_are_available
+[1A[2K[6/6] [cc] › e2e/command-center-window-fence.spec.ts:317:1 › test_f6_window_theme_attribute_is_applied
+[1A[2K  1 failed
+    [cc] › e2e/command-center-window-fence.spec.ts:230:1 › test_f3_refresh_action_and_draft_reload_keep_composer_usable 
+  5 passed (23.2s)
+fence=F7 verdict=PASS fault_class=none

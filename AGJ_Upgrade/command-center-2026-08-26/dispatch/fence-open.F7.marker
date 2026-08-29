@@ -15,7 +15,7 @@
   "collected": 10,
   "test_path": "e2e/command-center-window-fence.spec.ts",
   "test_hash": "sha256:b37a440ffba5d4675d94739a618fb05c71db6a69dbb8696aa155f1d77ac3c7b8",
-  "negative_control": "FENCE_STUB=F1 FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
+  "negative_control": "FENCE_STUB=I1 FENCE_ID=F7 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs",
   "authored_by": "coplanner:sol+grok46; rev2-projcore",
   "opened_at": 1787896995,
   "driver_epoch": "1787894777-3583140"

@@ -21,23 +21,29 @@
 - [DONE] 19: D4 — Expose owner-only endpoint management and per-agent summary history.  <!-- driver-advanced 6a11ee027c1e -->
 - [DONE] 20: D5 — Let the owner add, edit, remove, and select summary endpoints in Settings.  <!-- driver-advanced 5990791a082b -->
 - [DONE] 21: D6 — Show each agent's newest summaries in a useful scrollable dropdown.  <!-- driver-advanced b687e58a439e -->
-- [PENDING] 22: D7 — Prove an answered solicit becomes a stored local-LLM summary in the dropdown.
+- [DONE] 22: D7 — Prove an answered solicit becomes a stored local-LLM summary in the dropdown.  <!-- driver-advanced 7a4c7c0a77 satisfied-via-D0 -->
 - [DONE] 23: E1 — Let the owner persist one-time wakeups independently of the retired OVM scheduler.  <!-- driver-advanced 245e1293ff1c -->
 - [DONE] 24: E2 — Fire each due wakeup once through safety checks and audit, then clear it.  <!-- driver-advanced 5dfa879526e3 -->
 - [DONE] 25: E3 — Expose owner-only wakeup scheduling, pending state, and cancellation.  <!-- driver-advanced 2e2c18f91eef -->
 - [DONE] 26: E4 — Show and manage a one-time wakeup from expanded or collapsed agent headers.  <!-- driver-advanced b1d8258c5d4d -->
-- [PENDING] 27: E5 — Prove a scheduled wakeup appears, fires once, sends its action, and clears.
+- [DONE] 27: E5 — Prove a scheduled wakeup appears, fires once, sends its action, and clears.  <!-- driver-advanced 126885a546 -->
 - [DONE] 28: F1 — Keep unsent composer text isolated by viewer and agent across reloads.  <!-- driver-advanced c5aa50963b0c -->
 - [DONE] 29: F2 — Restore drafts on agent switches and clear only the successfully sent draft.  <!-- driver-advanced afa783f35e13 -->
 - [DONE] 30: F3 — Refresh transcript and live session details without blocking the composer.  <!-- driver-advanced 41459b9897b7 -->
 - [DONE] 31: F4 — Match the mockup's compact independently collapsible command-center header.  <!-- driver-advanced 138b91fd1e -->
 - [DONE] 32: F5 — Switch agents by dropdown on narrow screens and scrubber on wide screens.  <!-- driver-advanced 40ec05e841 -->
 - [DONE] 33: F6 — Keep the locked window readable and theme-adaptive from phone through desktop.  <!-- driver-advanced 241b5cf3f0 -->
-- [PENDING] 34: F7 — Prove the complete agent window matches the mockup without terminal regressions.
-- [PENDING] 35: G1 — Remove dead OVM and mockup scratch artifacts while preserving the locked design record.
-- [PENDING] 36: G2 — Keep live backup and restart unreachable from tiller; only a confirmed human may execute.
+- [DONE] 34: F7 — Prove the complete agent window matches the mockup without terminal regressions.  <!-- driver-advanced 126885a546 -->
+- [DONE] 35: G1 — Remove dead OVM and mockup scratch artifacts while preserving the locked design record.  <!-- driver-advanced 28d46055f2 -->
+- [DONE] 36: G2 — Keep live backup and restart unreachable from tiller; only a confirmed human may execute.  <!-- driver-advanced 6c26334bcf -->
 - [DONE] 37: H8 — Make B8 CLOSE measurement collect every F-OVM id and named-red A2 under FENCE_STUB=B2.  <!-- driver-advanced 78fe35e10ee0 -->
 - [DONE] 38: C0 — Make the reminders fence journey measure the real C4 contract plus C1-C6 collection.  <!-- driver-advanced fe98610ebf34 -->
 - [DONE] 39: F0 — Make the window fence journey named-red on G1-J2 against current HEAD without product UI.  <!-- driver-advanced d08ca352dd82 -->
-- [PENDING] 40: D0 — Make the summaries fence journey measure the real owner-gated D4 contract plus C6 arrival.
+- [DONE] 40: D0 — Make the summaries fence journey measure the real owner-gated D4 contract plus C6 arrival.  <!-- driver-advanced 7a4c7c0a77 -->
 - [DONE] 41: E0 — Make the wakeup fence journey measure real E3 pending routes and E2 fire-once.  <!-- driver-advanced 88d17608cca3 -->
+- [DONE] 42: F0b — Rewrite the window fence POSITIVE path so G1-J2 are literal og-req assertions.  <!-- driver-advanced 9e35ea8523 -->
+- [DONE] 43: F0c — Named-red per G1-J2 plus server-backed F7 negative (after F0b).  <!-- driver-advanced 6c7a2e61f7 -->
+- [DONE] 44: E0b — Give the wakeup fence its own distinct check per capability so a break can be pinned to the right layer.  <!-- driver-advanced aab20bbfe9 -->
+- [DONE] 45: F0d — Make the window fence's refresh check reliable under load instead of racing a fixed timeout.  <!-- driver-advanced 6e9b5801d7 -->
+- [DONE] 46: E0c — Make sure a real wakeup-fence failure always shows up in its report instead of getting silently dropped.  <!-- driver-advanced 126885a546 -->
+- [DONE] 47: F8 — Restore the existing terminal controls that the new window design broke at phone width.  <!-- driver-advanced d70d12cd67 -->

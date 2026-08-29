@@ -1,0 +1,9 @@
+{
+  "slice": "F0b",
+  "attempt": 5,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "RAISE-F0b-c1 SLICE-TOO-BIG a4 sonnet5 1800s still working. Split: this row is POSITIVE path only (F0c owns named-reds+contract). Park-rollback restored HEAD 7a4c7c0; ref refs/tiller/command-center-2026-08-26/F0b=e368ae3. Do NOT wholesale cherry-pick e368ae3 (edited server.ts + synthetic I1 throw). Port only spec setup+literal asserts from that ref / validation/F0b-fix-a3.md findings 1-2. Findings 3-4 are F0c. FENCE_ID=F7 without --gate. Sonnet5/opus5. F1-F6 frozen. No src/api/server.ts edits.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T12:38:20Z"
+}

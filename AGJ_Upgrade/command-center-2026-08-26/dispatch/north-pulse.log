@@ -13,3 +13,36 @@
 2026-08-28T08:50:55+00:00 solicit reports: issues: none owed. F5 a4 in flight; not 3 failed rounds. Monitor 381861 live. ; raises: all ACKED. E5 PLAN_SOUND a11 parked. D7 parked waiting D0. — waking north
 2026-08-28T09:21:30+00:00 solicit reports: issues: none owed. F6 a2 in flight (budget 1/4). Monitor 685355 live. Pulse LI; raises: all ACKED. F5 DONE (advance-F5, 40ec05e). E5 PLAN_SOUND parked. D7/D0  — waking north
 2026-08-28T09:52:06+00:00 solicit reports: issues: none. Monitor 685355 live. Pulse LIVE. parked=[D0,D7,E5]; raises: all ACKED. E5 PLAN_SOUND parked. D7/D0 parked waiting D0 PLAN_SOUND. — waking north
+2026-08-28T10:22:10+00:00 projcore pane is CHURNING — skipping this tick (it is working, not wedged)
+2026-08-28T10:27:59+00:00 solicit reports: issues: D7 OPEN vacuous after D0 `--gate` green. F7 journey vs og-req G3/H3/I2; raises: F7-c2 SKIP a10. D7-a9 SKIP written unapplied (keep parked). No new RAI — waking north
+2026-08-28T10:58:34+00:00 solicit reports: issues: none. Both north rulings applied (D7 satisfied-via-D0; F7 harness-only; raises: none owed. F7-c2 SKIP a10 until F0b. E5 PLAN_SOUND a11 parked. — waking north
+2026-08-28T11:29:10+00:00 solicit reports: issues: none. a1 FAIL TEST_NOT_DISCRIMINATING 54e06c7; a2 correction in gate. ; raises: none owed. F7 parked until F0b. E5 PLAN_SOUND a11 parked. — waking north
+2026-08-28T11:59:45+00:00 solicit reports: issues: none. Repeats are harness bugs in F0b-fix-a2.md, not AC drift. Not 3 f; raises: none owed. F0b PLAN SUSPECT answered (HARNESS-SMOKE sound). F7/E5 park — waking north
+2026-08-28T12:30:20+00:00 solicit reports: issues: none new. a1-a3 same harness class; a4 is L1_ATTEMPTS roster escalate,; raises: none owed. PLAN SUSPECT answered (HARNESS-SMOKE sound). F7/E5 parked. — waking north
+2026-08-28T13:01:10+00:00 solicit reports: issues: none. Post-split a1 incomplete; a2 running focused fence tests. Not 3 ; raises: none owed. F0b-c1 split done. F7/E5 parked. — waking north
+2026-08-28T13:31:12+00:00 PROMPT CHANGED:  north.md#af3f95a0 NORTH_AGENT.md#3ba4872b north-agent.md#3ba4872b ->  north.md#8c3a35db NORTH_AGENT.md#3ba4872b north-agent.md#3ba4872b
+2026-08-28T13:31:47+00:00 solicit reports: issues: none new. a1 IMPL_INCOMPLETE; a2/a3 TEST_NOT_DISCRIMINATING. a4 is L1_; raises: none owed. F7/E5 parked. F0c waits F0b. — waking north
+2026-08-28T14:01:48+00:00 PROMPT CHANGED:  north.md#8c3a35db NORTH_AGENT.md#3ba4872b north-agent.md#3ba4872b ->  north.md#bd8461d8 NORTH_AGENT.md#3ba4872b north-agent.md#3ba4872b
+2026-08-28T14:02:38+00:00 solicit reports: issues: none. F0b split landed. F0c is named-reds + server-backed F7 negative.; raises: none owed. F7/E5 parked until F0c then F7 CLOSE. — waking north
+2026-08-28T14:33:13+00:00 solicit reports: issues: none. Pane has a command running (gate with reverted server), not empt; raises: none owed. F7/E5 parked. — waking north
+2026-08-28T15:13:19+00:00 NO ANSWER in 10m — waking north
+2026-08-28T15:33:20+00:00 projcore session 'x-01_projcore_grok46_agjassist' GONE
+2026-08-28T15:35:31+00:00 another pulse owns this run — exiting
+2026-08-28T15:36:34+00:00 another pulse owns this run — exiting
+2026-08-28T15:37:03+00:00 pulse START run=command-center-2026-08-26 north='agj-3767' projcore='x-02_projcore_sonnet5_agjassist' solicit=1800s
+2026-08-28T15:37:21+00:00 another pulse owns this run — exiting
+2026-08-28T16:07:53+00:00 solicit reports: issues: F0c a2's prior dispatch WEDGED (not slow): glimmer showed "Weekly limi; raises: none owed. F7/E5 parked. — waking north
+2026-08-28T16:38:29+00:00 solicit reports: issues: E5-c7 flagged fault_class=plan on a repeated fingerprint; I overrode i; raises: none owed. E5-c7 and F0c-c2 both answered this cycle. — waking north
+2026-08-28T17:09:04+00:00 solicit reports: issues: codex bin-symlink outage recurred a second time (interrupted self-upda; raises: none owed. Both prior RAISEs (E5-c9, F0c-c3) answered and applied at 1 — waking north
+2026-08-28T17:39:40+00:00 solicit reports: issues: Root cause of the last hour's roster churn: codex's own self-update fi; raises: none owed. — waking north
+2026-08-28T18:09:44+00:00 projcore pane is CHURNING — skipping this tick (it is working, not wedged)
+2026-08-28T18:15:03+00:00 solicit reports: issues: Confirmed parked-slices.json = [E5, F7] only — F0c correctly out of th; raises: none owed. — waking north
+2026-08-28T18:45:08+00:00 projcore pane is CHURNING — skipping this tick (it is working, not wedged)
+2026-08-28T18:50:27+00:00 solicit reports: issues: Two decisions waiting on you: (1) E5 — proposed editing fence-open.E5.; raises: none owed. Both open questions answered and held (SKIP_TO_PROJCORE), n — waking north
+2026-08-28T19:20:31+00:00 projcore pane is CHURNING — skipping this tick (it is working, not wedged)
+2026-08-28T19:25:34+00:00 projcore pane is CHURNING — skipping this tick (it is working, not wedged)
+2026-08-28T19:30:53+00:00 solicit reports: issues: G1 hit a real product regression, not its own fault: e2e/terminal-ux-c; raises: none owed. G1-c1 answered (SKIP_TO_PROJCORE, a1) -- held, not retried. — waking north
+2026-08-28T20:01:13+00:00 solicit reports: issues: none. F8's landing checked carefully (the 'A4 conflicts with UI scope'; raises: none owed. — waking north
+2026-08-28T20:31:49+00:00 solicit reports: raises: none owed. — waking north
+2026-08-28T20:46:50+00:00 work_remaining=0 — run genuinely finished, exiting
+2026-08-28T20:46:50+00:00 pulse exiting

@@ -1,0 +1,32 @@
+{
+  "sha256": "7220a2d32042de73290d83df4dfebe4538daec6f2c984ab4340ea7a93c53b423",
+  "values": {
+    "v": 1,
+    "seat_profile": "roster",
+    "l1_attempts": 3,
+    "impl_L1": "terra",
+    "impl_L1_esc": "sonnet5",
+    "impl_L2": "terra",
+    "impl_L2_esc": "sonnet5",
+    "impl_L3": "sonnet5",
+    "impl_L3_esc": "sol",
+    "impl_L4": "sol",
+    "impl_L4_esc": "opus5",
+    "val_L1": "sonnet5",
+    "val_L2": "sonnet5",
+    "val_L3": "codex55",
+    "val_L4": "opus5",
+    "env:IMPL_L1": "terra",
+    "env:IMPL_L1_ESC": "sonnet5",
+    "env:IMPL_L2": "terra",
+    "env:IMPL_L2_ESC": "sonnet5",
+    "env:IMPL_L3": "sonnet5",
+    "env:IMPL_L3_ESC": "sol",
+    "env:IMPL_L4": "sol",
+    "env:VAL_L1": "sonnet5",
+    "env:VAL_L2": "sonnet5",
+    "env:VAL_L3": "codex55",
+    "env:VAL_L4": "opus5"
+  },
+  "stamped_at": 1787940728
+}

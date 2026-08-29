@@ -1,0 +1,14 @@
+[1A[2K[2m[WebServer] [22m(node:2330776) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 6 tests using 1 worker
+
+[1A[2K[1/6] [cc] › e2e/command-center-window-fence.spec.ts:162:1 › test_f1_refresh_from_session_surface_visible
+[1A[2K[2/6] [cc] › e2e/command-center-window-fence.spec.ts:186:1 › test_f2_draft_and_switcher_surfaces_are_rendered
+[1A[2K[3/6] [cc] › e2e/command-center-window-fence.spec.ts:216:1 › test_f3_refresh_action_and_draft_reload_keep_composer_usable
+[1A[2K[4/6] [cc] › e2e/command-center-window-fence.spec.ts:259:1 › test_f4_header_v2_collapses_without_losing_command_center_chrome
+[1A[2K[5/6] [cc] › e2e/command-center-window-fence.spec.ts:295:1 › test_f5_phone_dropdown_and_wide_switcher_are_available
+[1A[2K[6/6] [cc] › e2e/command-center-window-fence.spec.ts:331:1 › test_f6_window_theme_attribute_is_applied
+[1A[2K  6 passed (49.7s)
+fence=F7 verdict=PASS fault_class=none

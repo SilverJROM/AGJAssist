@@ -1,0 +1,4 @@
+FINDING 1 of 1
+WHAT FAILED: The required focused validator command `FENCE_ID=E5 AGJASSIST_FENCE_DB_MODE=temp-copy node e2e/run-command-center-playwright-fence.mjs` did not complete green. It exited 143 twice before Playwright emitted test results; the generated report at `fence-report-v1.json` has E5 collected IDs but no passed IDs and verdict FAIL.
+THE FIX: Re-run the exact focused command in an environment where Node/Playwright is not being SIGTERM'd; the concrete blocker is process exit 143 before `npx playwright test` can execute the E5 spec. Also move or overwrite any stale root `fence-report-v1.json` before the rerun so the runner cannot merge old fence data into a failed invocation.
+WHY THE LAST ATTEMPT MISSED IT: Static harness isolation is present, but executable validation was interrupted at the process level.

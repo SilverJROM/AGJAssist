@@ -18,3 +18,34 @@ watch: status cadence -> [tiller] STATUS 09:53 · command-center-2026-08-26 · S
 watch: another watcher already owns this run — exiting
 watch: BACKSTOP — driver exited with 6 slice(s) still not DONE and no live driver (nag 2)
 watch: another watcher already owns this run — exiting
+watch: BACKSTOP — driver exited with 5 slice(s) still not DONE and no live driver (nag 3)
+watch: status cadence -> [tiller] STATUS 10:23 · command-center-2026-08-26 · STALLED
+watch: BACKSTOP — driver exited with 5 slice(s) still not DONE and no live driver (nag 4)
+watch: another watcher already owns this run — exiting
+watch: status cadence -> [tiller] STATUS 10:53 · command-center-2026-08-26 · NOMINAL
+watch: status cadence -> [tiller] STATUS 11:23 · command-center-2026-08-26 · NOMINAL
+watch: status cadence -> [tiller] STATUS 11:54 · command-center-2026-08-26 · NOMINAL
+watch: status cadence -> [tiller] STATUS 12:24 · command-center-2026-08-26 · NOMINAL
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting
+watch: another watcher already owns this run — exiting

@@ -1,0 +1,58 @@
+[1A[2K[2m[WebServer] [22m(node:1179048) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 4 tests using 1 worker
+
+[1A[2K[1/4] [cc] › e2e/command-center-wakeup-fence.spec.ts:144:1 › test_e1_schema_persists_one_time_wakeup_fields
+[1A[2K[2/4] [cc] › e2e/command-center-wakeup-fence.spec.ts:188:1 › test_e2_service_fires_due_wakeup_once_into_temp_pane
+[1A[2K[3/4] [cc] › e2e/command-center-wakeup-fence.spec.ts:274:1 › test_e3_routes_schedule_pending_and_cancel_owner_wakeup
+[1A[2K[4/4] [cc] › e2e/command-center-wakeup-fence.spec.ts:331:1 › test_e4_ui_shows_pending_indicator_in_expanded_and_collapsed_headers
+[1A[2K  4 passed (9.5s)
+[1A[2K[2m[WebServer] [22m(node:1180197) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+Running 4 tests using 1 worker
+
+[1A[2K[1/4] [cc] › e2e/command-center-wakeup-fence.spec.ts:144:1 › test_e1_schema_persists_one_time_wakeup_fields
+[1A[2K[2/4] [cc] › e2e/command-center-wakeup-fence.spec.ts:188:1 › test_e2_service_fires_due_wakeup_once_into_temp_pane
+[1A[2K  1) [cc] › e2e/command-center-wakeup-fence.spec.ts:188:1 › test_e2_service_fires_due_wakeup_once_into_temp_pane 
+
+    Error: FENCE failures: [{"id":"E2","kind":"assert","message":"FENCE_STUB=E2 forces E2 failure"}]
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoEqual[2m([22m[32mexpected[39m[2m) // deep equality[22m
+
+    [32m- Expected  - 1[39m
+    [31m+ Received  + 7[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   Object {[39m
+    [31m+     "id": "E2",[39m
+    [31m+     "kind": "assert",[39m
+    [31m+     "message": "FENCE_STUB=E2 forces E2 failure",[39m
+    [31m+   },[39m
+    [31m+ ][39m
+
+      75 |   );
+      76 |   writeReport();
+    > 77 |   expect(localFailed, `FENCE failures: ${JSON.stringify(localFailed)}`).toEqual([]);
+         |                                                                         ^
+      78 | }
+      79 |
+      80 | async function installOwnerSession(page) {
+        at finishContributor (/home/agjrom/TGBOTS/AGJAssist/e2e/command-center-wakeup-fence.spec.ts:77:73)
+        at /home/agjrom/TGBOTS/AGJAssist/e2e/command-center-wakeup-fence.spec.ts:271:9
+
+    Error Context: test-results/command-center-wakeup-fenc-62ffa--wakeup-once-into-temp-pane-cc/error-context.md
+
+    Error Context: test-results/command-center-wakeup-fenc-62ffa--wakeup-once-into-temp-pane-cc/error-context.md
+
+
+[1A[2K[3/4] [cc] › e2e/command-center-wakeup-fence.spec.ts:274:1 › test_e3_routes_schedule_pending_and_cancel_owner_wakeup
+[1A[2K[4/4] [cc] › e2e/command-center-wakeup-fence.spec.ts:331:1 › test_e4_ui_shows_pending_indicator_in_expanded_and_collapsed_headers
+[1A[2K  1 failed
+    [cc] › e2e/command-center-wakeup-fence.spec.ts:188:1 › test_e2_service_fires_due_wakeup_once_into_temp_pane 
+  3 passed (9.5s)
+fence=E5 verdict=PASS fault_class=none

@@ -1,0 +1,26 @@
+# G1 attempt 3 — A2/A3 evidence (commit 28d4605)
+
+## A2 — real boot on :3399 (TELEGRAM_TEST_MODE=true)
+AGJAssist API server listening on 0.0.0.0:3399
+AGJAssist booted in TEST_MODE=true (Telegram bot not started)
+
+  GET /api/overmind/status -> 404
+  GET /api/overmind/projects -> 404
+  GET /api/overmind/workflows -> 404
+  GET /api/overmind/stream -> 404
+  GET /api/app-settings -> 404
+  GET /api/health -> 200
+
+## A2 — overmind wiring grep over src/
+  (none)
+
+## A3 — real AssistantCore.handleCommand() at commit 28d4605
+  "/overmind" -> "Unknown command. Use /help."
+  "/om_tasks 1" -> "Unknown command. Use /help."
+  "/om_pause 1" -> "Unknown command. Use /help."
+  "/om_resume 1" -> "Unknown command. Use /help."
+  "/om_drop 1" -> "Unknown command. Use /help."
+  "/ovm_start" -> "Unknown command. Use /help."
+  "/ovm_end" -> "Unknown command. Use /help."
+  control "/help" -> "AGJAssist Commands:\n/jobs or /tmux - list tmux jobs and pane"
+  control "/nonsense" -> "Unknown command. Use /help."

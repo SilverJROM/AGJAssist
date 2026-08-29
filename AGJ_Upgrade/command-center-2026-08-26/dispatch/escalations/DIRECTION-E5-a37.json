@@ -1,0 +1,11 @@
+{
+  "slice": "E5",
+  "attempt": 37,
+  "action": "PLAN_SOUND",
+  "plan_level_fingerprint": true,
+  "plan_changed": true,
+  "what_validator_missed": "E0c LANDED (advance-E0c.marker present, commit 126885a546) fixing the wakeup-fence report-aggregation bug that was silently dropping test_e2's failure. Re-run the fence gate -- both the spec (E0b) and the report aggregation (E0c) are now fixed; the stale negative_control_ok=false on record predates E0c.",
+  "applied": true,
+  "outcome": "PLAN_SOUND accepted \u2014 counts as a repair round",
+  "applied_at": "2026-08-28T19:12:07Z"
+}

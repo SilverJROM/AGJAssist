@@ -1,0 +1,24 @@
+{
+  "schema": "fence-report-v1",
+  "collected": [
+    "E1",
+    "E2",
+    "E3",
+    "F1",
+    "F2",
+    "F3"
+  ],
+  "passed": [
+    "E3",
+    "F2",
+    "E1",
+    "F1"
+  ],
+  "failed": [
+    {
+      "id": "F3",
+      "kind": "assert",
+      "message": "\u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator:  locator('[data-testid=\"summary-endpoint-sheet\"]')\nExpected: visible\nReceived: hidden\nTimeout:  5000ms\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-testid=\"summary-endpoint-sheet\"]')\u001b[22m\n\u001b[2m    14 × locator resolved to <div data-testid=\"summary-endpoint-sheet\">…</div>\u001b[22m\n\u001b[2m       - unexpected value \"hidden\"\u001b[22m\n"
+    }
+  ]
+}

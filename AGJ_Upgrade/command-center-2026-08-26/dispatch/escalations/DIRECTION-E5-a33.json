@@ -1,0 +1,11 @@
+{
+  "slice": "E5",
+  "attempt": 33,
+  "action": "PLAN_SOUND",
+  "plan_level_fingerprint": true,
+  "plan_changed": true,
+  "what_validator_missed": "E0b LANDED (row 44 DONE, commits 9d7bf6b + aab20bb on HEAD) and re-authored e2e/command-center-wakeup-fence.spec.ts with 4 distinct LITERAL_ACTION_E1..E4 tokens and a distinct FENCE_STUB target per contributor \u2014 verified: `grep -c LITERAL_ACTION_E[1-4]` = 4. The previous spec (a5a6923) could not attribute because E1/E3/E4 shared D1/D2/D3 tokens, which is why the fence re-parked on the identical fp1:4c534f69 fingerprint. The PLAN HAS CHANGED (plan_changed:true): the spec on HEAD is different from the one that produced every prior fingerprint. Un-park and RE-RUN the E5 fence gate against the NEW spec \u2014 do NOT requeue the stale units from the old verdict. With the attributable spec and E1-E4 all DONE/correct, the fence should now either PASS (close E5) or red-CLOSE naming a REAL single contributor (not the collision), at which point localization writes a repair contract and PLAN_SOUND+units becomes valid. This is the re-measure the whole E0b split existed to enable. Do NOT send RETRY_WITH_DIRECTION to this fence row \u2014 RETRY cannot repair a composition and only re-parks it.",
+  "applied": true,
+  "outcome": "PLAN_SOUND accepted \u2014 counts as a repair round",
+  "applied_at": "2026-08-28T18:10:09Z"
+}

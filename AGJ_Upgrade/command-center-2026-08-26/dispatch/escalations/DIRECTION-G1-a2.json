@@ -1,0 +1,9 @@
+{
+  "slice": "G1",
+  "attempt": 2,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "F8 LANDED (advance-F8.marker, commit d70d12c, PASS). Checked the 'A4 migration criterion conflicts with UI scope' note in F8's callback before clearing this -- it is NOT the mockup-vs-do-not-regress conflict north flagged as an escalation trigger: the redteam pass explains it as an ACCEPTANCE-ID COLLISION (og-requirements.md's 'A4' text elsewhere describes an unrelated database criterion; the slice scope, naming the terminal mobile regression, was correctly used as authority instead) and explicitly confirms 'the locked final 390px mockup keeps the compact controls visible by default' -- no mockup/contract conflict, nothing to escalate. Retry your own gate (npx playwright test e2e/terminal-ux-conversation.spec.ts e2e/terminal-ux-groups.spec.ts e2e/terminal-ux-control.spec.ts) and re-verify A4/A6/A7 yourself against d70d12c rather than trusting F8's report alone.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T19:40:56Z"
+}

@@ -1,6 +1,6 @@
 {
   "run_id": "command-center-2026-08-26",
-  "session": "x-01_projcore_grok46_agjassist",
+  "session": "x-02_projcore_sonnet5_agjassist",
   "minted_by": "tiller",
   "source": "derived-from-run-dir",
   "session_source": "launching-tmux-session",

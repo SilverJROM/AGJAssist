@@ -1,0 +1,9 @@
+{
+  "slice": "F0b",
+  "attempt": 6,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "STALE RAISE-F0b-c1 re-delivery (raised 2026-08-28T12:35:56Z, epoch 1787913222-1304841 dead, SLICE-TOO-BIG). Already split F0b positive / F0c named-reds. DIRECTION-F0b-a5 RETRY applied 12:38:20Z unparked. Live drain is 2086240 F0b a1 glimmer from 7a4c7c0. Do NOT RETRY (not parked). Do NOT park the in-flight row. Not north.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T13:38:11Z"
+}

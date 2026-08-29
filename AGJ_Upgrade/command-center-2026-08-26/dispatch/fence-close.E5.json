@@ -1,25 +1,19 @@
 {
   "fence": "E5",
-  "green": false,
+  "green": true,
   "passed_ids": [
-    "D3"
+    "E1",
+    "E2",
+    "E3",
+    "E4"
   ],
-  "failed_ids": [
-    "D1",
-    "D2"
-  ],
-  "fingerprint": "fp1:4c534f69e7dd8f2fd157",
+  "failed_ids": [],
+  "fingerprint": "",
   "negative_control_ok": true,
   "superset_ok": true,
-  "test_hash": "sha256:b57c5b9d6cb0b4cd239ecf3814fdc483ed6fa9d1c66e9f16e1beeabe65dc63ee",
-  "verdict": {
-    "fence": "E5",
-    "verdict": "FAIL",
-    "fault_class": "implementation",
-    "failing_units": "E3",
-    "plan_defect": "false",
-    "plan_defect_reason": "none"
-  },
+  "test_hash": "sha256:809c4bed14f10046499c2a05388c7b8f192c6778c31f304a45b1d685d0eac3e1",
+  "verdict": null,
   "verdict_err": "no [FENCE-VERDICT-V1] token",
-  "measured_at_head": "23ff1d1b3c304afbaa5315af2719760ac5c0ae30"
+  "negative_control_detail": "1 named assertion(s) failed: E2",
+  "measured_at_head": "126885a5460b6d494425f8ef450820438fcbb875"
 }

@@ -1,0 +1,5 @@
+{
+  "type": "seat-failure",
+  "slice": "F0c",
+  "error": "spawn_seat: x-tlre7cd71a78feb_impl_terra launch FAILED \u2014 `codex` not on the seat PATH (env broken, e.g. an interrupted self-update). Fix the env, then resume."
+}

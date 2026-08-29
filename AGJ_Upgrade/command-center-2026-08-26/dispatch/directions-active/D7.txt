@@ -1,1 +1,1 @@
-D0 is the summaries harness rewrite, not a D7 product contributor (fence-contract contributors stay D1-D6). D7 stays PARKED until dispatch/advance-D0.marker exists, then CLOSE against the real D4 contract plus C6 arrival fixture. Do not OPEN or CLOSE on the A0/12b6391 scaffold. Product D1-D6 unchanged. Do not walk L2/L3.
+[north] 2026-08-28: D7 satisfied-via-D0. Identical FENCE_ID=D7 --gate already PASS at 7a4c7c0 (all E1-E3,F1-F3 green; FENCE_STUB=D3 named-red E1). No separate red OPEN. Row is DONE. Do not unpark into OPEN. Product D1-D6 unchanged.

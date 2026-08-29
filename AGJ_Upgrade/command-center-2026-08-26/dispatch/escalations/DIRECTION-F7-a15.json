@@ -1,0 +1,11 @@
+{
+  "slice": "F7",
+  "attempt": 15,
+  "action": "PLAN_SOUND",
+  "plan_level_fingerprint": true,
+  "plan_changed": true,
+  "what_validator_missed": "F0d LANDED (advance-F0d.marker present, commit 6e9b5801d7) hardening the I1 negative-control wait so it is no longer racing a fixed 10s timeout under load. Re-run the fence gate -- the stale negative_control_ok=false on record predates F0d.",
+  "applied": true,
+  "outcome": "PLAN_SOUND accepted \u2014 counts as a repair round",
+  "applied_at": "2026-08-28T19:12:07Z"
+}

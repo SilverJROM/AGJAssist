@@ -1,0 +1,9 @@
+{
+  "slice": "G2",
+  "attempt": 1,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "Verified: 'npm run build' genuinely fails on current HEAD (28d4605, before G2 touches anything) with 3 pre-existing TS18046 errors -- request.params is of type 'unknown' at agent-reminder-routes.ts:83,124 and agent-wakeup-routes.ts:75. Root cause in all three: the handler callback is annotated 'async (request: FastifyRequest, reply: FastifyReply) => {...}' with a BARE FastifyRequest type, discarding the generic route-params type Fastify already infers from the route registration (e.g. app.delete<{ Params: { id: string } }>(...)). Fix: drop the explicit ': FastifyRequest' annotation on request in those three handlers (or type it explicitly as FastifyRequest<{ Params: { id: string } }>) so request.params.id resolves to a string instead of unknown. This is a small, mechanical type-safety fix pre-existing from the reminder/wakeup route work, not something G2 introduced and not a design change -- fix in place, do not touch route behavior, then continue with G2's own release-script scope.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T20:33:11Z"
+}

@@ -64,3 +64,25 @@ Tier-3 (requirements/strategy) reaches north one-way. **Only [north] has the Tel
 ## [driver] advanced F5 — verdict 40ec05e841e42289566ee9fd36224ca351c43076
 
 ## [driver] advanced F6 — verdict 241b5cf3f06077953ee2d3edd79f51a7323fbea1
+
+## [driver] advanced D0 — verdict 7a4c7c0a77eb199995696786c3f979c2b1e1a3b4
+
+## [driver] advanced F0b — verdict 9e35ea852351f9285b549531e297439dfe77e225
+
+## [driver] advanced E0b — verdict aab20bbfe9dc9a6bdc83b15def2a09661cbc475f
+
+## [driver] advanced F0c — verdict 6c7a2e61f70009834d7e3b280a5fa00c43ffb5df
+
+## [driver] advanced F0d — verdict 6e9b5801d77857871e2dd5ae8f8e119af42ce6cb
+
+## [driver] advanced E0c — verdict 126885a5460b6d494425f8ef450820438fcbb875
+
+## [driver] advanced E5 — verdict 126885a5460b6d494425f8ef450820438fcbb875
+
+## [driver] advanced F7 — verdict 126885a5460b6d494425f8ef450820438fcbb875
+
+## [driver] advanced F8 — verdict d70d12cd6783dfcf713e2d1c052c1bfd7257a07c
+
+## [driver] advanced G1 — verdict 28d46055f20ee75805516dd6e881454b4aea3c87
+
+## [driver] advanced G2 — verdict 6c26334bcfb0b7b3a8c8b97044938b2844965e08

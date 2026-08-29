@@ -1,0 +1,9 @@
+{
+  "slice": "E5",
+  "attempt": 28,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "RAISE-E5-c7 flagged fault_class=plan on 'same seam failed twice' (fp1:4c534f69) \u2014 overriding that framing with verified evidence, not re-litigating PLAN_SOUND a11 (which still stands unchanged). Checked directly: fence-contract.json's E5 entry AND e2e/command-center-wakeup-fence.spec.ts still use the OLD scheme (acceptance_ids ['D1','D2','D3'], LITERAL_ACTION_D1_SCHEMA / D1_ROUTE / D2_UI / D3_...) \u2014 the distinct-id fix PLAN_SOUND a11 prescribed for E1/E2/E3/E4 has NEVER actually been written to either file. So the identical fingerprint recurring across cycles is not a failed retry of the fix \u2014 it's the same unfixed test being exercised repeatedly; nobody has attempted the actual edit yet. The localizer's own read this cycle (fault_class=implementation, failing_units=E3) is consistent with this: E3's test literals are the common element in BOTH collisions per north's original diagnosis (test_e3 shares D1 with test_e1, shares D2 with test_e4), so E3's fence-test construction is exactly where the fix belongs. ACTION FOR THE FENCE-AUTHOR (sonnet5/opus5, not app-code L2/L3): edit fence-contract.json (acceptance_ids -> distinct E1/E2/E3/E4, four distinct FENCE_STUB targets) AND e2e/command-center-wakeup-fence.spec.ts (give each of test_e1/e2/e3/e4 its OWN LITERAL_ACTION_E<n> token, not the shared D-prefixed ones) so FENCE_STUB=E1|E2|E3|E4 each forces a unique id red with four distinct fingerprints, per the unchanged PLAN_SOUND a11 brief in directions-active/E5.txt. Keep the composed positive journey. Do not re-open PLAN_SOUND; do not route to an app-code implementer tier.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T16:39:11Z"
+}

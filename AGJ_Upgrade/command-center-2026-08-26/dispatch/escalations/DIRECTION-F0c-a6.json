@@ -1,0 +1,9 @@
+{
+  "slice": "F0c",
+  "attempt": 6,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "F0c is a PLAIN slice (feeds F7's window fence) and has NEVER had an honest drive \u2014 every prior park was infrastructure: glimmer weekly-limit wedge, then repeated codex env outages at attempts=0. codex is now stable (auto-relink watcher keeps the bin symlink alive), so this is the first clean toolchain. Do NOT re-plan or split F0c \u2014 just drive it. CRITICAL COUPLING: F0c's park-rollback restores/reverts E5's fence-close.E5.json + fence-state.E5.json across the shared coordination commit, which UNDOES E5's re-measure every time F0c parks. So F0c MUST LAND to unblock E5. impl_tier=L3: the ladder runs terra at a1-a3 then sonnet5 at a4; per wflow-c1 the attempt counter resets on each un-park, so give it ONE clean uninterrupted drive to actually reach a4/sonnet5 rather than resetting on terra. Retry the F0c brief as-is per directions-active/F0c.txt (one named-red per G1-J2 via FENCE_STUB=<AC>, remap fence-contract.json F7 negative to I1 server-backed, F1-F6 frozen). If it reaches a4 on sonnet5 and still fails, THAT is the first real evidence about F0c's difficulty.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T18:12:11Z"
+}

@@ -1,0 +1,9 @@
+{
+  "slice": "F7",
+  "attempt": 13,
+  "action": "RETRY_WITH_DIRECTION",
+  "note": "Root cause of c3/c4 ('negative control did not turn red') found via code read, not another guess: do_fence_close runs om['negative_control'] (the OPEN MARKER's recorded command), not fence-contract.json's current negative_control_cmd. dispatch/fence-open.F7.marker was captured before F0c existed and still had negative_control='FENCE_STUB=F1 ...' \u2014 F1 is client-only (the exact vacuous target the original plan_defect finding on F7 identified and F0c was minted to fix), so FENCE_STUB=F1 was deterministically a no-op every time, not flaky. My earlier manual runs of the CURRENT fence-contract.json command (FENCE_STUB=I1) correctly failed both times (2/2) -- consistent with this diagnosis, not contradicting it. Corrected dispatch/fence-open.F7.marker's negative_control field from FENCE_STUB=F1 to FENCE_STUB=I1, matching fence-contract.json's already-approved value verbatim (F0c's remap, not a new claim) -- a stale pointer corrected to the currently-approved command, not a historical record rewritten. Re-run the gate.",
+  "applied": true,
+  "outcome": "unparked",
+  "applied_at": "2026-08-28T18:48:49Z"
+}

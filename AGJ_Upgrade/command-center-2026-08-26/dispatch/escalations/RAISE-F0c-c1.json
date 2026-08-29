@@ -1,0 +1,15 @@
+{
+  "slice": "F0c",
+  "cycle": 1,
+  "attempt": 0,
+  "why": "seat/dispatch failure: spawn_seat: x-tlre7cd71a78feb_impl_terra launch FAILED \u2014 `codex` not on the seat PATH (env broken, e.g. an interrupted self-update). Fix the env, then resume.",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787933657-3861754",
+  "raised_at": "2026-08-28T16:14:24Z",
+  "note": "a tmux seat could not be created or briefed \u2014 usually a stale/dying session reusing a stable seat name, or a CLI that failed to boot. THIS attempt was never dispatched, so no correction is owed for it \u2014 but that is NOT the same as nothing being at stake: if EARLIER attempts on this slice committed, the park below rolls their work back too, and an infrastructure event has then ended a slice that was making progress. The commits are saved to refs/tiller/<run>/<slice> first (the park log names the ref and every commit it discards), so recovery is a cherry-pick, not archaeology. RETRY_WITH_DIRECTION is normally right here; if it repeats on the same slice, check `tmux ls` for a wedged seat and the ledger at dispatch/tiller-sessions.ledger before retrying again."
+}

@@ -1,0 +1,12 @@
+{
+  "type": "rollback-discarded",
+  "slice": "F0b",
+  "commits": 3,
+  "shortstat": "2 files changed, 201 insertions(+), 23 deletions(-)",
+  "preserved_ref": "refs/tiller/command-center-2026-08-26/F0b",
+  "shas": [
+    "e368ae3 [F0b] fix F7 harness per validator a3 prescription",
+    "6f73f87 [F0b] fix harness assertions per validator prescription",
+    "54e06c7 [F0b] rewrite window fence harness for G1-J2 with named-red and server-backed I1 negative"
+  ]
+}

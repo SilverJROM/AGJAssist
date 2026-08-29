@@ -1,0 +1,9 @@
+{
+  "slice": "F0c",
+  "attempt": 5,
+  "action": "SKIP_TO_PROJCORE",
+  "note": "Self-heal exhausted (2/2) on a seat-gone wedge that is NOT F0c-specific: this is the 3rd terra/codex wedge in ~40 minutes, all identical ('Missing optional dependency @openai/codex-linux-x64'). Verified live each time: codex's own self-update ('codex update' -> 'npm install @openai/codex') keeps firing on its own (a fresh instance was starting again at the moment of this RAISE, pid 634713, reparented to init) and briefly corrupts the shared ~/.npm-global codex install for every concurrent seat on this box, not just this run. No config.toml/CLI switch found to disable it. Parking rather than burning a 3rd retry against a resource that has failed identically 3 times running \u2014 this is infra instability, not an implementation or plan defect, and F0c's own required code is already confirmed at HEAD (3c5046a) per DIRECTION-F0c-a4. Will retry once codex proves stable (a clean invocation with F0c's real launch flags, not just --version) rather than on a timer. Not blocking E0b/other independent work.",
+  "applied": true,
+  "outcome": "kept-parked (projcore owns via re-plan)",
+  "applied_at": "2026-08-28T18:05:49Z"
+}

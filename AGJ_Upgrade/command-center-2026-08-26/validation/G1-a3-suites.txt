@@ -1,0 +1,42 @@
+# G1 attempt 3 — suite results and differential baseline (commit 28d4605)
+
+## Focused tests (the row's `tests` command, verbatim)
+  npx vitest run tests/command-center-cleanup.test.ts --minWorkers=1 --maxWorkers=4
+    -> 1 file passed, 5 tests passed          exit 0
+  npx playwright test e2e/terminal-ux-conversation.spec.ts e2e/terminal-ux-groups.spec.ts e2e/terminal-ux-control.spec.ts
+    -> 28 passed (chromium + cc projects)     exit 0
+
+## Suites that G1 had regressed in earlier attempts — all green again
+  tests/bottom-nav-helpers.test.ts        PASS   (a1: failed to load, deleted overmind-helpers.js import)
+  tests/unit/agent-wake-scheduler.spec.ts PASS   (a1: stale "overmind: " nudge prefix)
+  tests/telegram-resilience.test.ts       PASS   (a1: stale startup log string)
+  e2e/mcp-oauth.spec.ts AC-6              PASS   (a1: MCP_OAUTH_RETURN_KEY declaration deleted)
+  .tg-home-preferences computed style     PASS   (a2: live CSS rule swept out with the OVM purge)
+  pane-utils spinner glyph set            PASS   (a2: ⠧ U+2827 dropped in the port)
+  undeclaredModuleConstants() guard       PASS   (a2: assertion was vacuous; now mutation-proved)
+
+## Full suites — differential against the PRE-G1 parent 41f51e9^
+  unit   41f51e9^ : 32 failed files | 15 failed tests
+  unit   28d4605  :  6 failed files | 13 failed tests | 523 passed | 1 skipped
+         => G1 cleared 26 failing files; the 13 remaining ALL predate G1:
+            tests/agent-wakeup-routes.test.ts (1)
+            tests/mcp-migration.test.ts (3)
+            tests/telegram-commands.test.ts (1)  <- broken by ccc0bdd [B5], not G1
+            tests/unit/agent-reminder-schema.spec.ts (2)
+            tests/unit/command-center-migration.spec.ts (2)
+            tests/unit/database.spec.ts (4)
+
+  e2e    41f51e9^ : 18 failed | 80 passed  (chromium)
+  e2e    28d4605  : 16 failed | 78 passed  (chromium)
+         => the 16 remaining ALL predate G1 and sit on the B8/F7 rows per the Scope:
+            command-center-drafts, command-center-header, command-center-reminders-fence,
+            command-center-summaries-fence, command-center-wakeup-fence (4),
+            command-center-wakeup, command-center-window-fence (6), terminal-ux-header-tabs
+         => parent-hint-b5 (was red at 41f51e9^) correctly deleted by G1 as dead OVM residue.
+         => command-center-endpoints D5 was a flake at 41f51e9^; green at 28d4605 (re-run twice).
+
+  tsc --noEmit 28d4605: 3 errors, all pre-existing TS18046 in agent-reminder-routes /
+  agent-wakeup-routes; the ~20 overmind TS2307 dangling-module errors present at 41f51e9^
+  are gone.
+
+## Zero G1-attributable regressions remain in either suite.

@@ -1,0 +1,56 @@
+# G1 attempt 3 — red-team probes (commit 28d4605)
+
+## Probe A — hardened undeclaredModuleConstants(), mutation-tested
+1) as shipped                              -> []
+   mutation removed the decl: true | readers left: 2
+2) with the a1 defect reintroduced          -> [ 'MCP_OAUTH_RETURN_KEY' ]
+   catches a1 defect: true
+3) invented TOTALLY_UNDECLARED_SENTINEL     -> flagged: true
+4) in-test negative control (rename decl)   -> contains MCP_OAUTH_RETURN_KEY: true
+5) if the helper were weakened back to a2's regex, the in-test control would report: nothing -> the in-test control GOES RED
+
+## Probe B — allowlist + narrowed-regex audit
+A) shipped regex, allowlist NOT applied -> flagged: [ 'DAY_YYMMDD_DT', 'DAY_YYMMDD_WT' ]
+B) wider regex flags 70 names; 68 have no underscore and are therefore invisible to the shipped scan:
+    JSON, NAMES, REST, API, URL, POST, MCP, PATCH, YOU, DELETE, PUT, GET, THE, TERMINAL, TAB, ONLY, JROM, DOM, OTHER, M19, CLI, AND, M18, AGENT, NOT, TOGGLE, SEND, NEW, M23, M21, SAFETY, OPEN, AMD, NOTES, PAGE, HTML, DIV, CRUD, TASKS, SECTION, T00, SUN, MON, TUE, WED, THU, FRI, SAT, SETUP, R18, TEST, PROPOSED, DONE, PASS, REAL, WORK, PROPOS, IDLE, GAP, SETTER, CORE, PURELY, R19, STATUS, WHO, WORKING, BATCH, LIFETIME
+C) of those, not a known browser/JS global: NAMES, REST, API, POST, MCP, PATCH, YOU, DELETE, PUT, GET, THE, TERMINAL, TAB, ONLY, JROM, DOM, OTHER, M19, CLI, AND, M18, AGENT, NOT, TOGGLE, SEND, NEW, M23, M21, SAFETY, OPEN, AMD, NOTES, PAGE, HTML, DIV, CRUD, TASKS, SECTION, T00, SUN, MON, TUE, WED, THU, FRI, SAT, SETUP, R18, TEST, PROPOSED, DONE, PASS, REAL, WORK, PROPOS, IDLE, GAP, SETTER, CORE, PURELY, R19, STATUS, WHO, WORKING, BATCH, LIFETIME
+     NAMES @192: // tmux key NAMES sent to the /keys REST endpoint (works over the tunnel — no
+     REST @192: // tmux key NAMES sent to the /keys REST endpoint (works over the tunnel — no
+
+## Probe C — the three spinner assertions, mutation-tested (⠧ removed => 25 glyphs)
+as shipped (26 glyphs):
+   assertion 1  [...SPINNER_GLYPHS].toHaveLength(26)          -> PASS
+   assertion 2  isPaneChromeLine("  ⠧ Working (12s)")===true  -> PASS
+   assertion 3  hashPane(...)===sha256("same body")           -> PASS
+MUTATED (⠧ removed, 25):
+   assertion 1  [...SPINNER_GLYPHS].toHaveLength(26)          -> FAIL
+   assertion 2  isPaneChromeLine("  ⠧ Working (12s)")===true  -> PASS
+   assertion 3  hashPane(...)===sha256("same body")           -> PASS
+
+specimen analysis with the 25-glyph set:
+   isPaneChromeLine("  ⠧ Working (12s)") = true  <- 'Working (' alone matches turnChromeRe
+   isPaneChromeLine("  ⠧ hello")         = false  <- glyph-only specimen: this is what discriminates
+   (good build) isPaneChromeLine("  ⠧ hello") = true
+
+## Probe D — hashPane literal in the new test is a SECOND PATH, not a mechanism paste
+   sha256("same body")                 = 8f6372a8b1509601faa57ff3a292cfcccb95aa2325c18b8e50b0c035ea1648fe
+   literal in the test                 = 8f6372a8b1509601faa57ff3a292cfcccb95aa2325c18b8e50b0c035ea1648fe
+   derivable without the mechanism     = true
+   sha256(RAW pane, i.e. the a1 defect)= b093055c8e1d2894d2c15bdb8058af238843cfbed5b141a3843f1eb3a468c110 -> assertion catches a1
+
+## Probe E — pane-utils.ts vs the deleted original (second-path differential)
+   PANE-UTILS: equivalent across 26 glyphs x2 checks + 11 specimens x4 functions (0 drift)
+
+## Probe F — CSS structure + full-range orphan sweep 41f51e9^..28d4605
+final brace depth: 0 (0 = balanced)   min depth seen: 0
+lines: 3846 bytes: 111312
+empty rule blocks: 0
+declarations outside any rule block: 0
+   .tg-home-preferences at brace depth 0 (top level, not inside @media) — line 2069
+   orphan-style sweep: only .closed, the known false positive (.ovm-status-dot.closed only)
+
+## Probe G — tsc --noEmit
+src/api/routes/agent-reminder-routes.ts(83,25): error TS18046: 'request.params' is of type 'unknown'.
+src/api/routes/agent-reminder-routes.ts(124,25): error TS18046: 'request.params' is of type 'unknown'.
+src/api/routes/agent-wakeup-routes.ts(75,25): error TS18046: 'request.params' is of type 'unknown'.
+   (identical to the pre-G1 baseline minus ~20 overmind TS2307 errors)

@@ -1,0 +1,10 @@
+{
+  "slice": "E5",
+  "attempt": 29,
+  "action": "PLAN_SOUND",
+  "plan_level_fingerprint": true,
+  "what_validator_missed": "The repeated-fingerprint gate (RAISE-E5-c7, c8, both attempt:0, fired BEFORE any new seat dispatch) reads 'same seam fp1:4c534f69 failed twice running' as evidence of a stuck/broken plan. It is not \u2014 it is comparing a fingerprint that has never changed because no commit has ever attempted the fix. Verified via git history, not just current file content: `git log -- e2e/command-center-wakeup-fence.spec.ts` shows exactly 4 commits, the last being a5a6923 ('[E5] Land fence PREPARE journeys and E3 repair-test'), dated 2026-08-28T06:04:42Z. That commit IS the version PLAN_SOUND a11 (north, ~07:27) diagnosed as broken (shared LITERAL_ACTION_D1/D2/D3 tokens across E1/E3/E4). Zero commits have touched this file since a5a6923 \u2014 confirmed reachable from HEAD (`git merge-base --is-ancestor a5a6923 HEAD` = yes), so nothing was lost to a park-rollback either. My two prior un-parks (a27, a28) both re-hit this same pre-dispatch gate before any implementer/fence-author seat ever spawned (driver.log shows no build/impl line for E5 in either cycle). So 'failed twice running' is really 'blocked twice before running' \u2014 the underlying fix (distinct FENCE_STUB=E1|E2|E3|E4 targets and distinct LITERAL_ACTION_E<n> tokens per contributor, exactly as PLAN_SOUND a11 already specified in directions-active/E5.txt) has simply never been attempted. This PLAN_SOUND does not change the requirement or north's ruling in any way \u2014 it only tells the gate that the recurrence is a 'never tried' signature, not a 'tried and failed' one, so the fence-author dispatch can finally proceed. plan_level_fingerprint is set (not a per-unit repair_contract claim) because the defect is in the fence's own fingerprint/id construction, not a localizable app-code bug \u2014 consistent with the localizer's own E3 read (E3's test literals are the shared element in both collisions per north's original diagnosis).",
+  "applied": true,
+  "outcome": "PLAN_SOUND accepted \u2014 counts as a repair round",
+  "applied_at": "2026-08-28T16:54:14Z"
+}

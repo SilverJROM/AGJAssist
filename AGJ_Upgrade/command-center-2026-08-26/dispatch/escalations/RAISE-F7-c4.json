@@ -1,0 +1,15 @@
+{
+  "slice": "F7",
+  "cycle": 4,
+  "attempt": 0,
+  "why": "the negative control did not turn the journey red \u2014 the test passes whether or not the behaviour is wired, so green proves nothing",
+  "gate_failed": null,
+  "action_options": [
+    "RETRY_WITH_DIRECTION",
+    "SKIP_TO_PROJCORE",
+    "STOP_TRUE_BLOCKED"
+  ],
+  "driver_epoch": "1787942763-998033",
+  "raised_at": "2026-08-28T18:46:06Z",
+  "note": "fault_class=plan means the implementer seat ladder is SKIPPED entirely \u2014 do not answer RETRY_WITH_DIRECTION into L2/L3. Walking the ladder on a broken plan burns three seats to rediscover the plan is broken. Re-plan the fence, or return a DIRECTION with action=PLAN_SOUND carrying `what_validator_missed`."
+}

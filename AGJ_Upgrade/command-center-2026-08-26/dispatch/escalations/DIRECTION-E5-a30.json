@@ -1,0 +1,12 @@
+{
+  "slice": "E5",
+  "attempt": 30,
+  "action": "PLAN_SOUND",
+  "units": [
+    "E3"
+  ],
+  "what_validator_missed": "CORRECTS a29 (which had the right diagnosis but the wrong field: it set plan_level_fingerprint with NO units, so it un-parked the fence to re-run the SAME broken spec a5a6923 and dispatched no seat -> re-park). The mechanism for an INTEGRATION fence is PLAN_SOUND + units naming the failing contributor, which requeues that unit as a normal slice where an implementer acts. The E5 localize already named it: fault_class=implementation failing_units=E3. E3 is requeued. The fix the E3 seat must implement is NOT E3 app code (E1-E4 are all DONE and correct) \u2014 it is the FENCE HARNESS defect north's PLAN_SOUND a11 already specified and that has NEVER actually been attempted (git log of e2e/command-center-wakeup-fence.spec.ts shows the last touch is a5a6923, the pre-a11 version): rewrite the wakeup fence so EACH contributor gets its OWN distinct named-red \u2014 a distinct FENCE_STUB target per E1/E2/E3/E4 and a distinct LITERAL_ACTION_E<n> token per contributor. Right now E1/E3/E4 share LITERAL_ACTION_D1/D2/D3 tokens, so breaking the E3 (routes) seam collides indistinguishably with E1/E4 and the E3 test cannot attribute -> the repeated fp1:4c534f69 fingerprint. Concretely for E3: test_e3_routes_schedule_pending_and_cancel_owner_wakeup must assert its OWN LITERAL_ACTION_E3 token via FENCE_STUB=E3, so a broken owner-gated registerAgentWakeupRoutes (GET /api/agent-wakeups/pending + cancel) fails E3 and ONLY E3. Full spec in directions-active/E5.txt (a11). This is a harness-correctness fix to the fence's E3 discriminator; do not change E1-E4 product code.",
+  "applied": true,
+  "outcome": "REFUSED: PLAN_SOUND returns 'E3' to the implementer with no validator-authored test \u2014 that is the cheap implementer defining its own success criterion again. Author the test or set plan_level_fingerprint.",
+  "applied_at": "2026-08-28T16:51:17Z"
+}

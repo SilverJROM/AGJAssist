@@ -1,0 +1,16 @@
+{
+  "type": "stalled",
+  "axes_frozen": [
+    "done_count",
+    "seats",
+    "markers",
+    "callbacks_bytes"
+  ],
+  "state": {
+    "done_count": 38,
+    "seats": "58fae1983a830bbc",
+    "markers": 38,
+    "callbacks_bytes": 52636
+  },
+  "hint": " KEPT ALIVE BY: nothing. HEAD is a SLICE-TAGGED commit (3c5046a6fa \"feat(F0c): fix H1 stub infinite loop\") \u2014 CHECK FOR A STRANDED CALLBACK before treating this as a hang: the work may be complete and merely unseen. **A pane that is CHANGING is not evidence of progress** \u2014 a client retrying a failed compaction animates identically to a model thinking, and those need opposite responses. If the commit is already here, the seat has nothing left to do."
+}
