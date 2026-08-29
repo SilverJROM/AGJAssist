@@ -916,6 +916,13 @@ function TerminalTab({ projectId, projectName } = {}) {
   // default to the active session) + the message the reminder posts to the chat.
   const [dlgReminderSessions, setDlgReminderSessions] = useState({});
   const [dlgReminderMessage, setDlgReminderMessage] = useState("Status update — where are you at, and any blockers?");
+  // Editing an existing reminder's session recipients (id being edited + the
+  // checklist state name -> bool).
+  const [editingReminderId, setEditingReminderId] = useState(null);
+  const [editReminderSessions, setEditReminderSessions] = useState({});
+  // Draggable header dropdowns (reminders/wakeups/summaries): null = default
+  // anchored position, else a dragged {left, top}.
+  const [modalPos, setModalPos] = useState(null);
   const [summaries, setSummaries] = useState([]);
   const [summariesLoading, setSummariesLoading] = useState(false);
   const [tabsCollapsed, setTabsCollapsed] = useState(true);
@@ -1139,6 +1146,52 @@ function TerminalTab({ projectId, projectName } = {}) {
       console.error(e);
     }
   };
+
+  // Open the session editor for an existing reminder, pre-checked with its current
+  // recipients.
+  const startEditReminder = (r) => {
+    const sel = {};
+    (r.recipients || []).forEach((rc) => { if (rc.include === undefined || rc.include) sel[rc.agent_name] = true; });
+    setEditReminderSessions(sel);
+    setEditingReminderId(r.id);
+  };
+  const saveEditReminderSessions = async (r) => {
+    const recipients = fullGroupMembers
+      .filter((m) => editReminderSessions[m.name])
+      .map((m) => ({ agent_name: m.name, include: 1 }));
+    if (recipients.length === 0) return;
+    try {
+      await api('/api/agent-reminders/' + r.id, { method: 'PATCH', body: JSON.stringify({ recipients }) });
+      const data = await api('/api/agent-reminders/active').catch(() => null);
+      if (data) setAgentReminders(Array.isArray(data.reminders) ? data.reminders : []);
+      setEditingReminderId(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Drag the open header dropdown by its title bar (desktop/tablet). Pointer-based
+  // so it works for mouse + touch; the position is clamped to the viewport.
+  const startModalDrag = (e) => {
+    const modal = e.currentTarget.closest('[data-draggable-modal]');
+    if (!modal || (e.button !== undefined && e.button !== 0)) return;
+    const rect = modal.getBoundingClientRect();
+    const offX = e.clientX - rect.left;
+    const offY = e.clientY - rect.top;
+    const onMove = (ev) => {
+      const left = Math.max(4, Math.min(ev.clientX - offX, window.innerWidth - rect.width - 4));
+      const top = Math.max(4, Math.min(ev.clientY - offY, window.innerHeight - 40));
+      setModalPos({ left, top });
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    e.preventDefault();
+  };
+  const modalPosStyle = modalPos ? `left:${modalPos.left}px;top:${modalPos.top}px;right:auto` : 'top:60px;right:12px';
 
   const handleSaveEndpoint = async () => {
     if (!endpointName || !endpointBaseUrl || !endpointModel) return;
@@ -1795,10 +1848,10 @@ function TerminalTab({ projectId, projectName } = {}) {
         ` : ''}
       </div>
       ${summariesOpen && html`
-        <div key="summaries-dropdown" data-testid="agent-summaries-dropdown" style="position:absolute;top:60px;right:12px;z-index:250;width:320px;max-height:400px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div key="summaries-dropdown" data-testid="agent-summaries-dropdown" data-draggable-modal style=${'position:absolute;z-index:250;width:320px;max-height:400px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3);' + modalPosStyle}>
+          <div class="dd-drag-handle" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:move;touch-action:none" onpointerdown=${startModalDrag}>
             <strong>Summaries</strong>
-            <button type="button" onclick=${() => setSummariesOpen(false)}>✕</button>
+            <button type="button" style="cursor:pointer" onpointerdown=${e => e.stopPropagation()} onclick=${() => setSummariesOpen(false)}>✕</button>
           </div>
           ${summariesLoading ? html`<div>Loading…</div>` : summaries.length === 0 ? html`<div data-testid="summaries-empty">No summaries yet</div>` : html`
             ${[...summaries].sort((a, b) => { const tb = Date.parse(b.created_at || '') || 0; const ta = Date.parse(a.created_at || '') || 0; return tb - ta || (Number(b.id) || 0) - (Number(a.id) || 0); }).map(s => {
@@ -1819,21 +1872,40 @@ function TerminalTab({ projectId, projectName } = {}) {
         </div>
       `}
       ${remindersOpen && html`
-        <div key="reminders-dropdown" data-testid="agent-reminders-dropdown" style="position:absolute;top:60px;right:12px;z-index:250;width:320px;max-width:calc(100vw - 24px);max-height:440px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div key="reminders-dropdown" data-testid="agent-reminders-dropdown" data-draggable-modal style=${'position:absolute;z-index:250;width:320px;max-width:calc(100vw - 24px);max-height:440px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3);' + modalPosStyle}>
+          <div class="dd-drag-handle" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;cursor:move;touch-action:none" onpointerdown=${startModalDrag}>
             <strong>Reminders</strong>
-            <button type="button" aria-label="Close" onclick=${() => setRemindersOpen(false)}>✕</button>
+            <button type="button" aria-label="Close" style="cursor:pointer" onpointerdown=${e => e.stopPropagation()} onclick=${() => setRemindersOpen(false)}>✕</button>
           </div>
           <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px">Periodically nudge this agent group so it keeps reporting.</div>
           ${agentReminders.length === 0
             ? html`<div data-testid="dd-reminders-empty" style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">No active reminders</div>`
             : html`${agentReminders.map(r => html`
-              <div data-testid="dd-reminder-row" style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:6px">
-                <div style="min-width:0;font-size:12px">
-                  <div>Every ${r.cadence_minutes || '?'} min${r.folder_group ? ' · ' + r.folder_group : ''}</div>
-                  ${r.solicit_message ? html`<div style="color:var(--text-secondary);font-size:11px;margin-top:2px">“${r.solicit_message}”</div>` : ''}
+              <div data-testid="dd-reminder-item" style="border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:6px">
+                <div data-testid="dd-reminder-row" style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+                  <div style="min-width:0;font-size:12px">
+                    <div>Every ${r.cadence_minutes || '?'} min${r.folder_group ? ' · ' + r.folder_group : ''}</div>
+                    ${r.solicit_message ? html`<div style="color:var(--text-secondary);font-size:11px;margin-top:2px">“${r.solicit_message}”</div>` : ''}
+                    ${(r.recipients && r.recipients.filter(rc => rc.include === undefined || rc.include).length) ? html`<div style="color:var(--text-secondary);font-size:11px;margin-top:2px">→ ${r.recipients.filter(rc => rc.include === undefined || rc.include).map(rc => rc.agent_name).join(', ')}</div>` : ''}
+                  </div>
+                  <div style="display:flex;gap:4px;flex:0 0 auto">
+                    <button type="button" class="btn btn-sm" data-testid="dd-reminder-edit" onclick=${() => editingReminderId === r.id ? setEditingReminderId(null) : startEditReminder(r)}>${editingReminderId === r.id ? 'Close' : 'Edit'}</button>
+                    <button type="button" class="btn btn-sm" data-testid="dd-reminder-cancel" onclick=${async () => { try { await api('/api/agent-reminders/' + r.id, { method: 'DELETE' }); setAgentReminders(prev => prev.filter(x => x.id !== r.id)); if (editingReminderId === r.id) setEditingReminderId(null); } catch {} }}>Cancel</button>
+                  </div>
                 </div>
-                <button type="button" class="btn btn-sm" data-testid="dd-reminder-cancel" onclick=${async () => { try { await api('/api/agent-reminders/' + r.id, { method: 'DELETE' }); setAgentReminders(prev => prev.filter(x => x.id !== r.id)); } catch {} }}>Cancel</button>
+                ${editingReminderId === r.id ? html`
+                  <div data-testid="dd-reminder-edit-panel" style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
+                    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Add / remove sessions</div>
+                    ${fullGroupMembers.length === 0
+                      ? html`<div style="font-size:12px;color:var(--text-secondary)">No sessions in this folder</div>`
+                      : fullGroupMembers.map((m) => html`
+                        <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:3px;cursor:pointer">
+                          <input type="checkbox" data-testid="dd-edit-session" data-session=${m.name} checked=${!!editReminderSessions[m.name]} onchange=${e => setEditReminderSessions(s => ({ ...s, [m.name]: e.target.checked }))} />
+                          <span>${m.name}${m.isActive ? ' · current' : ''}</span>
+                        </label>`)}
+                    <button type="button" class="btn btn-sm btn-primary" data-testid="dd-reminder-edit-save" onclick=${() => saveEditReminderSessions(r)}>Save sessions</button>
+                  </div>
+                ` : ''}
               </div>`)}`}
           <div style="border-top:1px solid var(--border);margin:6px 0 8px;padding-top:8px;font-weight:600;font-size:12px">New reminder</div>
           <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
@@ -1859,10 +1931,10 @@ function TerminalTab({ projectId, projectName } = {}) {
         </div>
       `}
       ${wakeupsOpen && html`
-        <div key="wakeups-dropdown" data-testid="agent-wakeups-dropdown" style="position:absolute;top:60px;right:12px;z-index:250;width:320px;max-width:calc(100vw - 24px);max-height:440px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div key="wakeups-dropdown" data-testid="agent-wakeups-dropdown" data-draggable-modal style=${'position:absolute;z-index:250;width:320px;max-width:calc(100vw - 24px);max-height:440px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3);' + modalPosStyle}>
+          <div class="dd-drag-handle" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;cursor:move;touch-action:none" onpointerdown=${startModalDrag}>
             <strong>Wakeups</strong>
-            <button type="button" aria-label="Close" onclick=${() => setWakeupsOpen(false)}>✕</button>
+            <button type="button" aria-label="Close" style="cursor:pointer" onpointerdown=${e => e.stopPropagation()} onclick=${() => setWakeupsOpen(false)}>✕</button>
           </div>
           <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px">Fire a one-time action into ${activeTarget || 'this agent'} at a set time.</div>
           ${(() => {
