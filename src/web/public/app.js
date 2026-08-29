@@ -912,6 +912,10 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [summariesOpen, setSummariesOpen] = useState(false);
   const [remindersOpen, setRemindersOpen] = useState(false);
   const [wakeupsOpen, setWakeupsOpen] = useState(false);
+  // Reminder dropdown: which folder sessions to nudge (name -> bool; undefined =
+  // default to the active session) + the message the reminder posts to the chat.
+  const [dlgReminderSessions, setDlgReminderSessions] = useState({});
+  const [dlgReminderMessage, setDlgReminderMessage] = useState("Status update — where are you at, and any blockers?");
   const [summaries, setSummaries] = useState([]);
   const [summariesLoading, setSummariesLoading] = useState(false);
   const [tabsCollapsed, setTabsCollapsed] = useState(true);
@@ -1105,6 +1109,32 @@ function TerminalTab({ projectId, projectName } = {}) {
       api('/api/agent-reminders/active')
         .then(data => setAgentReminders(Array.isArray(data?.reminders) ? data.reminders : []))
         .catch(() => {});
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Reminder dropdown create: recipients are the chosen folder sessions (default:
+  // the active session), and solicit_message is the message posted to the chat.
+  const reminderSessionChecked = (name, isActive) =>
+    (dlgReminderSessions[name] !== undefined ? dlgReminderSessions[name] : isActive);
+  const handleCreateReminderFromDropdown = async () => {
+    const minutes = cadenceCustom ? Number(cadenceCustom) : cadenceMinutes;
+    if (!Number.isFinite(minutes) || minutes <= 0) return;
+    const folderGroup = resolvedActiveGroupTab === 'all' ? 'all' : (activeGroup?.id || resolvedActiveGroupTab);
+    const chosen = fullGroupMembers.filter((m) => reminderSessionChecked(m.name, m.isActive));
+    if (chosen.length === 0) return;
+    const payload = {
+      folder_group: folderGroup,
+      cadence_minutes: minutes,
+      repeat_limit: repeatMode === 'unlimited' ? null : Number(repeatLimit) || 0,
+      solicit_message: (dlgReminderMessage || '').trim() || 'give me a status update',
+      recipients: chosen.map((m) => ({ agent_name: m.name, include: 1 })),
+    };
+    try {
+      await api('/api/agent-reminders', { method: 'POST', body: JSON.stringify(payload) });
+      const data = await api('/api/agent-reminders/active').catch(() => null);
+      if (data) setAgentReminders(Array.isArray(data.reminders) ? data.reminders : []);
     } catch (e) {
       console.error(e);
     }
@@ -1798,8 +1828,11 @@ function TerminalTab({ projectId, projectName } = {}) {
           ${agentReminders.length === 0
             ? html`<div data-testid="dd-reminders-empty" style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">No active reminders</div>`
             : html`${agentReminders.map(r => html`
-              <div data-testid="dd-reminder-row" style="display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:6px">
-                <span style="font-size:12px">Every ${r.cadence_minutes || '?'} min${r.folder_group ? ' · ' + r.folder_group : ''}</span>
+              <div data-testid="dd-reminder-row" style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:6px">
+                <div style="min-width:0;font-size:12px">
+                  <div>Every ${r.cadence_minutes || '?'} min${r.folder_group ? ' · ' + r.folder_group : ''}</div>
+                  ${r.solicit_message ? html`<div style="color:var(--text-secondary);font-size:11px;margin-top:2px">“${r.solicit_message}”</div>` : ''}
+                </div>
                 <button type="button" class="btn btn-sm" data-testid="dd-reminder-cancel" onclick=${async () => { try { await api('/api/agent-reminders/' + r.id, { method: 'DELETE' }); setAgentReminders(prev => prev.filter(x => x.id !== r.id)); } catch {} }}>Cancel</button>
               </div>`)}`}
           <div style="border-top:1px solid var(--border);margin:6px 0 8px;padding-top:8px;font-weight:600;font-size:12px">New reminder</div>
@@ -1809,8 +1842,20 @@ function TerminalTab({ projectId, projectName } = {}) {
             <button type="button" class=${'btn btn-sm' + (!cadenceCustom && cadenceMinutes===60 ? ' btn-primary' : '')} data-testid="dd-cadence-60" onclick=${() => { setCadenceMinutes(60); setCadenceCustom(''); }}>60m</button>
             <input data-testid="dd-cadence-custom" type="number" min="1" placeholder="custom" value=${cadenceCustom} oninput=${e => setCadenceCustom(e.target.value)} style="width:74px" />
           </div>
-          <input data-testid="dd-recipient" type="text" placeholder="Recipient agent (e.g. agent-a)" value=${recipientAgentName} oninput=${e => setRecipientAgentName(e.target.value)} style="width:100%;margin-bottom:8px" />
-          <button type="button" class="btn btn-sm btn-primary" data-testid="dd-reminder-create" onclick=${async () => { await handleSaveReminder(); }}>Create reminder</button>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Sessions in this folder</div>
+          <div data-testid="dd-reminder-sessions" style="margin-bottom:8px;max-height:120px;overflow:auto">
+            ${fullGroupMembers.length === 0
+              ? html`<div style="font-size:12px;color:var(--text-secondary)">No sessions in this folder</div>`
+              : fullGroupMembers.map((m) => html`
+                <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-bottom:3px;cursor:pointer">
+                  <input type="checkbox" data-testid="dd-reminder-session" data-session=${m.name} checked=${reminderSessionChecked(m.name, m.isActive)} onchange=${e => setDlgReminderSessions(s => ({ ...s, [m.name]: e.target.checked }))} />
+                  <span>${m.name}${m.isActive ? ' · current' : ''}${m.status ? ' (' + m.status + ')' : ''}</span>
+                </label>
+              `)}
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Message posted to the chat</div>
+          <textarea data-testid="dd-reminder-message" placeholder="e.g. Status update — where are you at, and any blockers?" value=${dlgReminderMessage} oninput=${e => setDlgReminderMessage(e.target.value)} style="width:100%;min-height:54px;margin-bottom:8px;resize:vertical;box-sizing:border-box"></textarea>
+          <button type="button" class="btn btn-sm btn-primary" data-testid="dd-reminder-create" onclick=${handleCreateReminderFromDropdown}>Create reminder</button>
         </div>
       `}
       ${wakeupsOpen && html`
