@@ -1289,12 +1289,14 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
   border: 1px solid var(--accent-chip-border);
   background: var(--accent-selected);
   border-radius: 12px;
-  /* The whole prompt (question + every option) is one scroll area, capped so a
-     long option set never clips the last choice or steals the whole view — the
-     user can scroll to read all the details before answering. */
-  max-height: 62vh;
+  /* Take the prompt's natural height so a long option set is DOMINANT (~70-80% of
+     the chat), capped so it scrolls instead of clipping — the whole thing
+     (question + every option) scrolls as one. flex-shrink:0 is the fix for the
+     regression where the panel collapsed to ~1 line when the transcript above had
+     lots of content. */
+  flex: 0 0 auto;
+  max-height: 78vh;
   overflow-y: auto;
-  min-height: 0;
   overscroll-behavior: contain;
 }
 .terminal-selection-head {
