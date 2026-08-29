@@ -1289,6 +1289,13 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
   border: 1px solid var(--accent-chip-border);
   background: var(--accent-selected);
   border-radius: 12px;
+  /* The whole prompt (question + every option) is one scroll area, capped so a
+     long option set never clips the last choice or steals the whole view — the
+     user can scroll to read all the details before answering. */
+  max-height: 62vh;
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 .terminal-selection-head {
   display: flex;
@@ -1310,8 +1317,8 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
 .terminal-selection-title {
   white-space: pre-line;
   word-break: break-word;
-  overflow-y: auto;
-  max-height: 38vh;
+  /* No separate scroll here — the whole .terminal-selection panel scrolls as one,
+     so the question and options share a single scrollbar. */
   line-height: 1.45;
   font-size: 13.5px;
   flex: 1 1 auto;
