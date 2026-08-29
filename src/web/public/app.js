@@ -910,6 +910,8 @@ function TerminalTab({ projectId, projectName } = {}) {
   const [defaultEndpointId, setDefaultEndpointId] = useState(null);
   const [endpointError, setEndpointError] = useState('');
   const [summariesOpen, setSummariesOpen] = useState(false);
+  const [remindersOpen, setRemindersOpen] = useState(false);
+  const [wakeupsOpen, setWakeupsOpen] = useState(false);
   const [summaries, setSummaries] = useState([]);
   const [summariesLoading, setSummariesLoading] = useState(false);
   const [tabsCollapsed, setTabsCollapsed] = useState(true);
@@ -1750,15 +1752,15 @@ function TerminalTab({ projectId, projectName } = {}) {
         </div>
         ${!isListView ? html`
           <div class="cc-utilarea" data-testid="utilities">
-            <button type="button" class="cc-util-chip" data-testid="reminder-chip"
-                    title="Set up an agent reminder (opens ⚙ settings)"
-                    onclick=${() => { setSummariesOpen(false); setMenuOpen(true); }}>Reminder: ${agentReminders.length > 0 ? agentReminders[0].id : 'none'}</button>
-            <button type="button" class="cc-util-chip" data-testid="wakeup-chip"
-                    title="Schedule an agent wakeup (opens ⚙ settings)"
-                    onclick=${() => { setSummariesOpen(false); setMenuOpen(true); }}>Wakeup: ${wakeups.length > 0 ? wakeups[0].id : 'none'}</button>
-            <button type="button" class="cc-util-chip" data-testid="summary-chip"
+            <button type="button" class=${'cc-util-chip' + (remindersOpen ? ' cc-util-chip-open' : '')} data-testid="reminder-chip" aria-expanded=${remindersOpen}
+                    title="Set up an agent reminder"
+                    onclick=${() => { setSummariesOpen(false); setWakeupsOpen(false); setRemindersOpen(o => !o); }}>Reminder: ${agentReminders.length > 0 ? agentReminders[0].id : 'none'}</button>
+            <button type="button" class=${'cc-util-chip' + (wakeupsOpen ? ' cc-util-chip-open' : '')} data-testid="wakeup-chip" aria-expanded=${wakeupsOpen}
+                    title="Schedule an agent wakeup"
+                    onclick=${() => { setSummariesOpen(false); setRemindersOpen(false); setWakeupsOpen(o => !o); }}>Wakeup: ${wakeups.length > 0 ? wakeups[0].id : 'none'}</button>
+            <button type="button" class=${'cc-util-chip' + (summariesOpen ? ' cc-util-chip-open' : '')} data-testid="summary-chip" aria-expanded=${summariesOpen}
                     title="View agent summaries"
-                    onclick=${() => { setMenuOpen(false); setSummariesOpen(true); }}>Summary: ${summaries.length > 0 ? summaries[0].summary_text?.slice(0,20) : 'none'}</button>
+                    onclick=${() => { setRemindersOpen(false); setWakeupsOpen(false); setSummariesOpen(s => !s); }}>Summary: ${summaries.length > 0 ? summaries[0].summary_text?.slice(0,20) : 'none'}</button>
           </div>
         ` : ''}
       </div>
@@ -1784,6 +1786,66 @@ function TerminalTab({ projectId, projectName } = {}) {
               `;
             })}
           `}
+        </div>
+      `}
+      ${remindersOpen && html`
+        <div key="reminders-dropdown" data-testid="agent-reminders-dropdown" style="position:absolute;top:60px;right:12px;z-index:250;width:320px;max-width:calc(100vw - 24px);max-height:440px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <strong>Reminders</strong>
+            <button type="button" aria-label="Close" onclick=${() => setRemindersOpen(false)}>✕</button>
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px">Periodically nudge this agent group so it keeps reporting.</div>
+          ${agentReminders.length === 0
+            ? html`<div data-testid="dd-reminders-empty" style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">No active reminders</div>`
+            : html`${agentReminders.map(r => html`
+              <div data-testid="dd-reminder-row" style="display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:6px">
+                <span style="font-size:12px">Every ${r.cadence_minutes || '?'} min${r.folder_group ? ' · ' + r.folder_group : ''}</span>
+                <button type="button" class="btn btn-sm" data-testid="dd-reminder-cancel" onclick=${async () => { try { await api('/api/agent-reminders/' + r.id, { method: 'DELETE' }); setAgentReminders(prev => prev.filter(x => x.id !== r.id)); } catch {} }}>Cancel</button>
+              </div>`)}`}
+          <div style="border-top:1px solid var(--border);margin:6px 0 8px;padding-top:8px;font-weight:600;font-size:12px">New reminder</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+            <button type="button" class=${'btn btn-sm' + (!cadenceCustom && cadenceMinutes===15 ? ' btn-primary' : '')} data-testid="dd-cadence-15" onclick=${() => { setCadenceMinutes(15); setCadenceCustom(''); }}>15m</button>
+            <button type="button" class=${'btn btn-sm' + (!cadenceCustom && cadenceMinutes===30 ? ' btn-primary' : '')} data-testid="dd-cadence-30" onclick=${() => { setCadenceMinutes(30); setCadenceCustom(''); }}>30m</button>
+            <button type="button" class=${'btn btn-sm' + (!cadenceCustom && cadenceMinutes===60 ? ' btn-primary' : '')} data-testid="dd-cadence-60" onclick=${() => { setCadenceMinutes(60); setCadenceCustom(''); }}>60m</button>
+            <input data-testid="dd-cadence-custom" type="number" min="1" placeholder="custom" value=${cadenceCustom} oninput=${e => setCadenceCustom(e.target.value)} style="width:74px" />
+          </div>
+          <input data-testid="dd-recipient" type="text" placeholder="Recipient agent (e.g. agent-a)" value=${recipientAgentName} oninput=${e => setRecipientAgentName(e.target.value)} style="width:100%;margin-bottom:8px" />
+          <button type="button" class="btn btn-sm btn-primary" data-testid="dd-reminder-create" onclick=${async () => { await handleSaveReminder(); }}>Create reminder</button>
+        </div>
+      `}
+      ${wakeupsOpen && html`
+        <div key="wakeups-dropdown" data-testid="agent-wakeups-dropdown" style="position:absolute;top:60px;right:12px;z-index:250;width:320px;max-width:calc(100vw - 24px);max-height:440px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <strong>Wakeups</strong>
+            <button type="button" aria-label="Close" onclick=${() => setWakeupsOpen(false)}>✕</button>
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px">Fire a one-time action into ${activeTarget || 'this agent'} at a set time.</div>
+          ${(() => {
+            const now = new Date();
+            const pending = wakeups.filter(w => w.pane_target === activeTarget && new Date(w.manual_fire_time) > now);
+            return pending.length === 0
+              ? html`<div data-testid="dd-wakeups-empty" style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">No pending wakeups</div>`
+              : html`${pending.map(w => { const diffMin = Math.max(0, Math.round((new Date(w.manual_fire_time) - now) / 60000)); return html`
+                <div data-testid="dd-wakeup-row" style="display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid var(--border);border-radius:8px;padding:6px 8px;margin-bottom:6px">
+                  <span style="font-size:12px">in ${diffMin}m · ${w.action || ''}</span>
+                  <button type="button" class="btn btn-sm" data-testid="dd-wakeup-cancel" onclick=${async () => { try { await api('/api/agent-wakeups/' + w.id, { method: 'DELETE' }); setWakeups(prev => prev.filter(x => x.id !== w.id)); } catch {} }}>Cancel</button>
+                </div>`; })}`;
+          })()}
+          <div style="border-top:1px solid var(--border);margin:6px 0 8px;padding-top:8px;font-weight:600;font-size:12px">Schedule wakeup</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input data-testid="dd-wakeup-date" type="date" value=${wakeupDate} oninput=${e => setWakeupDate(e.target.value)} style="flex:1;min-width:0" />
+            <input data-testid="dd-wakeup-time" type="time" value=${wakeupTime} oninput=${e => setWakeupTime(e.target.value)} style="flex:1;min-width:0" />
+          </div>
+          <input data-testid="dd-wakeup-action" type="text" placeholder="Action to send" value=${wakeupAction} oninput=${e => setWakeupAction(e.target.value)} style="width:100%;margin-bottom:8px" />
+          <button type="button" class="btn btn-sm btn-primary" data-testid="dd-wakeup-create" onclick=${async () => {
+            if (!wakeupDate || !wakeupTime || !wakeupAction) return;
+            const iso = new Date(wakeupDate + 'T' + wakeupTime).toISOString();
+            try {
+              const res = await api('/api/agent-wakeups', { method: 'POST', body: JSON.stringify({ pane_target: activeTarget || '', manual_fire_time: iso, action: wakeupAction }) });
+              if (res?.wakeup) setWakeups(prev => [...prev, res.wakeup]);
+              setWakeupDate(''); setWakeupTime('');
+            } catch {}
+          }}>Schedule wakeup</button>
         </div>
       `}
       <div key="sectionnav-overlay" class="terminal-sectionnav-overlay"

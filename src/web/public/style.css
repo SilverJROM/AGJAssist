@@ -3781,6 +3781,7 @@ body.tg-miniapp {
 .cc-utilarea { display:flex; align-items:center; gap:6px; min-width:0; padding:0 0 9px; }
 .cc-utilarea [data-testid$="-chip"] { display:inline-block; max-width:104px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 8px; border:1px solid var(--border); border-radius:999px; background:var(--surface-2); color:var(--text-secondary); font-size:10px; font-family:inherit; line-height:1.4; cursor:pointer; }
 .cc-utilarea button[data-testid$="-chip"]:hover { color:var(--text); border-color:var(--accent); }
+.cc-utilarea button.cc-util-chip-open { color:var(--text); border-color:var(--accent); background:var(--accent-soft, var(--surface)); }
 .cc-utilarea button[data-testid$="-chip"]:active { transform:scale(0.96); }
 .cc-util-toggle { flex:0 0 auto; width:24px; height:24px; border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary); border-radius:7px; cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:center; padding:0; }
 .terminal-shell-header.util-collapsed .cc-utilarea { display:none; }
