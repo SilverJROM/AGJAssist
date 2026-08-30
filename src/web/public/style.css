@@ -1299,6 +1299,46 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* When a selection is active, the prompt must DOMINATE the chat (~70-80%) and
+   scroll internally — instead of only taking its natural content height while
+   the transcript hogs the column. Cap the transcript to a slim strip (still
+   scrollable for history) and let the selection panel grow to fill the rest. */
+/* Selection prompt as a centered modal — fixed positioning escapes the chat's
+   flex layout entirely, so it reliably DOMINATES the screen (~80vh) and scrolls
+   internally, regardless of the transcript/container sizing. */
+.terminal-selection-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+}
+.terminal-selection.terminal-selection-modal {
+  margin: 0;
+  width: min(600px, 94vw);
+  max-height: 82vh;
+  overflow-y: auto;
+  background: var(--surface);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+.terminal-selection-close {
+  margin-left: auto;
+  align-self: flex-start;
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.terminal-selection-close:hover { background: var(--accent-selected); color: var(--text); }
 .terminal-selection-head {
   display: flex;
   align-items: center;

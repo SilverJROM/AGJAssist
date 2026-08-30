@@ -3830,10 +3830,12 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       </div>
 
       ${showSelection ? html`
-        <div class=${'terminal-selection' + (selection.multi ? ' multi' : '')} data-testid="terminal-selection">
+        <div class="terminal-selection-backdrop" data-testid="terminal-selection-backdrop">
+        <div class=${'terminal-selection terminal-selection-modal' + (selection.multi ? ' multi' : '')} data-testid="terminal-selection" role="dialog" aria-modal="true">
           <div class="terminal-selection-head">
             <span class="terminal-selection-dot"></span>
             <span class="terminal-selection-title" data-testid="terminal-selection-title">${selection.question || selection.title || 'Claude is asking'}</span>
+            <button type="button" class="terminal-selection-close" data-testid="terminal-selection-close" aria-label="Close" onclick=${() => setDismissedSel(selectionSig)}>✕</button>
           </div>
           <div class="terminal-selection-opts">
             ${selection.options.map((opt, i) => {
@@ -3866,6 +3868,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                       onclick=${() => submitSelection(selection)}>Submit ⏎</button>
             </div>
           ` : ''}
+        </div>
         </div>
       ` : ''}
 
