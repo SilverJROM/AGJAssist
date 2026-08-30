@@ -45,7 +45,10 @@ export class AgentSolicitService {
 
     const solicitMessage = params.solicit_message ?? "give me a status update";
     const repeatLimit = params.repeat_limit ?? null;
-    const nextFire = params.next_fire ?? null;
+    // An active reminder must have a scheduled next_fire or it is never "due"
+    // (getDueReminders requires next_fire IS NOT NULL). Default to one cadence
+    // period from now so it fires on schedule without an explicit next_fire.
+    const nextFire = params.next_fire ?? new Date(Date.now() + params.cadence_minutes * 60 * 1000).toISOString();
     const active = params.active ?? 1;
 
     const reminder = this.db
@@ -143,7 +146,12 @@ export class AgentSolicitService {
     const folderGroup = updates.folder_group ?? existing.folder_group;
     const cadenceMinutes = updates.cadence_minutes ?? existing.cadence_minutes;
     const repeatLimit = updates.repeat_limit !== undefined ? updates.repeat_limit : existing.repeat_limit;
-    const nextFire = updates.next_fire !== undefined ? updates.next_fire : existing.next_fire;
+    // Re-arm the schedule when neither the update nor the existing row carries a
+    // next_fire (e.g. a legacy reminder created before next_fire was defaulted),
+    // so editing a stuck reminder makes it fire again.
+    const nextFire = updates.next_fire !== undefined
+      ? updates.next_fire
+      : (existing.next_fire ?? new Date(Date.now() + cadenceMinutes * 60 * 1000).toISOString());
     const solicitMessage = updates.solicit_message ?? existing.solicit_message;
     const active = updates.active ?? existing.active;
 

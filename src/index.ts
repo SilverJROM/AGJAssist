@@ -22,6 +22,9 @@ import { AgentAssignmentService } from "./services/agent-assignment-service.js";
 import { AgentEventsService } from "./services/agent-events-service.js";
 import { CoordinatorLaunchService } from "./services/coordinator-launch-service.js";
 import { AgentWakeScheduler } from "./services/agent-wake-scheduler.js";
+import { AgentReminderScheduler } from "./services/agent-reminder-scheduler.js";
+import { AgentSolicitService } from "./services/agent-solicit-service.js";
+import { TerminalGroupsService } from "./services/terminal-groups-service.js";
 import { SelectionWatchService } from "./services/selection-watch-service.js";
 import {
   formatError,
@@ -80,6 +83,19 @@ async function main(): Promise<void> {
   // Wire services to bot core
   const ownerRow = db.prepare("SELECT id FROM users WHERE telegram_id = ?").get(config.telegram.authorizedUserId) as { id: number } | undefined;
   core.setServices(projectService, noteService, authService, ownerRow?.id || 1);
+
+  // Agent-reminder scheduler ("periodically nudge this agent group"). The
+  // fireDue implementation shipped without a scheduler wiring it up, so agent
+  // reminders never actually fired — this ticks it on the 60s loop below.
+  const agentSolicitService = new AgentSolicitService(db);
+  const agentReminderScheduler = new AgentReminderScheduler(
+    agentSolicitService,
+    tmuxService,
+    safetyService,
+    auditService,
+    new TerminalGroupsService(db),
+    delegationService
+  );
   const telegramAssistant = config.telegram.testMode
     ? null
     : new TelegramAssistant(config.telegram.botToken, core, {
@@ -136,6 +152,9 @@ async function main(): Promise<void> {
   // Reminder scheduler — check every 60 seconds for due reminders
   setInterval(async () => {
     try {
+      // Agent-group reminders: fire each due reminder into its recipient panes.
+      try { await agentReminderScheduler.fireDue(ownerRow?.id || 1); } catch {}
+
       // New alert-based system
       const dueAlerts = reminderService.getDueAlerts();
       for (const { reminder, alert } of dueAlerts) {
