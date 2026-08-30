@@ -37,6 +37,12 @@ export class AssistantCore {
     this.ownerUserId = ownerUserId;
   }
 
+  /** Passthrough so the Telegram callback handler can resolve a web-login number-match. */
+  resolveTgAuthChallenge(challengeId: string, selected: number): "verified" | "failed" | "expired" | "unknown" {
+    if (!this.authService) return "unknown";
+    return this.authService.resolveTgChallenge(challengeId, selected);
+  }
+
   private getState(userId: number): UserState {
     if (!this.userState.has(userId)) {
       this.userState.set(userId, {

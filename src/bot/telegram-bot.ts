@@ -79,6 +79,17 @@ export class TelegramAssistant {
     }
   }
 
+  /** Send the web-login number-match buttons to the owner. */
+  async sendTgAuthChallenge(chatId: number | string, challengeId: string, buttons: number[]): Promise<void> {
+    await this.bot.sendMessage(chatId, "🔐 Web sign-in attempt — tap the number shown on your screen:", {
+      reply_markup: {
+        inline_keyboard: [
+          buttons.map((n) => ({ text: String(n), callback_data: `tgauth:${challengeId}:${n}` }))
+        ]
+      }
+    });
+  }
+
   private async configureCommands(): Promise<void> {
     try {
       await this.bot.setMyCommands([
@@ -113,6 +124,11 @@ export class TelegramAssistant {
       try {
         if (query.data?.startsWith("helmpwl:")) {
           await this.handleHelmPasswordlessCallback(query);
+          return;
+        }
+
+        if (query.data?.startsWith("tgauth:")) {
+          await this.handleTgAuthCallback(query);
           return;
         }
 
@@ -175,6 +191,36 @@ export class TelegramAssistant {
         await this.sendMessageSafe(chatId, `Error: ${msg}`);
       }
     });
+  }
+
+  private async handleTgAuthCallback(query: TelegramBot.CallbackQuery): Promise<void> {
+    if (!this.core.isAuthorized(query.from.id)) {
+      await this.answerCallbackQuerySafe(query.id, { text: "Unauthorized" });
+      return;
+    }
+    const parts = query.data?.split(":") ?? [];
+    if (parts.length !== 3 || parts[0] !== "tgauth" || !parts[1]) {
+      await this.answerCallbackQuerySafe(query.id, { text: "Invalid" });
+      return;
+    }
+    const selected = Number(parts[2]);
+    if (!Number.isInteger(selected)) {
+      await this.answerCallbackQuerySafe(query.id, { text: "Invalid" });
+      return;
+    }
+    const result = this.core.resolveTgAuthChallenge(parts[1], selected);
+    const ok = result === "verified";
+    const label = ok
+      ? "✅ Web sign-in approved."
+      : result === "failed"
+        ? "❌ Wrong number — sign-in denied."
+        : "⌛ That sign-in request has expired.";
+    try {
+      if (query.message) {
+        await this.bot.editMessageText(label, { chat_id: query.message.chat.id, message_id: query.message.message_id });
+      }
+    } catch { /* ignore edit races */ }
+    await this.answerCallbackQuerySafe(query.id, { text: ok ? "Signed in" : "Denied" });
   }
 
   private async handleHelmPasswordlessCallback(query: TelegramBot.CallbackQuery): Promise<void> {

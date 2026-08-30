@@ -161,7 +161,7 @@ export async function createApiServer(
   registerTgLoginRoutes(app, config, services.telegramAssistant);
   registerLokalaiLinkRoutes(app, config);
   registerTelegramWebhookRoutes(app, config, services.telegramAssistant);
-  registerAuthRoutes(app, services.authService);
+  registerAuthRoutes(app, services.authService, config, services.telegramAssistant);
   registerProjectRoutes(app, services.authService, services.projectService, services.auditService);
   registerSafetyRoutes(app, services.authService, services.safetyService);
   registerAuditRoutes(app, services.authService, services.auditService);

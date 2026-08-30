@@ -523,6 +523,12 @@ function Login() {
   const [totp, setTotp] = useState('');
   const [needs2FA, setNeeds2FA] = useState(false);
   const [step, setStep] = useState('code'); // 'code' | 'totp'
+  // 2FA + Telegram number-match login (primary); 'code' is the /weblogin fallback.
+  const [mode, setMode] = useState('tg2fa'); // 'tg2fa' | 'code'
+  const [tgDisplayNumber, setTgDisplayNumber] = useState(null);
+  const [tgPolling, setTgPolling] = useState(false);
+  const tgPollRef = useRef(null);
+  useEffect(() => () => { if (tgPollRef.current) clearTimeout(tgPollRef.current); }, []);
 
   async function doAuth(initData, surface = 'web') {
     setLoading(true);
@@ -578,13 +584,75 @@ function Login() {
     setLoading(false);
   }
 
+  // 2FA + Telegram number-match: verify the 2FA code, then the bot sends 3 numbers
+  // and you tap the one shown here. Uses raw fetch (not api()) so a 401 doesn't
+  // trip the session-expired path.
+  function pollTg2fa(challengeId) {
+    const deadline = Date.now() + 2 * 60 * 1000;
+    const tick = async () => {
+      if (Date.now() > deadline) { setTgPolling(false); setTgDisplayNumber(null); setError('Sign-in timed out — try again.'); return; }
+      let res, data;
+      try {
+        res = await fetch(`${API_BASE}/api/auth/tg2fa/poll`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challengeId }) });
+        data = await res.json().catch(() => ({}));
+      } catch { tgPollRef.current = setTimeout(tick, 2000); return; }
+      if (res.ok && data.token) { setTgPolling(false); setTgDisplayNumber(null); finishWebLogin(data); return; }
+      if (res.status === 401) {
+        setTgPolling(false); setTgDisplayNumber(null);
+        setError(data.status === 'failed' ? 'A different number was tapped — sign-in denied. Try again.' : 'Sign-in request expired — try again.');
+        return;
+      }
+      tgPollRef.current = setTimeout(tick, 1800);
+    };
+    tick();
+  }
+  async function startTg2fa() {
+    if (totp.length !== 6) return;
+    setLoading(true); setError('');
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/tg2fa/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ totp: totp.trim() }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error || 'Invalid 2FA code'); setLoading(false); return; }
+      setTgDisplayNumber(data.displayNumber);
+      setTgPolling(true);
+      pollTg2fa(data.challengeId);
+    } catch {
+      setError('Could not start sign-in — check your connection.');
+    }
+    setLoading(false);
+  }
+  function cancelTg2fa() {
+    if (tgPollRef.current) clearTimeout(tgPollRef.current);
+    setTgPolling(false); setTgDisplayNumber(null); setError('');
+  }
+
   return html`
     <div class="login-container">
       <div class="login-card">
         <h2>AGJAssist</h2>
         ${window.Telegram?.WebApp?.initData ? html`
           <p>${loading ? 'Authenticating...' : 'Telegram WebApp detected. Authenticating automatically...'}</p>
-        ` : step === 'code' ? html`
+        ` : mode === 'tg2fa' ? (tgDisplayNumber == null ? html`
+          <p>Enter your <strong>2FA code</strong> from your authenticator app.</p>
+          <div class="form-group" style="margin-top:16px">
+            <label>2FA Code</label>
+            <input value=${totp} onInput=${e => setTotp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                   onKeyDown=${e => e.key === 'Enter' && totp.length === 6 && startTg2fa()}
+                   placeholder="000000" maxlength="6" data-testid="tg2fa-totp" inputmode="numeric"
+                   style="text-align:center;font-size:24px;letter-spacing:8px;font-family:monospace" autofocus />
+          </div>
+          <button class="btn btn-primary" style="width:100%" data-testid="tg2fa-continue" onclick=${startTg2fa} disabled=${loading || totp.length !== 6}>
+            ${loading ? 'Sending…' : 'Continue'}
+          </button>
+          <button class="btn" style="width:100%;margin-top:8px" onclick=${() => { setMode('code'); setError(''); setTotp(''); }}>
+            Use a login code instead
+          </button>
+        ` : html`
+          <p>Open Telegram and <strong>tap this number</strong> to approve the sign-in:</p>
+          <div data-testid="tg2fa-number" style="font-size:46px;font-weight:800;text-align:center;letter-spacing:6px;margin:14px 0;color:var(--accent)">${tgDisplayNumber}</div>
+          <p style="text-align:center;color:var(--text-secondary);font-size:13px">${tgPolling ? 'Waiting for your tap in Telegram…' : ''}</p>
+          <button class="btn" style="width:100%;margin-top:8px" data-testid="tg2fa-cancel" onclick=${cancelTg2fa}>Cancel</button>
+        `) : step === 'code' ? html`
           <p>Send <strong>/weblogin</strong> to the bot on Telegram to get a login code.</p>
           <div class="form-group" style="margin-top: 16px">
             <label>Login Code</label>
@@ -594,6 +662,9 @@ function Login() {
           </div>
           <button class="btn btn-primary" style="width:100%" onclick=${checkCodeAndProceed} disabled=${loading}>
             ${loading ? 'Checking...' : 'Continue'}
+          </button>
+          <button class="btn" style="width:100%;margin-top:8px" onclick=${() => { setMode('tg2fa'); setError(''); setCode(''); }}>
+            Use 2FA + Telegram sign-in
           </button>
         ` : html`
           <p>Enter your 2FA code from your authenticator app.</p>

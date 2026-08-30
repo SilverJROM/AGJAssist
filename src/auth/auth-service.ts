@@ -106,6 +106,105 @@ export class AuthService {
     };
   }
 
+  // ---- 2FA (TOTP) + Telegram number-match web login ----
+  // start() verifies the TOTP then mints a short-lived number-match challenge; the
+  // owner taps the matching number in Telegram (resolveTgChallenge), and the web
+  // polls (pollTgChallenge) until it's verified, at which point a session is issued.
+  private tgChallenges = new Map<string, {
+    displayNumber: number;
+    telegramId: number;
+    expiresAt: number;
+    status: "pending" | "verified" | "failed";
+    sessionHours?: number;
+  }>();
+  private totpFailWindow = { count: 0, resetAt: 0 };
+
+  private issueWebSession(userRow: UserRow, sessionHours?: number): AuthResult {
+    const hours = sessionHours || this.sessionExpiryHours;
+    const sessionId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+    const token = jwt.sign(
+      { sub: userRow.id, sid: sessionId, tid: userRow.telegram_id },
+      this.jwtSecret,
+      { expiresIn: `${hours}h` }
+    );
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    this.db
+      .prepare("INSERT INTO sessions (id, user_id, token_hash, surface, expires_at) VALUES (?, ?, ?, ?, ?)")
+      .run(sessionId, userRow.id, tokenHash, "web", expiresAt);
+    return {
+      token,
+      user: {
+        id: userRow.id,
+        telegramId: userRow.telegram_id,
+        username: userRow.username,
+        displayName: userRow.display_name,
+        role: userRow.role as "owner" | "viewer"
+      }
+    };
+  }
+
+  /** Verify the owner's TOTP, then mint a number-match challenge to send via Telegram. */
+  startTgChallenge(ownerTelegramId: number, totp: string, sessionHours?: number): {
+    challengeId: string;
+    displayNumber: number;
+    buttons: number[];
+  } | null {
+    const now = Date.now();
+    // Brute-force guard on the TOTP: 5 failures per 5 minutes.
+    if (now > this.totpFailWindow.resetAt) this.totpFailWindow = { count: 0, resetAt: now + 5 * 60 * 1000 };
+    if (this.totpFailWindow.count >= 5) return null;
+
+    const userRow = this.db
+      .prepare("SELECT * FROM users WHERE telegram_id = ? AND active = 1")
+      .get(ownerTelegramId) as UserRow | undefined;
+    if (!userRow || !userRow.totp_enabled || !userRow.totp_secret ||
+        !totp || !otplib.verifySync({ token: totp, secret: userRow.totp_secret }).valid) {
+      this.totpFailWindow.count += 1;
+      return null;
+    }
+    this.totpFailWindow.count = 0;
+
+    for (const [id, c] of this.tgChallenges) if (c.expiresAt < now) this.tgChallenges.delete(id);
+
+    const challengeId = crypto.randomUUID();
+    const displayNumber = 10 + Math.floor(Math.random() * 90);
+    const buttons = new Set<number>([displayNumber]);
+    while (buttons.size < 3) buttons.add(10 + Math.floor(Math.random() * 90));
+    this.tgChallenges.set(challengeId, {
+      displayNumber,
+      telegramId: ownerTelegramId,
+      status: "pending",
+      expiresAt: now + 2 * 60 * 1000,
+      sessionHours
+    });
+    return { challengeId, displayNumber, buttons: [...buttons].sort(() => Math.random() - 0.5) };
+  }
+
+  /** Called from the bot when the owner taps a number button. */
+  resolveTgChallenge(challengeId: string, selected: number): "verified" | "failed" | "expired" | "unknown" {
+    const c = this.tgChallenges.get(challengeId);
+    if (!c) return "unknown";
+    if (c.expiresAt < Date.now()) { this.tgChallenges.delete(challengeId); return "expired"; }
+    if (c.status !== "pending") return c.status;
+    c.status = selected === c.displayNumber ? "verified" : "failed";
+    return c.status;
+  }
+
+  /** Polled by the web; issues a session once the challenge is verified (one-time). */
+  pollTgChallenge(challengeId: string): AuthResult | { status: "pending" | "failed" | "expired" } {
+    const c = this.tgChallenges.get(challengeId);
+    if (!c || c.expiresAt < Date.now()) { if (c) this.tgChallenges.delete(challengeId); return { status: "expired" }; }
+    if (c.status === "pending") return { status: "pending" };
+    this.tgChallenges.delete(challengeId);
+    if (c.status === "failed") return { status: "failed" };
+    const userRow = this.db
+      .prepare("SELECT * FROM users WHERE telegram_id = ? AND active = 1")
+      .get(c.telegramId) as UserRow | undefined;
+    if (!userRow) return { status: "failed" };
+    return this.issueWebSession(userRow, c.sessionHours);
+  }
+
   authenticateTelegram(initData: string, surface: "miniapp" | "web"): AuthResult | null {
     const tgUser = validateTelegramInitData(initData, this.botToken);
     if (!tgUser) return null;

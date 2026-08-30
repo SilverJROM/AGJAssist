@@ -1,12 +1,62 @@
 import { FastifyInstance } from "fastify";
+import type { AppConfig } from "../../config/config.js";
+import type { TelegramAssistant } from "../../bot/telegram-bot.js";
 import { AuthService } from "../../auth/auth-service.js";
 import { createAuthMiddleware, requireOwner } from "../../auth/auth-middleware.js";
 
 export function registerAuthRoutes(
   app: FastifyInstance,
-  authService: AuthService
+  authService: AuthService,
+  config?: AppConfig,
+  telegramAssistant?: TelegramAssistant | null
 ): void {
   const authMiddleware = createAuthMiddleware(authService);
+
+  // ---- 2FA (TOTP) + Telegram number-match web login ----
+  // Enter your 6-digit 2FA code -> the bot sends 3 numbers, you tap the one shown
+  // on the web -> logged in. (Runs alongside the /weblogin-code login.)
+  app.post<{ Body: { totp?: string; hours?: number } }>(
+    "/api/auth/tg2fa/start",
+    async (request, reply) => {
+      const { totp, hours } = request.body || {};
+      if (!totp || !/^\d{6}$/.test(String(totp).trim())) {
+        return reply.code(400).send({ error: "A 6-digit 2FA code is required" });
+      }
+      if (!config || !telegramAssistant) {
+        return reply.code(503).send({ error: "Telegram sign-in is unavailable" });
+      }
+      const ownerId = config.telegram.authorizedUserId;
+      const sessionHours = Number.isFinite(Number(hours)) && Number(hours) > 0 ? Number(hours) : undefined;
+      const challenge = authService.startTgChallenge(ownerId, String(totp).trim(), sessionHours);
+      if (!challenge) {
+        return reply.code(401).send({ error: "Invalid 2FA code" });
+      }
+      try {
+        await telegramAssistant.sendTgAuthChallenge(ownerId, challenge.challengeId, challenge.buttons);
+      } catch {
+        return reply.code(502).send({ error: "Could not send the Telegram challenge" });
+      }
+      return { challengeId: challenge.challengeId, displayNumber: challenge.displayNumber };
+    }
+  );
+
+  app.post<{ Body: { challengeId?: string } }>(
+    "/api/auth/tg2fa/poll",
+    async (request, reply) => {
+      const { challengeId } = request.body || {};
+      if (!challengeId || typeof challengeId !== "string") {
+        return reply.code(400).send({ error: "challengeId is required" });
+      }
+      const result = authService.pollTgChallenge(challengeId);
+      if ("token" in result) {
+        return result;
+      }
+      if (result.status === "pending") {
+        return reply.code(200).send({ status: "pending" });
+      }
+      return reply.code(401).send({ status: result.status });
+    }
+  );
 
   app.post<{ Body: { initData: string; surface?: "miniapp" | "web" } }>(
     "/api/auth/telegram",
