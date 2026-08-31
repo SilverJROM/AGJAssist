@@ -12,6 +12,7 @@ import { ProjectService } from "../services/project-service.js";
 import { SafetyService } from "../services/safety-service.js";
 import { AuditService } from "../services/audit-service.js";
 import { registerAuthRoutes } from "./routes/auth-routes.js";
+import { registerEscalationRoutes } from "./routes/escalation-routes.js";
 import { registerProjectRoutes } from "./routes/project-routes.js";
 import { registerSafetyRoutes } from "./routes/safety-routes.js";
 import { registerAuditRoutes } from "./routes/audit-routes.js";
@@ -162,6 +163,7 @@ export async function createApiServer(
   registerLokalaiLinkRoutes(app, config);
   registerTelegramWebhookRoutes(app, config, services.telegramAssistant);
   registerAuthRoutes(app, services.authService, config, services.telegramAssistant);
+  registerEscalationRoutes(app, config, services.telegramAssistant, services.auditService);
   registerProjectRoutes(app, services.authService, services.projectService, services.auditService);
   registerSafetyRoutes(app, services.authService, services.safetyService);
   registerAuditRoutes(app, services.authService, services.auditService);

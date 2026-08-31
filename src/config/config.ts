@@ -50,6 +50,7 @@ export interface AppConfig {
     authorizedUserId: number;
     authorizedChatIds: number[];
     testMode: boolean;
+    escalationToken: string;
     updateMode: "webhook" | "polling";
     webhookUrl: string | null;
     webhookPath: string;
@@ -132,6 +133,12 @@ export function loadConfig(): AppConfig {
     .createHash("sha256")
     .update(`agjassist:${botToken}`)
     .digest("hex");
+  // Shared secret agents present to POST /api/escalate. Derived from the bot
+  // token so it works out-of-the-box, overridable via ESCALATION_TOKEN.
+  const defaultEscalationToken = crypto
+    .createHash("sha256")
+    .update(`agjassist-escalate:${botToken}`)
+    .digest("hex");
 
   return {
     telegram: {
@@ -139,6 +146,7 @@ export function loadConfig(): AppConfig {
       authorizedUserId,
       authorizedChatIds,
       testMode: parseBool(optional("TEST_MODE", "false")),
+      escalationToken: optional("ESCALATION_TOKEN", defaultEscalationToken),
       updateMode,
       webhookUrl: webhookUrl || null,
       webhookPath,
