@@ -991,6 +991,9 @@ function TerminalTab({ projectId, projectName } = {}) {
   // checklist state name -> bool).
   const [editingReminderId, setEditingReminderId] = useState(null);
   const [editReminderSessions, setEditReminderSessions] = useState({});
+  // Editing an existing reminder's cadence (preset minutes + free-form override).
+  const [editCadence, setEditCadence] = useState(30);
+  const [editCadenceCustom, setEditCadenceCustom] = useState('');
   // Draggable header dropdowns (reminders/wakeups/summaries): null = default
   // anchored position, else a dragged {left, top}.
   const [modalPos, setModalPos] = useState(null);
@@ -1224,6 +1227,9 @@ function TerminalTab({ projectId, projectName } = {}) {
     const sel = {};
     (r.recipients || []).forEach((rc) => { if (rc.include === undefined || rc.include) sel[rc.agent_name] = true; });
     setEditReminderSessions(sel);
+    const c = Number(r.cadence_minutes) || 30;
+    setEditCadence(c);
+    setEditCadenceCustom([15, 30, 60].includes(c) ? '' : String(c));
     setEditingReminderId(r.id);
   };
   const saveEditReminderSessions = async (r) => {
@@ -1231,8 +1237,10 @@ function TerminalTab({ projectId, projectName } = {}) {
       .filter((m) => editReminderSessions[m.name])
       .map((m) => ({ agent_name: m.name, include: 1 }));
     if (recipients.length === 0) return;
+    const minutes = editCadenceCustom ? Number(editCadenceCustom) : editCadence;
+    if (!Number.isFinite(minutes) || minutes < 1) return;
     try {
-      await api('/api/agent-reminders/' + r.id, { method: 'PATCH', body: JSON.stringify({ recipients }) });
+      await api('/api/agent-reminders/' + r.id, { method: 'PATCH', body: JSON.stringify({ recipients, cadence_minutes: minutes }) });
       const data = await api('/api/agent-reminders/active').catch(() => null);
       if (data) setAgentReminders(Array.isArray(data.reminders) ? data.reminders : []);
       setEditingReminderId(null);
@@ -1974,7 +1982,17 @@ function TerminalTab({ projectId, projectName } = {}) {
                           <input type="checkbox" data-testid="dd-edit-session" data-session=${m.name} checked=${!!editReminderSessions[m.name]} onchange=${e => setEditReminderSessions(s => ({ ...s, [m.name]: e.target.checked }))} />
                           <span>${m.name}${m.isActive ? ' · current' : ''}</span>
                         </label>`)}
-                    <button type="button" class="btn btn-sm btn-primary" data-testid="dd-reminder-edit-save" onclick=${() => saveEditReminderSessions(r)}>Save sessions</button>
+                    <div style="font-size:11px;color:var(--text-secondary);margin:8px 0 4px">Cadence (how often it fires)</div>
+                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+                      ${[15, 30, 60].map((mins) => html`
+                        <button type="button" class=${'btn btn-sm' + (!editCadenceCustom && editCadence === mins ? ' btn-primary' : '')}
+                                data-testid=${'dd-edit-cadence-' + mins}
+                                onclick=${() => { setEditCadence(mins); setEditCadenceCustom(''); }}>${mins}m</button>`)}
+                      <input data-testid="dd-edit-cadence-custom" type="number" min="1" placeholder="custom" value=${editCadenceCustom}
+                             oninput=${e => setEditCadenceCustom(e.target.value)} style="width:74px" />
+                      <span style="font-size:11px;color:var(--text-secondary)">min</span>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-primary" data-testid="dd-reminder-edit-save" onclick=${() => saveEditReminderSessions(r)}>Save</button>
                   </div>
                 ` : ''}
               </div>`)}`}

@@ -145,13 +145,17 @@ export class AgentSolicitService {
 
     const folderGroup = updates.folder_group ?? existing.folder_group;
     const cadenceMinutes = updates.cadence_minutes ?? existing.cadence_minutes;
+    const cadenceChanged = updates.cadence_minutes !== undefined && updates.cadence_minutes !== existing.cadence_minutes;
     const repeatLimit = updates.repeat_limit !== undefined ? updates.repeat_limit : existing.repeat_limit;
-    // Re-arm the schedule when neither the update nor the existing row carries a
-    // next_fire (e.g. a legacy reminder created before next_fire was defaulted),
-    // so editing a stuck reminder makes it fire again.
+    // Reschedule next_fire to now + cadence when the cadence changes (so a shorter
+    // interval fires sooner instead of waiting out the old schedule), or when
+    // neither the update nor the existing row carries a next_fire (e.g. a legacy
+    // reminder created before next_fire was defaulted). An explicit next_fire wins.
     const nextFire = updates.next_fire !== undefined
       ? updates.next_fire
-      : (existing.next_fire ?? new Date(Date.now() + cadenceMinutes * 60 * 1000).toISOString());
+      : ((cadenceChanged || existing.next_fire == null)
+          ? new Date(Date.now() + cadenceMinutes * 60 * 1000).toISOString()
+          : existing.next_fire);
     const solicitMessage = updates.solicit_message ?? existing.solicit_message;
     const active = updates.active ?? existing.active;
 
