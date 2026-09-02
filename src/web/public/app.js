@@ -2996,6 +2996,12 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     setEntries(prev => {
       const list = Array.isArray(prev) ? prev : [];
       const lastUser = lastRoleIndex(list, 'user');
+      const lastAgent = lastRoleIndex(list, 'agent');
+      // Settled exchange (last turn is an agent reply): keep it and let
+      // applyAgentPatch/_reconcileMovedOnPane patch it to the live pane content, so
+      // a queued composer echo (a reminder sitting unsent above fresh output) does
+      // not wipe the reply on refresh. Only a mid-send (last=user) rebuilds fresh.
+      if (lastAgent >= 0 && lastAgent >= lastUser) return applyAgentPatch(list, latest);
       const kept = lastUser >= 0 ? list.slice(0, lastUser + 1) : [];
       return applyAgentPatch(kept, latest);
     });

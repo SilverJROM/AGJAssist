@@ -1806,3 +1806,38 @@ describe("detectSelectionPrompt", () => {
     expect(sel!.multi).toBe(false);
   });
 });
+
+describe("moved-on desync: queued composer echoes the last YOU while the agent ran on", () => {
+  const SENT = "Status update — % completion and ETA";
+  const settled = () => [
+    { id: "u1", role: "user", name: "You", content: SENT, sentContent: SENT, sent: SENT },
+    { id: "a1", role: "agent", name: "Agent", content: "OLD-REPLY-MARKER x-07_projcore earlier text" },
+  ];
+  const lastAgent = (list: any[]) => [...list].reverse().find((e) => e.role === "agent");
+
+  it("patches the agent turn from content above a trailing ❯ composer (chrome below)", () => {
+    const pane = [
+      "● NEW-REPLY-MARKER B26 is dispatched. 0/9 landed. Going quiet.",
+      "  Baked for 7m 16s",
+      "",
+      "❯ " + SENT,
+      "  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent",
+      "  ✔ Update installed · Restart to update",
+    ].join("\n");
+    const next = applyAgentPatch(settled(), pane, { now: 1_700_000_000_000 });
+    expect(lastAgent(next).content).toContain("NEW-REPLY-MARKER");
+    expect(lastAgent(next).content).not.toContain("OLD-REPLY-MARKER");
+  });
+
+  it("does NOT hijack a real reply that sits BELOW a composer echo (defers to normal path)", () => {
+    const pane = [
+      "● OLD-REPLY-MARKER x-07_projcore earlier text",
+      "",
+      "❯ " + SENT,
+      "● FRESH-BELOW answer to the status request",
+    ].join("\n");
+    const next = applyAgentPatch(settled(), pane, { now: 1_700_000_000_000, previousSnapshot: "● OLD-REPLY-MARKER x-07_projcore earlier text" });
+    // reconciler must return the list unchanged here (normal previousSnapshot diff owns it)
+    expect(next).toHaveLength(2);
+  });
+});

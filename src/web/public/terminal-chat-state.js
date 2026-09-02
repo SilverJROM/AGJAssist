@@ -37,6 +37,9 @@ const _overflowChromeRe = /^\s*(?:…|\.\.\.)\s*\+\d+\s+(?:completed|more|lines?
 // Claude TUI paints a right-aligned "HH:MM:SS [N/M]" counter over the first
 // physical line of the wrapped user box. The tail of the message survives.
 const _paneCounterRe = /\b\d{2}:\d{2}:\d{2}\s+\[\d+\/\d+\]/;
+// Claude TUI update/restart + "/clear to save" nags — pure chrome that otherwise
+// leaks into a reply and (below a composer) blocks the moved-on desync patch.
+const _updateNagRe = /^(?:✔\s*)?Update installed\b|\bRestart to update\b|^new task\?\s*\/clear\b/i;
 
 function _isStatusChromeLine(line) {
   const trimmed = (line || "").trim();
@@ -75,6 +78,7 @@ function _isChromeLine(line) {
   if (_turnChromeRe.test(line)) return false;
   return _composerGlyphRe.test(trimmed)
     || _composerPlaceholderRe.test(trimmed)
+    || _updateNagRe.test(trimmed)
     || _isBoxDrawingLine(line)
     || /^[─=]{3,}$/.test(trimmed)
     || _interruptChromeRe.test(trimmed)
@@ -1040,19 +1044,28 @@ function _reconcileMovedOnPane(list, snapshot, now) {
   if (!newestText) return null;
 
   const lastUser = lastUserIdx >= 0 ? list[lastUserIdx] : null;
-  // In sync? The last stored user turn corresponds to the newest pane run.
+  // Is the newest ❯ run just the last stored user turn — echoed, or QUEUED unsent
+  // in the composer (a reminder / queued send sitting in a busy pane)? Then there
+  // is no NEW exchange to append. BUT do NOT declare "in sync" and bail here: the
+  // agent may have produced fresh output ABOVE the prompt that the chat is still
+  // missing, so fall through to the above-prompt patch below (the lkAsst/hris
+  // "chat frozen while the terminal moved on" desync — a reminder's queued text in
+  // the composer matched the last YOU and froze the whole transcript).
+  let syncedRun = false;
   if (lastUser) {
     const sent = lastUser.sentContent || lastUser.sent || lastUser.content || "";
-    if (_runMatchesSent(newest, sent)) return null;
-    if ((lastUser.content || "").trim() === newestText) return null;
+    if (_runMatchesSent(newest, sent) || (lastUser.content || "").trim() === newestText) syncedRun = true;
   }
 
   const afterRaw = rawLines.slice(newest.cutAfter + 1).join("\n");
   const body = _removeUserText(_prepareDiffText(afterRaw), list, { lastUserOnly: false }).trim();
-
   if (body) {
-    // A real reply below the newest ❯ — this is a new exchange the chat missed
-    // (tab switch / SSH-driven). Append it as a user + agent turn.
+    // A reply sits BELOW the newest ❯. If that ❯ merely echoes/queues the last YOU
+    // (no new send), the normal previousSnapshot-diff path accumulates it — don't
+    // hijack it here (that would wrongly replace the live reply with older text).
+    if (syncedRun) return null;
+    // Otherwise it's a genuinely NEW send whose exchange the chat missed (tab
+    // switch / SSH-driven). Append it as a user + agent turn.
     if (lastAgentIdx >= 0 && (list[lastAgentIdx].content || "").trim().endsWith(body)) return null;
     const ts = new Date(now).toLocaleTimeString();
     const userEntry = makeEntry("you-reco-" + now, "user", "You", newestText, ts);
