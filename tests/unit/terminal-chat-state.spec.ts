@@ -1841,3 +1841,41 @@ describe("moved-on desync: queued composer echoes the last YOU while the agent r
     expect(next).toHaveLength(2);
   });
 });
+
+describe("multi-CLI: codex (› prompt, • bullets) reconciles like Claude", () => {
+  const lastAgent = (list: any[]) => [...list].reverse().find((e) => e.role === "agent");
+  const settled = () => [
+    { id: "u1", role: "user", name: "You", content: "any results?", sentContent: "any results?", sent: "any results?" },
+    { id: "a1", role: "agent", name: "Agent", content: "OLD-CDX earlier codex reply" },
+  ];
+
+  it("patches the agent turn from a • bullet above a › composer, stripping codex chrome", () => {
+    const pane = [
+      "• NEW-CDX The compile is finished — FP4 baseline 51.24 tok/s.",
+      "  Proceeding with prefill then the MTP comparison.",
+      "",
+      "› Ask Codex to do anything",
+      "  gpt-5.6-terra medium fast · ~/websites/lokalAI · lokalAI · fix/g3 · Main [default]",
+    ].join("\n");
+    const next = applyAgentPatch(settled(), pane, { now: 1_700_000_000_000 });
+    const a = lastAgent(next);
+    expect(a.content).toContain("NEW-CDX");
+    expect(a.content).not.toContain("OLD-CDX");
+    expect(a.content).not.toContain("Ask Codex");
+    expect(a.content).not.toContain("gpt-5.6-terra");
+  });
+
+  it("detects a › user message + the reply below it (new codex exchange)", () => {
+    const pane = [
+      "• OLD-CDX earlier codex reply",
+      "› any results?",
+      "• FRESH-CDX the confirmed FP4 baseline is 51.24 tok/s decode.",
+      "",
+      "› Ask Codex to do anything",
+    ].join("\n");
+    const start = [{ id: "a1", role: "agent", name: "Agent", content: "OLD-CDX earlier codex reply" }];
+    const next = applyAgentPatch(start, pane, { now: 1_700_000_000_000, previousSnapshot: "• OLD-CDX earlier codex reply" });
+    expect(next.some((e: any) => e.role === "user" && /any results/.test(e.content))).toBe(true);
+    expect(lastAgent(next).content).toContain("FRESH-CDX");
+  });
+});

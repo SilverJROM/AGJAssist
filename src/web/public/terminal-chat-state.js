@@ -26,7 +26,12 @@ const _tipChromeRe = /^\s*Tip:/;
 const _turnChromeRe = /(\d+[hms]|\d+m \d+s)|tokens|effort|Drizzl\w*|Working|Thinking|Compacting|Waiting for|Worked for/i;
 const _tmuxConfRe = /~\/\.tmux\.conf/;
 const _composerGlyphRe = /^[❯›▌]/u;
-const _composerPlaceholderRe = /^\s*Type a message\b/i;
+// Empty-composer placeholder across CLIs: Claude "Type a message", codex "Ask
+// Codex to do anything", grok/kloo "Ask <X> …" — chrome, never a user message.
+const _composerPlaceholderRe = /^\s*(?:Type a message\b|Send a message\b|Ask\b[^\n]*\b(?:to do anything|anything)\b|Ask (?:Codex|Grok|Kloo)\b)/i;
+// Codex/grok/kloo status footer: "<model> · ~/<path> · <proj> · <branch> · …".
+// The "· ~/<path> ·" middle segment is distinctive; strip the whole line.
+const _cliFooterRe = /[·•]\s+~\/[^\s·•]+\s+[·•]/;
 const _interruptChromeRe = /^\s*esc to interrupt\s*$/i;
 // Editor-tabs indicator ("⧉ index · index · index · ctrl+] to open") and related
 // CLI hint chrome ("… to run in background", "… +N completed/more/lines") — pure
@@ -74,7 +79,7 @@ function _isChromeLine(line) {
   if (trimmed === "") return false;
   // Order: C1, then C3, then C4 keep, then C2.
   if (_isStatusChromeLine(line)) return true;
-  if (_modelFooterRe.test(trimmed) || _tipChromeRe.test(trimmed)) return true;
+  if (_modelFooterRe.test(trimmed) || _cliFooterRe.test(trimmed) || _tipChromeRe.test(trimmed)) return true;
   if (_turnChromeRe.test(line)) return false;
   return _composerGlyphRe.test(trimmed)
     || _composerPlaceholderRe.test(trimmed)
@@ -675,32 +680,37 @@ function _ansiStrippedRows(text) {
     .split("\n");
 }
 
+// User-send prompt glyphs across CLIs: Claude uses ❯, codex/grok/kloo use ›.
 function _isUserPromptGlyph(line) {
-  return /^\s*[│┃║]?\s*❯/u.test(line || "");
+  return /^\s*[│┃║]?\s*[❯›]/u.test(line || "");
 }
 
 function _stripUserRunLine(line, isFirst) {
   let text = String(line ?? "").replace(_paneCounterRe, "");
   text = text.replace(/^\s*[│┃║]\s?/, "").replace(/\s*[│┃║]\s*$/, "");
-  if (isFirst) text = text.replace(/^\s*❯\s*/u, "");
+  if (isFirst) text = text.replace(/^\s*[❯›]\s*/u, "");
   return text.replace(/[ \t\u00A0]+$/g, "");
 }
 
 function _isUserPromptLine(line) {
   if (!_isUserPromptGlyph(line)) return false;
-  return Boolean(_normalizeWs(_stripUserRunLine(line, true)));
+  const stripped = _normalizeWs(_stripUserRunLine(line, true));
+  if (!stripped) return false;
+  // The empty composer carries a placeholder ("Type a message", "Ask Codex to do
+  // anything", …) after the glyph — that is chrome, not a user message.
+  return !_composerPlaceholderRe.test(stripped);
 }
 
 function _isUserRunBoundary(line) {
   const trimmed = (line || "").trim();
   if (!trimmed) return true;
   if (_isUserPromptGlyph(line)) return true;
-  if (/^\s*[│┃║]?\s*●/u.test(line || "")) return true;
+  if (/^\s*[│┃║]?\s*[●•]/u.test(line || "")) return true;
   if (/^[─━═]{3,}/u.test(trimmed) || /[─━═]{5,}/u.test(trimmed)) return true;
   if (_isRoundBoxOpener(line) || _isRoundBoxCloser(line)) return true;
   if (_isStatusChromeLine(line) || _isC4StatusLine(line) || _isSpinnerChromeLine(line)) return true;
   if (_statusChromeRe.test(trimmed) || _modelFooterRe.test(trimmed) || _tipChromeRe.test(trimmed)) return true;
-  if (/^[›▌]/u.test(trimmed) || _composerPlaceholderRe.test(trimmed)) return true;
+  if (/^▌/u.test(trimmed) || _composerPlaceholderRe.test(trimmed)) return true;
   return false;
 }
 
@@ -788,7 +798,7 @@ function _lastMatchingUserRun(runs, sent) {
 function _latestBulletBlocks(lines) {
   let first = -1;
   for (let i = 0; i < lines.length; i += 1) {
-    if (/^\s*[│┃║]?\s*●/u.test(lines[i] || "")) {
+    if (/^\s*[│┃║]?\s*[●•]/u.test(lines[i] || "")) {
       first = i;
       break;
     }
@@ -976,7 +986,9 @@ function _lastEmptyPromptIndex(rawLines) {
     const line = rawLines[i];
     if (!_isUserPromptGlyph(line)) continue;
     const rest = _normalizeWs(_stripUserRunLine(line, true));
-    if (!rest) return i; // ❯ with no typed content
+    // Empty composer: nothing typed, or just the placeholder ("Type a message",
+    // "Ask Codex to do anything", …) — the idle prompt across CLIs.
+    if (!rest || _composerPlaceholderRe.test(rest)) return i;
   }
   return -1;
 }
