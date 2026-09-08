@@ -44,6 +44,11 @@ export function registerEscalationRoutes(
     "/api/escalate",
     { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
     async (request, reply) => {
+      // Fail-closed: with no configured secret the wire is disabled entirely
+      // (no BOT_TOKEN-derived fallback), so an unconfigured server can't be paged.
+      if (!config.telegram.escalationToken) {
+        return reply.code(503).send({ error: "escalation endpoint not configured" });
+      }
       if (!tokenMatches(presentedToken(request.headers as Record<string, unknown>), config.telegram.escalationToken)) {
         return reply.code(401).send({ error: "invalid or missing escalation token" });
       }

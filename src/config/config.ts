@@ -133,20 +133,17 @@ export function loadConfig(): AppConfig {
     .createHash("sha256")
     .update(`agjassist:${botToken}`)
     .digest("hex");
-  // Shared secret agents present to POST /api/escalate. Derived from the bot
-  // token so it works out-of-the-box, overridable via ESCALATION_TOKEN.
-  const defaultEscalationToken = crypto
-    .createHash("sha256")
-    .update(`agjassist-escalate:${botToken}`)
-    .digest("hex");
-
   return {
     telegram: {
       botToken,
       authorizedUserId,
       authorizedChatIds,
       testMode: parseBool(optional("TEST_MODE", "false")),
-      escalationToken: optional("ESCALATION_TOKEN", defaultEscalationToken),
+      // The north escalate wire (POST /api/escalate) requires an explicit,
+      // non-derivable secret. NO default is derived from BOT_TOKEN — otherwise any
+      // on-box script that already reads BOT_TOKEN could reproduce the token and
+      // bypass the north-only contract. Unset → the endpoint is fail-closed (503).
+      escalationToken: optional("ESCALATION_TOKEN", ""),
       updateMode,
       webhookUrl: webhookUrl || null,
       webhookPath,
