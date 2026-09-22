@@ -798,6 +798,13 @@ body.tg-miniapp:not(.tg-light) .terminal-group-overlay {
 }
 /* Minimal inline attachment pill: a small thumbnail + ✕, sits in the composer
    row so attaching an image does NOT add a row or shrink the input. */
+.terminal-attach-pills {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 40%;
+}
 .terminal-attach-pill {
   position: relative;
   flex: 0 0 auto;

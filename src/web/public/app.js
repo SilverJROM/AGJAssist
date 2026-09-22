@@ -2887,7 +2887,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [lastCommand, setLastCommand] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState(0);
   const [sendMode, setSendMode] = useState('command');
-  const [attachment, setAttachment] = useState(null);
+  const [attachments, setAttachments] = useState([]);
   const [attaching, setAttaching] = useState(false);
   const [attachError, setAttachError] = useState('');
   const [replyLimit, setReplyLimit] = useState(() => readTerminalReplyLimit());
@@ -3226,7 +3226,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       const draft = readTerminalDraft(draftViewer, target);
       setInput(draft ?? '');
       draftHydratedRef.current = true;
-      setAttachment(null);
+      setAttachments([]);
       setAttachError('');
       setEntries([]);
       setSnapshot('');
@@ -3394,7 +3394,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   // `failed` with the exact text/attachment needed to resend — it persists via the
   // recent-message memory, so a message that didn't go through is never silently
   // lost when you leave the session; you can see it and one-tap resend.
-  async function performSend(command, youId, attachmentPath) {
+  async function performSend(command, youId, attachmentPaths = []) {
     const sentText = sanitizeOutgoingCommand(command).trim();
     if (!sentText) return;
     const beforeSnapshot = snapshotRef.current;
@@ -3430,7 +3430,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     } catch (e) {
       // Mark the YOU bubble as not-delivered + attach resend data (persists).
       setEntries(prev => prev.map(entry => entry.id === youId
-        ? { ...entry, failed: true, retrying: false, resendText: command, resendAttachmentPath: attachmentPath || null, failReason: e.message || 'Not sent' }
+        ? { ...entry, failed: true, retrying: false, resendText: command, resendAttachmentPaths: attachmentPaths, failReason: e.message || 'Not sent' }
         : entry));
       setStatus('error');
     }
@@ -3440,8 +3440,8 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
 
   async function sendCommand() {
     const text = input.trim();
-    const imageRef = attachment?.path ? `[image: ${attachment.path}]` : '';
-    const command = text && imageRef ? `${text} ${imageRef}` : (text || imageRef);
+    const imageRefs = attachments.map((item) => `[image: ${item.path}]`).join(' ');
+    const command = text && imageRefs ? `${text} ${imageRefs}` : (text || imageRefs);
     if (!command || sending) return;
 
     const sentText = sanitizeOutgoingCommand(command).trim();
@@ -3458,20 +3458,20 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
 
     const now = Date.now();
     const youId = 'you-' + now;
-    const attachmentPath = attachment?.path || null;
+    const attachmentPaths = attachments.map((item) => item.path);
     setInput('');
     clearTerminalDraft(draftViewer, target);
-    setAttachment(null);
+    setAttachments([]);
     setAttachError('');
     setEntries(prev => appendYou(prev, command, { now, sentContent: sentText }));
-    await performSend(command, youId, attachmentPath);
+    await performSend(command, youId, attachmentPaths);
   }
 
   // One-tap resend of a message that failed to send.
   async function resendFailed(entry) {
     if (sending || !entry || !entry.resendText) return;
     setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, failed: false, retrying: true } : e));
-    await performSend(entry.resendText, entry.id, entry.resendAttachmentPath);
+    await performSend(entry.resendText, entry.id, entry.resendAttachmentPaths || []);
   }
 
   async function sendManualEnter() {
@@ -3593,8 +3593,8 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
     fileInputRef.current?.click();
   }
 
-  function clearAttachment() {
-    setAttachment(null);
+  function removeAttachment(index) {
+    setAttachments(prev => prev.filter((_, currentIndex) => currentIndex !== index));
     setAttachError('');
   }
 
@@ -3630,19 +3630,18 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
       if (!result?.ok || !result.path) {
         throw new Error('Upload did not return a path.');
       }
-      setAttachment({ path: result.path, preview: dataUrl, name });
+      setAttachments(prev => [...prev, { path: result.path, preview: dataUrl, name }]);
     } catch (e) {
-      setAttachment(null);
       setAttachError(e.message || 'Failed to attach image.');
     }
     setAttaching(false);
   }
 
   async function handleAttachFile(event) {
-    const file = event.target.files && event.target.files[0];
+    const files = Array.from(event.target.files || []);
     event.target.value = '';
-    if (!file || sending || attaching) return;
-    await uploadAttachedImage(file);
+    if (!files.length || sending || attaching) return;
+    for (const file of files) await uploadAttachedImage(file);
   }
 
   function handleComposerPaste(event) {
@@ -3936,11 +3935,15 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
               <path d="M21 16l-5-5-11 8"></path>
             </svg>
           </button>
-          <input type="file" accept="image/*" hidden ref=${fileInputRef} onChange=${handleAttachFile} />
-          ${attachment ? html`
-            <span class="terminal-attach-pill" data-testid="terminal-attachment-chip" title=${attachment.path}>
-              <img src=${attachment.preview} alt="" />
-              <button type="button" onclick=${clearAttachment} aria-label="Remove attachment">×</button>
+          <input type="file" accept="image/*" multiple hidden ref=${fileInputRef} onChange=${handleAttachFile} />
+          ${attachments.length ? html`
+            <span class="terminal-attach-pills" data-testid="terminal-attachment-list">
+              ${attachments.map((attachment, index) => html`
+                <span class="terminal-attach-pill" data-testid="terminal-attachment-chip" title=${attachment.path}>
+                  <img src=${attachment.preview} alt="" />
+                  <button type="button" onclick=${() => removeAttachment(index)} aria-label=${`Remove attachment ${index + 1}`}>×</button>
+                </span>
+              `)}
             </span>
           ` : ''}
           <div data-testid="terminal-draft">
@@ -3959,7 +3962,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                         // Empty composer + an active multi-select prompt → Enter
                         // submits the toggled options (like the terminal). With
                         // text, it sends the message as usual.
-                        if (!input.trim() && !attachment && showSelection && selection?.multi) {
+                        if (!input.trim() && !attachments.length && showSelection && selection?.multi) {
                           submitSelection(selection);
                         } else {
                           sendCommand();
@@ -3967,7 +3970,7 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
                       }
                     }}></textarea>
           </div>
-          <button class="terminal-chat-send-btn" data-testid="terminal-send-command" onclick=${sendCommand} disabled=${sending || (!input.trim() && !attachment)}>
+          <button class="terminal-chat-send-btn" data-testid="terminal-send-command" onclick=${sendCommand} disabled=${sending || (!input.trim() && !attachments.length)}>
             ${sending ? html`<div class="typing-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>` : '➤'}
           </button>
         </div>

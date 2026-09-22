@@ -164,6 +164,49 @@ test('attach-image: paperclip -> chip -> send appends [image: path] and clears t
   await expect(chip).toHaveCount(0);
 });
 
+test('attach-image: two picker files remain visible and send as ordered image tokens', async ({ page }) => {
+  test.setTimeout(60_000);
+
+  let sentCommand: unknown = null;
+  const uploadedNames: string[] = [];
+  await page.route(/\/api\/tmux\/attach-image$/, async (route) => {
+    const body = route.request().postDataJSON() as { filename?: string };
+    const name = body.filename || 'unnamed.png';
+    uploadedNames.push(name);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, path: `tmp/${name}` }),
+    });
+  });
+  await page.route(/\/api\/tmux\/panes\/[^/]+\/send$/, async (route) => {
+    sentCommand = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+  });
+
+  await openFriendlyTerminal(page);
+  const fileInput = page.locator('input[type="file"]');
+  const chips = page.locator('[data-testid="terminal-attachment-chip"]');
+  const composerInput = page.locator('[data-testid="terminal-composer-input"]');
+  const sendButton = page.locator('[data-testid="terminal-send-command"]');
+
+  await fileInput.setInputFiles([
+    { name: 'first.png', mimeType: 'image/png', buffer: Buffer.from(TINY_PNG_BASE64, 'base64') },
+    { name: 'second.png', mimeType: 'image/png', buffer: Buffer.from(TINY_PNG_BASE64, 'base64') },
+  ]);
+
+  await expect(chips).toHaveCount(2);
+  expect(uploadedNames).toEqual(['first.png', 'second.png']);
+  await composerInput.fill('compare both');
+  await sendButton.click();
+  await expect.poll(() => sentCommand).toEqual({
+    command: 'compare both [image: tmp/first.png] [image: tmp/second.png]',
+    enter: true,
+    clear_first: false,
+  });
+  await expect(chips).toHaveCount(0);
+});
+
 test('attach-image: clipboard paste of an image uses the same chip and send path', async ({ page }) => {
   test.setTimeout(60_000);
 
