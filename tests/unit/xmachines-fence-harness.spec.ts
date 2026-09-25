@@ -80,6 +80,48 @@ describe('xmachines fence harness A0.2', () => {
     expect(fence.acceptance_ids.length).toBeGreaterThan(0);
   });
 
+  it('names the missing id under fault_class=missing_acceptance (J1e) — driven by a fixture that accepts only one of two ids', () => {
+    const tmpDir = mkTmpDir('xm-fence-partial');
+    try {
+      const fixtureContract = path.join(tmpDir, 'fence-contract.json');
+      fs.writeFileSync(fixtureContract, JSON.stringify({
+        fences: {
+          PARTIAL: { acceptance_ids: ['P1', 'P2'], test_path: 'e2e/xmachines-fence-FIXTURE-PARTIAL.spec.ts' },
+        },
+      }));
+      const result = runHarness(['--fence', 'PARTIAL', '--contract', fixtureContract], tmpDir);
+      expect(result.status).not.toBe(0);
+      const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
+      expect(report.verdict_line).toContain('fault_class=missing_acceptance');
+      expect(report.collected).toEqual(['P1']);
+      expect(report.failed.some((f: any) => f.id === 'P2')).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('--expect-red stays RED for an all-rejected fixture (J1b/attempt-2 regression) instead of the early-return PASS', () => {
+    const tmpDir = mkTmpDir('xm-fence-expectred');
+    try {
+      const fixtureContract = path.join(tmpDir, 'fence-contract.json');
+      fs.writeFileSync(fixtureContract, JSON.stringify({
+        fences: {
+          EXPECT_RED_STATIC: { acceptance_ids: ['Y1'], test_path: 'e2e/xmachines-fence-FIXTURE-EXPECT-RED-STATIC.spec.ts' },
+        },
+      }));
+      const result = runHarness(['--fence', 'EXPECT_RED_STATIC', '--contract', fixtureContract, '--expect-red', 'Y1'], tmpDir);
+      // Attempt 2's bug: this exact all-rejected shape used to short-circuit
+      // to verdict=PASS fault_class=none with collected:[] before any of the
+      // completeness/L9e/differential checks ran.
+      expect(result.status).not.toBe(0);
+      const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
+      expect(report.verdict_line).toContain('verdict=FAIL');
+      expect(report.verdict_line).not.toContain('fault_class=none');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   it('rejects argv-only power proof under L9e — driven by a fixture journey that claims L9e via argv', () => {
     const tmpDir = mkTmpDir('xm-fence-l9e');
     try {

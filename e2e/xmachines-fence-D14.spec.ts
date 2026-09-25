@@ -11,14 +11,14 @@ test(`xmachines fence ${FENCE_ID} — section render`, async ({ page }) => {
   const results: boolean[] = [];
 
   // A1e — a fresh #/xmachines load renders the xmachines section rather than the landing page.
-  results.push(await guardedCheck('A1e', async () => {
+  results.push(await guardedCheck('A1e', 'D1', async () => {
     await page.goto('/#/xmachines', { waitUntil: 'domcontentloaded' });
     const section = page.locator('[data-section="xmachines"]').first();
     await section.waitFor({ state: 'visible', timeout: 5000 });
   }));
 
   // D2e — the UI renders the exact normal-Off refusal reason.
-  results.push(await guardedCheck('D2e', async () => {
+  results.push(await guardedCheck('D2e', 'D7', async () => {
     await page.goto('/#/xmachines/gpu', { waitUntil: 'domcontentloaded' });
     const offButton = page.locator('[data-action="power-off"]').first();
     await offButton.click({ timeout: 5000 });

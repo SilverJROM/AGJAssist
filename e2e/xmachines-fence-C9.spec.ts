@@ -11,7 +11,7 @@ test(`xmachines fence ${FENCE_ID} — power POST`, async ({ request }) => {
   const results: boolean[] = [];
 
   // L15b — every power POST requires an idempotency key.
-  results.push(await guardedCheck('L15b', async () => {
+  results.push(await guardedCheck('L15b', 'C3', async () => {
     const res = await request.post('/api/xmachines/machines/gpu/power/off', {
       data: {},
       failOnStatusCode: false,
@@ -22,7 +22,7 @@ test(`xmachines fence ${FENCE_ID} — power POST`, async ({ request }) => {
   }));
 
   // I5c — a stale or never-verified WoL-safe state routes Off through the force challenge.
-  results.push(await guardedCheck('I5c', async () => {
+  results.push(await guardedCheck('I5c', 'C4', async () => {
     const res = await request.post('/api/xmachines/machines/gpu/power/off', {
       data: {},
       headers: { 'idempotency-key': 'xmachines-fence-c9-i5c', 'x-fence-stub': 'stale-wol' },
@@ -35,7 +35,7 @@ test(`xmachines fence ${FENCE_ID} — power POST`, async ({ request }) => {
   }));
 
   // L3a — full force is a separate action from normal Off.
-  results.push(await guardedCheck('L3a', async () => {
+  results.push(await guardedCheck('L3a', 'C5', async () => {
     const offRes = await request.post('/api/xmachines/machines/gpu/power/off', {
       data: {},
       headers: { 'idempotency-key': 'xmachines-fence-c9-l3a-off' },

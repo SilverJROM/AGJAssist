@@ -11,7 +11,7 @@ test(`xmachines fence ${FENCE_ID} — sampled reading`, async ({ request, page }
   const results: boolean[] = [];
 
   // E1a — one bounded nvidia-smi query discovers the current GPU inventory at poll time.
-  results.push(await guardedCheck('E1a', async () => {
+  results.push(await guardedCheck('E1a', 'B2', async () => {
     const res = await request.get('/api/xmachines/machines/gpu', { failOnStatusCode: false });
     const body = await res.json().catch(() => ({}));
     if (!(res.status() === 200 && body.uuid && body.polled_at)) {
@@ -20,14 +20,14 @@ test(`xmachines fence ${FENCE_ID} — sampled reading`, async ({ request, page }
   }));
 
   // B3a — a measured value is visibly marked measured.
-  results.push(await guardedCheck('B3a', async () => {
+  results.push(await guardedCheck('B3a', 'B4', async () => {
     await page.goto('/#/xmachines/gpu', { waitUntil: 'domcontentloaded' });
     const marker = page.locator('[data-provenance="measured"]').first();
     await marker.waitFor({ state: 'visible', timeout: 5000 });
   }));
 
   // I1a — a persisted thermal threshold breach creates one alert.
-  results.push(await guardedCheck('I1a', async () => {
+  results.push(await guardedCheck('I1a', 'B11', async () => {
     const res = await request.get('/api/xmachines/alerts?limit=1', { failOnStatusCode: false });
     const body = await res.json().catch(() => ({}));
     if (!(res.status() === 200 && Array.isArray(body.alerts))) {

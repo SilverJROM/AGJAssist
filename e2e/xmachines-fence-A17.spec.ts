@@ -11,7 +11,7 @@ test(`xmachines fence ${FENCE_ID} — safety decision`, async ({ request }) => {
   const results: boolean[] = [];
 
   // L1e — fail-closed refusal returns "cannot confirm idle".
-  results.push(await guardedCheck('L1e', async () => {
+  results.push(await guardedCheck('L1e', 'A1', async () => {
     const res = await request.post('/api/xmachines/machines/gpu/power/off', {
       data: {},
       failOnStatusCode: false,
@@ -23,7 +23,7 @@ test(`xmachines fence ${FENCE_ID} — safety decision`, async ({ request }) => {
   }));
 
   // L2d — a guard-3 refusal is never rewritten into --force.
-  results.push(await guardedCheck('L2d', async () => {
+  results.push(await guardedCheck('L2d', 'A13', async () => {
     const res = await request.post('/api/xmachines/machines/gpu/power/off', {
       data: { force: true },
       failOnStatusCode: false,
@@ -35,7 +35,7 @@ test(`xmachines fence ${FENCE_ID} — safety decision`, async ({ request }) => {
   }));
 
   // L4a — gpu at .174 is protected while the signal role is live.
-  results.push(await guardedCheck('L4a', async () => {
+  results.push(await guardedCheck('L4a', 'A4', async () => {
     const res = await request.get('/api/xmachines/machines/gpu', { failOnStatusCode: false });
     const body = await res.json().catch(() => ({}));
     if (!(res.status() === 200 && body.protected === true)) {
@@ -44,7 +44,7 @@ test(`xmachines fence ${FENCE_ID} — safety decision`, async ({ request }) => {
   }));
 
   // L7a — audit records the incoming power request.
-  results.push(await guardedCheck('L7a', async () => {
+  results.push(await guardedCheck('L7a', 'A8', async () => {
     const res = await request.get('/api/xmachines/audit?limit=1', { failOnStatusCode: false });
     const body = await res.json().catch(() => ({}));
     if (!(res.status() === 200 && Array.isArray(body.entries) && body.entries.length > 0)) {
