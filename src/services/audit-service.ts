@@ -38,10 +38,50 @@ export interface AuditQueryFilters {
   offset?: number;
 }
 
+/** Required detail keys for action_type xmachines_power (L7a–L7m). Presence, not truthiness. */
+const XMACHINES_POWER_REQUIRED_KEYS = [
+  "request",
+  "authorization",
+  "pre_state",
+  "guards",
+  "force_reason",
+  "target",
+  "action",
+  "gateway_status",
+  "final_state",
+  "actor_id",
+  "session_id",
+  "request_id",
+  "request_source",
+  "timestamps",
+] as const;
+
+function assertXmachinesPowerDetails(
+  details: Record<string, unknown> | null | undefined
+): void {
+  const record =
+    details !== null &&
+    details !== undefined &&
+    typeof details === "object" &&
+    !Array.isArray(details)
+      ? details
+      : null;
+  for (const key of XMACHINES_POWER_REQUIRED_KEYS) {
+    if (!record || !Object.prototype.hasOwnProperty.call(record, key)) {
+      throw new Error(
+        `xmachines_power audit rejected: missing required key ${key}`
+      );
+    }
+  }
+}
+
 export class AuditService {
   constructor(private readonly db: DatabaseService) {}
 
   log(params: AuditLogParams): number {
+    if (params.actionType === "xmachines_power") {
+      assertXmachinesPowerDetails(params.details ?? null);
+    }
     const result = this.db
       .prepare(
         `INSERT INTO audit_log (user_id, agent_name, action_type, resource_type, resource_id, details, tmux_target, surface)
@@ -62,9 +102,11 @@ export class AuditService {
 
   completeAudit(id: number, details: Record<string, unknown>): boolean {
     const row = this.db
-      .prepare("SELECT details FROM audit_log WHERE id = ?")
-      .get(id) as { details: string | null } | undefined;
+      .prepare("SELECT action_type, details FROM audit_log WHERE id = ?")
+      .get(id) as { action_type: string; details: string | null } | undefined;
     if (!row) return false;
+    // xmachines_power rows are append-only: refuse in-place UPDATE/merge (L7q).
+    if (row.action_type === "xmachines_power") return false;
     let merged: Record<string, unknown> = { ...details };
     if (row.details) {
       try {

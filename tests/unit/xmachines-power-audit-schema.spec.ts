@@ -98,33 +98,37 @@ describe('xmachines power audit schema A8', () => {
     const { [key]: _remove, ...rest } = valid as any;
     const details = rest as Partial<PowerAuditDetails>;
 
-    const id = audit.log({
-      actionType: 'xmachines_power',
-      resourceType: 'xmachines',
-      details,
-      surface: 'web',
-    });
+    expect(() =>
+      audit.log({
+        actionType: 'xmachines_power',
+        resourceType: 'xmachines',
+        details,
+        surface: 'web',
+      })
+    ).toThrow(`xmachines_power audit rejected: missing required key ${key}`);
 
-    expect(id).toBeGreaterThan(0);
-    const row = audit.query({ actionType: 'xmachines_power', limit: 1 })[0];
-    const parsed = JSON.parse(row.details || '{}') as any;
-    expect(parsed[key]).toBeUndefined();
+    const rows = audit.query({ actionType: 'xmachines_power', limit: 10 });
+    expect(rows).toHaveLength(0);
     db.close();
   });
 
   it('overwrite of an existing audit row fails / is append-only', () => {
     const { db, audit } = makeService();
+    const original = buildValidDetails();
     const id = audit.log({
       actionType: 'xmachines_power',
       resourceType: 'xmachines',
-      details: buildValidDetails(),
+      details: original,
       surface: 'web',
     });
-    expect(audit.completeAudit(id, { hacked: true })).toBe(true);
-    const row = audit.query({ actionType: 'xmachines_power', limit: 1 })[0];
-    const parsed = JSON.parse(row.details || '{}') as any;
-    expect(parsed.hacked).toBe(true);
-    expect(parsed.request).toBeDefined();
+    expect(id).toBeGreaterThan(0);
+    expect(audit.completeAudit(id, { hacked: true })).toBe(false);
+    const rows = audit.query({ actionType: 'xmachines_power', limit: 10 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(id);
+    const parsed = JSON.parse(rows[0].details || '{}') as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(parsed, 'hacked')).toBe(false);
+    expect(parsed).toEqual(original);
     db.close();
   });
 });
