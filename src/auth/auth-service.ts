@@ -445,4 +445,11 @@ export class AuthService {
       .run(userId);
     return result.changes > 0;
   }
+
+  revokeAllWebSessions(userId: number): number {
+    const result = this.db
+      .prepare("DELETE FROM sessions WHERE user_id = ? AND surface IN ('web', 'miniapp')")
+      .run(userId);
+    return result.changes;
+  }
 }
