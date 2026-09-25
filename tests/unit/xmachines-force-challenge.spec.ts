@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ForceChallengeService } from '../../src/services/xmachines/force-challenge.js';
-import crypto from 'node:crypto';
 
 describe('xmachines force challenge A3', () => {
   let svc: ForceChallengeService;
@@ -37,14 +36,19 @@ describe('xmachines force challenge A3', () => {
     expect(second.reason).toMatch(/consumed|already|used/);
   });
 
-  it('L3d: a force challenge expires no later than 60 seconds', async () => {
-    const res = svc.startChallenge(ownerId, sessionId, machine, action)!;
-    const ch = svc['challenges'].get(res.id)!;
-    // Simulate expiry by advancing time
-    ch.expiresAt = Date.now() - 1;
-    const confirm = svc.confirmChallenge(res.id, sessionId, machine, action, res.displayNumber);
-    expect(confirm.ok).toBe(false);
-    expect(confirm.reason).toMatch(/expired/);
+  it('L3d: a force challenge expires no later than 60 seconds', () => {
+    const start = 1_790_356_108_000;
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(start);
+      const res = svc.startChallenge(ownerId, sessionId, machine, action)!;
+      vi.setSystemTime(start + 60_000);
+      const confirm = svc.confirmChallenge(res.id, sessionId, machine, action, res.displayNumber);
+      expect(confirm.ok).toBe(false);
+      expect(confirm.reason).toBe('expired');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('L3e: a force challenge is bound to one web session', () => {
@@ -69,12 +73,20 @@ describe('xmachines force challenge A3', () => {
     expect(confirm.reason).toMatch(/action/);
   });
 
-  it('L3h: force confirmation text contains current live process and lease probe', () => {
-    const probe = svc.buildConfirmationText(machine, action);
-    expect(probe).toBeTruthy();
-    expect(probe).toContain(machine);
-    expect(probe).toContain(action);
-    // The probe text is built from live process/lease probe source
-    expect(probe.length).toBeGreaterThan(0);
+  it('L3h: force confirmation text contains current live process and lease probe', async () => {
+    const processSpecimen = 'pid=9173 comm=signal-live';
+    const leaseSpecimen = 'lease=xmac-claim-hdd-17-transcript-archive';
+    const holderSpecimen = 'holder=seat-tiller-a3';
+    const stubSpecimen = 'processes=checked leases=checked';
+    const probed = new ForceChallengeService(async () => ({
+      processesText: processSpecimen,
+      leasesText: leaseSpecimen,
+      leaseHolders: [holderSpecimen],
+    }));
+    const text = await probed.buildConfirmationText(machine, action);
+    expect(text).toContain(processSpecimen);
+    expect(text).toContain(leaseSpecimen);
+    expect(text).toContain(holderSpecimen);
+    expect(text).not.toContain(stubSpecimen);
   });
 });

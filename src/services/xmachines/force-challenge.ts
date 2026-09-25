@@ -35,9 +35,20 @@ export interface ConfirmResult {
   challenge?: Challenge;
 }
 
+/** Current process/pid and lease/holder text from a probe path outside this service. */
+export interface ForceProbeSnapshot {
+  processesText: string;
+  leasesText: string;
+  leaseHolders?: string[];
+}
+
+export type ForceProbe = (machine: string) => Promise<ForceProbeSnapshot>;
+
 export class ForceChallengeService {
   private challenges = new Map<string, Challenge>();
   private readonly TTL_MS = 60_000;
+
+  constructor(private readonly getForceProbe?: ForceProbe) {}
 
   startChallenge(ownerId: number, sessionId: string, machine: string, action: 'off'): StartChallengeResult {
     const id = crypto.randomUUID();
@@ -80,7 +91,7 @@ export class ForceChallengeService {
     if (ch.consumed) {
       return { ok: false, reason: 'already-consumed' };
     }
-    if (Date.now() > ch.expiresAt) {
+    if (Date.now() >= ch.expiresAt) {
       ch.consumed = true;
       this.challenges.delete(challengeId);
       return { ok: false, reason: 'expired' };
@@ -104,12 +115,18 @@ export class ForceChallengeService {
     return { ok: true, challenge: ch };
   }
 
-  buildConfirmationText(machine: string, action: 'off'): string {
-    // Live probe text: current processes and lease probe
-    // In production this would query the collector/leases; here we provide a deterministic probe stub
-    const now = new Date().toISOString();
-    const probe = `probe:${machine}:${action}:${now}:processes=checked leases=checked`;
-    return `Force confirmation for ${machine} ${action}\nProbe: ${probe}\nCurrent live process and lease probe included.`;
+  async buildConfirmationText(machine: string, action: 'off'): Promise<string> {
+    if (!this.getForceProbe) {
+      throw new Error('force-probe-missing');
+    }
+    const probe = await this.getForceProbe(machine);
+    const holders = probe.leaseHolders ?? [];
+    return [
+      `Force confirmation for ${machine} ${action}`,
+      probe.processesText,
+      probe.leasesText,
+      ...holders,
+    ].join('\n');
   }
 
   private prune() {
