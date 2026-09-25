@@ -11,10 +11,10 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const SPY = path.join(REPO, "tests/helpers/xmac-argv-spy.sh");
 
 const SYNTHETIC_FLEET = [
-  { name: "gpu", state: "synthetic", cpuTemp: 41, gpuTemp: 52, powerWatts: 120, uptime: "synthetic", provenance: "fake", sampleAge: "0s" },
-  { name: "hdd", state: "synthetic", cpuTemp: 36, gpuTemp: 33, powerWatts: 90, uptime: "synthetic", provenance: "fake", sampleAge: "0s" },
-  { name: "gpu2", state: "synthetic", cpuTemp: 44, gpuTemp: 61, powerWatts: 200, uptime: "synthetic", provenance: "fake", sampleAge: "0s" },
-  { name: "media", state: "synthetic", cpuTemp: 47, gpuTemp: 70, powerWatts: 250, uptime: "synthetic", provenance: "fake", sampleAge: "0s" },
+  { name: "gpu", state: "synthetic", cpuTemp: 41, gpuTemp: 52, powerWatts: 120, uptime: "synthetic", provenance: "fake", sampleAge: "0s", roleHint: "" },
+  { name: "hdd", state: "synthetic", cpuTemp: 36, gpuTemp: 33, powerWatts: 90, uptime: "synthetic", provenance: "fake", sampleAge: "0s", roleHint: "" },
+  { name: "gpu2", state: "synthetic", cpuTemp: 44, gpuTemp: 61, powerWatts: 200, uptime: "synthetic", provenance: "fake", sampleAge: "0s", roleHint: "" },
+  { name: "media", state: "synthetic", cpuTemp: 47, gpuTemp: 70, powerWatts: 250, uptime: "synthetic", provenance: "fake", sampleAge: "0s", roleHint: "" },
 ] as const;
 
 const CLIENT_ARM_REJECTED = { ok: false, actuated: false, error: "client-arm-rejected" };
