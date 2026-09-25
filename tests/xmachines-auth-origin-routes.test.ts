@@ -98,14 +98,36 @@ describe("xmachines auth/origin route guards A6", () => {
     ...extra
   });
 
-  it("A2c/H1a: GET telemetry returns 401 without session", async () => {
-    const res = await app.inject({ method: "GET", url: "/api/xmachines/telemetry", headers: {} });
-    expect(res.statusCode).toBe(401);
+  const routes = [
+    { method: "GET" as const, url: "/api/xmachines/telemetry" },
+    { method: "GET" as const, url: "/api/xmachines/machines/gpu" },
+    { method: "POST" as const, url: "/api/xmachines/machines/gpu/power/off" },
+    { method: "POST" as const, url: "/api/xmachines/machines/gpu/power/on" },
+  ];
+
+  it("A2c/H1a: missing auth returns 401 on every xmachines route", async () => {
+    for (const route of routes) {
+      const res = await app.inject({ method: route.method, url: route.url, headers: {} });
+      expect(res.statusCode, `${route.method} ${route.url}`).toBe(401);
+    }
   });
 
-  it("A2c/H1a: GET telemetry returns 403 for non-owner", async () => {
-    const res = await app.inject({ method: "GET", url: "/api/xmachines/telemetry", headers: viewerHeaders() });
-    expect(res.statusCode).toBe(403);
+  it("A2c/H1a: invalid auth returns 401 on every xmachines route", async () => {
+    for (const route of routes) {
+      const res = await app.inject({
+        method: route.method,
+        url: route.url,
+        headers: { authorization: "Bearer not-a-session", host: "agjasst.silverjrom.app" },
+      });
+      expect(res.statusCode, `${route.method} ${route.url}`).toBe(401);
+    }
+  });
+
+  it("A2c/H1a: viewer auth returns 403 on every xmachines route", async () => {
+    for (const route of routes) {
+      const res = await app.inject({ method: route.method, url: route.url, headers: viewerHeaders() });
+      expect(res.statusCode, `${route.method} ${route.url}`).toBe(403);
+    }
   });
 
   it("H1a: GET telemetry returns 200 for owner with canonical host/origin", async () => {
@@ -120,6 +142,27 @@ describe("xmachines auth/origin route guards A6", () => {
       headers: ownerHeaders({ host: "evil.example.com" })
     });
     expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "host_not_allowed" });
+  });
+
+  it("H1b/L6b: canonical host with a noncanonical port is refused", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/xmachines/machines/gpu/power/off",
+      headers: ownerHeaders({ host: "agjasst.silverjrom.app:9999" })
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "host_not_allowed" });
+  });
+
+  it("H1b/L6b: X-Forwarded-Host canonical alias with a noncanonical port is refused", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/xmachines/machines/gpu/power/off",
+      headers: ownerHeaders({ "x-forwarded-host": "agjasst.silverjrom.app:9999" })
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: "host_not_allowed" });
   });
 
   it("H1b/H1c/L6b/L6c: power route rejects non-canonical Origin", async () => {
@@ -150,17 +193,46 @@ describe("xmachines auth/origin route guards A6", () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it("L6d: power route enforces per-route rate limit", async () => {
-    // Fastify rate limit default is high; we check the guard exists by hitting twice quickly.
-    // The test asserts the route is reachable and returns non-500 for first request.
-    const res1 = await app.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/off", headers: ownerHeaders() });
-    expect([200, 403]).toContain(res1.statusCode);
+  const unarmed = (action: "on" | "off") => ({
+    ok: false,
+    actuated: false,
+    mode: "fake",
+    reason: "unarmed",
+    machine: "gpu",
+    action,
   });
 
-  it("L6e: owner identity enforces cross-route rate limit", async () => {
-    const res1 = await app.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/on", headers: ownerHeaders() });
-    const res2 = await app.inject({ method: "POST", url: "/api/xmachines/machines/hdd/power/off", headers: ownerHeaders() });
-    expect([200, 403]).toContain(res1.statusCode);
-    expect([200, 403]).toContain(res2.statusCode);
+  it("L6d: the 11th request on one power route is 429", async () => {
+    const url = "/api/xmachines/machines/gpu/power/off";
+    for (let i = 0; i < 10; i++) {
+      const res = await app.inject({ method: "POST", url, headers: ownerHeaders() });
+      expect(res.statusCode, `request ${i + 1}`).toBe(403);
+      expect(res.json(), `request ${i + 1}`).toEqual(unarmed("off"));
+    }
+    const blocked = await app.inject({ method: "POST", url, headers: ownerHeaders() });
+    expect(blocked.statusCode).toBe(429);
+  });
+
+  it("L6e: the 11th alternating owner power request is 429", async () => {
+    const services = stubServices();
+    const fresh = await createApiServer(minimalConfig(), services);
+    await fresh.ready();
+    try {
+      const urls = [
+        "/api/xmachines/machines/gpu/power/off",
+        "/api/xmachines/machines/gpu/power/on",
+      ] as const;
+      for (let i = 0; i < 10; i++) {
+        const action = i % 2 === 0 ? "off" : "on";
+        const res = await fresh.inject({ method: "POST", url: urls[i % 2], headers: ownerHeaders() });
+        expect(res.statusCode, `request ${i + 1}`).toBe(403);
+        expect(res.json(), `request ${i + 1}`).toEqual(unarmed(action));
+      }
+      const blocked = await fresh.inject({ method: "POST", url: urls[0], headers: ownerHeaders() });
+      expect(blocked.statusCode).toBe(429);
+    } finally {
+      await fresh.close();
+      services.db.close();
+    }
   });
 });

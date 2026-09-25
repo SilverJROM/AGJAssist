@@ -19,6 +19,15 @@ const SYNTHETIC_FLEET = [
 
 const CLIENT_ARM_REJECTED = { ok: false, actuated: false, error: "client-arm-rejected" };
 const MACHINES = ["gpu", "hdd", "gpu2", "media"] as const;
+const LOCAL_OWNER = "a03-owner-token";
+
+function localHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    authorization: `Bearer ${LOCAL_OWNER}`,
+    host: "localhost:3101",
+    ...extra,
+  };
+}
 
 function minimalConfig(): AppConfig {
   return {
@@ -53,7 +62,10 @@ function minimalConfig(): AppConfig {
 
 function stubServices(): ApiServices {
   return {
-    authService: {} as ApiServices["authService"],
+    authService: {
+      verifyToken: (token: string) =>
+        token === LOCAL_OWNER ? { id: 1, role: "owner", username: "owner" } : null,
+    } as ApiServices["authService"],
     projectService: {} as ApiServices["projectService"],
     safetyService: {} as ApiServices["safetyService"],
     auditService: {} as ApiServices["auditService"],
@@ -129,7 +141,7 @@ describe("xmachines actuation isolation A0.3", () => {
 
   it("L10a: local and test mode default to synthetic telemetry", async () => {
     const { spyLog } = await boot(false);
-    const res = await app!.inject({ method: "GET", url: "/api/xmachines/telemetry" });
+    const res = await app!.inject({ method: "GET", url: "/api/xmachines/telemetry", headers: localHeaders() });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ mode: "fake", armed: false, machines: SYNTHETIC_FLEET });
     expect(spyArgv(spyLog)).toEqual([]);
@@ -137,7 +149,7 @@ describe("xmachines actuation isolation A0.3", () => {
 
   it("L10b: real control is impossible without explicit server-side arm state", async () => {
     const { spyLog } = await boot(false);
-    const res = await app!.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/off" });
+    const res = await app!.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/off", headers: localHeaders() });
     expect(res.statusCode).toBe(403);
     expect(res.json()).toEqual(unarmedPower("gpu", "off"));
     expect(spyArgv(spyLog)).toEqual([]);
@@ -145,7 +157,7 @@ describe("xmachines actuation isolation A0.3", () => {
 
   it("L10b: server process XMACHINES_ARM=1 is what constructs the real gateway", async () => {
     const { spyLog } = await boot(true);
-    const res = await app!.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/off" });
+    const res = await app!.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/off", headers: localHeaders() });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true, actuated: true, mode: "armed", machine: "gpu", action: "off" });
     expect(spyArgv(spyLog)).toEqual([["down", "gpu"]]);
@@ -153,10 +165,10 @@ describe("xmachines actuation isolation A0.3", () => {
 
   it("L10c: local read and power attempts produce zero real-fleet calls", async () => {
     const { spyLog } = await boot(false);
-    const telemetry = await app!.inject({ method: "GET", url: "/api/xmachines/telemetry" });
-    const read = await app!.inject({ method: "GET", url: "/api/xmachines/machines/hdd" });
-    const off = await app!.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/off" });
-    const on = await app!.inject({ method: "POST", url: "/api/xmachines/machines/media/power/on" });
+    const telemetry = await app!.inject({ method: "GET", url: "/api/xmachines/telemetry", headers: localHeaders() });
+    const read = await app!.inject({ method: "GET", url: "/api/xmachines/machines/hdd", headers: localHeaders() });
+    const off = await app!.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/off", headers: localHeaders() });
+    const on = await app!.inject({ method: "POST", url: "/api/xmachines/machines/media/power/on", headers: localHeaders() });
     expect(telemetry.statusCode).toBe(200);
     expect(telemetry.json()).toEqual({ mode: "fake", armed: false, machines: SYNTHETIC_FLEET });
     expect(read.statusCode).toBe(200);
@@ -171,8 +183,8 @@ describe("xmachines actuation isolation A0.3", () => {
   it("K1c: local power requests cannot actuate a real machine", async () => {
     const { spyLog } = await boot(false);
     for (const machine of MACHINES) {
-      const off = await app!.inject({ method: "POST", url: `/api/xmachines/machines/${machine}/power/off` });
-      const on = await app!.inject({ method: "POST", url: `/api/xmachines/machines/${machine}/power/on` });
+      const off = await app!.inject({ method: "POST", url: `/api/xmachines/machines/${machine}/power/off`, headers: localHeaders() });
+      const on = await app!.inject({ method: "POST", url: `/api/xmachines/machines/${machine}/power/on`, headers: localHeaders() });
       expect(off.statusCode).toBe(403);
       expect(off.json()).toEqual(unarmedPower(machine, "off"));
       expect(on.statusCode).toBe(403);
@@ -186,16 +198,17 @@ describe("xmachines actuation isolation A0.3", () => {
     const header = await app!.inject({
       method: "POST",
       url: "/api/xmachines/machines/gpu/power/off",
-      headers: { XMACHINES_ARM: "1" },
+      headers: localHeaders({ XMACHINES_ARM: "1" }),
     });
     const query = await app!.inject({
       method: "POST",
       url: "/api/xmachines/machines/gpu/power/off?XMACHINES_ARM=1",
+      headers: localHeaders(),
     });
     const body = await app!.inject({
       method: "POST",
       url: "/api/xmachines/machines/gpu/power/on",
-      headers: { "content-type": "application/json" },
+      headers: localHeaders({ "content-type": "application/json" }),
       payload: { XMACHINES_ARM: "1" },
     });
     expect(header.statusCode).toBe(400);

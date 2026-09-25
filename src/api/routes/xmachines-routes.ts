@@ -1,14 +1,22 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { callCarriesClientArm, resolveXmachinesRuntime } from "../../services/xmachines/runtime.js";
 import { AuthService } from "../../auth/auth-service.js";
-import { createAuthMiddleware, requireOwner } from "../../auth/auth-middleware.js";
+import { createAuthMiddleware } from "../../auth/auth-middleware.js";
 
 const CLIENT_ARM_REJECTED = { ok: false, actuated: false, error: "client-arm-rejected" };
 
 const CANONICAL_HOST = "agjasst.silverjrom.app";
 const CANONICAL_ORIGIN = `https://${CANONICAL_HOST}`;
-const LOCAL_TEST_HOSTS = new Set(["localhost:3101", "127.0.0.1:3101", "localhost", "127.0.0.1"]);
+// Complete lowercased host[:port]. The canonical name is listed only without a port.
+const ALLOWED_HOSTS = new Set([
+  CANONICAL_HOST,
+  "localhost:3101",
+  "127.0.0.1:3101",
+  "localhost",
+  "127.0.0.1",
+]);
 const LOCAL_TEST_ORIGINS = new Set(["http://localhost:3101", "http://127.0.0.1:3101"]);
+const POWER_LIMIT = { max: 10, timeWindow: "1 minute" };
 
 function clientArm(request: FastifyRequest): boolean {
   return callCarriesClientArm({
@@ -31,11 +39,23 @@ function originFromRequest(request: FastifyRequest): string {
 }
 
 function isHostAllowed(host: string): boolean {
-  if (!host) return false;
-  const [hostname, port] = host.split(":");
-  if (hostname === CANONICAL_HOST) return true;
-  if (LOCAL_TEST_HOSTS.has(host)) return true;
-  return false;
+  return ALLOWED_HOSTS.has(host);
+}
+
+function powerAction(url: string): "on" | "off" | null {
+  const pathOnly = url.split("?")[0] ?? "";
+  if (pathOnly.endsWith("/power/off")) return "off";
+  if (pathOnly.endsWith("/power/on")) return "on";
+  return null;
+}
+
+function ownerKey(request: FastifyRequest): string {
+  const id = request.sessionUser?.id;
+  return id === undefined || id === null ? "anon" : String(id);
+}
+
+function limitExceeded(result: { isAllowed: boolean; isExceeded?: boolean }): boolean {
+  return result.isAllowed === false && result.isExceeded === true;
 }
 
 function isOriginAllowed(origin: string): boolean {
@@ -101,13 +121,39 @@ async function power(
 
 export function registerXmachinesRoutes(app: FastifyInstance, authService?: AuthService): void {
   const authMiddleware = authService ? createAuthMiddleware(authService) : async () => {};
+  const perActionLimit = {
+    off: app.createRateLimit({
+      ...POWER_LIMIT,
+      keyGenerator: (req) => `${ownerKey(req)}:off`,
+    }),
+    on: app.createRateLimit({
+      ...POWER_LIMIT,
+      keyGenerator: (req) => `${ownerKey(req)}:on`,
+    }),
+  };
+  const allPowerLimit = app.createRateLimit({
+    ...POWER_LIMIT,
+    keyGenerator: (req) => `${ownerKey(req)}:all-power`,
+  });
+
   app.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
-    if (request.url?.startsWith("/api/xmachines")) {
-      await authMiddleware(request, reply);
-      if (request.sessionUser?.role !== "owner") {
-        reply.code(403).send({ error: "Owner role required" });
-        return;
-      }
+    if (!request.url?.startsWith("/api/xmachines")) return;
+    await authMiddleware(request, reply);
+    if (reply.sent) return;
+    if (!request.sessionUser) return;
+    if (request.sessionUser.role !== "owner") {
+      reply.code(403).send({ error: "Owner role required" });
+      return;
+    }
+    if (request.method !== "POST") return;
+    const action = powerAction(request.url);
+    if (!action) return;
+    const perAction = await perActionLimit[action](request);
+    const allPower = await allPowerLimit(request);
+    if (limitExceeded(perAction) || limitExceeded(allPower)) {
+      const err = new Error("rate_limited") as Error & { statusCode: number };
+      err.statusCode = 429;
+      throw err;
     }
   });
 
@@ -145,13 +191,11 @@ export function registerXmachinesRoutes(app: FastifyInstance, authService?: Auth
 
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/off",
-    { config: { rateLimit: { max: 10, timeWindow: "1 minute", keyGenerator: (req: FastifyRequest) => `${req.sessionUser?.id ?? "anon"}:off` } } },
     async (request, reply) => power(request, reply, request.params.name, "off")
   );
 
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/on",
-    { config: { rateLimit: { max: 10, timeWindow: "1 minute", keyGenerator: (req: FastifyRequest) => `${req.sessionUser?.id ?? "anon"}:on` } } },
     async (request, reply) => power(request, reply, request.params.name, "on")
   );
 }
