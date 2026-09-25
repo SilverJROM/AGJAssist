@@ -1,10 +1,10 @@
 import { FakeGateway, RealXmacGateway, type XmacGateway } from './gateway.js';
-import { SyntheticTelemetry } from './telemetry.js';
+import { ReadOnlyCollector } from './readonly-collector.js';
 
 export interface XmachinesRuntime {
   armed: boolean;
   gateway: XmacGateway;
-  telemetry: SyntheticTelemetry;
+  telemetry: ReadOnlyCollector;
 }
 
 // Arm is process configuration. Request fields are not an input to this function.
@@ -13,7 +13,7 @@ export function resolveXmachinesRuntime(serverEnv: NodeJS.ProcessEnv = process.e
   return {
     armed,
     gateway: armed ? new RealXmacGateway() : new FakeGateway(),
-    telemetry: new SyntheticTelemetry(),
+    telemetry: new ReadOnlyCollector(),
   };
 }
 
