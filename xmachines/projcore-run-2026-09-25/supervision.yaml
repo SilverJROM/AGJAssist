@@ -1,0 +1,7 @@
+# Supervision contract — xmachines run. Sibling of topology.yaml (never a section inside it).
+# Stamped ONCE by [north] 2026-09-25; projcore treats it as immutable for the run.
+enabled: false        # JROM chose OFF (2026-09-25). Attended/foreground effort.
+# OFF is a silent no-op: projcore proceeds exactly as before, unsupervised, and says nothing about it.
+# Rationale: this is watched live by JROM; guardian supervision is recommended only for overnight/
+# unattended runs. If this ever becomes unattended, re-stamp enabled:true per north-guardian.md
+# (register with routing fields + provider_patience_min).
