@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { callCarriesClientArm, resolveXmachinesRuntime } from "../../services/xmachines/runtime.js";
 import { ActionCoordinator } from "../../services/xmachines/action-coordinator.js";
 import { AuthService } from "../../auth/auth-service.js";
 import { createAuthMiddleware } from "../../auth/auth-middleware.js";
+import type { AuditService } from "../../services/audit-service.js";
 
 const CLIENT_ARM_REJECTED = { ok: false, actuated: false, error: "client-arm-rejected" };
 
@@ -66,6 +68,90 @@ function idempotencyKeyFromRequest(request: FastifyRequest): string {
   return headerValue(request.headers["x-idempotency-key"]);
 }
 
+type AttemptClassification = "on" | "off" | "force" | "denied" | "replayed" | "rate-limited";
+
+function machineFromRequest(request: FastifyRequest): string {
+  const pathOnly = request.url.split("?")[0] ?? "";
+  const match = pathOnly.match(/\/machines\/([^/]+)\/power\/(?:on|off)$/);
+  if (!match?.[1]) return "";
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+function bearerToken(request: FastifyRequest): string {
+  const header = headerValue(request.headers.authorization);
+  const prefix = "bearer ";
+  return header.toLowerCase().startsWith(prefix) ? header.slice(prefix.length).trim() : "";
+}
+
+function authorizationOf(request: FastifyRequest): { ok: boolean; role: string } {
+  const role = request.sessionUser?.role ?? "";
+  return { ok: role === "owner", role };
+}
+
+function observedPreState(machine: string): string {
+  if (!machine) return "";
+  return resolveXmachinesRuntime(process.env).telemetry.forMachine(machine)?.state ?? "";
+}
+
+function forceReasonFromBody(request: FastifyRequest): string | null {
+  const body = request.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const record = body as Record<string, unknown>;
+  if (record.force !== true) return null;
+  return typeof record.force_reason === "string" ? record.force_reason : "";
+}
+
+function recordPowerAttempt(
+  audit: AuditService | undefined,
+  request: FastifyRequest,
+  fields: {
+    machine: string;
+    action: "on" | "off";
+    classification: AttemptClassification;
+    forceReason: string;
+    guards: Record<string, { ok: boolean; detail?: string }>;
+    preState: string;
+    finalState: string;
+  }
+): void {
+  if (!audit || typeof audit.log !== "function") return;
+  const user = request.sessionUser;
+  const now = new Date().toISOString();
+  audit.log({
+    userId: user?.id ?? null,
+    agentName: user?.username ?? null,
+    actionType: "xmachines_power",
+    resourceType: "xmachines",
+    resourceId: fields.machine ? `${fields.machine}/${fields.action}` : fields.action,
+    surface: "web",
+    details: {
+      request: {
+        machine: fields.machine,
+        action: fields.action,
+        idempotencyKey: idempotencyKeyFromRequest(request),
+      },
+      authorization: authorizationOf(request),
+      pre_state: fields.preState,
+      guards: fields.guards,
+      force_reason: fields.forceReason,
+      target: fields.machine,
+      action: fields.action,
+      gateway_status: 0,
+      final_state: fields.finalState,
+      actor_id: user?.id === undefined || user?.id === null ? "" : String(user.id),
+      session_id: bearerToken(request),
+      request_id: headerValue(request.headers["x-request-id"]) || randomUUID(),
+      request_source: "api",
+      timestamps: { requestedAt: now, completedAt: now },
+      classification: fields.classification,
+    },
+  });
+}
+
 function limitExceeded(result: { isAllowed: boolean; isExceeded?: boolean }): boolean {
   return result.isAllowed === false && result.isExceeded === true;
 }
@@ -99,20 +185,47 @@ function power(
   request: FastifyRequest,
   reply: FastifyReply,
   coordinator: ActionCoordinator,
+  audit: AuditService | undefined,
   name: string,
   action: "on" | "off"
 ) {
+  const auditAttempt = (
+    classification: AttemptClassification,
+    guards: Record<string, { ok: boolean; detail?: string }>,
+    extra?: { forceReason?: string; preState?: string; finalState?: string }
+  ) => {
+    const preState = extra?.preState ?? "";
+    recordPowerAttempt(audit, request, {
+      machine: name,
+      action,
+      classification,
+      forceReason: extra?.forceReason ?? "",
+      guards,
+      preState,
+      finalState: extra?.finalState ?? preState,
+    });
+  };
   if (clientArm(request)) {
+    auditAttempt("denied", { client_arm: { ok: false } });
     return reply.code(400).send(CLIENT_ARM_REJECTED);
   }
-  if (!requireCanonicalHost(request, reply)) return;
-  if (!requireCanonicalOrigin(request, reply)) return;
+  if (!requireCanonicalHost(request, reply)) {
+    auditAttempt("denied", { host: { ok: false, detail: "host_not_allowed" } });
+    return;
+  }
+  if (!requireCanonicalOrigin(request, reply)) {
+    auditAttempt("denied", { origin: { ok: false, detail: "origin_not_allowed" } });
+    return;
+  }
   const runtime = resolveXmachinesRuntime(process.env);
   const known = runtime.telemetry.forMachine(name);
   if (!known) {
+    auditAttempt("denied", { machine: { ok: false, detail: "unknown-machine" } });
     return reply.code(404).send({ ok: false, actuated: false, error: "unknown-machine" });
   }
+  const observed = known.state;
   if (!runtime.armed) {
+    auditAttempt("denied", { armed: { ok: false, detail: "unarmed" } }, { preState: observed, finalState: observed });
     return reply.code(403).send({
       ok: false,
       actuated: false,
@@ -122,17 +235,50 @@ function power(
       action,
     });
   }
-  const result = coordinator.handle({
+  // Force confirmation is a later route. Record the attempt and do not emit --force.
+  if (action === "off") {
+    const forceReason = forceReasonFromBody(request);
+    if (forceReason !== null) {
+      auditAttempt(
+        "force",
+        { force_confirmation: { ok: false, detail: "force-confirmation-required" } },
+        { forceReason, preState: observed, finalState: "" }
+      );
+      return reply.code(400).send({ status: "rejected", reason: "force-confirmation-required" });
+    }
+  }
+  const { replayed, ...result } = coordinator.handle({
     machine: name,
     action,
     idempotencyKey: idempotencyKeyFromRequest(request),
     ownerId: ownerKey(request),
   });
+  const classification: AttemptClassification = replayed
+    ? "replayed"
+    : result.status === "rejected"
+      ? "denied"
+      : action;
+  const guards: Record<string, { ok: boolean; detail?: string }> = {};
+  if (replayed) {
+    guards.idempotency = { ok: true, detail: "replayed" };
+  } else if (result.reason) {
+    guards[result.reason] = { ok: false, detail: result.detail };
+  } else {
+    guards.accepted = { ok: true };
+  }
+  auditAttempt(classification, guards, {
+    preState: observed,
+    finalState: result.status === "in-progress" ? "" : observed,
+  });
   const code = result.status === "in-progress" ? 202 : 400;
   return reply.code(code).send(result);
 }
 
-export function registerXmachinesRoutes(app: FastifyInstance, authService?: AuthService): void {
+export function registerXmachinesRoutes(
+  app: FastifyInstance,
+  authService?: AuthService,
+  auditService?: AuditService
+): void {
   const coordinator = new ActionCoordinator();
   const authMiddleware = authService ? createAuthMiddleware(authService) : async () => {};
   const perActionLimit = {
@@ -153,9 +299,39 @@ export function registerXmachinesRoutes(app: FastifyInstance, authService?: Auth
   app.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
     if (!request.url?.startsWith("/api/xmachines")) return;
     await authMiddleware(request, reply);
-    if (reply.sent) return;
+    if (reply.sent) {
+      const action = request.method === "POST" ? powerAction(request.url) : null;
+      if (action) {
+        const machine = machineFromRequest(request);
+        const preState = observedPreState(machine);
+        recordPowerAttempt(auditService, request, {
+          machine,
+          action,
+          classification: "denied",
+          forceReason: "",
+          guards: { authorization: { ok: false, detail: "unauthenticated" } },
+          preState,
+          finalState: preState,
+        });
+      }
+      return;
+    }
     if (!request.sessionUser) return;
     if (request.sessionUser.role !== "owner") {
+      const action = request.method === "POST" ? powerAction(request.url) : null;
+      if (action) {
+        const machine = machineFromRequest(request);
+        const preState = observedPreState(machine);
+        recordPowerAttempt(auditService, request, {
+          machine,
+          action,
+          classification: "denied",
+          forceReason: "",
+          guards: { authorization: { ok: false, detail: "owner-role-required" } },
+          preState,
+          finalState: preState,
+        });
+      }
       reply.code(403).send({ error: "Owner role required" });
       return;
     }
@@ -165,6 +341,17 @@ export function registerXmachinesRoutes(app: FastifyInstance, authService?: Auth
     const perAction = await perActionLimit[action](request);
     const allPower = await allPowerLimit(request);
     if (limitExceeded(perAction) || limitExceeded(allPower)) {
+      const machine = machineFromRequest(request);
+      const preState = observedPreState(machine);
+      recordPowerAttempt(auditService, request, {
+        machine,
+        action,
+        classification: "rate-limited",
+        forceReason: "",
+        guards: { rate_limit: { ok: false } },
+        preState,
+        finalState: preState,
+      });
       const err = new Error("rate_limited") as Error & { statusCode: number };
       err.statusCode = 429;
       throw err;
@@ -205,11 +392,13 @@ export function registerXmachinesRoutes(app: FastifyInstance, authService?: Auth
 
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/off",
-    async (request, reply) => power(request, reply, coordinator, request.params.name, "off")
+    async (request, reply) =>
+      power(request, reply, coordinator, auditService, request.params.name, "off")
   );
 
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/on",
-    async (request, reply) => power(request, reply, coordinator, request.params.name, "on")
+    async (request, reply) =>
+      power(request, reply, coordinator, auditService, request.params.name, "on")
   );
 }

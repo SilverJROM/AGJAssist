@@ -18,6 +18,8 @@ export interface ActionResult {
   reason?: 'idempotency-key-required' | 'cooldown' | 'machine-busy' | 'protected-role' | 'cannot-confirm-idle';
   role?: string;
   detail?: string;
+  /** Same idempotency key rejoined an in-flight operation. Routes strip this before the HTTP body. */
+  replayed?: true;
 }
 
 interface OngoingAction {
@@ -98,7 +100,7 @@ export class ActionCoordinator {
 
     const existing = this.idempotency.get(idempotencyKey);
     if (existing) {
-      return { status: 'in-progress', operationId: existing.operationId };
+      return { status: 'in-progress', operationId: existing.operationId, replayed: true };
     }
 
     const cooldownUntil = this.cooldowns.get(machine) ?? 0;
