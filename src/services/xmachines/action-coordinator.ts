@@ -1,5 +1,8 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { resolveProtectedRole } from './protected-roles.js';
 
 export interface ActionRequest {
@@ -12,7 +15,7 @@ export interface ActionRequest {
 export interface ActionResult {
   status: 'in-progress' | 'rejected';
   operationId?: string;
-  reason?: 'idempotency-key-required' | 'cooldown' | 'machine-busy' | 'protected-role';
+  reason?: 'idempotency-key-required' | 'cooldown' | 'machine-busy' | 'protected-role' | 'cannot-confirm-idle';
   role?: string;
   detail?: string;
 }
@@ -30,6 +33,54 @@ const COOLDOWN_MS = 30_000;
 
 function xmacArgv(action: 'on' | 'off', machine: string): string[] {
   return action === 'on' ? ['up', machine] : ['down', machine];
+}
+
+function readMachinesConf(): Map<string, { ip: string; busyCheck: string }> {
+  const home = os.homedir();
+  const confPath = process.env.XMAC_CONF ?? path.join(home, '.config/agent-protocols/xmac/machines.conf');
+  const map = new Map<string, { ip: string; busyCheck: string }>();
+  try {
+    const txt = fs.readFileSync(confPath, 'utf8');
+    for (const line of txt.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const parts = trimmed.split('|');
+      if (parts.length < 6) continue;
+      const name = parts[0].trim();
+      const ip = parts[1].trim();
+      const busyCheck = parts.slice(5).join('|').trim();
+      map.set(name, { ip, busyCheck });
+    }
+  } catch {}
+  return map;
+}
+
+function runBusyCheck(machine: string, busyCheck: string): { ok: boolean; output: string; error: string } {
+  if (!busyCheck) return { ok: true, output: '', error: '' };
+  const confMap = readMachinesConf();
+  const entry = confMap.get(machine);
+  if (!entry) return { ok: false, output: '', error: 'no-registry' };
+  if (!entry.ip) return { ok: false, output: '', error: 'no-ip' };
+  const user = process.env.XMAC_USER ?? 'agjrom';
+  const sshCmd = `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 ${user}@${entry.ip} bash -c '${busyCheck.replace(/'/g, `'\\''`)}'`;
+  const start = Date.now();
+  const result = spawnSync('bash', ['-c', sshCmd], { timeout: 8000, stdio: 'pipe' });
+  const elapsed = Date.now() - start;
+  if (result.error) {
+    return { ok: false, output: '', error: result.error.message };
+  }
+  if (result.status === null) {
+    return { ok: false, output: '', error: 'timeout' };
+  }
+  if (result.status !== 0) {
+    const out = (result.stdout?.toString() ?? '').trim();
+    if (out === '') {
+      return { ok: false, output: '', error: 'ssh-error-empty' };
+    }
+    return { ok: true, output: out, error: '' };
+  }
+  const out = (result.stdout?.toString() ?? '').trim();
+  return { ok: true, output: out, error: '' };
 }
 
 export class ActionCoordinator {
@@ -73,6 +124,22 @@ export class ActionCoordinator {
           role: refusal.role,
           detail: refusal.detail,
         };
+      }
+    }
+
+    // App-side fail-closed busy preflight before any OFF gateway call
+    if (action === 'off') {
+      const confMap = readMachinesConf();
+      const entry = confMap.get(machine);
+      const busyCheck = entry?.busyCheck ?? '';
+      if (busyCheck) {
+        const { ok, output, error } = runBusyCheck(machine, busyCheck);
+        if (!ok || error === 'timeout' || error === 'ssh-error-empty' || error === 'no-registry' || error === 'no-ip') {
+          return { status: 'rejected', reason: 'cannot-confirm-idle', detail: `cannot confirm idle: ${error || 'preflight-failure'}` };
+        }
+        if (output.length > 0) {
+          return { status: 'rejected', reason: 'cannot-confirm-idle', detail: `busy: ${output.slice(0, 200)}` };
+        }
       }
     }
 
