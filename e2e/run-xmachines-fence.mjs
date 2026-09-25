@@ -101,7 +101,7 @@ function classifyByUnitSpread(failedWithUnits, fallbackFaultClass) {
 }
 
 function l9eProvenanceFailure(collectedEntries) {
-  if (!acceptance_ids.includes('L9e') || EXPECT_RED === 'L9e') return null;
+  if (!acceptance_ids.includes('L9e')) return null;
   const l9e = collectedEntries.find((entry) => entry.id === 'L9e');
   if (!l9e || l9e.via !== 'host-state') {
     return { id: 'L9e', kind: 'assert', message: `L9e evidence via=${l9e ? l9e.via : 'missing'}, argv-only proof is not acceptable` };
@@ -132,12 +132,25 @@ if (EXPECT_RED) {
     );
   }
 
-  const l9eFailure = l9eProvenanceFailure(runB.collectedEntries);
+  // Provenance is judged on the unstubbed baseline (run A): that is the
+  // green result being trusted. A run-B check would treat a stub-induced
+  // L9e rejection as argv_only_power_proof, so it is skipped when L9e is
+  // the id under negative control.
+  const l9eFailure = l9eProvenanceFailure(runA.collectedEntries);
   if (l9eFailure) {
     writeReportAndExit('FAIL', 'argv_only_power_proof', runB.collected, runB.collected.filter((id) => id !== 'L9e'), [l9eFailure], 1);
   }
+  if (EXPECT_RED !== 'L9e') {
+    const l9eFailureB = l9eProvenanceFailure(runB.collectedEntries);
+    if (l9eFailureB) {
+      writeReportAndExit('FAIL', 'argv_only_power_proof', runB.collected, runB.collected.filter((id) => id !== 'L9e'), [l9eFailureB], 1);
+    }
+  }
 
-  const idGreenInA = runA.collected.includes(EXPECT_RED);
+  const greenEntry = runA.collectedEntries.find((entry) => entry.id === EXPECT_RED);
+  const idGreenInA = EXPECT_RED === 'L9e'
+    ? Boolean(greenEntry && greenEntry.via === 'host-state')
+    : Boolean(greenEntry);
   const idRedInB = runB.rejected.has(EXPECT_RED);
 
   if (!idGreenInA) {

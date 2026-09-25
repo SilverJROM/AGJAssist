@@ -15,9 +15,13 @@ function mkTmpDir(prefix: string) {
 // Drives the ACTUAL harness (e2e/run-xmachines-fence.mjs) as a subprocess —
 // never writes fence-report-v1.json itself (north D-082: the report must be
 // produced by the system under test, not authored by the test).
-function runHarness(harnessArgs: string[], cwd: string) {
+function runHarness(harnessArgs: string[], cwd: string, extraEnv: NodeJS.ProcessEnv = {}) {
   try {
-    const stdout = execFileSync('node', [RUNNER, ...harnessArgs], { cwd, encoding: 'utf8' });
+    const stdout = execFileSync('node', [RUNNER, ...harnessArgs], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, ...extraEnv },
+    });
     return { status: 0, stdout };
   } catch (error: any) {
     return {
@@ -115,8 +119,66 @@ describe('xmachines fence harness A0.2', () => {
       // completeness/L9e/differential checks ran.
       expect(result.status).not.toBe(0);
       const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
-      expect(report.verdict_line).toContain('verdict=FAIL');
-      expect(report.verdict_line).not.toContain('fault_class=none');
+      expect(report.verdict_line).toContain('fault_class=negative_control_not_differential');
+      expect(report.failed[0].id).toBe('Y1');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('--expect-red PASSes when the stub is what turns Z1 from green to red (J1b differential happy path)', () => {
+    const tmpDir = mkTmpDir('xm-fence-differential');
+    try {
+      const fixtureContract = path.join(tmpDir, 'fence-contract.json');
+      fs.writeFileSync(fixtureContract, JSON.stringify({
+        fences: {
+          DIFFERENTIAL: { acceptance_ids: ['Z1'], test_path: 'e2e/xmachines-fence-FIXTURE-DIFFERENTIAL.spec.ts' },
+        },
+      }));
+      const result = runHarness(
+        ['--fence', 'DIFFERENTIAL', '--contract', fixtureContract, '--expect-red', 'Z1'],
+        tmpDir,
+        { FENCE_STUB: 'FIXTURE-UNIT' },
+      );
+      expect(result.status).toBe(0);
+      const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
+      expect(report.verdict_line).toContain('verdict=PASS fault_class=none');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('classifies a 2-unit failure report as missing_acceptance (J1c boundary below)', () => {
+    const tmpDir = mkTmpDir('xm-fence-units2');
+    try {
+      const fixtureContract = path.join(tmpDir, 'fence-contract.json');
+      fs.writeFileSync(fixtureContract, JSON.stringify({
+        fences: {
+          UNITS2: { acceptance_ids: ['U1', 'U2'], test_path: 'e2e/xmachines-fence-FIXTURE-UNITS-2.spec.ts' },
+        },
+      }));
+      const result = runHarness(['--fence', 'UNITS2', '--contract', fixtureContract], tmpDir);
+      expect(result.status).not.toBe(0);
+      const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
+      expect(report.verdict_line).toContain('fault_class=missing_acceptance');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('classifies a 3-unit failure report as plan_defect (J1c boundary above)', () => {
+    const tmpDir = mkTmpDir('xm-fence-units3');
+    try {
+      const fixtureContract = path.join(tmpDir, 'fence-contract.json');
+      fs.writeFileSync(fixtureContract, JSON.stringify({
+        fences: {
+          UNITS3: { acceptance_ids: ['U1', 'U2', 'U3'], test_path: 'e2e/xmachines-fence-FIXTURE-UNITS-3.spec.ts' },
+        },
+      }));
+      const result = runHarness(['--fence', 'UNITS3', '--contract', fixtureContract], tmpDir);
+      expect(result.status).not.toBe(0);
+      const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
+      expect(report.verdict_line).toContain('fault_class=plan_defect');
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
