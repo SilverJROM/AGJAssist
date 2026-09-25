@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { callCarriesClientArm, resolveXmachinesRuntime } from "../../services/xmachines/runtime.js";
+import { ActionCoordinator } from "../../services/xmachines/action-coordinator.js";
 import { AuthService } from "../../auth/auth-service.js";
 import { createAuthMiddleware } from "../../auth/auth-middleware.js";
 
@@ -54,6 +55,17 @@ function ownerKey(request: FastifyRequest): string {
   return id === undefined || id === null ? "anon" : String(id);
 }
 
+function headerValue(value: string | string[] | undefined): string {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+function idempotencyKeyFromRequest(request: FastifyRequest): string {
+  const primary = headerValue(request.headers["idempotency-key"]);
+  if (primary) return primary;
+  return headerValue(request.headers["x-idempotency-key"]);
+}
+
 function limitExceeded(result: { isAllowed: boolean; isExceeded?: boolean }): boolean {
   return result.isAllowed === false && result.isExceeded === true;
 }
@@ -83,9 +95,10 @@ function requireCanonicalOrigin(request: FastifyRequest, reply: FastifyReply): b
   return true;
 }
 
-async function power(
+function power(
   request: FastifyRequest,
   reply: FastifyReply,
+  coordinator: ActionCoordinator,
   name: string,
   action: "on" | "off"
 ) {
@@ -109,17 +122,18 @@ async function power(
       action,
     });
   }
-  const result = action === "off" ? await runtime.gateway.down(name) : await runtime.gateway.up(name);
-  return reply.code(200).send({
-    ok: true,
-    actuated: result.actuated,
-    mode: "armed",
+  const result = coordinator.handle({
     machine: name,
     action,
+    idempotencyKey: idempotencyKeyFromRequest(request),
+    ownerId: ownerKey(request),
   });
+  const code = result.status === "in-progress" ? 202 : 400;
+  return reply.code(code).send(result);
 }
 
 export function registerXmachinesRoutes(app: FastifyInstance, authService?: AuthService): void {
+  const coordinator = new ActionCoordinator();
   const authMiddleware = authService ? createAuthMiddleware(authService) : async () => {};
   const perActionLimit = {
     off: app.createRateLimit({
@@ -191,11 +205,11 @@ export function registerXmachinesRoutes(app: FastifyInstance, authService?: Auth
 
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/off",
-    async (request, reply) => power(request, reply, request.params.name, "off")
+    async (request, reply) => power(request, reply, coordinator, request.params.name, "off")
   );
 
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/on",
-    async (request, reply) => power(request, reply, request.params.name, "on")
+    async (request, reply) => power(request, reply, coordinator, request.params.name, "on")
   );
 }

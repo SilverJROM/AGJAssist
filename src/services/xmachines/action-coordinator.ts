@@ -1,5 +1,5 @@
-import { EventEmitter } from 'node:events';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 
 export interface ActionRequest {
   machine: string;
@@ -9,136 +9,103 @@ export interface ActionRequest {
 }
 
 export interface ActionResult {
-  status: 'in-progress' | 'completed' | 'rejected';
+  status: 'in-progress' | 'rejected';
   operationId?: string;
-  actuated?: boolean;
+  reason?: 'idempotency-key-required' | 'cooldown' | 'machine-busy';
 }
 
-export interface OngoingAction {
+interface OngoingAction {
   operationId: string;
   machine: string;
   action: 'on' | 'off';
   idempotencyKey: string;
   ownerId: string;
   startedAt: number;
-  promise: Promise<ActionResult>;
 }
 
-export class ActionCoordinator extends EventEmitter {
-  private mutexes = new Map<string, Promise<void>>();
+const COOLDOWN_MS = 30_000;
+
+function xmacArgv(action: 'on' | 'off', machine: string): string[] {
+  return action === 'on' ? ['up', machine] : ['down', machine];
+}
+
+export class ActionCoordinator {
   private ongoing = new Map<string, OngoingAction>();
   private idempotency = new Map<string, OngoingAction>();
   private cooldowns = new Map<string, number>();
-  private readonly cooldownMs = 30_000;
-  private readonly maxConcurrent = 1;
 
-  private key(machine: string, action: string) {
-    return `${machine}:${action}`;
-  }
+  handle(request: ActionRequest): ActionResult {
+    const idempotencyKey = request.idempotencyKey.trim();
+    const { machine, action, ownerId } = request;
 
-  async handle(request: ActionRequest): Promise<ActionResult> {
-    const { machine, action, idempotencyKey, ownerId } = request;
-
-    // L15b: Every power POST requires idempotency key
     if (!idempotencyKey) {
-      return { status: 'rejected' };
+      return { status: 'rejected', reason: 'idempotency-key-required' };
     }
 
-    // Check cooldown
-    const cooldownUntil = this.cooldowns.get(machine) ?? 0;
-    if (Date.now() < cooldownUntil) {
-      return { status: 'in-progress', operationId: 'cooldown' };
-    }
-
-    // L15d: Duplicate coalescing
     const existing = this.idempotency.get(idempotencyKey);
     if (existing) {
-      // Return immediately, don't wait for promise
       return { status: 'in-progress', operationId: existing.operationId };
     }
 
-    // Check for ongoing action on same machine
-    const ongoingForMachine = Array.from(this.ongoing.values()).find(
-      a => a.machine === machine
-    );
-    
-    if (ongoingForMachine) {
-      // L15j: ON during OFF serialized without overlap
-      // Return immediately with in-progress
-      return { status: 'in-progress', operationId: ongoingForMachine.operationId };
+    const cooldownUntil = this.cooldowns.get(machine) ?? 0;
+    if (Date.now() < cooldownUntil) {
+      return { status: 'rejected', reason: 'cooldown' };
     }
 
-    // L15a: Per-machine mutex
-    const operationId = `${machine}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    
-    // Start action in background
-    this.executeAction(machine, action, operationId, idempotencyKey, ownerId).then(() => {
-      this.ongoing.delete(operationId);
-      this.idempotency.delete(idempotencyKey);
-      // L15f: Start cooldown on completion
-      this.cooldowns.set(machine, Date.now() + this.cooldownMs);
-      setTimeout(() => this.cooldowns.delete(machine), this.cooldownMs);
-    });
-    
-    const ongoingAction: OngoingAction = {
+    const inFlight = Array.from(this.ongoing.values()).find((row) => row.machine === machine);
+    if (inFlight) {
+      if (inFlight.action === action) {
+        return { status: 'in-progress', operationId: inFlight.operationId };
+      }
+      return { status: 'rejected', reason: 'machine-busy' };
+    }
+
+    const operationId = randomUUID();
+    const ongoing: OngoingAction = {
       operationId,
       machine,
       action,
       idempotencyKey,
       ownerId,
       startedAt: Date.now(),
-      promise: Promise.resolve({ status: 'in-progress' as const, operationId }),
     };
+    this.ongoing.set(operationId, ongoing);
+    this.idempotency.set(idempotencyKey, ongoing);
 
-    this.ongoing.set(operationId, ongoingAction);
-    this.idempotency.set(idempotencyKey, ongoingAction);
+    // Detached child: handle returns before xmac.sh exits.
+    void this.launch(action, machine).then(() => {
+      const current = this.ongoing.get(operationId);
+      if (!current) return;
+      this.ongoing.delete(operationId);
+      this.idempotency.delete(current.idempotencyKey);
+      const until = Date.now() + COOLDOWN_MS;
+      this.cooldowns.set(machine, until);
+      const timer = setTimeout(() => {
+        if (this.cooldowns.get(machine) === until) this.cooldowns.delete(machine);
+      }, COOLDOWN_MS);
+      timer.unref();
+    });
 
-    // L15e: Return in-progress immediately
     return { status: 'in-progress', operationId };
   }
 
-  private async executeAction(
-    machine: string,
-    action: 'on' | 'off',
-    operationId: string,
-    idempotencyKey: string,
-    ownerId: string
-  ): Promise<ActionResult> {
-    // L15c: Detached child process
+  private launch(action: 'on' | 'off', machine: string): Promise<void> {
+    const argv = xmacArgv(action, machine);
     return new Promise((resolve) => {
-      // Simulate detached child for xmac work
-      const child = spawn('sh', ['-c', `sleep 0.1 && echo done`], {
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      const child = spawn('xmac.sh', argv, {
         detached: true,
         stdio: 'ignore',
+        env: process.env,
       });
-      
+      child.once('error', done);
+      child.once('exit', done);
       child.unref();
-
-      // Simulate action completion
-      setTimeout(() => {
-        resolve({
-          status: 'completed',
-          operationId,
-          actuated: true,
-        });
-      }, 100);
     });
-  }
-
-  // For testing: check if machine is currently locked
-  isLocked(machine: string): boolean {
-    return Array.from(this.ongoing.values()).some(a => a.machine === machine);
-  }
-
-  // For testing: get ongoing actions
-  getOngoing(): OngoingAction[] {
-    return Array.from(this.ongoing.values());
-  }
-
-  // For testing: clear state
-  reset(): void {
-    this.ongoing.clear();
-    this.idempotency.clear();
-    this.cooldowns.clear();
   }
 }

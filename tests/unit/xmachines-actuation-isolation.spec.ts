@@ -157,10 +157,23 @@ describe("xmachines actuation isolation A0.3", () => {
 
   it("L10b: server process XMACHINES_ARM=1 is what constructs the real gateway", async () => {
     const { spyLog } = await boot(true);
-    const res = await app!.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/off", headers: localHeaders() });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ ok: true, actuated: true, mode: "armed", machine: "gpu", action: "off" });
-    expect(spyArgv(spyLog)).toEqual([["down", "gpu"]]);
+    const res = await app!.inject({
+      method: "POST",
+      url: "/api/xmachines/machines/gpu/power/off",
+      headers: localHeaders({ "idempotency-key": "a03-armed-off" }),
+    });
+    expect(res.statusCode).toBe(202);
+    const body = res.json() as { status?: string; operationId?: string };
+    expect(body.status).toBe("in-progress");
+    expect(typeof body.operationId).toBe("string");
+    expect(body.operationId!.length).toBeGreaterThan(0);
+    const deadline = Date.now() + 2000;
+    let argv = spyArgv(spyLog);
+    while (argv.length === 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      argv = spyArgv(spyLog);
+    }
+    expect(argv).toEqual([["down", "gpu"]]);
   });
 
   it("L10c: local read and power attempts produce zero real-fleet calls", async () => {
