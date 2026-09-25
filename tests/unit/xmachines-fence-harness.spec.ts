@@ -122,7 +122,7 @@ describe('xmachines fence harness A0.2', () => {
       expect(result.status).not.toBe(0);
       const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
       expect(report.verdict_line).toContain('fault_class=missing_acceptance');
-      expect(report.collected).toEqual(['P1']);
+      expect(report.collected).toEqual(['P1', 'e2e/fixtures/xmachines-fence-FIXTURE-PARTIAL.spec.ts']);
       expect(report.failed.some((f: any) => f.id === 'P2')).toBe(true);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -145,7 +145,10 @@ describe('xmachines fence harness A0.2', () => {
       expect(result.status).not.toBe(0);
       const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
       expect(report.verdict_line).toContain('fault_class=negative_control_not_differential');
+      expect(report.collected).toEqual(['Y1', 'e2e/fixtures/xmachines-fence-FIXTURE-EXPECT-RED-STATIC.spec.ts']);
+      expect(report.passed).toEqual([]);
       expect(report.failed[0].id).toBe('Y1');
+      expect(report.passed).not.toContain('Y1');
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -168,6 +171,12 @@ describe('xmachines fence harness A0.2', () => {
       expect(result.status).toBe(0);
       const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
       expect(report.verdict_line).toContain('verdict=PASS fault_class=none');
+      // Z1 is rejected under the stub. It stays in collected and failed, and
+      // must not also be listed as passed (accept ids only).
+      expect(report.collected).toEqual(['Z1', 'e2e/fixtures/xmachines-fence-FIXTURE-DIFFERENTIAL.spec.ts']);
+      expect(report.passed).toEqual([]);
+      expect(report.failed).toEqual([{ id: 'Z1', kind: 'assert', unit: 'FIXTURE-UNIT' }]);
+      expect(report.passed.filter((id: string) => id === 'Z1')).toEqual([]);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -186,6 +195,19 @@ describe('xmachines fence harness A0.2', () => {
       expect(result.status).not.toBe(0);
       const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
       expect(report.verdict_line).toContain('fault_class=missing_acceptance');
+      // Reject-only: U1 and U2 are observed, so collected is not empty, but
+      // neither id was accepted so passed stays empty and disjoint from failed.
+      expect(report.collected).toEqual([
+        'U1',
+        'U2',
+        'e2e/fixtures/xmachines-fence-FIXTURE-UNITS-2.spec.ts',
+      ]);
+      expect(report.passed).toEqual([]);
+      expect(report.failed).toEqual([
+        { id: 'U1', kind: 'assert', unit: 'UNIT-A', message: 'missing from collected' },
+        { id: 'U2', kind: 'assert', unit: 'UNIT-B', message: 'missing from collected' },
+      ]);
+      expect(report.passed.filter((id: string) => id === 'U1' || id === 'U2')).toEqual([]);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

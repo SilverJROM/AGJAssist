@@ -90,12 +90,18 @@ function spawnJourney(env) {
   while ((match = REJECT_RE.exec(combinedOutput)) !== null) {
     rejected.set(match[1], { unit: match[2] });
   }
+  // `accepted` feeds report `passed` only. `collected` is the observed union
+  // (accept + reject) for the report `collected` field and reachability.
+  // A rejected id must not also be reported as passed.
+  const accepted = collectedEntries.map((entry) => entry.id);
+  const collected = [...new Set([...accepted, ...Array.from(rejected.keys())])];
   return {
     exitCode: result.status ?? 1,
     collectedEntries,
-    collected: [...new Set([...collectedEntries.map((entry) => entry.id), ...Array.from(rejected.keys())])],
+    accepted,
+    collected,
     rejected,
-    hasRejectOnly: collectedEntries.length === 0 && rejected.size > 0,
+    hasRejectOnly: accepted.length === 0 && rejected.size > 0,
   };
 }
 
@@ -134,7 +140,7 @@ if (EXPECT_RED) {
       'FAIL',
       'unreached_acceptance',
       collectedBWithPath,
-      runB.collected,
+      runB.accepted,
       unreached.map((id) => ({ id, kind: 'assert', message: 'journey never reached this acceptance id' })),
       1
     );
@@ -146,12 +152,12 @@ if (EXPECT_RED) {
   // the id under negative control.
   const l9eFailure = l9eProvenanceFailure(runA.collectedEntries);
   if (l9eFailure) {
-    writeReportAndExit('FAIL', 'argv_only_power_proof', collectedBWithPath, collectedBWithPath.filter((id) => id !== 'L9e'), [l9eFailure], 1);
+    writeReportAndExit('FAIL', 'argv_only_power_proof', collectedBWithPath, runB.accepted.filter((id) => id !== 'L9e'), [l9eFailure], 1);
   }
   if (EXPECT_RED !== 'L9e') {
     const l9eFailureB = l9eProvenanceFailure(runB.collectedEntries);
     if (l9eFailureB) {
-      writeReportAndExit('FAIL', 'argv_only_power_proof', collectedBWithPath, collectedBWithPath.filter((id) => id !== 'L9e'), [l9eFailureB], 1);
+      writeReportAndExit('FAIL', 'argv_only_power_proof', collectedBWithPath, runB.accepted.filter((id) => id !== 'L9e'), [l9eFailureB], 1);
     }
   }
 
@@ -166,7 +172,7 @@ if (EXPECT_RED) {
       'FAIL',
       'negative_control_not_differential',
       collectedBWithPath,
-      runB.collected,
+      runB.accepted.filter((id) => id !== EXPECT_RED),
       [{ id: EXPECT_RED, kind: 'assert', message: `id was not green in the unstubbed baseline run (collected=${JSON.stringify(runA.collected)}); a stub cannot be shown to cause a failure that was already there` }],
       1
     );
@@ -176,7 +182,7 @@ if (EXPECT_RED) {
       'FAIL',
       'negative_control_did_not_red',
       collectedBWithPath,
-      runB.collected.filter((id) => id !== EXPECT_RED),
+      runB.accepted.filter((id) => id !== EXPECT_RED),
       [{ id: EXPECT_RED, kind: 'assert', message: 'expected id to be named-rejected under the stubbed run but it passed' }],
       1
     );
@@ -186,7 +192,7 @@ if (EXPECT_RED) {
     'PASS',
     'none',
     collectedBWithPath,
-    runB.collected,
+    runB.accepted,
     [...runB.rejected.entries()].map(([id, meta]) => ({ id, kind: 'assert', unit: meta.unit })),
     0
   );
@@ -208,7 +214,7 @@ if (!hasEvidence) {
 
 const l9eFailure = l9eProvenanceFailure(run.collectedEntries);
 if (l9eFailure) {
-  writeReportAndExit('FAIL', 'argv_only_power_proof', collectedWithPath, collectedWithPath.filter((id) => id !== 'L9e'), [l9eFailure], 1);
+  writeReportAndExit('FAIL', 'argv_only_power_proof', collectedWithPath, run.accepted.filter((id) => id !== 'L9e'), [l9eFailure], 1);
 }
 
 // J1e — collected must equal the row's acceptance_ids as two independent sets.
@@ -234,7 +240,7 @@ if (missing.length > 0 || extraForSet.length > 0) {
     'FAIL',
     faultClass,
     collectedWithPath,
-    collectedWithPath.filter((id) => acceptanceSet.has(id)),
+    run.accepted.filter((id) => acceptanceSet.has(id)),
     [...failedWithUnits, ...failedUnreached, ...failedExtra],
     1
   );
