@@ -202,6 +202,71 @@ describe('xmachines fence harness A0.2', () => {
     }
   }, 60_000);
 
+  it('--expect-red fails with negative_control_did_not_red when the id stays green under the stub (J1b M6)', () => {
+    const tmpDir = mkTmpDir('xm-fence-stub-ignored');
+    try {
+      const fixtureContract = path.join(tmpDir, 'fence-contract.json');
+      fs.writeFileSync(fixtureContract, JSON.stringify({
+        fences: {
+          STUB_IGNORED: { acceptance_ids: ['W1'], test_path: 'e2e/xmachines-fence-FIXTURE-STUB-IGNORED.spec.ts' },
+        },
+      }));
+      const result = runHarness(
+        ['--fence', 'STUB_IGNORED', '--contract', fixtureContract, '--expect-red', 'W1'],
+        tmpDir,
+        { FENCE_STUB: 'ANY-UNIT' },
+      );
+      expect(result.status).not.toBe(0);
+      const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
+      expect(report.verdict_line).toContain('fault_class=negative_control_did_not_red');
+      expect(report.failed[0].id).toBe('W1');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('--expect-red names unreached_acceptance when P2 is never observed (J1b M7 completeness)', () => {
+    const tmpDir = mkTmpDir('xm-fence-unreached');
+    try {
+      const fixtureContract = path.join(tmpDir, 'fence-contract.json');
+      fs.writeFileSync(fixtureContract, JSON.stringify({
+        fences: {
+          PARTIAL: { acceptance_ids: ['P1', 'P2'], test_path: 'e2e/xmachines-fence-FIXTURE-PARTIAL.spec.ts' },
+        },
+      }));
+      const result = runHarness(
+        ['--fence', 'PARTIAL', '--contract', fixtureContract, '--expect-red', 'P1'],
+        tmpDir,
+      );
+      expect(result.status).not.toBe(0);
+      const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
+      expect(report.verdict_line).toContain('fault_class=unreached_acceptance');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('names an uncontracted extra id under fault_class=missing_acceptance (J1e extra half / M5)', () => {
+    const tmpDir = mkTmpDir('xm-fence-extra');
+    try {
+      const fixtureContract = path.join(tmpDir, 'fence-contract.json');
+      fs.writeFileSync(fixtureContract, JSON.stringify({
+        fences: {
+          EXTRA: { acceptance_ids: ['V1'], test_path: 'e2e/xmachines-fence-FIXTURE-EXTRA.spec.ts' },
+        },
+      }));
+      const result = runHarness(['--fence', 'EXTRA', '--contract', fixtureContract], tmpDir);
+      expect(result.status).not.toBe(0);
+      const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
+      expect(report.verdict_line).toContain('fault_class=missing_acceptance');
+      const extraFail = report.failed.find((f: any) => f.id === 'V9');
+      expect(extraFail).toBeDefined();
+      expect(extraFail.message).toBe('not in contract acceptance_ids');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   it('phase checkpoints A17 B17 C9 D14 exist and their declared acceptance_ids match the contract', async () => {
     const contract = JSON.parse(fs.readFileSync(CONTRACT, 'utf8'));
     const checkpoints = ['A17', 'B17', 'C9', 'D14'];
