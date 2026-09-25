@@ -1,79 +1,214 @@
-import { describe, expect, it } from 'vitest';
-import { FakeGateway, resolveGateway } from '../../src/services/xmachines/gateway';
-import { SyntheticTelemetry } from '../../src/services/xmachines/telemetry';
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterEach, describe, expect, it } from "vitest";
+import type { FastifyInstance } from "fastify";
+import { createApiServer, type ApiServices } from "../../src/api/server.js";
+import { AppConfig } from "../../src/config/config.js";
 
-describe('xmachines actuation isolation A0.3', () => {
-  it('L10a: local and test mode default to non-actuating fake gateway and synthetic telemetry', async () => {
-    delete process.env.XMACHINES_ARM;
-    const gateway = resolveGateway();
-    expect(gateway).toBeDefined();
-    expect(gateway).toBeInstanceOf(FakeGateway);
-    
-    const fake = gateway as FakeGateway;
-    const downResult = await fake.down('gpu');
-    expect(downResult.actuated).toBe(false);
-    expect(downResult.argv).toEqual(['down', 'gpu']);
-    
-    const telemetry = new SyntheticTelemetry();
-    const data = telemetry.generate();
-    expect(data.length).toBeGreaterThan(0);
-    expect(data[0].provenance).toBe('fake');
-    expect(data[0].state).toBe('synthetic');
-  });
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const SPY = path.join(REPO, "tests/helpers/xmac-argv-spy.sh");
 
-  it('L10b: real control is impossible without explicit server-side arm state', () => {
-    const original = process.env.XMACHINES_ARM;
-    
-    delete process.env.XMACHINES_ARM;
-    let gateway = resolveGateway();
-    expect(gateway).toBeInstanceOf(FakeGateway);
-    
-    process.env.XMACHINES_ARM = '0';
-    gateway = resolveGateway();
-    expect(gateway).toBeInstanceOf(FakeGateway);
-    
-    process.env.XMACHINES_ARM = '1';
-    gateway = resolveGateway();
-    // Even when armed, A0.3 isolation means we still return fake to prevent real actuation
-    // The arm flag is checked but real gateway is not instantiated in this slice
-    expect(gateway).toBeInstanceOf(FakeGateway);
-    
-    if (original !== undefined) {
-      process.env.XMACHINES_ARM = original;
-    } else {
-      delete process.env.XMACHINES_ARM;
+const SYNTHETIC_FLEET = [
+  { name: "gpu", state: "synthetic", cpuTemp: 41, gpuTemp: 52, powerWatts: 120, uptime: "synthetic", provenance: "fake", sampleAge: "0s" },
+  { name: "hdd", state: "synthetic", cpuTemp: 36, gpuTemp: 33, powerWatts: 90, uptime: "synthetic", provenance: "fake", sampleAge: "0s" },
+  { name: "gpu2", state: "synthetic", cpuTemp: 44, gpuTemp: 61, powerWatts: 200, uptime: "synthetic", provenance: "fake", sampleAge: "0s" },
+  { name: "media", state: "synthetic", cpuTemp: 47, gpuTemp: 70, powerWatts: 250, uptime: "synthetic", provenance: "fake", sampleAge: "0s" },
+] as const;
+
+const CLIENT_ARM_REJECTED = { ok: false, actuated: false, error: "client-arm-rejected" };
+const MACHINES = ["gpu", "hdd", "gpu2", "media"] as const;
+
+function minimalConfig(): AppConfig {
+  return {
+    telegram: {
+      botToken: "123:ABC",
+      authorizedUserId: 1,
+      authorizedChatIds: [1],
+      testMode: true,
+      updateMode: "polling",
+      webhookUrl: null,
+      webhookPath: "/api/telegram/webhook",
+      webhookSecretToken: "s"
+    },
+    runtime: {
+      workspaceRoot: "/tmp",
+      allowedCommandPrefixes: [],
+      maxToolIterations: 1,
+      defaultTimeoutMinutes: 1
+    },
+    api: {
+      port: 0,
+      host: "127.0.0.1",
+      jwtSecret: "s",
+      sessionExpiryHours: 24
+    },
+    db: { path: ":memory:" },
+    projects: { root: "/tmp" },
+    tmux: { historyRetentionDays: 1, outputBufferLines: 100, streamIntervalMs: 100 },
+    overmind: { token: "t" }
+  };
+}
+
+function stubServices(): ApiServices {
+  return {
+    authService: {} as ApiServices["authService"],
+    projectService: {} as ApiServices["projectService"],
+    safetyService: {} as ApiServices["safetyService"],
+    auditService: {} as ApiServices["auditService"],
+    tmuxService: {} as ApiServices["tmuxService"],
+    tmuxStreamManager: {} as ApiServices["tmuxStreamManager"],
+    db: {} as ApiServices["db"],
+    delegationService: {} as ApiServices["delegationService"],
+    noteService: {} as ApiServices["noteService"],
+    planService: {} as ApiServices["planService"],
+    taskService: {} as ApiServices["taskService"],
+    fileService: {} as ApiServices["fileService"],
+    stepTemplateService: {} as ApiServices["stepTemplateService"],
+    personalTaskService: {} as ApiServices["personalTaskService"],
+    reminderService: {} as ApiServices["reminderService"],
+    agentAssignmentService: {} as ApiServices["agentAssignmentService"],
+  };
+}
+
+function unarmedPower(machine: string, action: "on" | "off") {
+  return { ok: false, actuated: false, mode: "fake", reason: "unarmed", machine, action };
+}
+
+function readSpy(spyLog: string): string {
+  if (!fs.existsSync(spyLog)) return "";
+  return fs.readFileSync(spyLog, "utf8");
+}
+
+function spyArgv(spyLog: string): string[][] {
+  return readSpy(spyLog)
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .map((line) => line.split("\t").slice(1));
+}
+
+describe("xmachines actuation isolation A0.3", () => {
+  let app: FastifyInstance | undefined;
+  let scratch: string | undefined;
+  let prev: NodeJS.ProcessEnv;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+    if (prev) {
+      process.env.PATH = prev.PATH;
+      restoreEnv("XMAC_ARGV_SPY_LOG", prev.XMAC_ARGV_SPY_LOG);
+      restoreEnv("XMAC_ARGV_SPY_REAL", prev.XMAC_ARGV_SPY_REAL);
+      restoreEnv("XMACHINES_ARM", prev.XMACHINES_ARM);
     }
+    if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
+    scratch = undefined;
   });
 
-  it('L10c: local Playwright produces zero real-fleet calls', async () => {
-    delete process.env.XMACHINES_ARM;
-    const gateway = resolveGateway();
-    const fake = gateway as FakeGateway;
-    
-    const actuations: Array<{ machine: string; action: string }> = [];
-    const originalDown = fake.down.bind(fake);
-    
-    // Verify actuations are recorded but not executed
-    const result = await fake.down('gpu');
-    expect(result.actuated).toBe(false);
-    
-    const telemetry = new SyntheticTelemetry();
-    const sample = telemetry.forMachine('gpu');
-    expect(sample.provenance).toBe('fake');
+  async function boot(arm: boolean): Promise<{ spyLog: string }> {
+    scratch = fs.mkdtempSync(path.join(os.tmpdir(), "a03-act-"));
+    const bin = path.join(scratch, "bin");
+    fs.mkdirSync(bin);
+    fs.symlinkSync(SPY, path.join(bin, "xmac.sh"));
+    const spyLog = path.join(scratch, "spy.log");
+    prev = {
+      PATH: process.env.PATH,
+      XMAC_ARGV_SPY_LOG: process.env.XMAC_ARGV_SPY_LOG,
+      XMAC_ARGV_SPY_REAL: process.env.XMAC_ARGV_SPY_REAL,
+      XMACHINES_ARM: process.env.XMACHINES_ARM,
+    };
+    process.env.PATH = `${bin}${path.delimiter}${process.env.PATH ?? ""}`;
+    process.env.XMAC_ARGV_SPY_LOG = spyLog;
+    delete process.env.XMAC_ARGV_SPY_REAL;
+    if (arm) process.env.XMACHINES_ARM = "1";
+    else delete process.env.XMACHINES_ARM;
+    app = await createApiServer(minimalConfig(), stubServices());
+    return { spyLog };
+  }
+
+  it("L10a: local and test mode default to synthetic telemetry", async () => {
+    const { spyLog } = await boot(false);
+    const res = await app!.inject({ method: "GET", url: "/api/xmachines/telemetry" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ mode: "fake", armed: false, machines: SYNTHETIC_FLEET });
+    expect(spyArgv(spyLog)).toEqual([]);
   });
 
-  it('K1c: local Playwright cannot actuate a real machine', async () => {
-    const gateway = new FakeGateway({ machines: ['gpu', 'hdd', 'gpu2', 'media'] });
-    
-    const results = await Promise.all([
-      gateway.up('gpu'),
-      gateway.down('hdd'),
-      gateway.up('gpu2'),
-    ]);
-    
-    results.forEach((r) => {
-      expect(r.actuated).toBe(false);
-      expect(r.argv).toBeDefined();
+  it("L10b: real control is impossible without explicit server-side arm state", async () => {
+    const { spyLog } = await boot(false);
+    const res = await app!.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/off" });
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual(unarmedPower("gpu", "off"));
+    expect(spyArgv(spyLog)).toEqual([]);
+  });
+
+  it("L10b: server process XMACHINES_ARM=1 is what constructs the real gateway", async () => {
+    const { spyLog } = await boot(true);
+    const res = await app!.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/off" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true, actuated: true, mode: "armed", machine: "gpu", action: "off" });
+    expect(spyArgv(spyLog)).toEqual([["down", "gpu"]]);
+  });
+
+  it("L10c: local read and power attempts produce zero real-fleet calls", async () => {
+    const { spyLog } = await boot(false);
+    const telemetry = await app!.inject({ method: "GET", url: "/api/xmachines/telemetry" });
+    const read = await app!.inject({ method: "GET", url: "/api/xmachines/machines/hdd" });
+    const off = await app!.inject({ method: "POST", url: "/api/xmachines/machines/gpu/power/off" });
+    const on = await app!.inject({ method: "POST", url: "/api/xmachines/machines/media/power/on" });
+    expect(telemetry.statusCode).toBe(200);
+    expect(telemetry.json()).toEqual({ mode: "fake", armed: false, machines: SYNTHETIC_FLEET });
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toEqual({ mode: "fake", armed: false, machine: SYNTHETIC_FLEET[1] });
+    expect(off.statusCode).toBe(403);
+    expect(off.json()).toEqual(unarmedPower("gpu", "off"));
+    expect(on.statusCode).toBe(403);
+    expect(on.json()).toEqual(unarmedPower("media", "on"));
+    expect(readSpy(spyLog)).toBe("");
+  });
+
+  it("K1c: local power requests cannot actuate a real machine", async () => {
+    const { spyLog } = await boot(false);
+    for (const machine of MACHINES) {
+      const off = await app!.inject({ method: "POST", url: `/api/xmachines/machines/${machine}/power/off` });
+      const on = await app!.inject({ method: "POST", url: `/api/xmachines/machines/${machine}/power/on` });
+      expect(off.statusCode).toBe(403);
+      expect(off.json()).toEqual(unarmedPower(machine, "off"));
+      expect(on.statusCode).toBe(403);
+      expect(on.json()).toEqual(unarmedPower(machine, "on"));
+    }
+    expect(spyArgv(spyLog)).toEqual([]);
+  });
+
+  it("negative: a client-supplied XMACHINES_ARM does not arm or reach xmac.sh", async () => {
+    const { spyLog } = await boot(false);
+    const header = await app!.inject({
+      method: "POST",
+      url: "/api/xmachines/machines/gpu/power/off",
+      headers: { XMACHINES_ARM: "1" },
     });
+    const query = await app!.inject({
+      method: "POST",
+      url: "/api/xmachines/machines/gpu/power/off?XMACHINES_ARM=1",
+    });
+    const body = await app!.inject({
+      method: "POST",
+      url: "/api/xmachines/machines/gpu/power/on",
+      headers: { "content-type": "application/json" },
+      payload: { XMACHINES_ARM: "1" },
+    });
+    expect(header.statusCode).toBe(400);
+    expect(header.json()).toEqual(CLIENT_ARM_REJECTED);
+    expect(query.statusCode).toBe(400);
+    expect(query.json()).toEqual(CLIENT_ARM_REJECTED);
+    expect(body.statusCode).toBe(400);
+    expect(body.json()).toEqual(CLIENT_ARM_REJECTED);
+    expect(readSpy(spyLog)).toBe("");
   });
 });
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}

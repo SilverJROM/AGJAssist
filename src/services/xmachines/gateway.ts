@@ -1,3 +1,8 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
 export interface XmacGateway {
   status: (name: string) => Promise<{ name: string; state: string; ip?: string }>;
   leases: () => Promise<Array<unknown>>;
@@ -43,15 +48,30 @@ export class FakeGateway implements XmacGateway {
   }
 }
 
-export function resolveGateway(): XmacGateway {
-  const armed = process.env.XMACHINES_ARM === '1';
-  if (armed) {
-    // Real gateway would be loaded here; for A0.3 isolation we still return fake
-    // to avoid real actuation. The arm flag is checked, but the default remains fake.
-    // Explicit server-side arm is required for real control per L10b.
-    console.log('[xmachines] Resolved gateway mode: fake (arm flag requires explicit handling)');
-  } else {
-    console.log('[xmachines] Resolved gateway mode: fake (default local/test)');
+export class RealXmacGateway implements XmacGateway {
+  private async xmac(args: string[]): Promise<void> {
+    await execFileAsync('xmac.sh', args);
   }
-  return new FakeGateway();
+
+  async status(name: string) {
+    await this.xmac(['status', name]);
+    return { name, state: 'unknown' };
+  }
+
+  async leases() {
+    await this.xmac(['leases']);
+    return [];
+  }
+
+  async down(name: string) {
+    const argv = ['down', name];
+    await this.xmac(argv);
+    return { actuated: true, argv };
+  }
+
+  async up(name: string) {
+    const argv = ['up', name];
+    await this.xmac(argv);
+    return { actuated: true, argv };
+  }
 }
