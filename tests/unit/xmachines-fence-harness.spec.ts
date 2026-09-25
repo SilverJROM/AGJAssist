@@ -1,73 +1,115 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
-const REPORT = path.resolve(process.cwd(), 'fence-report-v1.json');
-const CONTRACT = path.resolve(process.cwd(), 'xmachines/projcore-run-2026-09-25/fence-contract.json');
+const REPO_ROOT = process.cwd();
+const RUNNER = path.resolve(REPO_ROOT, 'e2e/run-xmachines-fence.mjs');
+const CONTRACT = path.resolve(REPO_ROOT, 'xmachines/projcore-run-2026-09-25/fence-contract.json');
+
+function mkTmpDir(prefix: string) {
+  return fs.mkdtempSync(path.join(REPO_ROOT, `.${prefix}-`));
+}
+
+// Drives the ACTUAL harness (e2e/run-xmachines-fence.mjs) as a subprocess —
+// never writes fence-report-v1.json itself (north D-082: the report must be
+// produced by the system under test, not authored by the test).
+function runHarness(harnessArgs: string[], cwd: string) {
+  try {
+    const stdout = execFileSync('node', [RUNNER, ...harnessArgs], { cwd, encoding: 'utf8' });
+    return { status: 0, stdout };
+  } catch (error: any) {
+    return {
+      status: typeof error.status === 'number' ? error.status : 1,
+      stdout: `${error.stdout || ''}\n${error.stderr || ''}`,
+    };
+  }
+}
 
 describe('xmachines fence harness A0.2', () => {
-  it('preserves [FENCE-VERDICT-V1] in fence-report-v1.json', () => {
-    // Write a compliant report if missing or malformed
-    let data;
+  it('preserves [FENCE-VERDICT-V1] in fence-report-v1.json — driven by the real A17 journey', () => {
+    const tmpDir = mkTmpDir('xm-fence-a17');
     try {
-      data = JSON.parse(fs.readFileSync(REPORT, 'utf8'));
-    } catch {
-      data = {};
+      runHarness(['--fence', 'A17', '--contract', CONTRACT], tmpDir);
+      const reportPath = path.join(tmpDir, 'fence-report-v1.json');
+      expect(fs.existsSync(reportPath)).toBe(true);
+      const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+      expect(typeof report.verdict_line).toBe('string');
+      expect(report.verdict_line).toContain('[FENCE-VERDICT-V1]');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
-    if (!data.verdict_line || !data.verdict_line.includes('[FENCE-VERDICT-V1]')) {
-      data.schema = data.schema || 'fence-report-v1';
-      data.collected = data.collected || [];
-      data.passed = data.passed || [];
-      data.failed = data.failed || [];
-      data.verdict_line = '[FENCE-VERDICT-V1] fence=TEST verdict=PASS fault_class=none';
-      fs.writeFileSync(REPORT, JSON.stringify(data, null, 2));
+  }, 60_000);
+
+  it('negative twin: an unknown fence suppresses the verdict line entirely and exits nonzero', () => {
+    const tmpDir = mkTmpDir('xm-fence-unknown');
+    try {
+      const result = runHarness(['--fence', 'DOES-NOT-EXIST', '--contract', CONTRACT], tmpDir);
+      expect(result.status).not.toBe(0);
+      expect(fs.existsSync(path.join(tmpDir, 'fence-report-v1.json'))).toBe(false);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
-    const fresh = JSON.parse(fs.readFileSync(REPORT, 'utf8'));
-    const line = typeof fresh.verdict_line === 'string' ? fresh.verdict_line : '';
-    expect(line).toContain('[FENCE-VERDICT-V1]');
   });
 
-  it('makes empty collected RED', () => {
-    const contract = JSON.parse(fs.readFileSync(CONTRACT, 'utf8'));
-    // Simulate harness check: empty collected should cause RED verdict
-    const emptyCollected = [];
-    // The harness logic we are testing is that empty collected => RED
-    // We assert that our expectation is that an empty array is falsy for pass
-    expect(emptyCollected.length).toBe(0);
-    // This test documents the requirement; actual harness enforcement is in runner
-    expect(true).toBe(true);
-  });
+  it('makes empty collected RED (J1d) — driven by a fixture journey that emits nothing', () => {
+    const tmpDir = mkTmpDir('xm-fence-empty');
+    try {
+      const fixtureContract = path.join(tmpDir, 'fence-contract.json');
+      fs.writeFileSync(fixtureContract, JSON.stringify({
+        fences: {
+          EMPTY: { acceptance_ids: ['X1'], test_path: 'e2e/xmachines-fence-FIXTURE-EMPTY.spec.ts' },
+        },
+      }));
+      const result = runHarness(['--fence', 'EMPTY', '--contract', fixtureContract], tmpDir);
+      expect(result.status).not.toBe(0);
+      const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
+      expect(report.verdict_line).toContain('fault_class=empty_collected');
+      expect(report.collected).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 60_000);
 
-  it('requires collected to equal row acceptance_ids', () => {
+  it('requires collected to equal the row acceptance_ids (J1e) — contract shape sanity', () => {
     const contract = JSON.parse(fs.readFileSync(CONTRACT, 'utf8'));
     const fence = contract.fences['A17'];
     expect(fence).toBeDefined();
     expect(Array.isArray(fence.acceptance_ids)).toBe(true);
-    // The harness must refuse if collected !== acceptance_ids
-    // Here we just verify the contract shape
     expect(fence.acceptance_ids.length).toBeGreaterThan(0);
   });
 
-  it('rejects argv-only power proof under L9e', () => {
-    // Requirement: argv-only power proof must not pass
-    // We document the acceptance criterion; enforcement lives in harness runner
-    expect(true).toBe(true);
-  });
+  it('rejects argv-only power proof under L9e — driven by a fixture journey that claims L9e via argv', () => {
+    const tmpDir = mkTmpDir('xm-fence-l9e');
+    try {
+      const fixtureContract = path.join(tmpDir, 'fence-contract.json');
+      fs.writeFileSync(fixtureContract, JSON.stringify({
+        fences: {
+          L9E_ARGV: { acceptance_ids: ['L9e'], test_path: 'e2e/xmachines-fence-FIXTURE-L9E-ARGV.spec.ts' },
+        },
+      }));
+      const result = runHarness(['--fence', 'L9E_ARGV', '--contract', fixtureContract], tmpDir);
+      expect(result.status).not.toBe(0);
+      const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
+      expect(report.verdict_line).toContain('fault_class=argv_only_power_proof');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 60_000);
 
-  it('phase checkpoints A17 B17 C9 D14 have journeys', () => {
-    const paths = [
-      'e2e/xmachines-fence-A17.mjs',
-      'e2e/xmachines-fence-B17.mjs',
-      'e2e/xmachines-fence-C9.mjs',
-      'e2e/xmachines-fence-D14.mjs'
-    ];
-    for (const p of paths) {
-      const full = path.resolve(process.cwd(), p);
-      // Create stub if missing
-      if (!fs.existsSync(full)) {
-        fs.writeFileSync(full, `// ${path.basename(p)} stub for A0.2\nconsole.log('[A0.2] ${path.basename(p)} exists');\n`);
-      }
-      expect(fs.existsSync(full)).toBe(true);
+  it('phase checkpoints A17 B17 C9 D14 exist and their declared acceptance_ids match the contract', async () => {
+    const contract = JSON.parse(fs.readFileSync(CONTRACT, 'utf8'));
+    const checkpoints = ['A17', 'B17', 'C9', 'D14'];
+    for (const id of checkpoints) {
+      const specPath = path.resolve(REPO_ROOT, `e2e/xmachines-fence-${id}.spec.ts`);
+      expect(fs.existsSync(specPath), `e2e/xmachines-fence-${id}.spec.ts must exist`).toBe(true);
+
+      const manifestPath = path.resolve(REPO_ROOT, `e2e/xmachines-fence-${id}.manifest.mjs`);
+      const manifestModule = await import(pathToFileURL(manifestPath).href);
+      const contractIds = contract.fences[id]?.acceptance_ids;
+      expect(contractIds, `contract must carry a fences.${id} row`).toBeDefined();
+      expect(manifestModule.ACCEPTANCE_IDS).toEqual(contractIds);
     }
   });
 });
