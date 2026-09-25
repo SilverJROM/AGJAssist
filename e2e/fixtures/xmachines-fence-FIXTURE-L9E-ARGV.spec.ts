@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-import { acceptLine } from './xmachines-fence-helpers.mjs';
+import { acceptLine } from '../xmachines-fence-helpers.mjs';
 
 // Harness self-test fixture only (tests/unit/xmachines-fence-harness.spec.ts).
 // Deliberately claims L9e via argv (not host-state) so the runner's

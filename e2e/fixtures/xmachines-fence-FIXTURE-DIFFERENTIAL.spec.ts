@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-import { guardedCheck } from './xmachines-fence-helpers.mjs';
+import { guardedCheck } from '../xmachines-fence-helpers.mjs';
 
 // Harness self-test fixture only (tests/unit/xmachines-fence-harness.spec.ts).
 // Empty body always succeeds, so unstubbed it ACCEPTs Z1 and under

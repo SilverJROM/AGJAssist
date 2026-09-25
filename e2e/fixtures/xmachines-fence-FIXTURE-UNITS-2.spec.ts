@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-import { rejectLine } from './xmachines-fence-helpers.mjs';
+import { rejectLine } from '../xmachines-fence-helpers.mjs';
 
 // Harness self-test fixture only (tests/unit/xmachines-fence-harness.spec.ts).
 // Two rejected ids, two distinct units — J1c's classifyByUnitSpread must

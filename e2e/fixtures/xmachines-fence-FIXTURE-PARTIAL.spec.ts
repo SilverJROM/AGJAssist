@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-import { acceptLine } from './xmachines-fence-helpers.mjs';
+import { acceptLine } from '../xmachines-fence-helpers.mjs';
 
 // Harness self-test fixture only (tests/unit/xmachines-fence-harness.spec.ts).
 // Accepts exactly one of a two-id fixture row and never mentions the other

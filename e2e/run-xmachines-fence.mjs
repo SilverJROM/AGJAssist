@@ -59,9 +59,15 @@ if (!testPath || !fs.existsSync(path.resolve(REPO_ROOT, testPath))) {
 
 // Observed evidence comes from the journey's own stdout lines, never from
 // the contract row (north D-082): the contract is the EXPECTED value, this
-// parse is the OBSERVED value.
-const ACCEPT_RE = /\[FENCE-ACCEPT-V1]\s+id=(\S+)(?:\s+via=(\S+))?/g;
-const REJECT_RE = /\[FENCE-REJECT-V1]\s+id=(\S+)\s+unit=(\S+)/g;
+// parse is the OBSERVED value. Playwright's line reporter prefixes later
+// console.log lines with CSI cursor/erase sequences, so those markers are
+// not at column 0 until CSI is stripped. Strip only the parse buffer;
+// mid-line forgeries stay mid-line and the ^ anchors still refuse them.
+function stripAnsi(text) {
+  return text.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+}
+const ACCEPT_RE = /^\[FENCE-ACCEPT-V1]\s+id=(\S+)(?:\s+via=(\S+))?/gm;
+const REJECT_RE = /^\[FENCE-REJECT-V1]\s+id=(\S+)\s+unit=(\S+)/gm;
 
 function spawnJourney(env) {
   const result = spawnSync(
@@ -71,7 +77,7 @@ function spawnJourney(env) {
   );
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
-  const combinedOutput = `${result.stdout || ''}\n${result.stderr || ''}`;
+  const combinedOutput = stripAnsi(`${result.stdout || ''}\n${result.stderr || ''}`);
 
   const collectedEntries = [];
   let match;

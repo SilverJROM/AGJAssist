@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-import { acceptLine } from './xmachines-fence-helpers.mjs';
+import { acceptLine } from '../xmachines-fence-helpers.mjs';
 
 // Harness self-test fixture only (tests/unit/xmachines-fence-harness.spec.ts).
 // Calls acceptLine directly, never guardedCheck, so FENCE_STUB cannot change

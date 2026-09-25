@@ -20,7 +20,11 @@ export function acceptLine(id, via = 'host-state') {
 }
 
 export function rejectLine(id, unit, reason) {
-  console.log(`[FENCE-REJECT-V1] id=${id} unit=${unit} reason=${String(reason).replace(/\s+/g, ' ').slice(0, 300)}`);
+  const sanitized = String(reason)
+    .replace(/\[FENCE-(ACCEPT|REJECT|VERDICT)-V1]/g, '[REDACTED-MARKER]')
+    .replace(/\s+/g, ' ')
+    .slice(0, 300);
+  console.log(`[FENCE-REJECT-V1] id=${id} unit=${unit} reason=${sanitized}`);
 }
 
 // Runs `fn`; emits ACCEPT on success, REJECT (naming `unit`) on failure.

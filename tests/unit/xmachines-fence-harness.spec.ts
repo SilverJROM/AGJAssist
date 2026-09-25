@@ -35,16 +35,41 @@ describe('xmachines fence harness A0.2', () => {
   it('preserves [FENCE-VERDICT-V1] in fence-report-v1.json — driven by the real A17 journey', () => {
     const tmpDir = mkTmpDir('xm-fence-a17');
     try {
-      runHarness(['--fence', 'A17', '--contract', CONTRACT], tmpDir);
+      const result = runHarness(['--fence', 'A17', '--contract', CONTRACT], tmpDir);
       const reportPath = path.join(tmpDir, 'fence-report-v1.json');
       expect(fs.existsSync(reportPath)).toBe(true);
       const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
       expect(typeof report.verdict_line).toBe('string');
       expect(report.verdict_line).toContain('[FENCE-VERDICT-V1]');
+      // A17 currently exits nonzero (routes do not exist yet). Pinning
+      // verdict=FAIL here, plus agreement with the process exit, kills a
+      // mutant that writes verdict=PASS into the report while still exiting 1.
+      expect(report.verdict_line).toContain('verdict=FAIL');
+      expect(result.status).not.toBe(0);
+      const verdictWord = /verdict=(\S+)/.exec(report.verdict_line)?.[1];
+      expect(verdictWord).toBe(result.status === 0 ? 'PASS' : 'FAIL');
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   }, 60_000);
+
+  it('names missing_journey when the contract test_path does not exist (M12)', () => {
+    const tmpDir = mkTmpDir('xm-fence-missing');
+    try {
+      const fixtureContract = path.join(tmpDir, 'fence-contract.json');
+      fs.writeFileSync(fixtureContract, JSON.stringify({
+        fences: {
+          MISSING: { acceptance_ids: ['M1'], test_path: 'e2e/xmachines-fence-DOES-NOT-EXIST.spec.ts' },
+        },
+      }));
+      const result = runHarness(['--fence', 'MISSING', '--contract', fixtureContract], tmpDir);
+      expect(result.status).not.toBe(0);
+      const report = JSON.parse(fs.readFileSync(path.join(tmpDir, 'fence-report-v1.json'), 'utf8'));
+      expect(report.verdict_line).toContain('fault_class=missing_journey');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 
   it('negative twin: an unknown fence suppresses the verdict line entirely and exits nonzero', () => {
     const tmpDir = mkTmpDir('xm-fence-unknown');
@@ -63,7 +88,7 @@ describe('xmachines fence harness A0.2', () => {
       const fixtureContract = path.join(tmpDir, 'fence-contract.json');
       fs.writeFileSync(fixtureContract, JSON.stringify({
         fences: {
-          EMPTY: { acceptance_ids: ['X1'], test_path: 'e2e/xmachines-fence-FIXTURE-EMPTY.spec.ts' },
+          EMPTY: { acceptance_ids: ['X1'], test_path: 'e2e/fixtures/xmachines-fence-FIXTURE-EMPTY.spec.ts' },
         },
       }));
       const result = runHarness(['--fence', 'EMPTY', '--contract', fixtureContract], tmpDir);
@@ -90,7 +115,7 @@ describe('xmachines fence harness A0.2', () => {
       const fixtureContract = path.join(tmpDir, 'fence-contract.json');
       fs.writeFileSync(fixtureContract, JSON.stringify({
         fences: {
-          PARTIAL: { acceptance_ids: ['P1', 'P2'], test_path: 'e2e/xmachines-fence-FIXTURE-PARTIAL.spec.ts' },
+          PARTIAL: { acceptance_ids: ['P1', 'P2'], test_path: 'e2e/fixtures/xmachines-fence-FIXTURE-PARTIAL.spec.ts' },
         },
       }));
       const result = runHarness(['--fence', 'PARTIAL', '--contract', fixtureContract], tmpDir);
@@ -110,7 +135,7 @@ describe('xmachines fence harness A0.2', () => {
       const fixtureContract = path.join(tmpDir, 'fence-contract.json');
       fs.writeFileSync(fixtureContract, JSON.stringify({
         fences: {
-          EXPECT_RED_STATIC: { acceptance_ids: ['Y1'], test_path: 'e2e/xmachines-fence-FIXTURE-EXPECT-RED-STATIC.spec.ts' },
+          EXPECT_RED_STATIC: { acceptance_ids: ['Y1'], test_path: 'e2e/fixtures/xmachines-fence-FIXTURE-EXPECT-RED-STATIC.spec.ts' },
         },
       }));
       const result = runHarness(['--fence', 'EXPECT_RED_STATIC', '--contract', fixtureContract, '--expect-red', 'Y1'], tmpDir);
@@ -132,7 +157,7 @@ describe('xmachines fence harness A0.2', () => {
       const fixtureContract = path.join(tmpDir, 'fence-contract.json');
       fs.writeFileSync(fixtureContract, JSON.stringify({
         fences: {
-          DIFFERENTIAL: { acceptance_ids: ['Z1'], test_path: 'e2e/xmachines-fence-FIXTURE-DIFFERENTIAL.spec.ts' },
+          DIFFERENTIAL: { acceptance_ids: ['Z1'], test_path: 'e2e/fixtures/xmachines-fence-FIXTURE-DIFFERENTIAL.spec.ts' },
         },
       }));
       const result = runHarness(
@@ -154,7 +179,7 @@ describe('xmachines fence harness A0.2', () => {
       const fixtureContract = path.join(tmpDir, 'fence-contract.json');
       fs.writeFileSync(fixtureContract, JSON.stringify({
         fences: {
-          UNITS2: { acceptance_ids: ['U1', 'U2'], test_path: 'e2e/xmachines-fence-FIXTURE-UNITS-2.spec.ts' },
+          UNITS2: { acceptance_ids: ['U1', 'U2'], test_path: 'e2e/fixtures/xmachines-fence-FIXTURE-UNITS-2.spec.ts' },
         },
       }));
       const result = runHarness(['--fence', 'UNITS2', '--contract', fixtureContract], tmpDir);
@@ -172,7 +197,7 @@ describe('xmachines fence harness A0.2', () => {
       const fixtureContract = path.join(tmpDir, 'fence-contract.json');
       fs.writeFileSync(fixtureContract, JSON.stringify({
         fences: {
-          UNITS3: { acceptance_ids: ['U1', 'U2', 'U3'], test_path: 'e2e/xmachines-fence-FIXTURE-UNITS-3.spec.ts' },
+          UNITS3: { acceptance_ids: ['U1', 'U2', 'U3'], test_path: 'e2e/fixtures/xmachines-fence-FIXTURE-UNITS-3.spec.ts' },
         },
       }));
       const result = runHarness(['--fence', 'UNITS3', '--contract', fixtureContract], tmpDir);
@@ -190,7 +215,7 @@ describe('xmachines fence harness A0.2', () => {
       const fixtureContract = path.join(tmpDir, 'fence-contract.json');
       fs.writeFileSync(fixtureContract, JSON.stringify({
         fences: {
-          L9E_ARGV: { acceptance_ids: ['L9e'], test_path: 'e2e/xmachines-fence-FIXTURE-L9E-ARGV.spec.ts' },
+          L9E_ARGV: { acceptance_ids: ['L9e'], test_path: 'e2e/fixtures/xmachines-fence-FIXTURE-L9E-ARGV.spec.ts' },
         },
       }));
       const result = runHarness(['--fence', 'L9E_ARGV', '--contract', fixtureContract], tmpDir);
@@ -208,7 +233,7 @@ describe('xmachines fence harness A0.2', () => {
       const fixtureContract = path.join(tmpDir, 'fence-contract.json');
       fs.writeFileSync(fixtureContract, JSON.stringify({
         fences: {
-          STUB_IGNORED: { acceptance_ids: ['W1'], test_path: 'e2e/xmachines-fence-FIXTURE-STUB-IGNORED.spec.ts' },
+          STUB_IGNORED: { acceptance_ids: ['W1'], test_path: 'e2e/fixtures/xmachines-fence-FIXTURE-STUB-IGNORED.spec.ts' },
         },
       }));
       const result = runHarness(
@@ -231,7 +256,7 @@ describe('xmachines fence harness A0.2', () => {
       const fixtureContract = path.join(tmpDir, 'fence-contract.json');
       fs.writeFileSync(fixtureContract, JSON.stringify({
         fences: {
-          PARTIAL: { acceptance_ids: ['P1', 'P2'], test_path: 'e2e/xmachines-fence-FIXTURE-PARTIAL.spec.ts' },
+          PARTIAL: { acceptance_ids: ['P1', 'P2'], test_path: 'e2e/fixtures/xmachines-fence-FIXTURE-PARTIAL.spec.ts' },
         },
       }));
       const result = runHarness(
@@ -252,7 +277,7 @@ describe('xmachines fence harness A0.2', () => {
       const fixtureContract = path.join(tmpDir, 'fence-contract.json');
       fs.writeFileSync(fixtureContract, JSON.stringify({
         fences: {
-          EXTRA: { acceptance_ids: ['V1'], test_path: 'e2e/xmachines-fence-FIXTURE-EXTRA.spec.ts' },
+          EXTRA: { acceptance_ids: ['V1'], test_path: 'e2e/fixtures/xmachines-fence-FIXTURE-EXTRA.spec.ts' },
         },
       }));
       const result = runHarness(['--fence', 'EXTRA', '--contract', fixtureContract], tmpDir);
