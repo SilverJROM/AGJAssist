@@ -67,7 +67,11 @@ function assertXmachinesPowerDetails(
       ? details
       : null;
   for (const key of XMACHINES_POWER_REQUIRED_KEYS) {
-    if (!record || !Object.prototype.hasOwnProperty.call(record, key)) {
+    if (
+      !record ||
+      !Object.prototype.hasOwnProperty.call(record, key) ||
+      record[key] === undefined
+    ) {
       throw new Error(
         `xmachines_power audit rejected: missing required key ${key}`
       );

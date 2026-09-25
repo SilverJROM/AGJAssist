@@ -112,6 +112,27 @@ describe('xmachines power audit schema A8', () => {
     db.close();
   });
 
+  it('request explicitly set to undefined causes validation failure (JSON-drop boundary)', () => {
+    const { db, audit } = makeService();
+    const details = {
+      ...buildValidDetails(),
+      request: undefined,
+    } as unknown as Partial<PowerAuditDetails>;
+
+    expect(() =>
+      audit.log({
+        actionType: 'xmachines_power',
+        resourceType: 'xmachines',
+        details,
+        surface: 'web',
+      })
+    ).toThrow('xmachines_power audit rejected: missing required key request');
+
+    const rows = audit.query({ actionType: 'xmachines_power', limit: 10 });
+    expect(rows).toHaveLength(0);
+    db.close();
+  });
+
   it('overwrite of an existing audit row fails / is append-only', () => {
     const { db, audit } = makeService();
     const original = buildValidDetails();
