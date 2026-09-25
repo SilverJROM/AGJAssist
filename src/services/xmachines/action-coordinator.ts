@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { resolveProtectedRole } from './protected-roles.js';
 
 export interface ActionRequest {
   machine: string;
@@ -11,7 +12,9 @@ export interface ActionRequest {
 export interface ActionResult {
   status: 'in-progress' | 'rejected';
   operationId?: string;
-  reason?: 'idempotency-key-required' | 'cooldown' | 'machine-busy';
+  reason?: 'idempotency-key-required' | 'cooldown' | 'machine-busy' | 'protected-role';
+  role?: string;
+  detail?: string;
 }
 
 interface OngoingAction {
@@ -58,6 +61,19 @@ export class ActionCoordinator {
         return { status: 'in-progress', operationId: inFlight.operationId };
       }
       return { status: 'rejected', reason: 'machine-busy' };
+    }
+
+    // Protected-role off is refused from the fixture before any argv exists.
+    if (action === 'off') {
+      const refusal = resolveProtectedRole(machine);
+      if (refusal) {
+        return {
+          status: 'rejected',
+          reason: refusal.reason,
+          role: refusal.role,
+          detail: refusal.detail,
+        };
+      }
     }
 
     const operationId = randomUUID();
