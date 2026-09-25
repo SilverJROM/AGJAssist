@@ -18,6 +18,23 @@ export interface ObservedGpu {
   ordinal: number;
 }
 
+export interface ReaderResultRow {
+  machineName: string;
+  kind: 'smart' | 'nut';
+  availability: 'ok' | 'unavailable';
+  freshness: 'fresh' | 'stale';
+  value: string;
+  sampleTime: string;
+}
+
+export function persistReaderResult(db: Database.Database, row: ReaderResultRow): void {
+  db.prepare(`
+    INSERT INTO xm_reader_results (
+      machine_name, kind, availability, freshness, value, sample_time
+    ) VALUES (?, ?, ?, ?, ?, ?)
+  `).run(row.machineName, row.kind, row.availability, row.freshness, row.value, row.sampleTime);
+}
+
 export function persistSampleCycle(db: Database.Database, readings: readonly SampleReading[]): void {
   const insert = db.prepare(`
     INSERT INTO xm_samples (

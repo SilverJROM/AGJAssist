@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process';
+import type Database from 'better-sqlite3';
+import { persistReaderResult } from '../../db/xmachines-store.js';
 import { SyntheticTelemetry, type MachineTelemetry } from './telemetry.js';
 
 // Fixed contract: a reading at or above this cpu temperature is the alert condition.
@@ -27,9 +29,46 @@ export interface AlertRecord {
   cpuTemp: number;
 }
 
+export interface ObservedFleetMachine {
+  name: string;
+  state: 'up' | 'down';
+  host: string;
+}
+
 export interface CollectorReadSource {
   readSmart(machine: string): Omit<SmartReading, 'machine'>;
   readNut(machine: string): Omit<NutReading, 'machine'>;
+}
+
+// The fleet-observation seam. Default is SyntheticTelemetry; a caller that needs
+// a literal fixture installs one here rather than replacing collector methods.
+export interface CollectorTelemetrySource {
+  generate(): MachineTelemetry[];
+  forMachine(name: string): MachineTelemetry | undefined;
+}
+
+export interface ReaderResultEntry {
+  machine: string;
+  kind: 'smart' | 'nut';
+  availability: 'ok' | 'unavailable';
+  freshness: 'fresh' | 'stale';
+  value: string;
+}
+
+// Where a collected reading is recorded. Default is a no-op so the runtime's
+// no-argument construction stays side-effect-free; a caller that needs the
+// reading persisted installs a sink here.
+export interface ReaderResultSink {
+  record(entry: ReaderResultEntry): void;
+}
+
+const NOOP_READER_RESULT_SINK: ReaderResultSink = { record(): void {} };
+
+export interface CycleReading {
+  machine: string;
+  state: MachineTelemetry['state'];
+  smart?: SmartReading;
+  nut?: NutReading;
 }
 
 interface CommandOutcome {
@@ -82,8 +121,9 @@ class BoundedCommandReadSource implements CollectorReadSource {
 }
 
 export class ReadOnlyCollector {
-  private readonly telemetry = new SyntheticTelemetry();
+  private telemetry: CollectorTelemetrySource = new SyntheticTelemetry();
   private source: CollectorReadSource;
+  private sink: ReaderResultSink = NOOP_READER_RESULT_SINK;
 
   constructor(source?: CollectorReadSource) {
     this.source = source ?? new BoundedCommandReadSource();
@@ -95,6 +135,33 @@ export class ReadOnlyCollector {
     this.source = source;
   }
 
+  // Same seam, for the fleet-observation side: install a literal UP/DOWN fixture
+  // without replacing generate()/forMachine() themselves.
+  useTelemetrySource(source: CollectorTelemetrySource): void {
+    this.telemetry = source;
+  }
+
+  // Same seam, for where a collected reading is recorded.
+  useReaderResultSink(sink: ReaderResultSink): void {
+    this.sink = sink;
+  }
+
+  // Product sqlite sink. The caller names the database; readSmart/readNut write the row.
+  useReaderStore(db: Database.Database): void {
+    this.sink = {
+      record: (entry) => {
+        persistReaderResult(db, {
+          machineName: entry.machine,
+          kind: entry.kind,
+          availability: entry.availability,
+          freshness: entry.freshness,
+          value: entry.value,
+          sampleTime: new Date().toISOString(),
+        });
+      },
+    };
+  }
+
   generate(): MachineTelemetry[] {
     return this.telemetry.generate();
   }
@@ -104,11 +171,32 @@ export class ReadOnlyCollector {
   }
 
   readSmart(machine: string): SmartReading {
-    return { machine, ...this.source.readSmart(machine) };
+    const reading = { machine, ...this.source.readSmart(machine) };
+    this.sink.record({ machine, kind: 'smart', availability: reading.availability, freshness: reading.freshness, value: reading.health });
+    return reading;
   }
 
   readNut(machine: string): NutReading {
-    return { machine, ...this.source.readNut(machine) };
+    const reading = { machine, ...this.source.readNut(machine) };
+    this.sink.record({ machine, kind: 'nut', availability: reading.availability, freshness: reading.freshness, value: reading.battery });
+    return reading;
+  }
+
+  // The full collection-cycle entry point: observe the fleet, then read remote
+  // metrics only for rows already observed UP. A DOWN row is returned with its
+  // observed state and no smart/nut reading — its state is never re-probed.
+  runCycle(): CycleReading[] {
+    return this.generate().map((row): CycleReading => {
+      if (row.state !== 'up') {
+        return { machine: row.name, state: row.state };
+      }
+      return {
+        machine: row.name,
+        state: row.state,
+        smart: this.readSmart(row.name),
+        nut: this.readNut(row.name),
+      };
+    });
   }
 
   evaluateAlerts(): AlertRecord[] {

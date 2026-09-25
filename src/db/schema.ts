@@ -29,6 +29,20 @@ CREATE INDEX IF NOT EXISTS idx_xm_action_state_request ON xm_action_state(reques
 CREATE INDEX IF NOT EXISTS idx_xm_action_state_machine ON xm_action_state(machine_name, started_at);
 `;
 
+// Reader failure rows. L5j reads this table back after a timed-out probe.
+export const XM_READER_RESULTS_SQL = `
+CREATE TABLE IF NOT EXISTS xm_reader_results (
+  id INTEGER PRIMARY KEY,
+  machine_name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK(kind IN ('smart','nut')),
+  availability TEXT NOT NULL CHECK(availability IN ('ok','unavailable')),
+  freshness TEXT NOT NULL CHECK(freshness IN ('fresh','stale')),
+  value TEXT,
+  sample_time TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_xm_reader_results_machine_time ON xm_reader_results(machine_name, sample_time);
+`;
+
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
   version INTEGER NOT NULL
@@ -572,7 +586,8 @@ CREATE TABLE IF NOT EXISTS xm_config (
   value TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-${XM_ACTION_STATE_SQL}`;
+${XM_ACTION_STATE_SQL}
+${XM_READER_RESULTS_SQL}`;
 
 export const DEFAULT_SAFETY_PATTERNS = [
   { pattern: "rm -rf", description: "Recursive force delete", is_regex: 0 },
@@ -603,6 +618,7 @@ export function applyFreshDbExtras(db: Database.Database): void {
 /** Additive objects that must exist even on a DB already stamped at version 40. */
 export function applyXmachinesAdditiveFixes(db: Database.Database): void {
   db.exec(XM_ACTION_STATE_SQL);
+  db.exec(XM_READER_RESULTS_SQL);
   const devices = db
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='xm_devices'")
     .get() as { name: string } | undefined;

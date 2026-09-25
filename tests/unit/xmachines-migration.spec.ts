@@ -23,7 +23,7 @@ const ACTION_COLUMNS = [
   "reject_reason",
 ];
 
-const XM_TABLES = ["xm_action_state", "xm_alerts", "xm_config", "xm_devices", "xm_samples"];
+const XM_TABLES = ["xm_action_state", "xm_alerts", "xm_config", "xm_devices", "xm_reader_results", "xm_samples"];
 
 function tempDb(name: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agjassist-xmachines-migration-"));
