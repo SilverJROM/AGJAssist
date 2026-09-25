@@ -263,7 +263,7 @@ describe('xmachines busy preflight — fail-closed before OFF gateway', () => {
     expect(res.statusCode).toBe(202);
     const body = res.json() as { status?: string };
     expect(body.status).toBe('in-progress');
-    expect(await waitForArgv(spyLog, 1)).toEqual([['down', MACHINE]]);
+    expect(await waitForArgv(spyLog, 1)).toEqual([['down', MACHINE, '--owner-off']]);
     expect(sshTargets(sshLog).join('\n')).toContain(FIXTURE_TARGET);
   });
 });

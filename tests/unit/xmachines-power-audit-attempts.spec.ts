@@ -286,7 +286,7 @@ describe('xmachines power audit attempts A16', () => {
     });
     expect(res.statusCode).toBe(202);
     expect((res.json() as { status?: string }).status).toBe('in-progress');
-    expect(await waitForArgv(spyLog, 1)).toEqual([['down', 'hdd']]);
+    expect(await waitForArgv(spyLog, 1)).toEqual([['down', 'hdd', '--owner-off']]);
     const rows = powerRows(db!);
     expect(rows).toHaveLength(1);
     assertSchema(rows[0]);

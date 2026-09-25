@@ -15,7 +15,7 @@ export interface ActionRequest {
 export interface ActionResult {
   status: 'in-progress' | 'rejected';
   operationId?: string;
-  reason?: 'idempotency-key-required' | 'cooldown' | 'machine-busy' | 'protected-role' | 'cannot-confirm-idle';
+  reason?: 'idempotency-key-required' | 'cooldown' | 'machine-busy' | 'protected-role' | 'cannot-confirm-idle' | 'active-lease';
   role?: string;
   detail?: string;
   /** Same idempotency key rejoined an in-flight operation. Routes strip this before the HTTP body. */
@@ -36,6 +36,22 @@ const COOLDOWN_MS = 30_000;
 function xmacArgv(action: 'on' | 'off', machine: string): string[] {
   if (action === 'on') return ['up', machine];
   return ['down', machine, '--owner-off'];
+}
+
+function xmacStateDir(): string {
+  return process.env.XMAC_STATE?.trim() || path.join(os.homedir(), '.xmac');
+}
+
+// The real lease source xmac.sh/A13 write to: $XMAC_STATE/leases/<machine>/<holder>.
+// Reading it here — rather than trusting the gateway to refuse after being spawned —
+// is what keeps the app adapter a genuine no-spawn gate for a machine another agent holds.
+function readActiveLeaseNames(machine: string): string[] {
+  const dir = path.join(xmacStateDir(), 'leases', machine);
+  try {
+    return fs.readdirSync(dir).filter((name) => !name.startsWith('.'));
+  } catch {
+    return [];
+  }
 }
 
 function readMachinesConf(): Map<string, { ip: string; busyCheck: string }> {
@@ -143,6 +159,16 @@ export class ActionCoordinator {
         if (output.length > 0) {
           return { status: 'rejected', reason: 'cannot-confirm-idle', detail: `busy: ${output.slice(0, 200)}` };
         }
+      }
+    }
+
+    // App-side fail-closed lease refusal, immediately before launch: spawn nothing
+    // for a machine another agent is holding, rather than let xmac.sh refuse after
+    // the child is already spawned.
+    if (action === 'off') {
+      const leaseNames = readActiveLeaseNames(machine);
+      if (leaseNames.length > 0) {
+        return { status: 'rejected', reason: 'active-lease', detail: `active lease: ${leaseNames.join(', ')}` };
       }
     }
 
