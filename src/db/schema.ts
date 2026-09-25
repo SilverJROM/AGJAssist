@@ -9,6 +9,26 @@ import type Database from "better-sqlite3";
 
 export const SCHEMA_VERSION = 40;
 
+export const XM_ACTION_STATE_SQL = `
+CREATE TABLE IF NOT EXISTS xm_action_state (
+  id INTEGER PRIMARY KEY,
+  machine_name TEXT NOT NULL,
+  action TEXT NOT NULL CHECK(action IN ('on','off')),
+  status TEXT NOT NULL CHECK(status IN ('in-progress','rejected','completed','failed')),
+  idempotency_key TEXT NOT NULL,
+  request_id TEXT NOT NULL,
+  owner_id TEXT,
+  started_at TEXT NOT NULL DEFAULT (datetime('now')),
+  finished_at TEXT,
+  gateway_exit_status INTEGER,
+  final_state TEXT,
+  reject_reason TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_xm_action_state_idempotency ON xm_action_state(idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_xm_action_state_request ON xm_action_state(request_id);
+CREATE INDEX IF NOT EXISTS idx_xm_action_state_machine ON xm_action_state(machine_name, started_at);
+`;
+
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
   version INTEGER NOT NULL
@@ -528,6 +548,7 @@ CREATE TABLE IF NOT EXISTS xm_devices (
   gpu_uuid TEXT NOT NULL UNIQUE,
   gpu_name TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','retired')),
+  ordinal INTEGER NOT NULL DEFAULT 0,
   first_seen TEXT NOT NULL DEFAULT (datetime('now')),
   last_seen TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -551,7 +572,7 @@ CREATE TABLE IF NOT EXISTS xm_config (
   value TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-`;
+${XM_ACTION_STATE_SQL}`;
 
 export const DEFAULT_SAFETY_PATTERNS = [
   { pattern: "rm -rf", description: "Recursive force delete", is_regex: 0 },
@@ -577,4 +598,17 @@ export const DEFAULT_SAFETY_PATTERNS = [
 export function applyFreshDbExtras(db: Database.Database): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_notes_folder ON notes(folder_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned)");
+}
+
+/** Additive objects that must exist even on a DB already stamped at version 40. */
+export function applyXmachinesAdditiveFixes(db: Database.Database): void {
+  db.exec(XM_ACTION_STATE_SQL);
+  const devices = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='xm_devices'")
+    .get() as { name: string } | undefined;
+  if (!devices) return;
+  const cols = db.pragma("table_info(xm_devices)") as { name: string }[];
+  if (!cols.some((col) => col.name === "ordinal")) {
+    db.exec("ALTER TABLE xm_devices ADD COLUMN ordinal INTEGER NOT NULL DEFAULT 0");
+  }
 }

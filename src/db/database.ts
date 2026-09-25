@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
-import { SCHEMA_VERSION, SCHEMA_SQL, DEFAULT_SAFETY_PATTERNS, applyFreshDbExtras } from "./schema.js";
+import { SCHEMA_VERSION, SCHEMA_SQL, DEFAULT_SAFETY_PATTERNS, applyFreshDbExtras, applyXmachinesAdditiveFixes } from "./schema.js";
 
 // Schema-data constants live in ./schema.ts (B8 / DEC-003). Migration logic
 // stays here — see DEC-003 for the strict-safety rationale.
@@ -35,6 +35,7 @@ export class DatabaseService {
       // they reference columns the v23 ALTER adds on the upgrade path). See
       // applyFreshDbExtras + DEC-003.
       applyFreshDbExtras(this.db);
+      applyXmachinesAdditiveFixes(this.db);
       this.db.prepare("INSERT INTO schema_version (version) VALUES (?)").run(SCHEMA_VERSION);
       this.seedSafetyPatterns();
       this.seedDefaultNotesFolder();
@@ -873,14 +874,16 @@ export class DatabaseService {
 
       // Migration: v39 → v40: additive xmachines schema
       if (current && current.version < 40) {
-        // Tables xm_samples, xm_devices, xm_alerts, xm_config are created via SCHEMA_SQL
-        // after migrations; additive-only, no data changes.
+        // Tables xm_samples, xm_devices, xm_alerts, xm_config, xm_action_state
+        // are created via SCHEMA_SQL above. Additive-only; existing rows stay.
       }
 
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);
     }
+
+    applyXmachinesAdditiveFixes(this.db);
   }
 
   private seedSafetyPatterns(): void {

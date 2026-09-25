@@ -1,11 +1,29 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { DatabaseService } from "../../src/db/database.js";
+import { persistSampleCycle, reconcileGpuIdentities } from "../../src/db/xmachines-store.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 
 const tempDirs: string[] = [];
+
+const ACTION_COLUMNS = [
+  "id",
+  "machine_name",
+  "action",
+  "status",
+  "idempotency_key",
+  "request_id",
+  "owner_id",
+  "started_at",
+  "finished_at",
+  "gateway_exit_status",
+  "final_state",
+  "reject_reason",
+];
+
+const XM_TABLES = ["xm_action_state", "xm_alerts", "xm_config", "xm_devices", "xm_samples"];
 
 function tempDb(name: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agjassist-xmachines-migration-"));
@@ -49,8 +67,39 @@ function createLegacyV39Fixture(dbPath: string): void {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     INSERT INTO xm_config (key, value) VALUES ('legacy_key', 'legacy_value');
+
+    CREATE TABLE xm_action_state (
+      id INTEGER PRIMARY KEY,
+      machine_name TEXT NOT NULL,
+      action TEXT NOT NULL CHECK(action IN ('on','off')),
+      status TEXT NOT NULL CHECK(status IN ('in-progress','rejected','completed','failed')),
+      idempotency_key TEXT NOT NULL,
+      request_id TEXT NOT NULL,
+      owner_id TEXT,
+      started_at TEXT NOT NULL DEFAULT (datetime('now')),
+      finished_at TEXT,
+      gateway_exit_status INTEGER,
+      final_state TEXT,
+      reject_reason TEXT
+    );
+    INSERT INTO xm_action_state (
+      machine_name, action, status, idempotency_key, request_id, owner_id,
+      started_at, finished_at, gateway_exit_status, final_state
+    ) VALUES (
+      'gpu', 'off', 'completed', 'idem-preserve-7', 'req-preserve-7', 'owner-9',
+      '2026-08-01T00:00:00Z', '2026-08-01T00:00:05Z', 0, 'DOWN'
+    );
   `);
   raw.close();
+}
+
+function expectActionStateShape(db: DatabaseService): void {
+  const actionCols = db.raw.pragma("table_info(xm_action_state)") as Array<{ name: string }>;
+  expect(actionCols.map((col) => col.name)).toEqual(ACTION_COLUMNS);
+  const indexes = db.raw.pragma("index_list(xm_action_state)") as Array<{ name: string; unique: number }>;
+  const idempotency = indexes.find((index) => index.name === "idx_xm_action_state_idempotency");
+  expect(idempotency).toBeDefined();
+  expect(idempotency?.unique).toBe(1);
 }
 
 describe("xmachines migration A11", () => {
@@ -61,12 +110,15 @@ describe("xmachines migration A11", () => {
     expect(version.version).toBe(40);
 
     const tables = db.raw.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'xm_%'").all() as { name: string }[];
-    const names = tables.map(t => t.name).sort();
-    expect(names).toEqual(["xm_alerts", "xm_config", "xm_devices", "xm_samples"]);
+    const names = tables.map((t) => t.name).sort();
+    expect(names).toEqual(XM_TABLES);
 
     const sampleCols = db.raw.pragma("table_info(xm_samples)") as Array<{ name: string }>;
-    expect(sampleCols.map(c => c.name)).toContain("gpu_uuid");
-    expect(sampleCols.map(c => c.name)).toContain("machine_name");
+    expect(sampleCols.map((c) => c.name)).toContain("gpu_uuid");
+    expect(sampleCols.map((c) => c.name)).toContain("machine_name");
+    const deviceCols = db.raw.pragma("table_info(xm_devices)") as Array<{ name: string }>;
+    expect(deviceCols.map((c) => c.name)).toContain("ordinal");
+    expectActionStateShape(db);
     db.close();
   });
 
@@ -83,75 +135,196 @@ describe("xmachines migration A11", () => {
     expect(configRow?.value).toBe("legacy_value");
 
     const tables = db.raw.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'xm_%'").all() as { name: string }[];
-    const names = tables.map(t => t.name).sort();
-    expect(names).toEqual(["xm_alerts", "xm_config", "xm_devices", "xm_samples"]);
+    const names = tables.map((t) => t.name).sort();
+    expect(names).toEqual(XM_TABLES);
+
+    const preserved = db.prepare(`
+      SELECT machine_name, action, status, idempotency_key, request_id, owner_id,
+             started_at, finished_at, gateway_exit_status, final_state
+      FROM xm_action_state WHERE idempotency_key = 'idem-preserve-7'
+    `).get();
+    expect(preserved).toEqual({
+      machine_name: "gpu",
+      action: "off",
+      status: "completed",
+      idempotency_key: "idem-preserve-7",
+      request_id: "req-preserve-7",
+      owner_id: "owner-9",
+      started_at: "2026-08-01T00:00:00Z",
+      finished_at: "2026-08-01T00:00:05Z",
+      gateway_exit_status: 0,
+      final_state: "DOWN",
+    });
+    expectActionStateShape(db);
 
     const user = db.prepare("SELECT role FROM users WHERE id = 1").get() as { role: string } | undefined;
     expect(user?.role).toBe("owner");
 
-    (db as any).close();
+    db.close();
   });
 
-  it("sampler cycle persists metric history to xm_samples", () => {
-    const dbPath = tempDb("sampler.sqlite");
+  it("product sample and GPU reconcile paths persist history, reorder, and retired identities", () => {
+    const dbPath = tempDb("history.sqlite");
     const db = new DatabaseService(dbPath);
+    const raw = db.raw;
 
-    db.prepare(`
-      INSERT INTO xm_samples (machine_name, gpu_uuid, temperature, power_watts, utilization_gpu, utilization_mem, fan_speed, vram_mb)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run("gpu1", "uuid-1234", 65.2, 210.5, 0.87, 0.45, 1500, 8192);
+    reconcileGpuIdentities(raw, "fixture-box-zeta", [
+      { gpuUuid: "GPU-UUID-KEEP", gpuName: "RTX 3090", ordinal: 0 },
+      { gpuUuid: "GPU-UUID-GONE", gpuName: "RTX 4090", ordinal: 1 },
+    ], "2026-09-25T01:00:00Z");
 
-    const row = db.prepare("SELECT machine_name, gpu_uuid, temperature, power_watts FROM xm_samples WHERE gpu_uuid = ?").get("uuid-1234") as { machine_name: string; gpu_uuid: string; temperature: number; power_watts: number } | undefined;
-    expect(row).toBeDefined();
-    expect(row?.machine_name).toBe("gpu1");
-    expect(row?.gpu_uuid).toBe("uuid-1234");
-    expect(row?.temperature).toBe(65.2);
-    expect(row?.power_watts).toBe(210.5);
+    const keepBefore = raw.prepare(
+      "SELECT id, ordinal, status, first_seen FROM xm_devices WHERE gpu_uuid = ?",
+    ).get("GPU-UUID-KEEP") as { id: number; ordinal: number; status: string; first_seen: string };
+    const goneBefore = raw.prepare(
+      "SELECT id, ordinal, status FROM xm_devices WHERE gpu_uuid = ?",
+    ).get("GPU-UUID-GONE") as { id: number; ordinal: number; status: string };
+    expect(keepBefore.ordinal).toBe(0);
+    expect(goneBefore.status).toBe("active");
+
+    persistSampleCycle(raw, [{
+      machineName: "fixture-box-zeta",
+      gpuUuid: "GPU-UUID-GONE",
+      sampleTime: "2026-09-25T01:00:00Z",
+      temperature: 71.5,
+      powerWatts: 180,
+      utilizationGpu: 0.5,
+      utilizationMem: 0.25,
+      fanSpeed: 900,
+      vramMb: 24576,
+    }]);
+    persistSampleCycle(raw, [
+      {
+        machineName: "fixture-box-zeta",
+        gpuUuid: "GPU-UUID-GONE",
+        sampleTime: "2026-09-25T01:30:00Z",
+        temperature: 73.25,
+        powerWatts: 190,
+        utilizationGpu: 0.5,
+        utilizationMem: 0.25,
+        fanSpeed: 1100,
+        vramMb: 24576,
+      },
+      {
+        machineName: "fixture-box-zeta",
+        gpuUuid: "GPU-UUID-KEEP",
+        sampleTime: "2026-09-25T01:30:00Z",
+        temperature: 61,
+        powerWatts: 120,
+        utilizationGpu: 0.5,
+        utilizationMem: 0.25,
+        fanSpeed: 400,
+        vramMb: 24576,
+      },
+    ]);
+
+    expect(() => reconcileGpuIdentities(raw, "fixture-box-zeta", [
+      { gpuUuid: "GPU-UUID-NEW", gpuName: "A100", ordinal: 0 },
+      { gpuUuid: "GPU-UUID-NEW", gpuName: "A100-dup", ordinal: 1 },
+    ], "2026-09-25T02:00:00Z")).toThrow();
+
+    const keepMid = raw.prepare(
+      "SELECT id, ordinal, status FROM xm_devices WHERE gpu_uuid = ?",
+    ).get("GPU-UUID-KEEP") as { id: number; ordinal: number; status: string };
+    const goneMid = raw.prepare(
+      "SELECT id, ordinal, status FROM xm_devices WHERE gpu_uuid = ?",
+    ).get("GPU-UUID-GONE") as { id: number; ordinal: number; status: string };
+    const newMid = raw.prepare("SELECT id FROM xm_devices WHERE gpu_uuid = ?").get("GPU-UUID-NEW");
+    expect(keepMid).toEqual({ id: keepBefore.id, ordinal: 0, status: "active" });
+    expect(goneMid).toEqual({ id: goneBefore.id, ordinal: 1, status: "active" });
+    expect(newMid).toBeUndefined();
+
+    reconcileGpuIdentities(raw, "fixture-box-zeta", [
+      { gpuUuid: "GPU-UUID-NEW", gpuName: "A100", ordinal: 0 },
+      { gpuUuid: "GPU-UUID-KEEP", gpuName: "RTX 3090", ordinal: 1 },
+    ], "2026-09-25T02:00:00Z");
+
+    const keepAfter = raw.prepare(
+      "SELECT id, gpu_uuid, ordinal, status, first_seen, last_seen FROM xm_devices WHERE gpu_uuid = ?",
+    ).get("GPU-UUID-KEEP");
+    const goneAfter = raw.prepare(
+      "SELECT id, gpu_uuid, ordinal, status FROM xm_devices WHERE gpu_uuid = ?",
+    ).get("GPU-UUID-GONE");
+    const newAfter = raw.prepare(
+      "SELECT gpu_uuid, gpu_name, ordinal, status FROM xm_devices WHERE gpu_uuid = ?",
+    ).get("GPU-UUID-NEW");
+    expect(keepAfter).toEqual({
+      id: keepBefore.id,
+      gpu_uuid: "GPU-UUID-KEEP",
+      ordinal: 1,
+      status: "active",
+      first_seen: "2026-09-25T01:00:00Z",
+      last_seen: "2026-09-25T02:00:00Z",
+    });
+    expect(goneAfter).toEqual({
+      id: goneBefore.id,
+      gpu_uuid: "GPU-UUID-GONE",
+      ordinal: 1,
+      status: "retired",
+    });
+    expect(newAfter).toEqual({
+      gpu_uuid: "GPU-UUID-NEW",
+      gpu_name: "A100",
+      ordinal: 0,
+      status: "active",
+    });
+
+    const goneSamples = raw.prepare(
+      "SELECT temperature, sample_time FROM xm_samples WHERE gpu_uuid = ? ORDER BY sample_time",
+    ).all("GPU-UUID-GONE");
+    expect(goneSamples).toEqual([
+      { temperature: 71.5, sample_time: "2026-09-25T01:00:00Z" },
+      { temperature: 73.25, sample_time: "2026-09-25T01:30:00Z" },
+    ]);
+    const keepSamples = raw.prepare(
+      "SELECT temperature, sample_time, machine_name FROM xm_samples WHERE gpu_uuid = ?",
+    ).all("GPU-UUID-KEEP");
+    expect(keepSamples).toEqual([{
+      temperature: 61,
+      sample_time: "2026-09-25T01:30:00Z",
+      machine_name: "fixture-box-zeta",
+    }]);
 
     db.close();
   });
 
-  it("GPU history attaches to UUID with retired status history", () => {
-    const dbPath = tempDb("devices.sqlite");
-    const db = new DatabaseService(dbPath);
-
-    db.prepare(`
-      INSERT INTO xm_devices (machine_name, gpu_uuid, gpu_name, status)
-      VALUES (?, ?, ?, ?)
-    `).run("gpu1", "uuid-1234", "RTX 3090", "active");
-    db.prepare(`
-      INSERT INTO xm_devices (machine_name, gpu_uuid, gpu_name, status)
-      VALUES (?, ?, ?, ?)
-    `).run("gpu1", "uuid-5678", "RTX 4090", "retired");
-
-    const active = db.prepare("SELECT gpu_uuid, status FROM xm_devices WHERE status = 'active'").all() as Array<{ gpu_uuid: string; status: string }>;
-    const retired = db.prepare("SELECT gpu_uuid, status FROM xm_devices WHERE status = 'retired'").all() as Array<{ gpu_uuid: string; status: string }>;
-
-    expect(active).toHaveLength(1);
-    expect(active[0].gpu_uuid).toBe("uuid-1234");
-    expect(retired).toHaveLength(1);
-    expect(retired[0].gpu_uuid).toBe("uuid-5678");
-
-    db.close();
-  });
-
-  it("alert dedupe key prevents duplicate alerts", () => {
+  it("xm_alerts exposes non-unique dedupe_key and created_at for the B11 window", () => {
     const dbPath = tempDb("alerts.sqlite");
     const db = new DatabaseService(dbPath);
 
-    db.prepare(`
-      INSERT INTO xm_alerts (machine_name, alert_type, alert_level, message, dedupe_key)
-      VALUES (?, ?, ?, ?, ?)
-    `).run("gpu1", "temp_high", "warning", "High temperature", "dedup-001");
-    db.prepare(`
-      INSERT INTO xm_alerts (machine_name, alert_type, alert_level, message, dedupe_key)
-      VALUES (?, ?, ?, ?, ?)
-    `).run("gpu1", "temp_high", "warning", "High temperature again", "dedup-001");
+    const cols = db.raw.pragma("table_info(xm_alerts)") as Array<{ name: string }>;
+    const colNames = cols.map((col) => col.name);
+    expect(colNames).toEqual(expect.arrayContaining([
+      "machine_name",
+      "alert_type",
+      "created_at",
+      "dedupe_key",
+    ]));
 
-    const rows = db.prepare("SELECT id, message FROM xm_alerts WHERE dedupe_key = ? ORDER BY id").all("dedup-001") as Array<{ id: number; message: string }>;
-    expect(rows).toHaveLength(2);
-    expect(rows[0].message).toBe("High temperature");
-    expect(rows[1].message).toBe("High temperature again");
+    const indexes = db.raw.pragma("index_list(xm_alerts)") as Array<{ name: string; unique: number }>;
+    const dedupe = indexes.find((index) => index.name === "idx_xm_alerts_dedupe");
+    const byTime = indexes.find((index) => index.name === "idx_xm_alerts_machine_time");
+    expect(dedupe).toBeDefined();
+    expect(dedupe?.unique).toBe(0);
+    expect(byTime).toBeDefined();
+    expect(byTime?.unique).toBe(0);
+
+    db.prepare(`
+      INSERT INTO xm_alerts (machine_name, alert_type, alert_level, message, dedupe_key, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run("fixture-box-zeta", "temp_high", "warning", "High temperature", "dedup-001", "2026-09-25T01:00:00Z");
+    db.prepare(`
+      INSERT INTO xm_alerts (machine_name, alert_type, alert_level, message, dedupe_key, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run("fixture-box-zeta", "temp_high", "warning", "High temperature again", "dedup-001", "2026-09-25T01:40:00Z");
+
+    const rows = db.prepare(
+      "SELECT message, created_at FROM xm_alerts WHERE dedupe_key = ? ORDER BY created_at",
+    ).all("dedup-001");
+    expect(rows).toEqual([
+      { message: "High temperature", created_at: "2026-09-25T01:00:00Z" },
+      { message: "High temperature again", created_at: "2026-09-25T01:40:00Z" },
+    ]);
 
     db.close();
   });
