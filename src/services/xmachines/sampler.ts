@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import { resolveXmachinesRuntime } from './runtime.js';
+import { buildRegistry, readMachinesConf } from './registry.js';
 import type { MachineTelemetry } from './telemetry.js';
+import { spawnSync } from 'node:child_process';
 
 interface ObservedFleetFileRow {
   name: string;
@@ -18,6 +20,7 @@ function observedFleetFromFile(fixturePath: string) {
     uptime: 'observed',
     provenance: 'observed-fleet',
     sampleAge: '0s',
+    roleHint: '',
   }));
   return {
     generate(): MachineTelemetry[] {
@@ -39,6 +42,47 @@ export function sampleFleet(serverEnv: NodeJS.ProcessEnv = process.env) {
   if (typeof fixture === 'string' && fixture.length > 0) {
     runtime.telemetry.useTelemetrySource(observedFleetFromFile(fixture));
     runtime.telemetry.runCycle();
+  } else if (serverEnv.XMACHINES_USE_REGISTRY === '1') {
+    const statusOutput = runXmacStatusAll();
+    const registry = buildRegistry(statusOutput, serverEnv.XMAC_CONF);
+    const fleet: MachineTelemetry[] = registry.map(m => ({
+      name: m.name,
+      state: m.state === 'unknown' ? 'down' : m.state,
+      cpuTemp: 0,
+      gpuTemp: 0,
+      powerWatts: 0,
+      uptime: 'registry',
+      provenance: 'xmac-registry',
+      sampleAge: '0s',
+      roleHint: m.roleHint || '',
+    }));
+    runtime.telemetry.useTelemetrySource({
+      generate(): MachineTelemetry[] {
+        return fleet.map(row => ({ ...row }));
+      },
+      forMachine(name: string): MachineTelemetry | undefined {
+        const row = fleet.find(m => m.name === name);
+        return row ? { ...row } : undefined;
+      }
+    });
+    runtime.telemetry.runCycle();
   }
   return runtime.telemetry.generate();
+}
+
+function runXmacStatusAll(): string {
+  try {
+    const confPath = process.env.XMAC_CONF || '/home/agjrom/.config/agent-protocols/xmac/machines.conf';
+    const txt = fs.readFileSync(confPath, 'utf8');
+    const names = Array.from(new Set(txt.split('\n').map(l => l.trim().split('|')[0].trim()).filter(Boolean)));
+    const outputs: string[] = [];
+    for (const name of names) {
+      const res = spawnSync('xmac.sh', ['status', name], { encoding: 'utf8' });
+      const out = (res.stdout || '').toString();
+      if (out) outputs.push(out.trim());
+    }
+    return outputs.join('\n');
+  } catch {
+    return '';
+  }
 }
