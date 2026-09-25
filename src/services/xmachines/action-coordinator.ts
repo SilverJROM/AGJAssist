@@ -34,7 +34,8 @@ interface OngoingAction {
 const COOLDOWN_MS = 30_000;
 
 function xmacArgv(action: 'on' | 'off', machine: string): string[] {
-  return action === 'on' ? ['up', machine] : ['down', machine];
+  if (action === 'on') return ['up', machine];
+  return ['down', machine, '--owner-off'];
 }
 
 function readMachinesConf(): Map<string, { ip: string; busyCheck: string }> {
