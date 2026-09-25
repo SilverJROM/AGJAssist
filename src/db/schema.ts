@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 39;
+export const SCHEMA_VERSION = 40;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -506,6 +506,51 @@ CREATE TABLE IF NOT EXISTS agent_one_time_wakeups (
 );
 CREATE INDEX IF NOT EXISTS idx_agent_one_time_wakeups_status ON agent_one_time_wakeups(status);
 CREATE INDEX IF NOT EXISTS idx_agent_one_time_wakeups_fire_time ON agent_one_time_wakeups(manual_fire_time);
+
+CREATE TABLE IF NOT EXISTS xm_samples (
+  id INTEGER PRIMARY KEY,
+  machine_name TEXT NOT NULL,
+  gpu_uuid TEXT NOT NULL,
+  sample_time TEXT NOT NULL DEFAULT (datetime('now')),
+  temperature REAL,
+  power_watts REAL,
+  utilization_gpu REAL,
+  utilization_mem REAL,
+  fan_speed REAL,
+  vram_mb REAL
+);
+CREATE INDEX IF NOT EXISTS idx_xm_samples_machine_time ON xm_samples(machine_name, sample_time);
+CREATE INDEX IF NOT EXISTS idx_xm_samples_gpu_uuid ON xm_samples(gpu_uuid);
+
+CREATE TABLE IF NOT EXISTS xm_devices (
+  id INTEGER PRIMARY KEY,
+  machine_name TEXT NOT NULL,
+  gpu_uuid TEXT NOT NULL UNIQUE,
+  gpu_name TEXT,
+  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','retired')),
+  first_seen TEXT NOT NULL DEFAULT (datetime('now')),
+  last_seen TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_xm_devices_machine ON xm_devices(machine_name);
+
+CREATE TABLE IF NOT EXISTS xm_alerts (
+  id INTEGER PRIMARY KEY,
+  machine_name TEXT NOT NULL,
+  alert_type TEXT NOT NULL,
+  alert_level TEXT NOT NULL CHECK(alert_level IN ('warning','critical')),
+  message TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  dedupe_key TEXT NOT NULL,
+  resolved INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_xm_alerts_machine_time ON xm_alerts(machine_name, created_at);
+CREATE INDEX IF NOT EXISTS idx_xm_alerts_dedupe ON xm_alerts(dedupe_key);
+
+CREATE TABLE IF NOT EXISTS xm_config (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 export const DEFAULT_SAFETY_PATTERNS = [

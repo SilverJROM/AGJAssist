@@ -871,6 +871,12 @@ export class DatabaseService {
         // after migrations; no data migration required for fresh-vs-upgrade parity.
       }
 
+      // Migration: v39 → v40: additive xmachines schema
+      if (current && current.version < 40) {
+        // Tables xm_samples, xm_devices, xm_alerts, xm_config are created via SCHEMA_SQL
+        // after migrations; additive-only, no data changes.
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);
