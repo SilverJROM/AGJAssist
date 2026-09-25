@@ -191,7 +191,7 @@ function gatherHost(name, paths) {
   const serviceVerdict = service.stdout.trim() ? "VERIFIED" : "ABSENT";
   const status = xmacCall(["status", name], paths.spyLog);
   const leases = xmacCall(["leases"], paths.spyLog);
-  const guard = inspect(["sed", "-n", "148,169p", paths.source]);
+  const guard = inspect(["sed", "-n", "188,209p", paths.source]);
   const byLine = inspect(["grep", "-m", "1", " by=", paths.log]);
   const errLine = inspect(["grep", "-m", "1", " ERROR ", paths.log]);
   const flock = inspect(["grep", "-n", "-E", "flock|mutex|LOCKFILE", paths.source]);

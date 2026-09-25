@@ -130,6 +130,11 @@ run_down() {
 
 assert_no_force() {
   local name="$1"
+  # fcnt is an invariant that no mutation can flip: xmac.sh consumes --force as its own
+  # argv and never forwards it to ssh/ping/wakeonlan, so this can never observe a failure.
+  # The discriminating L2d checks are the xmac.log force=1 read-back below and the
+  # "pass --force" stderr-hint absence — this check only guards against a future rewrite
+  # that starts forwarding the flag.
   if [ "$fcnt" -ne 0 ]; then
     fail "$name --force argv count=$fcnt expected 0"
   fi
