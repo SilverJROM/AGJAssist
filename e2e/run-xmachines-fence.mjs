@@ -93,8 +93,9 @@ function spawnJourney(env) {
   return {
     exitCode: result.status ?? 1,
     collectedEntries,
-    collected: collectedEntries.map((entry) => entry.id),
+    collected: [...new Set([...collectedEntries.map((entry) => entry.id), ...Array.from(rejected.keys())])],
     rejected,
+    hasRejectOnly: collectedEntries.length === 0 && rejected.size > 0,
   };
 }
 
@@ -125,13 +126,14 @@ if (EXPECT_RED) {
   delete envA.FENCE_STUB;
   const runA = spawnJourney(envA);
 
-  const unionB = new Set([...runB.collected, ...runB.rejected.keys()]);
+  const unionB = new Set([...runB.collected, ...runB.rejected.keys(), testPath]);
   const unreached = acceptance_ids.filter((id) => !unionB.has(id));
+  const collectedBWithPath = [...new Set([...runB.collected, testPath])];
   if (unreached.length > 0) {
     writeReportAndExit(
       'FAIL',
       'unreached_acceptance',
-      runB.collected,
+      collectedBWithPath,
       runB.collected,
       unreached.map((id) => ({ id, kind: 'assert', message: 'journey never reached this acceptance id' })),
       1
@@ -144,12 +146,12 @@ if (EXPECT_RED) {
   // the id under negative control.
   const l9eFailure = l9eProvenanceFailure(runA.collectedEntries);
   if (l9eFailure) {
-    writeReportAndExit('FAIL', 'argv_only_power_proof', runB.collected, runB.collected.filter((id) => id !== 'L9e'), [l9eFailure], 1);
+    writeReportAndExit('FAIL', 'argv_only_power_proof', collectedBWithPath, collectedBWithPath.filter((id) => id !== 'L9e'), [l9eFailure], 1);
   }
   if (EXPECT_RED !== 'L9e') {
     const l9eFailureB = l9eProvenanceFailure(runB.collectedEntries);
     if (l9eFailureB) {
-      writeReportAndExit('FAIL', 'argv_only_power_proof', runB.collected, runB.collected.filter((id) => id !== 'L9e'), [l9eFailureB], 1);
+      writeReportAndExit('FAIL', 'argv_only_power_proof', collectedBWithPath, collectedBWithPath.filter((id) => id !== 'L9e'), [l9eFailureB], 1);
     }
   }
 
@@ -163,7 +165,7 @@ if (EXPECT_RED) {
     writeReportAndExit(
       'FAIL',
       'negative_control_not_differential',
-      runB.collected,
+      collectedBWithPath,
       runB.collected,
       [{ id: EXPECT_RED, kind: 'assert', message: `id was not green in the unstubbed baseline run (collected=${JSON.stringify(runA.collected)}); a stub cannot be shown to cause a failure that was already there` }],
       1
@@ -173,7 +175,7 @@ if (EXPECT_RED) {
     writeReportAndExit(
       'FAIL',
       'negative_control_did_not_red',
-      runB.collected,
+      collectedBWithPath,
       runB.collected.filter((id) => id !== EXPECT_RED),
       [{ id: EXPECT_RED, kind: 'assert', message: 'expected id to be named-rejected under the stubbed run but it passed' }],
       1
@@ -183,7 +185,7 @@ if (EXPECT_RED) {
   writeReportAndExit(
     'PASS',
     'none',
-    runB.collected,
+    collectedBWithPath,
     runB.collected,
     [...runB.rejected.entries()].map(([id, meta]) => ({ id, kind: 'assert', unit: meta.unit })),
     0
@@ -193,38 +195,46 @@ if (EXPECT_RED) {
 // Single (non-negative-control) run.
 const run = spawnJourney(process.env);
 
+// Determine the report's collected list: union of ACCEPT ids, REJECT ids, and the journey test_path.
+// The test_path token is included in the report but ignored for set-equality against acceptance_ids.
+const collectedWithPath = [...new Set([...run.collected, testPath])];
+// For empty check, we need to see if there are any ACCEPT/REJECT
+const hasEvidence = run.collected.length > 0;
 // J1d — a fence report with nothing observed at all (no ACCEPT, no REJECT —
 // the journey produced zero evidence of any kind) is RED.
-if (run.collected.length === 0 && run.rejected.size === 0) {
+if (!hasEvidence) {
   writeReportAndExit('FAIL', 'empty_collected', [], [], acceptance_ids.map((id) => ({ id, kind: 'assert' })), 1);
 }
 
 const l9eFailure = l9eProvenanceFailure(run.collectedEntries);
 if (l9eFailure) {
-  writeReportAndExit('FAIL', 'argv_only_power_proof', run.collected, run.collected.filter((id) => id !== 'L9e'), [l9eFailure], 1);
+  writeReportAndExit('FAIL', 'argv_only_power_proof', collectedWithPath, collectedWithPath.filter((id) => id !== 'L9e'), [l9eFailure], 1);
 }
 
 // J1e — collected must equal the row's acceptance_ids as two independent sets.
 const acceptanceSet = new Set(acceptance_ids);
-const collectedSet = new Set(run.collected);
+// Set-equality ignores the test_path token and REJECT ids — only ACCEPT ids satisfy acceptance
+const acceptIds = run.collectedEntries.map((entry) => entry.id);
+const collectedForEquality = acceptIds.filter((id) => id !== testPath);
+const collectedSet = new Set(collectedForEquality);
 const missing = acceptance_ids.filter((id) => !collectedSet.has(id));
-const extra = run.collected.filter((id) => !acceptanceSet.has(id));
+const extraForSet = acceptIds.filter((id) => !acceptanceSet.has(id) && id !== testPath);
 
-if (missing.length > 0 || extra.length > 0) {
-  console.error(`set_difference missing=${JSON.stringify(missing)} extra=${JSON.stringify(extra)}`);
+if (missing.length > 0 || extraForSet.length > 0) {
+  console.error(`set_difference missing=${JSON.stringify(missing)} extra=${JSON.stringify(extraForSet)}`);
   const failedWithUnits = missing
     .filter((id) => run.rejected.has(id))
     .map((id) => ({ id, kind: 'assert', unit: run.rejected.get(id).unit, message: 'missing from collected' }));
   const failedUnreached = missing
     .filter((id) => !run.rejected.has(id))
     .map((id) => ({ id, kind: 'assert', message: 'missing from collected' }));
-  const failedExtra = extra.map((id) => ({ id, kind: 'assert', message: 'not in contract acceptance_ids' }));
+  const failedExtra = extraForSet.map((id) => ({ id, kind: 'assert', message: 'not in contract acceptance_ids' }));
   const faultClass = classifyByUnitSpread(failedWithUnits, 'missing_acceptance');
   writeReportAndExit(
     'FAIL',
     faultClass,
-    run.collected,
-    run.collected.filter((id) => acceptanceSet.has(id)),
+    collectedWithPath,
+    collectedWithPath.filter((id) => acceptanceSet.has(id)),
     [...failedWithUnits, ...failedUnreached, ...failedExtra],
     1
   );
@@ -235,8 +245,8 @@ const faultClass = run.exitCode === 0 ? 'none' : 'implementation';
 writeReportAndExit(
   verdict,
   faultClass,
-  run.collected,
-  run.exitCode === 0 ? run.collected : [],
-  run.exitCode === 0 ? [] : run.collected.map((id) => ({ id, kind: 'assert' })),
+  collectedWithPath,
+  run.exitCode === 0 ? collectedForEquality : [],
+  run.exitCode === 0 ? [] : collectedForEquality.map((id) => ({ id, kind: 'assert' })),
   run.exitCode === 0 ? 0 : 1
 );
