@@ -1,0 +1,7 @@
+{
+  "state": "UP",
+  "observations": [
+    { "method": "ping", "up": true },
+    { "method": "ssh", "up": true }
+  ]
+}

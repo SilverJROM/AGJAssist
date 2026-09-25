@@ -1,0 +1,4 @@
+{
+  "state": "UP",
+  "observations": [{ "method": "ping", "up": true }]
+}
