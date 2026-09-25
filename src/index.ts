@@ -1,5 +1,6 @@
 import { loadConfig } from "./config/config.js";
 import { DatabaseService } from "./db/database.js";
+import type Database from "better-sqlite3";
 import { TmuxService } from "./tmux/tmux-service.js";
 import { AssistantCore } from "./bot/assistant-core.js";
 import { TelegramAssistant } from "./bot/telegram-bot.js";
@@ -17,6 +18,9 @@ import { StepTemplateService } from "./services/step-template-service.js";
 import { PersonalTaskService } from "./services/personal-task-service.js";
 import { ReminderService } from "./services/reminder-service.js";
 import { createApiServer } from "./api/server.js";
+import { sampleFleet } from "./services/xmachines/sampler.js";
+import { resolveXmachinesRuntime } from "./services/xmachines/runtime.js";
+import { ReadOnlyCollector } from "./services/xmachines/readonly-collector.js";
 import { AgentEventsStreamManager } from "./api/websocket/agent-events-stream-manager.js";
 import { AgentAssignmentService } from "./services/agent-assignment-service.js";
 import { AgentEventsService } from "./services/agent-events-service.js";
@@ -148,6 +152,28 @@ async function main(): Promise<void> {
 
   await apiServer.listen({ port: config.api.port, host: config.api.host });
   console.log(`AGJAssist API server listening on ${config.api.host}:${config.api.port}`);
+
+  // Xmachines runtime wiring — initialize collector without browser session
+  const xmachinesRuntime = resolveXmachinesRuntime(process.env);
+  const xmachinesCollector = xmachinesRuntime.telemetry as ReadOnlyCollector;
+  // Attach reader result sink to DB for server-side sampling persistence
+  try {
+    xmachinesCollector.useReaderStore(db.raw);
+  } catch {}
+
+  // Server sampler runs with no browser present; collector is ready on startup
+  try {
+    // Prime collector once at startup
+    sampleFleet(process.env);
+  } catch {}
+
+  // 30-minute server sampler scheduler — no new process/listener
+  const XmachinesSampleIntervalMs = 30 * 60 * 1000;
+  setInterval(() => {
+    try {
+      sampleFleet(process.env);
+    } catch {}
+  }, XmachinesSampleIntervalMs);
 
   // Reminder scheduler — check every 60 seconds for due reminders
   setInterval(async () => {
