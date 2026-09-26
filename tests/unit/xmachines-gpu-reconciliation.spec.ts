@@ -109,20 +109,31 @@ describe('B15 GPU reconciliation – atomic add/remove/reorder with retired hist
     const db = new DatabaseService(dbPath);
     const raw = db.raw;
 
+    const seenAt = '2026-09-25T01:00:00Z';
     reconcileGpuIdentities(raw, 'fixture-box-zeta', [
       { gpuUuid: 'GPU-UUID-A', gpuName: 'RTX 3090', ordinal: 0 },
-    ], '2026-09-25T01:00:00Z');
+    ], seenAt);
 
-    const before = raw.prepare('SELECT COUNT(*) as c FROM xm_devices').get() as any;
-    const beforeCount = before.c;
+    const identitySql = 'SELECT id, gpu_uuid, gpu_name, ordinal, status, first_seen, last_seen FROM xm_devices WHERE gpu_uuid = ?';
+    const beforeA = raw.prepare(identitySql).get('GPU-UUID-A') as any;
+    expect(beforeA).toMatchObject({
+      gpu_uuid: 'GPU-UUID-A',
+      gpu_name: 'RTX 3090',
+      ordinal: 0,
+      status: 'active',
+      first_seen: seenAt,
+      last_seen: seenAt,
+    });
 
     expect(() => reconcileGpuIdentities(raw, 'fixture-box-zeta', [
       { gpuUuid: 'GPU-UUID-B', gpuName: 'A100', ordinal: 0 },
       { gpuUuid: 'GPU-UUID-B', gpuName: 'A100-dup', ordinal: 1 },
     ], '2026-09-25T02:00:00Z')).toThrow();
 
-    const after = raw.prepare('SELECT COUNT(*) as c FROM xm_devices').get() as any;
-    expect(after.c).toBe(beforeCount);
+    const afterA = raw.prepare(identitySql).get('GPU-UUID-A');
+    expect(afterA).toEqual(beforeA);
+    const insertedB = raw.prepare("SELECT id FROM xm_devices WHERE gpu_uuid = 'GPU-UUID-B'").get();
+    expect(insertedB).toBeUndefined();
 
     db.close();
   });
