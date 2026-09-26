@@ -7215,6 +7215,24 @@ function Settings({ onEditBottomNav } = {}) {
           <h4 style="font-size:13px;margin-bottom:8px">Two-Factor Authentication</h4>
           <${TwoFactorSetup} />
         </div>
+        ${userInfo?.role === 'owner' && html`
+          <div style="margin-top:16px">
+            <h4 style="font-size:13px;margin-bottom:8px">Web Sessions</h4>
+            <div class="item-card" style="padding:12px 16px">
+              <button class="btn btn-danger btn-sm" data-testid="revoke-all-web-sessions" onclick=${async () => {
+                try {
+                  await api('/api/xmachines/sessions/revoke-all', { method: 'POST' });
+                  localStorage.removeItem('agj_token');
+                  localStorage.removeItem('agj_user');
+                  window.location.hash = '#/';
+                  window.location.reload();
+                } catch (e) {
+                  console.error(e);
+                }
+              }}>Revoke All Web Sessions</button>
+            </div>
+          </div>
+        `}
       </${SettingsSection}>
       <${SettingsSection} title="Terminal Conversation" defaultOpen=${true}>
         <div style="margin-bottom:16px">
