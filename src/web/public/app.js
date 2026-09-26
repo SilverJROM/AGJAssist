@@ -727,7 +727,7 @@ function Header({ user }) {
 }
 
 // Dashboard (hub with section cards)
-function Dashboard() {
+function Dashboard({ user }) {
   const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, notes: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -7333,26 +7333,33 @@ function BottomNavEditor({ tabIds, onChange, onClose }) {
   `;
 }
 
-function TgDashboard({ onEditBottomNav }) {
+function TgDashboard({ onEditBottomNav, user }) {
   const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, notes: 0 });
+  const [machineCount, setMachineCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const telemetryLoad = user?.role === 'owner'
+      ? api('/api/xmachines/telemetry').catch(() => ({ machines: [] }))
+      : Promise.resolve({ machines: [] });
     Promise.all([
       api('/api/projects').catch(() => ({ projects: [] })),
       api('/api/personal-tasks').catch(() => ({ tasks: [] })),
       api('/api/reminders').catch(() => ({ reminders: [] })),
-      api('/api/notes?status=open').catch(() => ({ notes: [] }))
-    ]).then(([p, t, r, n]) => {
+      api('/api/notes?status=open').catch(() => ({ notes: [] })),
+      telemetryLoad
+    ]).then(([p, t, r, n, telemetry]) => {
+      const machines = telemetry && Array.isArray(telemetry.machines) ? telemetry.machines : [];
       setStats({
         projects: p.projects?.length || 0,
         tasks: t.tasks?.length || 0,
         reminders: r.reminders?.length || 0,
         notes: n.notes?.length || 0
       });
+      setMachineCount(machines.length);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, []);
+  }, [user?.role]);
 
   if (loading) return html`<div class="loading">Loading...</div>`;
 
@@ -7364,7 +7371,7 @@ function TgDashboard({ onEditBottomNav }) {
     { icon: '\u{23F0}', label: 'Reminders', count: stats.reminders, route: '/tasks', desc: 'Upcoming events' },
     { icon: '\u{2699}', label: 'Settings', count: null, route: '/settings', desc: 'Config & templates' }
   ];
-  const xmachinesTile = { icon: '\u{1F4BB}', label: 'xMachines', count: 4, route: '/xmachines', desc: 'Machine fleet' };
+  const xmachinesTile = { icon: '\u{1F4BB}', label: 'xMachines', count: machineCount, route: '/xmachines', desc: 'Machine fleet' };
 
   return html`
     <div>
@@ -7912,7 +7919,7 @@ function TgApp() {
 
   let content;
   if (route === '/' || route === '') {
-    content = html`<${TgDashboard} onEditBottomNav=${() => setEditingBottomNav(true)} />`;
+    content = html`<${TgDashboard} onEditBottomNav=${() => setEditingBottomNav(true)} user=${user} />`;
   } else if (route === '/projects') {
     content = html`<${Projects} />`;
   } else if (route === '/terminals') {
@@ -7929,11 +7936,15 @@ function TgApp() {
     content = user?.role === 'owner'
       ? html`<${McpAccessPage} />`
       : html`<div class="empty-state">Owner role required</div>`;
-  } else if (route === '/xmachines') {
-    content = html`<${XmachinesFleetPage} />`;
-  } else if (route.startsWith('/xmachines/')) {
-    const name = decodeURIComponent(route.split('/')[2] || '');
-    content = html`<${XmachinesDetailPage} name=${name} key=${name} />`;
+  } else if (route === '/xmachines' || route.startsWith('/xmachines/')) {
+    if (user?.role !== 'owner') {
+      content = html`<div class="empty-state">Owner role required</div>`;
+    } else if (route === '/xmachines') {
+      content = html`<${XmachinesFleetPage} />`;
+    } else {
+      const name = decodeURIComponent(route.split('/')[2] || '');
+      content = html`<${XmachinesDetailPage} name=${name} key=${name} />`;
+    }
   } else if (route.startsWith('/project/')) {
     const id = route.split('/')[2];
     content = html`<${ProjectDetail} id=${id} key=${id} />`;
@@ -8317,7 +8328,7 @@ function App() {
 
   let content;
   if (route === '/' || route === '') {
-    content = html`<${Dashboard} />`;
+    content = html`<${Dashboard} user=${user} />`;
   } else if (route === '/projects') {
     content = html`<${Projects} />`;
   } else if (route === '/terminals') {
