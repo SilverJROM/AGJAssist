@@ -275,6 +275,10 @@ export function renderMachineCostDetail(payload) {
     ? `<button type="button" data-testid="xmachines-force-button" aria-label="Force ${name} off">Force Off</button>`
     : '';
   const gpuRows = Array.isArray(payload?.gpuRows) ? payload.gpuRows : [];
+  // D10 storage/UPS panel integration
+  const disks = Array.isArray(payload?.disks) ? payload.disks : [];
+  const filesystems = Array.isArray(payload?.filesystems) ? payload.filesystems : [];
+  const ups = payload?.ups || null;
   const gpuRowHtml = gpuRows.map(row => {
     const uuid = escapeHtml(row.uuid ?? '');
     const gpuName = escapeHtml(row.name ?? '');
@@ -292,7 +296,15 @@ export function renderMachineCostDetail(payload) {
     ? `<div data-testid="xmachines-force-challenge" data-challenge="${escapeHtml(String(challenge.challengeId))}"><div data-testid="xmachines-force-confirmation">Force confirmation\n${escapeHtml(confirmationText)}</div><div data-testid="xmachines-force-confirmation-text">Process probe:\n${escapeHtml(confirmationText)}</div><button type="button" data-testid="xmachines-force-confirm" aria-label="Confirm force off">Confirm Force Off ${challenge.displayNumber}</button><span data-testid="xmachines-force-number" data-number="${challenge.displayNumber}">${challenge.displayNumber}</span></div>`
     : '';
   const forceRefusalBlock = renderForceRefusal(payload && payload.forceRefusal);
-  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine, history)}${gpuRowHtml}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${offButton}${forceButton}${challengeBlock}${forceRefusalBlock}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
+  // D10: render hdd panel
+  const hddPanel = (disks.length > 0 || filesystems.length > 0)
+    ? `<div class="hdd-panel" data-machine="${escapeHtml(name)}">${disks.map(d => `<div class="disk-row" data-disk="${escapeHtml(d.device)}"><span class="disk-id">${escapeHtml(d.device)}</span><span class="smart-health">${escapeHtml(d.health)}</span><span class="disk-temp">${escapeHtml(d.temperatureC)}</span></div>`).join('')}${filesystems.map(f => `<div class="fs-row" data-mount="${escapeHtml(f.mount)}"><span class="fs-mount">${escapeHtml(f.mount)}</span><span class="fs-total">${escapeHtml(f.total)}</span><span class="fs-used">${escapeHtml(f.used)}</span><span class="fs-available">${escapeHtml(f.available)}</span></div>`).join('')}</div>`
+    : '';
+  // D10: render UPS panel
+  const upsPanel = ups
+    ? `<div class="ups-panel" data-machine="${escapeHtml(name)}"><span class="ups-battery">${escapeHtml(ups.batteryChargePct ?? 'unavailable')}</span><span class="ups-runtime">${escapeHtml(ups.runtimeSeconds != null ? `${ups.runtimeSeconds}s` : 'unavailable')}</span><span class="ups-load">${escapeHtml(ups.loadPct ?? 'unavailable')}</span></div>`
+    : `<div class="ups-panel" data-machine="${escapeHtml(name)}"><span class="ups-battery">unavailable</span><span class="ups-runtime">unavailable</span><span class="ups-load">unavailable</span></div>`;
+  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine, history)}${gpuRowHtml}${hddPanel}${upsPanel}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${offButton}${forceButton}${challengeBlock}${forceRefusalBlock}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
 }
 
 function defaultIdempotencyKey() {

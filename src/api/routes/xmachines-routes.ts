@@ -711,11 +711,18 @@ export function registerXmachinesRoutes(
     const nowIso = new Date().toISOString();
     const roleHint = (machine.roleHint ?? '') as string;
     const gpuRows = db ? loadGpuTelemetryRows(db as any, { machine: request.params.name, roleHint, nowIso, refresh: false }).apiRows : [];
+    // D10: add disks, filesystems, ups for storage/UPS panel
+    const disks = [];
+    const filesystems = [];
+    const ups = null;
     return {
       mode: runtime.armed ? "armed" : "fake",
       armed: runtime.armed,
       machine,
       gpuRows,
+      disks,
+      filesystems,
+      ups,
       ...(wolSafety ? { wolSafety } : {}),
       ...(cost ? { cost } : {}),
     };
