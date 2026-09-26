@@ -10,6 +10,20 @@ import { AppConfig } from '../../src/config/config.js';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SPY = path.join(REPO, 'tests/helpers/xmac-argv-spy.sh');
 const LOCAL_OWNER = 'a10-owner-token';
+const FIXTURE_MACHINES = ['gpu', 'gpu2', 'hdd', 'media'];
+
+function stamp(ms: number): string {
+  return new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+// Every fixture machine reports WoL-verified so the route's force-confirmation
+// gate never intercepts an Off before it reaches the coordinator under test.
+function verifiedWolLog(machines: string[]): string {
+  const now = Date.now();
+  const wake = stamp(now - 30 * 60 * 1000);
+  const up = stamp(now - 20 * 60 * 1000);
+  return machines.map((m) => `${wake} WAKE ${m} 1\n${up} UP ${m} 1\n`).join('');
+}
 
 const HOLD_SCRIPT = [
   '#!/bin/bash',
@@ -127,6 +141,10 @@ describe('xmachines action coordinator A10', () => {
       restoreEnv('XMAC_ARGV_SPY_REAL', prev.XMAC_ARGV_SPY_REAL);
       restoreEnv('XMAC_ARGV_SPY_RELEASE', prev.XMAC_ARGV_SPY_RELEASE);
       restoreEnv('XMACHINES_ARM', prev.XMACHINES_ARM);
+      restoreEnv('XMAC_CONF', prev.XMAC_CONF);
+      restoreEnv('XMAC_STATE', prev.XMAC_STATE);
+      restoreEnv('XMAC_LOG', prev.XMAC_LOG);
+      restoreEnv('XMACHINES_UP_SECONDS', prev.XMACHINES_UP_SECONDS);
     }
     if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
     scratch = undefined;
@@ -149,12 +167,35 @@ describe('xmachines action coordinator A10', () => {
       XMAC_ARGV_SPY_REAL: process.env.XMAC_ARGV_SPY_REAL,
       XMAC_ARGV_SPY_RELEASE: process.env.XMAC_ARGV_SPY_RELEASE,
       XMACHINES_ARM: process.env.XMACHINES_ARM,
+      XMAC_CONF: process.env.XMAC_CONF,
+      XMAC_STATE: process.env.XMAC_STATE,
+      XMAC_LOG: process.env.XMAC_LOG,
+      XMACHINES_UP_SECONDS: process.env.XMACHINES_UP_SECONDS,
     };
     process.env.PATH = `${bin}${path.delimiter}${process.env.PATH ?? ''}`;
     process.env.XMAC_ARGV_SPY_LOG = spyLog;
     process.env.XMAC_ARGV_SPY_REAL = hold;
     process.env.XMAC_ARGV_SPY_RELEASE = release;
     process.env.XMACHINES_ARM = '1';
+    // Hermetic: every machine this file exercises is a quiet, no-busy-check, WoL-verified
+    // fixture, so the fail-closed busy preflight, lease read, and WoL force-confirmation
+    // gate never consult the live xmac registry (~/.config/agent-protocols/xmac/machines.conf)
+    // or ~/.xmac state for real machine state.
+    const conf = path.join(scratch, 'machines.conf');
+    fs.writeFileSync(
+      conf,
+      FIXTURE_MACHINES
+        .map((name) => `${name}|192.0.2.50|02:00:00:00:00:50|agjrom|fixture|`)
+        .join('\n') + '\n',
+    );
+    const stateDir = path.join(scratch, 'xmac-state');
+    fs.mkdirSync(stateDir, { recursive: true });
+    const xmacLog = path.join(scratch, 'xmac.log');
+    fs.writeFileSync(xmacLog, verifiedWolLog(FIXTURE_MACHINES));
+    process.env.XMAC_CONF = conf;
+    process.env.XMAC_STATE = stateDir;
+    process.env.XMAC_LOG = xmacLog;
+    process.env.XMACHINES_UP_SECONDS = '3600';
     app = await createApiServer(minimalConfig(), stubServices());
     return { spyLog };
   }
@@ -238,7 +279,7 @@ describe('xmachines action coordinator A10', () => {
     expect(second.statusCode).toBe(202);
     expect(second.json()).toEqual(first.json());
     expect((first.json() as { status: string }).status).toBe('in-progress');
-    expect(await waitForArgv(spyLog, 1)).toEqual([['down', 'hdd']]);
+    expect(await waitForArgv(spyLog, 1)).toEqual([['down', 'hdd', '--owner-off']]);
   });
 
   it('L15h: two tabs with different keys yield one operation and one gateway argv', async () => {
@@ -261,7 +302,7 @@ describe('xmachines action coordinator A10', () => {
     const retryBody = retry.json() as { status: string; operationId: string };
     expect(firstBody.status).toBe('in-progress');
     expect(retryBody.operationId).toBe(firstBody.operationId);
-    expect(await waitForArgv(spyLog, 1)).toEqual([['down', 'media']]);
+    expect(await waitForArgv(spyLog, 1)).toEqual([['down', 'media', '--owner-off']]);
   });
 
   it('L15f: a completed action starts the per-machine cooldown', async () => {
@@ -294,7 +335,7 @@ describe('xmachines action coordinator A10', () => {
     expect((off.json() as { status: string }).status).toBe('in-progress');
     expect(on.statusCode).toBe(400);
     expect(on.json()).toEqual({ status: 'rejected', reason: 'machine-busy' });
-    expect(await waitForArgv(spyLog, 1)).toEqual([['down', 'hdd']]);
+    expect(await waitForArgv(spyLog, 1)).toEqual([['down', 'hdd', '--owner-off']]);
   });
 });
 

@@ -80,7 +80,42 @@ export function renderMachineCostDetail(payload) {
   const flag = placeholder ? 'placeholder tariff' : 'configured tariff';
   const flagAria = placeholder ? 'Tariff is a placeholder' : 'Tariff is configured';
   const caveat = escapeHtml(typeof cost.caveat === 'string' ? cost.caveat : '');
-  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine)}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
+  const offButton = machine.name != null
+    ? `<button type="button" data-testid="xmachines-off-button" aria-label="Turn ${name} off">Turn Off</button>`
+    : '';
+  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine)}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${offButton}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
+}
+
+function defaultIdempotencyKey() {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  } catch {}
+  return 'xm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+// The real normal-Off action: POSTs the app's own power/off route and merges a
+// rejection into the payload so renderMachineCostDetail can show it. Shared by
+// the app UI and by tests, so a browser-driven click exercises the exact same
+// request/merge mechanism the deployed detail page uses — not a stand-in for it.
+export async function handleMachineDetailClick(event, payload, options = {}) {
+  const target = event && event.target && typeof event.target.closest === 'function'
+    ? event.target.closest('[data-testid="xmachines-off-button"]')
+    : null;
+  if (!target) return payload;
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  const name = payload && payload.machine && payload.machine.name;
+  if (!name) return payload;
+  const fetchImpl = options.fetch || (typeof fetch !== 'undefined' ? fetch : null);
+  if (!fetchImpl) return payload;
+  const idempotencyKey = typeof options.idempotencyKey === 'function' ? options.idempotencyKey() : defaultIdempotencyKey();
+  const res = await fetchImpl(`/api/xmachines/machines/${encodeURIComponent(name)}/power/off`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+  });
+  let body = null;
+  try { body = await res.json(); } catch {}
+  if (res.ok || !body) return payload;
+  return { ...payload, offRefusal: body };
 }
 
 // Exact normal-Off refusal. Absent on read payloads, so existing detail markup is unchanged.

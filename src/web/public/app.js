@@ -15,7 +15,7 @@ import {
   writeBottomNavTabIds,
   writeLandingTab
 } from './nav-helpers.js';
-import { renderFleetOverview, renderMachineCostDetail } from './xmachines-cost-view.js';
+import { renderFleetOverview, renderMachineCostDetail, handleMachineDetailClick } from './xmachines-cost-view.js';
 
 const html = htm.bind(h);
 const TERMINAL_FONT_STORAGE_KEY = 'agj_terminal_font_size';
@@ -7817,15 +7817,28 @@ function XmachinesFleetPage() {
 }
 
 function XmachinesDetailPage({ name }) {
+  const [payload, setPayload] = useState(null);
   const [markup, setMarkup] = useState('');
   useEffect(() => {
     let cancelled = false;
     api('/api/xmachines/machines/' + encodeURIComponent(name))
-      .then((payload) => { if (!cancelled) setMarkup(renderMachineCostDetail(payload)); })
-      .catch(() => { if (!cancelled) setMarkup(''); });
+      .then((data) => { if (!cancelled) setPayload(data); })
+      .catch(() => { if (!cancelled) setPayload(null); });
     return () => { cancelled = true; };
   }, [name]);
-  return html`<div class="xmachines-view" dangerouslySetInnerHTML=${{ __html: markup }}></div>`;
+  useEffect(() => {
+    setMarkup(payload ? renderMachineCostDetail(payload) : '');
+  }, [payload]);
+  const onDetailClick = useCallback((event) => {
+    if (!payload) return;
+    handleMachineDetailClick(event, payload, {
+      fetch: (path, opts) => fetch(API_BASE + path, {
+        ...opts,
+        headers: { ...(opts && opts.headers), ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
+      }),
+    }).then((next) => { if (next !== payload) setPayload(next); });
+  }, [payload]);
+  return html`<div class="xmachines-view" onClick=${onDetailClick} dangerouslySetInnerHTML=${{ __html: markup }}></div>`;
 }
 
 function TgApp() {

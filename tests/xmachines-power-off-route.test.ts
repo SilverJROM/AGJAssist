@@ -1,13 +1,13 @@
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL, fileURLToPath } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { chromium } from '@playwright/test';
 import type { FastifyInstance } from 'fastify';
 import { createApiServer, type ApiServices } from '../src/api/server.js';
 import { AppConfig } from '../src/config/config.js';
-import { renderMachineCostDetail } from '../src/web/public/xmachines-cost-view.js';
 
 const OWNER_TOKEN = 'c4-owner-token';
 const OWNER_ID = 2;
@@ -20,6 +20,7 @@ const FIXTURE_TARGET = 'agjrom@192.0.2.50';
 const GPU_BUSY = 'gpu-process-busy';
 const LEASE_HOLDER = 'xmac-claim-hdd-17-transcript-archive';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const XMACHINES_COST_VIEW_PATH = path.join(REPO, 'src/web/public/xmachines-cost-view.js');
 const VALIDATION = path.join(REPO, 'xmachines/projcore-run-2026-09-25/validation');
 const MUTATION_REPORT = path.join(VALIDATION, 'C4-mutation-report-a2.md');
 const REFUSAL_HTML = path.join(VALIDATION, 'C4-off-refusal-a2.html');
@@ -225,6 +226,53 @@ interface BootOpts {
   wol?: WolKind;
   scenario?: Scenario;
   protectedRole?: boolean;
+}
+
+// Serves the REAL, unmodified src/web/public/xmachines-cost-view.js so a browser-driven
+// click exercises the app's own render+click+fetch mechanism, not a test-authored stand-in.
+function harnessHtml(machine: string): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Normal Off harness</title><style>body{font:16px sans-serif;background:#fff;color:#111;margin:24px}[role=alert]{color:#7a1f1f;font-weight:700}</style></head><body>
+<div id="root"></div>
+<script type="module">
+  import { renderMachineCostDetail, handleMachineDetailClick } from '/xmachines-cost-view.js';
+  const root = document.getElementById('root');
+  let payload = { machine: { name: ${JSON.stringify(machine)}, state: 'up' } };
+  function paint() { root.innerHTML = renderMachineCostDetail(payload); }
+  root.addEventListener('click', (event) => {
+    handleMachineDetailClick(event, payload, { fetch: (path, opts) => fetch(path, opts) })
+      .then((next) => { payload = next; paint(); });
+  });
+  paint();
+</script>
+</body></html>`;
+}
+
+async function startHarnessServer(machine: string): Promise<{ url: string; close: () => Promise<void> }> {
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+    if (url.pathname === '/xmachines-cost-view.js') {
+      fs.readFile(XMACHINES_COST_VIEW_PATH, (err, data) => {
+        if (err) { res.writeHead(404); res.end(); return; }
+        res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' });
+        res.end(data);
+      });
+      return;
+    }
+    if (url.pathname === '/harness.html') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(harnessHtml(machine));
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  const port = address && typeof address === 'object' ? address.port : 0;
+  return {
+    url: `http://127.0.0.1:${port}/harness.html`,
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
 }
 
 describe('xmachines power OFF route C4', () => {
@@ -487,35 +535,51 @@ describe('xmachines power OFF route C4', () => {
     await expectNoSpawn(spyLog);
   });
 
-  it('D2e: the detail surface renders the exact normal-Off refusal and the screenshot is on disk', async () => {
+  it('D2e: a real click on the real product OFF button renders the exact normal-Off refusal', async () => {
     const { spyLog, machine } = await boot({ wol: 'verified', scenario: 'busy' });
-    const res = await postOff(machine, 'c4-ui-refusal');
-    expect(res.statusCode).toBe(400);
-    const body = res.json() as { status?: string; reason?: string; detail?: string };
-    expect(body.reason).toBe('cannot-confirm-idle');
+
+    // Sanity: the route itself refuses independent of the UI.
+    const direct = await postOff(machine, 'c4-ui-sanity');
+    expect(direct.statusCode).toBe(400);
+    expect((direct.json() as { reason?: string }).reason).toBe('cannot-confirm-idle');
     await expectNoSpawn(spyLog);
 
-    const markup = renderMachineCostDetail({
-      machine: { name: machine, state: 'up' },
-      offRefusal: body,
-    });
     fs.mkdirSync(VALIDATION, { recursive: true });
-    fs.writeFileSync(
-      REFUSAL_HTML,
-      `<!doctype html><html><head><meta charset="utf-8"><title>Normal Off refusal</title><style>body{font:16px sans-serif;background:#fff;color:#111;margin:24px}[role=alert]{color:#7a1f1f;font-weight:700}</style></head><body>${markup}</body></html>`,
-    );
+    const harness = await startHarnessServer(machine);
     const browser = await chromium.launch({ headless: true });
     try {
       const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
-      await page.goto(pathToFileURL(REFUSAL_HTML).href);
+      // API-backed fixture: the browser's real fetch is answered by the real Fastify
+      // route handler (via inject), so the refusal body is product-produced, not authored
+      // by this test. Only the network transport is stood in for — same technique as any
+      // MSW/route-mock frontend test, backed here by the actual server instead of a stub.
+      await page.route('**/api/xmachines/machines/*/power/off', async (route) => {
+        const headers = await route.request().allHeaders();
+        const injected = await app!.inject({
+          method: 'POST',
+          url: `/api/xmachines/machines/${machine}/power/off`,
+          headers: ownerHeaders({ 'idempotency-key': headers['idempotency-key'] ?? '' }),
+        });
+        await route.fulfill({
+          status: injected.statusCode,
+          contentType: (injected.headers['content-type'] as string | undefined) ?? 'application/json',
+          body: injected.payload,
+        });
+      });
+      await page.goto(harness.url);
+      await page.getByTestId('xmachines-off-button').click();
+      await page.waitForSelector('[data-testid="xmachines-off-refusal"]');
+
       const detailText = (await page.getByTestId('xmachines-off-refusal').innerText()).trim();
       const reasonText = (await page.getByTestId('xmachines-off-refusal-reason').innerText()).trim();
       const detailAria = await page.getByTestId('xmachines-off-refusal').getAttribute('aria-label');
       const aria = await page.getByTestId('xmachines-off-refusal-block').ariaSnapshot();
+      fs.writeFileSync(REFUSAL_HTML, await page.content());
       await page.screenshot({ path: REFUSAL_PNG, fullPage: true });
       fs.writeFileSync(REFUSAL_DOM, `${JSON.stringify({ detailText, reasonText, detailAria, aria }, null, 2)}\n`);
     } finally {
       await browser.close();
+      await harness.close();
     }
 
     const saved = JSON.parse(fs.readFileSync(REFUSAL_DOM, 'utf8')) as {

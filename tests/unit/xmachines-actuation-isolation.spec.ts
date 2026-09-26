@@ -113,6 +113,10 @@ describe("xmachines actuation isolation A0.3", () => {
       restoreEnv("XMAC_ARGV_SPY_LOG", prev.XMAC_ARGV_SPY_LOG);
       restoreEnv("XMAC_ARGV_SPY_REAL", prev.XMAC_ARGV_SPY_REAL);
       restoreEnv("XMACHINES_ARM", prev.XMACHINES_ARM);
+      restoreEnv("XMAC_CONF", prev.XMAC_CONF);
+      restoreEnv("XMAC_STATE", prev.XMAC_STATE);
+      restoreEnv("XMAC_LOG", prev.XMAC_LOG);
+      restoreEnv("XMACHINES_UP_SECONDS", prev.XMACHINES_UP_SECONDS);
     }
     if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
     scratch = undefined;
@@ -129,12 +133,30 @@ describe("xmachines actuation isolation A0.3", () => {
       XMAC_ARGV_SPY_LOG: process.env.XMAC_ARGV_SPY_LOG,
       XMAC_ARGV_SPY_REAL: process.env.XMAC_ARGV_SPY_REAL,
       XMACHINES_ARM: process.env.XMACHINES_ARM,
+      XMAC_CONF: process.env.XMAC_CONF,
+      XMAC_STATE: process.env.XMAC_STATE,
+      XMAC_LOG: process.env.XMAC_LOG,
+      XMACHINES_UP_SECONDS: process.env.XMACHINES_UP_SECONDS,
     };
     process.env.PATH = `${bin}${path.delimiter}${process.env.PATH ?? ""}`;
     process.env.XMAC_ARGV_SPY_LOG = spyLog;
     delete process.env.XMAC_ARGV_SPY_REAL;
     if (arm) process.env.XMACHINES_ARM = "1";
     else delete process.env.XMACHINES_ARM;
+    // Hermetic: a quiet, no-busy-check machines.conf/state fixture so an armed Off never
+    // consults the live xmac registry or ~/.xmac state for real machine state. XMAC_LOG is
+    // deliberately left unset: under VITEST, readWolSafety short-circuits to null with no
+    // fixture at all, which is exactly the "no wolSafety field" shape L10c/L10a assert on.
+    const conf = path.join(scratch, "machines.conf");
+    fs.writeFileSync(
+      conf,
+      MACHINES.map((name) => `${name}|192.0.2.50|02:00:00:00:00:50|agjrom|fixture|`).join("\n") + "\n",
+    );
+    const stateDir = path.join(scratch, "xmac-state");
+    fs.mkdirSync(stateDir, { recursive: true });
+    process.env.XMAC_CONF = conf;
+    process.env.XMAC_STATE = stateDir;
+    delete process.env.XMAC_LOG;
     app = await createApiServer(minimalConfig(), stubServices());
     return { spyLog };
   }
@@ -173,7 +195,7 @@ describe("xmachines actuation isolation A0.3", () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
       argv = spyArgv(spyLog);
     }
-    expect(argv).toEqual([["down", "gpu"]]);
+    expect(argv).toEqual([["down", "gpu", "--owner-off"]]);
   });
 
   it("L10c: local read and power attempts produce zero real-fleet calls", async () => {
