@@ -273,9 +273,9 @@ export function renderMachineCostDetail(payload) {
   const powerState = powerStateLabel(machine);
   const isOffline = isOfflineMachine(machine);
   const inProgress = payload && payload.powerActionInProgress === true;
-  const canOn = !isOffline && (!machine.state || machine.state === 'down' || machine.state === 'offline');
+  const canOn = !machine.state || machine.state === 'down' || machine.state === 'offline';
   const canOff = !isOffline && machine.state && machine.state !== 'down' && machine.state !== 'offline';
-  const onButton = machine.name != null && canOn
+  const onButton = machine.name != null && canOn && !inProgress
     ? `<button type="button" data-testid="xmachines-on-button" aria-label="Turn ${name} on">Turn On</button>`
     : '';
   const offButton = machine.name != null && canOff && !inProgress
