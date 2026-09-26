@@ -12,10 +12,10 @@ const VIEWER_TOKEN = 'c5-viewer-token';
 const SESSION_OWNER_ID = 7;
 const OWNER_CHAT_ID = 867530902;
 const BOT_TOKEN = '424243:c5-force-confirm';
-const MACHINE = 'glimmer';
+const MACHINE = 'media';
 const HOST = 'agjasst.silverjrom.app';
 const ORIGIN = 'https://agjasst.silverjrom.app';
-const FORCE_URL = `/api/xmachines/machines/${MACHINE}/power/off`;
+const FORCE_URL = `/api/xmachines/machines/${MACHINE}/power/force`;
 
 type Captured = { url: string; body: unknown | null };
 
@@ -142,6 +142,6 @@ describe('xmachines force confirm route C5', () => {
     // Without a consumed challenge, route rejects force confirmation
     expect(res.statusCode).toBe(400);
     const body = res.json() as { reason: string };
-    expect(body.reason).toBe('force-confirmation-required');
+    expect(body.reason).toBe('challenge-required');
   });
 });

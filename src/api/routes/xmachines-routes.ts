@@ -9,6 +9,7 @@ import type BetterSqlite from "better-sqlite3";
 import type { DatabaseService } from "../../db/database.js";
 import { loadMachineEnergyCost, type CostWindow, type MachineCost } from "../../services/xmachines/cost.js";
 import { ForceChallengeService, type StartChallengeResult } from "../../services/xmachines/force-challenge.js";
+import { resolveProtectedRole } from "../../services/xmachines/protected-roles.js";
 import {
   ownerTelegramBaseOverridden,
   sendOwnerMessage,
@@ -252,6 +253,7 @@ async function power(
   wolForceChallenges: ForceChallengeService,
   telegram?: OwnerTelegram,
 ) {
+
   const auditAttempt = (
     classification: AttemptClassification,
     guards: Record<string, { ok: boolean; detail?: string }>,
@@ -298,7 +300,7 @@ async function power(
       action,
     });
   }
-  // Force confirmation is a later route. Record the attempt and do not emit --force.
+  // Force is a separate route; normal owner-off must never emit --force.
   // L15b: a missing key is rejected before any WoL challenge is created.
   if (action === "off") {
     const idempotencyKey = idempotencyKeyFromRequest(request);
@@ -377,6 +379,129 @@ async function power(
     : result.status === "rejected"
       ? "denied"
       : action;
+  const guards: Record<string, { ok: boolean; detail?: string }> = {};
+  if (replayed) {
+    guards.idempotency = { ok: true, detail: "replayed" };
+  } else if (result.reason) {
+    guards[result.reason] = { ok: false, detail: result.detail };
+  } else {
+    guards.accepted = { ok: true };
+  }
+  auditAttempt(classification, guards, {
+    preState: observed,
+    finalState: result.status === "in-progress" ? "" : observed,
+  });
+  const code = result.status === "in-progress" ? 202 : 400;
+  return reply.code(code).send(result);
+}
+
+async function powerForce(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  coordinator: ActionCoordinator,
+  audit: AuditService | undefined,
+  name: string,
+  wolForceChallenges: ForceChallengeService,
+  telegram?: OwnerTelegram,
+) {
+  const auditAttempt = (
+    classification: AttemptClassification,
+    guards: Record<string, { ok: boolean; detail?: string }>,
+    extra?: { preState?: string; finalState?: string }
+  ) => {
+    const preState = extra?.preState ?? "";
+    recordPowerAttempt(audit, request, {
+      machine: name,
+      action: "off",
+      classification,
+      forceReason: "",
+      guards,
+      preState,
+      finalState: extra?.finalState ?? preState,
+    });
+  };
+
+  if (clientArm(request)) {
+    auditAttempt("denied", { client_arm: { ok: false } });
+    return reply.code(400).send(CLIENT_ARM_REJECTED);
+  }
+  if (!requireCanonicalHost(request, reply)) {
+    auditAttempt("denied", { host: { ok: false, detail: "host_not_allowed" } });
+    return;
+  }
+  if (!requireCanonicalOrigin(request, reply)) {
+    auditAttempt("denied", { origin: { ok: false, detail: "origin_not_allowed" } });
+    return;
+  }
+
+  const runtime = resolveXmachinesRuntime(process.env);
+  const known = runtime.telemetry.forMachine(name);
+  if (!known) {
+    auditAttempt("denied", { machine: { ok: false, detail: "unknown-machine" } });
+    return reply.code(404).send({ ok: false, actuated: false, error: "unknown-machine" });
+  }
+  const observed = known.state;
+  if (!runtime.armed) {
+    auditAttempt("denied", { armed: { ok: false, detail: "unarmed" } }, { preState: observed, finalState: observed });
+    return reply.code(403).send({ ok: false, actuated: false, mode: "fake", reason: "unarmed", machine: name, action: "off" });
+  }
+
+  const idempotencyKey = idempotencyKeyFromRequest(request);
+  if (!idempotencyKey) {
+    auditAttempt("denied", { idempotency: { ok: false, detail: "idempotency-key-required" } }, { preState: observed, finalState: observed });
+    return reply.code(400).send({ status: "rejected", reason: "idempotency-key-required" });
+  }
+
+  const sessionId = bearerToken(request) || `owner:${ownerKey(request)}`;
+  const ownerIdNum = typeof request.sessionUser?.id === "number" ? request.sessionUser.id : NaN;
+  if (!Number.isFinite(ownerIdNum)) {
+    auditAttempt("denied", { authorization: { ok: false, detail: "owner-required" } }, { preState: observed, finalState: observed });
+    return reply.code(403).send({ error: "Owner role required" });
+  }
+
+  const role = resolveProtectedRole(name);
+  if (role) {
+    auditAttempt("denied", { protected_role: { ok: false, detail: role.detail } }, { preState: observed, finalState: observed });
+    return reply.code(403).send({ status: "rejected", reason: role.reason, role: role.role, detail: role.detail });
+  }
+
+  const body = request.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    auditAttempt("denied", { challenge: { ok: false, detail: "missing-challenge-body" } }, { preState: observed, finalState: observed });
+    return reply.code(400).send({ status: "rejected", reason: "challenge-required" });
+  }
+  const rec = body as Record<string, unknown>;
+  if (typeof rec.challengeId !== "string" || rec.challengeId.trim() === "" ||
+      typeof rec.selectedNumber !== "number" || !Number.isInteger(rec.selectedNumber)) {
+    auditAttempt("denied", { challenge: { ok: false, detail: "invalid-challenge-body" } }, { preState: observed, finalState: observed });
+    return reply.code(400).send({ status: "rejected", reason: "challenge-required" });
+  }
+  const confirmed = wolForceChallenges.confirmChallenge(
+    rec.challengeId.trim(),
+    sessionId,
+    name,
+    "off",
+    rec.selectedNumber
+  );
+  if (!confirmed.ok) {
+    auditAttempt("denied", { force_confirmation: { ok: false, detail: confirmed.reason ?? "force-confirmation-required" } }, { preState: observed, finalState: observed });
+    return reply.code(400).send({ status: "rejected", reason: "force-confirmation-required", detail: confirmed.reason });
+  }
+
+  const { replayed, ...result } = coordinator.handle({
+    machine: name,
+    action: "off",
+    idempotencyKey,
+    ownerId: String(ownerIdNum),
+    sessionId,
+  });
+
+  const classification: AttemptClassification = replayed
+    ? "replayed"
+    : result.status === "rejected"
+      ? "denied"
+      : "off";
+
   const guards: Record<string, { ok: boolean; detail?: string }> = {};
   if (replayed) {
     guards.idempotency = { ok: true, detail: "replayed" };
@@ -615,5 +740,11 @@ export function registerXmachinesRoutes(
     "/api/xmachines/machines/:name/power/on",
     async (request, reply) =>
       power(request, reply, coordinator, auditService, request.params.name, "on", wolForceChallenges, telegram)
+  );
+
+  app.post<{ Params: { name: string } }>(
+    "/api/xmachines/machines/:name/power/force",
+    async (request, reply) =>
+      powerForce(request, reply, coordinator, auditService, request.params.name, wolForceChallenges, telegram)
   );
 }
