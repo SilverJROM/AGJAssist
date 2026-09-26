@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import type Database from 'better-sqlite3';
 import { persistReaderResult } from '../../db/xmachines-store.js';
+import type { DiskCliPayload } from './disk-telemetry.js';
 import { SyntheticTelemetry, type MachineTelemetry } from './telemetry.js';
 
 // Fixed contract: a reading at or above this cpu temperature is the alert condition.
@@ -8,6 +9,18 @@ const CPU_TEMP_ALERT_AT = 90;
 const PING_DEADLINE_SECS = '2';
 const SSH_CONNECT_TIMEOUT_SECS = '5';
 const COMMAND_TIMEOUT_MS = 1000;
+const DISK_DF_MARKER = '===DF===';
+// Read-only. smartctl -H stays the health probe; this separate command is per-disk SMART plus df.
+const DISK_REMOTE_COMMAND = "smartctl --scan 2>/dev/null | awk '{print $1}' | while read -r dev; do echo \"=== $dev ===\"; smartctl -H -A \"$dev\" 2>/dev/null || true; done; echo \"===DF===\"; df -B1 -P 2>/dev/null || true";
+
+function splitDiskStdout(stdout: string): DiskCliPayload {
+  const at = stdout.indexOf(DISK_DF_MARKER);
+  if (at < 0) return { smartCtl: stdout.trim(), filesystem: '' };
+  return {
+    smartCtl: stdout.slice(0, at).trim(),
+    filesystem: stdout.slice(at + DISK_DF_MARKER.length).trim(),
+  };
+}
 
 export interface SmartReading {
   machine: string;
@@ -38,6 +51,7 @@ export interface ObservedFleetMachine {
 export interface CollectorReadSource {
   readSmart(machine: string): Omit<SmartReading, 'machine'>;
   readNut(machine: string): Omit<NutReading, 'machine'>;
+  readDiskCli?(machine: string): DiskCliPayload;
 }
 
 // The fleet-observation seam. Default is SyntheticTelemetry; a caller that needs
@@ -128,6 +142,12 @@ class BoundedCommandReadSource implements CollectorReadSource {
     }
     return { battery: probed.stdout, availability: 'ok', freshness: 'fresh' };
   }
+
+  readDiskCli(machine: string): DiskCliPayload {
+    const probed = probeHost(machine, DISK_REMOTE_COMMAND);
+    if (probed.stale) return { smartCtl: '', filesystem: '' };
+    return splitDiskStdout(probed.stdout);
+  }
 }
 
 export class ReadOnlyCollector {
@@ -206,6 +226,11 @@ export class ReadOnlyCollector {
     const reading = { machine, ...this.source.readNut(machine) };
     this.sink.record({ machine, kind: 'nut', availability: reading.availability, freshness: reading.freshness, value: reading.battery });
     return reading;
+  }
+
+  readDiskCli(machine: string): DiskCliPayload {
+    if (this.source.readDiskCli) return this.source.readDiskCli(machine);
+    return { smartCtl: '', filesystem: '' };
   }
 
   // The full collection-cycle entry point: observe the fleet, then read remote
