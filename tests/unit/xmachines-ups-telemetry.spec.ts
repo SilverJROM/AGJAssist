@@ -9,7 +9,9 @@ describe('xmachines-ups-telemetry', () => {
     });
     const reading = collector.readNut('hdd');
     expect(reading.availability).toBe('ok');
-    expect(reading.battery).toContain('battery.charge');
+    expect(reading.battery).toContain('battery.charge: 100');
+    expect(reading.battery).toContain('battery.runtime: 3600');
+    expect(reading.battery).toContain('ups.load: 25');
   });
 
   it('represents absent UPS source as unavailable', () => {
