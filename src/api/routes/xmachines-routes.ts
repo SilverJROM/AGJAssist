@@ -315,11 +315,13 @@ function power(
       }
     }
   }
+  const sessionId = bearerToken(request);
   const { replayed, ...result } = coordinator.handle({
     machine: name,
     action,
     idempotencyKey: idempotencyKeyFromRequest(request),
     ownerId: ownerKey(request),
+    sessionId,
   });
   const classification: AttemptClassification = replayed
     ? "replayed"

@@ -10,6 +10,7 @@ export interface ActionRequest {
   action: 'on' | 'off';
   idempotencyKey: string;
   ownerId: string;
+  sessionId?: string;
 }
 
 export interface ActionResult {
@@ -109,7 +110,7 @@ export class ActionCoordinator {
 
   handle(request: ActionRequest): ActionResult {
     const idempotencyKey = request.idempotencyKey.trim();
-    const { machine, action, ownerId } = request;
+    const { machine, action, ownerId, sessionId = '' } = request;
 
     if (!idempotencyKey) {
       return { status: 'rejected', reason: 'idempotency-key-required' };
@@ -185,7 +186,7 @@ export class ActionCoordinator {
     this.idempotency.set(idempotencyKey, ongoing);
 
     // Detached child: handle returns before xmac.sh exits.
-    void this.launch(action, machine).then(() => {
+    void this.launch(action, machine, ownerId, sessionId).then(() => {
       const current = this.ongoing.get(operationId);
       if (!current) return;
       this.ongoing.delete(operationId);
@@ -201,7 +202,7 @@ export class ActionCoordinator {
     return { status: 'in-progress', operationId };
   }
 
-  private launch(action: 'on' | 'off', machine: string): Promise<void> {
+  private launch(action: 'on' | 'off', machine: string, ownerId: string, sessionId: string): Promise<void> {
     const argv = xmacArgv(action, machine);
     return new Promise((resolve) => {
       let settled = false;
@@ -213,7 +214,10 @@ export class ActionCoordinator {
       const child = spawn('xmac.sh', argv, {
         detached: true,
         stdio: 'ignore',
-        env: process.env,
+        env: {
+          ...process.env,
+          XMAC_CALLER: `${ownerId}+${sessionId}`,
+        },
       });
       child.once('error', done);
       child.once('exit', done);
