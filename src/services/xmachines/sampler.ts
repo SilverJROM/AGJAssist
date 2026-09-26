@@ -1,8 +1,9 @@
 import fs from 'node:fs';
-import { persistSampleCycle, type SampleReading } from '../../db/xmachines-store.js';
+import { clearGpuPollState, markGpuDriverTimeout, markGpuNoNvidia, persistSampleCycle, reconcileGpuIdentities, type SampleReading } from '../../db/xmachines-store.js';
 import { resolveXmachinesRuntime, type XmachinesRuntime } from './runtime.js';
 import { buildRegistry } from './registry.js';
 import { queryMachineGpus } from './gpu-query.js';
+import { isNoNvidia, isNonNvidiaName } from './gpu-edge-states.js';
 import type { MachineTelemetry } from './telemetry.js';
 import { spawnSync } from 'node:child_process';
 
@@ -98,23 +99,50 @@ function persistMetricHistory(runtime: XmachinesRuntime): void {
   persistSampleCycle(db, readings);
 }
 
+function finiteMetric(value: number): number | null {
+  return Number.isFinite(value) ? value : null;
+}
+
 function liveGpuReadings(runtime: XmachinesRuntime, sampleTime: string): SampleReading[] {
+  const db = runtime.telemetry.metricStore();
   const readings: SampleReading[] = [];
   for (const machine of runtime.telemetry.generate()) {
     if (machine.state === 'down') continue;
     const queried = queryMachineGpus(machine.name);
+    if (queried.timedOut) {
+      if (db) markGpuDriverTimeout(db, machine.name, sampleTime);
+      continue;
+    }
+    if (isNoNvidia(queried)) {
+      if (db) markGpuNoNvidia(db, machine.name, sampleTime);
+      continue;
+    }
+    if (db) clearGpuPollState(db, machine.name);
+    const observed = Object.values(queried.byUuid).map((gpu, ordinal) => ({
+      gpuUuid: gpu.uuid,
+      gpuName: gpu.name,
+      ordinal,
+    }));
+    if (db && observed.length > 0) {
+      try {
+        reconcileGpuIdentities(db, machine.name, observed, sampleTime);
+      } catch {
+        // Same UUID on another fleet row must not abort the rest of the cycle.
+      }
+    }
     for (const gpu of Object.values(queried.byUuid)) {
+      const suppress = isNonNvidiaName(gpu.name);
       readings.push({
         machineName: machine.name,
         gpuUuid: gpu.uuid,
         sampleTime,
-        temperature: Number.isFinite(gpu.temperatureC) ? gpu.temperatureC : null,
-        powerWatts: Number.isFinite(gpu.powerDrawW) ? gpu.powerDrawW : null,
-        utilizationGpu: Number.isFinite(gpu.utilizationGpu) ? gpu.utilizationGpu : null,
+        temperature: suppress ? null : finiteMetric(gpu.temperatureC),
+        powerWatts: suppress ? null : finiteMetric(gpu.powerDrawW),
+        utilizationGpu: suppress ? null : finiteMetric(gpu.utilizationGpu),
         utilizationMem: null,
-        fanSpeed: Number.isFinite(gpu.fanSpeedPct) ? gpu.fanSpeedPct : null,
-        vramMb: Number.isFinite(gpu.memoryUsedMiB) ? gpu.memoryUsedMiB : null,
-        vramTotalMb: Number.isFinite(gpu.memoryTotalMiB) ? gpu.memoryTotalMiB : null,
+        fanSpeed: suppress ? null : finiteMetric(gpu.fanSpeedPct),
+        vramMb: suppress ? null : finiteMetric(gpu.memoryUsedMiB),
+        vramTotalMb: suppress ? null : finiteMetric(gpu.memoryTotalMiB),
       });
     }
   }

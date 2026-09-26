@@ -552,7 +552,8 @@ CREATE TABLE IF NOT EXISTS xm_samples (
   utilization_mem REAL,
   fan_speed REAL,
   vram_mb REAL,
-  vram_total_mb REAL
+  vram_total_mb REAL,
+  poll_chip TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_xm_samples_machine_time ON xm_samples(machine_name, sample_time);
 CREATE INDEX IF NOT EXISTS idx_xm_samples_gpu_uuid ON xm_samples(gpu_uuid);
@@ -636,5 +637,8 @@ export function applyXmachinesAdditiveFixes(db: Database.Database): void {
   const sampleCols = db.pragma("table_info(xm_samples)") as { name: string }[];
   if (!sampleCols.some((col) => col.name === "vram_total_mb")) {
     db.exec("ALTER TABLE xm_samples ADD COLUMN vram_total_mb REAL");
+  }
+  if (!sampleCols.some((col) => col.name === "poll_chip")) {
+    db.exec("ALTER TABLE xm_samples ADD COLUMN poll_chip TEXT");
   }
 }

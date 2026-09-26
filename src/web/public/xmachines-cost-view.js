@@ -275,6 +275,10 @@ export function renderMachineCostDetail(payload) {
     ? `<button type="button" data-testid="xmachines-force-button" aria-label="Force ${name} off">Force Off</button>`
     : '';
   const gpuRows = Array.isArray(payload?.gpuRows) ? payload.gpuRows : [];
+  const gpuChip = typeof payload?.gpuChip === 'string' ? payload.gpuChip : '';
+  const gpuBanner = gpuRows.length === 0 && gpuChip !== ''
+    ? `<span data-testid="xmachines-gpu-chip" role="status">${escapeHtml(gpuChip)}</span>`
+    : '';
   // D10 storage/UPS panel integration
   const disks = Array.isArray(payload?.disks) ? payload.disks : [];
   const filesystems = Array.isArray(payload?.filesystems) ? payload.filesystems : [];
@@ -304,7 +308,7 @@ export function renderMachineCostDetail(payload) {
   const upsPanel = ups
     ? `<div class="ups-panel" data-machine="${escapeHtml(name)}"><span class="ups-battery">${escapeHtml(ups.batteryChargePct ?? 'unavailable')}</span><span class="ups-runtime">${escapeHtml(ups.runtimeSeconds != null ? `${ups.runtimeSeconds}s` : 'unavailable')}</span><span class="ups-load">${escapeHtml(ups.loadPct ?? 'unavailable')}</span></div>`
     : `<div class="ups-panel" data-machine="${escapeHtml(name)}"><span class="ups-battery">unavailable</span><span class="ups-runtime">unavailable</span><span class="ups-load">unavailable</span></div>`;
-  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine, history)}${gpuRowHtml}${hddPanel}${upsPanel}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${offButton}${forceButton}${challengeBlock}${forceRefusalBlock}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
+  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine, history)}${gpuBanner}${gpuRowHtml}${hddPanel}${upsPanel}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${offButton}${forceButton}${challengeBlock}${forceRefusalBlock}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
 }
 
 function defaultIdempotencyKey() {

@@ -711,7 +711,11 @@ export function registerXmachinesRoutes(
     const wolSafety = evidence ? presentWolSafety(evidence) : null;
     const nowIso = new Date().toISOString();
     const roleHint = (machine.roleHint ?? '') as string;
-    const gpuRows = db ? loadGpuTelemetryRows(db as any, { machine: request.params.name, roleHint, nowIso, refresh: false }).apiRows : [];
+    // live poll on read for timeout/no-NVIDIA detection; sampler marker remains fallback for non-viewed machines.
+    const gpuSurface = db
+      ? loadGpuTelemetryRows(db as any, { machine: request.params.name, roleHint, nowIso, refresh: true })
+      : null;
+    const gpuRows = gpuSurface ? gpuSurface.apiRows : [];
     const panel = renderHddDiskPanel(runtime.telemetry, request.params.name);
     const nut = runtime.telemetry.readNut(request.params.name);
     const parsed = parseNutStatus(nut.battery);
@@ -730,6 +734,8 @@ export function registerXmachinesRoutes(
       armed: runtime.armed,
       machine,
       gpuRows,
+      gpuChip: gpuSurface ? gpuSurface.chip : '',
+      gpuState: gpuSurface ? gpuSurface.state : '',
       disks,
       filesystems,
       ups,

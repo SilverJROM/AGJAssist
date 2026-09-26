@@ -117,6 +117,7 @@ describe("xmachines migration A11", () => {
     expect(sampleCols.map((c) => c.name)).toContain("gpu_uuid");
     expect(sampleCols.map((c) => c.name)).toContain("machine_name");
     expect(sampleCols.map((c) => c.name)).toContain("vram_total_mb");
+    expect(sampleCols.map((c) => c.name)).toContain("poll_chip");
     const deviceCols = db.raw.pragma("table_info(xm_devices)") as Array<{ name: string }>;
     expect(deviceCols.map((c) => c.name)).toContain("ordinal");
     expectActionStateShape(db);
@@ -159,6 +160,7 @@ describe("xmachines migration A11", () => {
     expect(version.version).toBe(40);
     const sampleCols = db.raw.pragma("table_info(xm_samples)") as Array<{ name: string }>;
     expect(sampleCols.map((col) => col.name)).toContain("vram_total_mb");
+    expect(sampleCols.map((col) => col.name)).toContain("poll_chip");
     db.close();
   });
 

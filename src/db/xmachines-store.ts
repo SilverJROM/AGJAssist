@@ -111,3 +111,62 @@ export function reconcileGpuIdentities(
 
   apply(observed);
 }
+
+// Not a GPU. One row per machine records a poll that produced no inventory
+// (no-NVIDIA, or a timeout before any sample existed).
+export const GPU_POLL_MARKER_UUID = "__xm_poll__";
+
+function latestGpuSampleIds(db: Database.Database, machineName: string): number[] {
+  const rows = db.prepare(`
+    SELECT id, gpu_uuid FROM xm_samples
+    WHERE machine_name = ? AND gpu_uuid != ?
+    ORDER BY sample_time DESC, id DESC
+  `).all(machineName, GPU_POLL_MARKER_UUID) as Array<{ id: number; gpu_uuid: string }>;
+  const seen = new Set<string>();
+  const ids: number[] = [];
+  for (const row of rows) {
+    if (seen.has(row.gpu_uuid)) continue;
+    seen.add(row.gpu_uuid);
+    ids.push(row.id);
+  }
+  return ids;
+}
+
+export function clearGpuPollState(db: Database.Database, machineName: string): void {
+  db.prepare("DELETE FROM xm_samples WHERE machine_name = ? AND gpu_uuid = ?")
+    .run(machineName, GPU_POLL_MARKER_UUID);
+  db.prepare("UPDATE xm_samples SET poll_chip = NULL WHERE machine_name = ?")
+    .run(machineName);
+}
+
+export function markGpuDriverTimeout(db: Database.Database, machineName: string, sampleTime: string): void {
+  const apply = db.transaction(() => {
+    db.prepare("DELETE FROM xm_samples WHERE machine_name = ? AND gpu_uuid = ?")
+      .run(machineName, GPU_POLL_MARKER_UUID);
+    const ids = latestGpuSampleIds(db, machineName);
+    if (ids.length === 0) {
+      db.prepare(`
+        INSERT INTO xm_samples (machine_name, gpu_uuid, sample_time, poll_chip)
+        VALUES (?, ?, ?, 'error-timeout')
+      `).run(machineName, GPU_POLL_MARKER_UUID, sampleTime);
+      return;
+    }
+    const update = db.prepare("UPDATE xm_samples SET poll_chip = 'error-timeout' WHERE id = ?");
+    for (const id of ids) update.run(id);
+  });
+  apply();
+}
+
+export function markGpuNoNvidia(db: Database.Database, machineName: string, sampleTime: string): void {
+  const apply = db.transaction(() => {
+    db.prepare("UPDATE xm_samples SET poll_chip = NULL WHERE machine_name = ? AND gpu_uuid != ?")
+      .run(machineName, GPU_POLL_MARKER_UUID);
+    db.prepare("DELETE FROM xm_samples WHERE machine_name = ? AND gpu_uuid = ?")
+      .run(machineName, GPU_POLL_MARKER_UUID);
+    db.prepare(`
+      INSERT INTO xm_samples (machine_name, gpu_uuid, sample_time, poll_chip)
+      VALUES (?, ?, ?, 'no-NVIDIA')
+    `).run(machineName, GPU_POLL_MARKER_UUID, sampleTime);
+  });
+  apply();
+}

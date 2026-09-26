@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { persistSampleCycle, reconcileGpuIdentities, type SampleReading } from '../../db/xmachines-store.js';
+import { GPU_POLL_MARKER_UUID, persistSampleCycle, reconcileGpuIdentities, type SampleReading } from '../../db/xmachines-store.js';
 import { queryMachineGpus, type GpuQueryResult, type GpuReading } from './gpu-query.js';
 
 // A poll older than this against the caller clock is an expired sample.
@@ -44,13 +44,14 @@ interface StoredSample {
   fan_speed: number | null;
   vram_mb: number | null;
   vram_total_mb: number | null;
+  poll_chip: string | null;
 }
 
 function finiteOrNull(value: number): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-function isNonNvidiaName(name: string): boolean {
+export function isNonNvidiaName(name: string): boolean {
   return !/NVIDIA/i.test(name);
 }
 
@@ -61,7 +62,7 @@ function isExpired(sampleTime: string, nowIso: string): boolean {
   return nowMs - sampleMs > GPU_SAMPLE_FRESH_MS;
 }
 
-function isNoNvidia(result: GpuQueryResult): boolean {
+export function isNoNvidia(result: GpuQueryResult): boolean {
   if (result.timedOut || Object.keys(result.byUuid).length > 0) return false;
   if (result.errorCode === 'ENOENT') return true;
   return NO_NVIDIA_STDERR.test(result.stderr);
@@ -166,7 +167,7 @@ function rowFromStored(row: StoredSample, chip: string): GpuApiRow {
 function latestSamples(db: Database.Database, machine: string): StoredSample[] {
   const rows = db.prepare(`
     SELECT s.gpu_uuid, d.gpu_name, s.sample_time, s.temperature, s.power_watts,
-           s.utilization_gpu, s.fan_speed, s.vram_mb, s.vram_total_mb
+           s.utilization_gpu, s.fan_speed, s.vram_mb, s.vram_total_mb, s.poll_chip
     FROM xm_samples s
     LEFT JOIN xm_devices d ON d.gpu_uuid = s.gpu_uuid
     WHERE s.machine_name = ?
@@ -212,9 +213,18 @@ function renderStored(
   request: GpuTelemetryRequest,
   reason: 'read' | 'timeout',
 ): GpuTelemetrySurface {
-  const stored = latestSamples(db, request.machine);
+  const all = latestSamples(db, request.machine);
+  const marker = all.find((row) => row.gpu_uuid === GPU_POLL_MARKER_UUID) ?? null;
+  const stored = all.filter((row) => row.gpu_uuid !== GPU_POLL_MARKER_UUID);
+  // A stored no-NVIDIA poll is machine-wide and hides inventory, matching a live poll.
+  if (reason === 'read' && marker?.poll_chip === 'no-NVIDIA') {
+    return renderSurface(request.machine, 'no-nvidia', 'no-NVIDIA', [], false, []);
+  }
   // A timeout is not an empty inventory. Do not reconcile those GPUs away.
-  if (reason === 'timeout') {
+  const timedOut = reason === 'timeout'
+    || marker?.poll_chip === 'error-timeout'
+    || stored.some((row) => row.poll_chip === 'error-timeout');
+  if (timedOut) {
     const rows = stored.map((row) => rowFromStored(row, 'error-timeout'));
     return renderSurface(
       request.machine,
