@@ -782,4 +782,27 @@ export function registerXmachinesRoutes(
     async (request, reply) =>
       powerForce(request, reply, auditService, request.params.name, wolForceChallenges)
   );
+
+  app.get("/api/xmachines/audit", async (request, reply) => {
+    if (clientArm(request)) {
+      return reply.code(400).send(CLIENT_ARM_REJECTED);
+    }
+    if (!requireCanonicalHost(request, reply)) return;
+    if (!requireCanonicalOrigin(request, reply)) return;
+    if (!request.sessionUser || request.sessionUser.role !== "owner") {
+      return reply.code(403).send({ error: "Owner role required" });
+    }
+    if (!auditService) {
+      return reply.code(500).send({ error: "audit_unavailable" });
+    }
+    const query = request.query as Record<string, string>;
+    const limit = query.limit ? Math.min(Number(query.limit), 500) : 100;
+    const offset = query.offset ? Number(query.offset) : 0;
+    const entries = auditService.query({
+      actionType: "xmachines_power",
+      limit,
+      offset,
+    });
+    return { entries };
+  });
 }
