@@ -268,22 +268,11 @@ export function renderMachineCostDetail(payload) {
   const flag = placeholder ? 'placeholder tariff' : 'configured tariff';
   const flagAria = placeholder ? 'Tariff is a placeholder' : 'Tariff is configured';
   const caveat = escapeHtml(typeof cost.caveat === 'string' ? cost.caveat : '');
-  const offRefusal = payload && payload.offRefusal;
-  const onRefusal = payload && payload.onRefusal;
-  const powerState = powerStateLabel(machine);
-  const isOffline = isOfflineMachine(machine);
-  const onInFlight = payload && payload.powerActionInProgress === 'on';
-  const offInFlight = payload && payload.powerActionInProgress === 'off';
-  const canOn = !machine.state || machine.state === 'down' || machine.state === 'offline' || offInFlight;
-  const canOff = (!isOffline && machine.state && machine.state !== 'down' && machine.state !== 'offline') || onInFlight;
-  const onButton = machine.name != null && canOn && !onInFlight
-    ? `<button type="button" data-testid="xmachines-on-button" aria-label="Turn ${name} on">Turn On</button>`
-    : '';
-  const offButton = machine.name != null && canOff && !offInFlight
+  const offButton = machine.name != null
     ? `<button type="button" data-testid="xmachines-off-button" aria-label="Turn ${name} off">Turn Off</button>`
     : '';
-  const inProgressSpan = (onInFlight || offInFlight)
-    ? `<div data-testid="xmachines-power-inprogress" role="status">In Progress</div>`
+  const forceButton = machine.name != null
+    ? `<button type="button" data-testid="xmachines-force-button" aria-label="Force ${name} off">Force Off</button>`
     : '';
   const gpuRows = Array.isArray(payload?.gpuRows) ? payload.gpuRows : [];
   const gpuRowHtml = gpuRows.map(row => {
@@ -297,7 +286,13 @@ export function renderMachineCostDetail(payload) {
     const fan = escapeHtml(row.fan ?? '');
     return `<div class="gpu-row" data-testid="xmachines-gpu-row" data-gpu-uuid="${uuid}"><span data-testid="xmachines-gpu-name">${gpuName}</span><span data-testid="xmachines-gpu-chip" role="status">${chip}</span><span data-testid="xmachines-gpu-util">${util}</span><span data-testid="xmachines-gpu-vram">${memory}</span><span data-testid="xmachines-gpu-temp">${temp}</span><span data-testid="xmachines-gpu-power">${power}</span><span data-testid="xmachines-gpu-fan">${fan}</span></div>`;
   }).join('');
-  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine, history)}${gpuRowHtml}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${inProgressSpan}${onButton}${offButton}${renderNormalOffRefusal(payload && payload.offRefusal)}${renderNormalOnRefusal(payload && payload.onRefusal)}</section>`;
+  const challenge = payload && payload.forceChallenge;
+  const confirmationText = typeof payload?.forceConfirmation === 'string' ? payload.forceConfirmation : '';
+  const challengeBlock = (challenge && challenge.displayNumber != null)
+    ? `<div data-testid="xmachines-force-challenge" data-challenge="${escapeHtml(String(challenge.challengeId))}"><div data-testid="xmachines-force-confirmation">Force confirmation\n${escapeHtml(confirmationText)}</div><div data-testid="xmachines-force-confirmation-text">Process probe:\n${escapeHtml(confirmationText)}</div><button type="button" data-testid="xmachines-force-confirm" aria-label="Confirm force off">Confirm Force Off ${challenge.displayNumber}</button><span data-testid="xmachines-force-number" data-number="${challenge.displayNumber}">${challenge.displayNumber}</span></div>`
+    : '';
+  const forceRefusalBlock = renderForceRefusal(payload && payload.forceRefusal);
+  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine, history)}${gpuRowHtml}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${offButton}${forceButton}${challengeBlock}${forceRefusalBlock}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
 }
 
 function defaultIdempotencyKey() {
@@ -307,40 +302,46 @@ function defaultIdempotencyKey() {
   return 'xm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 
-// The real normal-Off/On action: POSTs the app's own power route and merges a
+// The real normal-Off action: POSTs the app's own power/off route and merges a
 // rejection into the payload so renderMachineCostDetail can show it. Shared by
 // the app UI and by tests, so a browser-driven click exercises the exact same
 // request/merge mechanism the deployed detail page uses — not a stand-in for it.
 export async function handleMachineDetailClick(event, payload, options = {}) {
-  const target = event && event.target && typeof event.target.closest === 'function'
-    ? event.target.closest('[data-testid="xmachines-off-button"], [data-testid="xmachines-on-button"]')
+  const offTarget = event && event.target && typeof event.target.closest === 'function'
+    ? event.target.closest('[data-testid="xmachines-off-button"]')
     : null;
-  if (!target) return payload;
+  const forceTarget = event && event.target && typeof event.target.closest === 'function'
+    ? event.target.closest('[data-testid="xmachines-force-button"]')
+    : null;
+  if (!offTarget && !forceTarget) return payload;
   if (event && typeof event.preventDefault === 'function') event.preventDefault();
   const name = payload && payload.machine && payload.machine.name;
   if (!name) return payload;
   const fetchImpl = options.fetch || (typeof fetch !== 'undefined' ? fetch : null);
   if (!fetchImpl) return payload;
-  const isOn = target.getAttribute('data-testid') === 'xmachines-on-button';
-  const action = isOn ? 'on' : 'off';
   const idempotencyKey = typeof options.idempotencyKey === 'function' ? options.idempotencyKey() : defaultIdempotencyKey();
-  const res = await fetchImpl(`/api/xmachines/machines/${encodeURIComponent(name)}/power/${action}`, {
+  const isForce = !!forceTarget;
+  const path = isForce
+    ? `/api/xmachines/machines/${encodeURIComponent(name)}/power/force`
+    : `/api/xmachines/machines/${encodeURIComponent(name)}/power/off`;
+  const res = await fetchImpl(path, {
     method: 'POST',
-    headers: { 'Idempotency-Key': idempotencyKey },
+    headers: { 'Idempotency-Key': idempotencyKey, 'Content-Type': 'application/json' },
+    body: isForce ? JSON.stringify({ challengeId: payload?.forceChallenge?.challengeId, selectedNumber: payload?.forceChallenge?.selectedNumber }) : undefined,
   });
   let body = null;
   try { body = await res.json(); } catch {}
-  if (res.ok) {
-    // Action accepted: mark which action is in flight, not just that one is
-    return { ...payload, powerActionInProgress: action, offRefusal: undefined, onRefusal: undefined };
+  if (res.ok || !body) return payload;
+  if (isForce && body && body.status === 'challenge') {
+    return { ...payload, forceChallenge: { challengeId: body.challengeId, displayNumber: body.displayNumber }, forceConfirmation: body.confirmation };
   }
-  if (!body) return payload;
-  // Rejection: store refusal with action-specific key
-  if (action === 'off') {
+  if (isForce && body && body.status === 'in-progress') {
+    return { ...payload, forceChallenge: null, forceConfirmation: '' };
+  }
+  if (!isForce) {
     return { ...payload, offRefusal: body };
-  } else {
-    return { ...payload, onRefusal: body };
   }
+  return { ...payload, forceRefusal: body };
 }
 
 // Exact normal-Off refusal. Absent on read payloads, so existing detail markup is unchanged.
@@ -353,14 +354,13 @@ export function renderNormalOffRefusal(refusal) {
   return `<div data-testid="xmachines-off-refusal-block" role="group" aria-label="Normal Off refusal"><p data-testid="xmachines-off-refusal" role="alert" aria-label="${escapeHtml(exact)}">${escapeHtml(exact)}</p><p data-testid="xmachines-off-refusal-reason" aria-label="${escapeHtml(reason)}">${escapeHtml(reason)}</p></div>`;
 }
 
-// Exact normal-On refusal renderer with distinct ids/labels.
-export function renderNormalOnRefusal(refusal) {
+export function renderForceRefusal(refusal) {
   if (!refusal || typeof refusal !== 'object') return '';
   const reason = typeof refusal.reason === 'string' ? refusal.reason : '';
   const detail = typeof refusal.detail === 'string' ? refusal.detail : '';
   if (!reason && !detail) return '';
   const exact = detail || reason;
-  return `<div data-testid="xmachines-on-refusal-block" role="group" aria-label="Normal On refusal"><p data-testid="xmachines-on-refusal" role="alert" aria-label="${escapeHtml(exact)}">${escapeHtml(exact)}</p><p data-testid="xmachines-on-refusal-reason" aria-label="${escapeHtml(reason)}">${escapeHtml(reason)}</p></div>`;
+  return `<div data-testid="xmachines-force-refusal-block" role="group" aria-label="Force Off refusal"><p data-testid="xmachines-force-refusal" role="alert" aria-label="${escapeHtml(exact)}">${escapeHtml(exact)}</p><p data-testid="xmachines-force-refusal-reason" aria-label="${escapeHtml(reason)}">${escapeHtml(reason)}</p></div>`;
 }
 
 function renderWolSafety(wolSafety) {
