@@ -3,62 +3,69 @@ run_id: xmachines-2026-09-25
 project: agjassist-xmachines
 north_star_ref: xmachines/projcore-run-2026-09-25/north-star.md
 stamped_by: agj                              # north author session (also the consult handle)
-stamped_at: 2026-09-25T09:54:49+00:00
+stamped_at: 2026-09-26T06:20:00+00:00
+# REVISION 2 (JROM 2026-09-26): CODEX FULLY CUT for usage hygiene (codex bucket ~depleted until Monday
+# reset). All codex seats reallocated to Claude per JROM: codex55/gpt-5.5 → sonnet5, terra → sonnet5,
+# sol → opus5, luna → haiku. Grok (grok47/grok45/grokcompose = separate xAI quota) and local seats
+# (glimmer/signal = unmetered) are UNCHANGED. Rev 1 stamped 2026-09-25T09:54:49Z. In-flight seats finish
+# on their current model; ALL NEW dispatches use this roster.
 
-# planning_criticality: high (carried in the briefing packet). Remote power-off is irreversible +
-# tunnel-exposed → requirements review engaged; red-team on architecturally-significant batches.
+# planning_criticality: high. (Planning is COMPLETE — these reviewer/co-planner/deliberation seats are
+# retained for validity + any re-plan only; they do not run in the remaining execution.)
 
-requirements_reviewers:                      # ENGAGED (high criticality) — run BEFORE planning
+requirements_reviewers:
   - { model: grok,   launch: "grok --always-approve" }   # NO -m: tracks the CLI default
-  - { model: sol,    launch: "codex -m gpt-5.6-sol -c model_reasoning_effort=\"xhigh\" --dangerously-bypass-approvals-and-sandbox" }
+  - { model: opus5,  launch: "claude --dangerously-skip-permissions --model claude-opus-5" }   # was sol (codex) → opus5
 
-plan_reviewers:                              # ALWAYS — gates Tiller (file-based PLAN-READY → plan-approval.md)
-  - { model: sol,    launch: "codex -m gpt-5.6-sol -c model_reasoning_effort=\"xhigh\" --dangerously-bypass-approvals-and-sandbox" }
+plan_reviewers:
+  - { model: opus5,  launch: "claude --dangerously-skip-permissions --model claude-opus-5" }   # was sol (codex) → opus5
 
-co_planners:                                 # EXACTLY 2 — "planner = sol + opus"
-  - { id: A, model: opus5, launch: "claude --dangerously-skip-permissions --model claude-opus-5" }
-  - { id: B, model: sol,   launch: "codex -m gpt-5.6-sol -c model_reasoning_effort=\"xhigh\" --dangerously-bypass-approvals-and-sandbox" }
+co_planners:                                 # EXACTLY 2 — planning is done; retained for validity/re-plan
+  - { id: A, model: opus5,   launch: "claude --dangerously-skip-permissions --model claude-opus-5" }
+  - { id: B, model: sonnet5, launch: "claude --dangerously-skip-permissions --model claude-sonnet-5" }   # was sol (codex) → a DISTINCT Claude voice (sonnet5) so the pair stays cross-model
 
-implementer:                                 # tiered — pre-routed per batch via impl_tier
-  L1: { model: glimmer, launch: "grok --always-approve -m glimmer-pipe" }   # muse-glimmer-30b · LOCAL/unmetered · meter_shim :8427 -> .179
+implementer:                                 # tiered — UNCHANGED (no codex here)
+  L1: { model: glimmer, launch: "grok --always-approve -m glimmer-pipe" }   # muse-glimmer-30b · LOCAL/unmetered
   L2: { model: grok47,  launch: "grok --always-approve -m grok-4.7" }
   L3: { model: sonnet5, launch: "claude --dangerously-skip-permissions --model claude-sonnet-5" }
 
 validator:                                   # tiered (verifier ≠ fixer at every tier)
-  L1: { model: signal,  launch: "grok --always-approve -m signal4500-174" } # signal-27b-4500 · LOCAL/unmetered · .174:8110  (⚠ O3: confirm capable)
-  L2: { model: codex55, launch: "codex -m gpt-5.5 --dangerously-bypass-approvals-and-sandbox" }
+  L1: { model: signal,  launch: "grok --always-approve -m signal4500-174" } # signal-27b-4500 · LOCAL/unmetered
+  L2: { model: sonnet5, launch: "claude --dangerously-skip-permissions --model claude-sonnet-5" }   # was codex55 (gpt-5.5) → sonnet5
   L3: { model: opus5,   launch: "claude --dangerously-skip-permissions --model claude-opus-5" }
-  # No L4: sol was the only L4 and is now planner-only. L4 is optional/additive — omitted.
+  # VERIFIER≠FIXER GUARD: implementer L3 is ALSO sonnet5. On any row whose implementer lands at L3
+  # (sonnet5), the validator MUST use L3 (opus5), never L2 (sonnet5) — a model must never grade its own
+  # work. Tiller's "reviewer stays above the seat it reviews" rule already enforces this; it is stated
+  # here so no future routing weakens it.
 
-deliberation_panel:                          # planning-stage front gate (HIGH → convene only on JROM approval)
+deliberation_panel:                          # planning-stage (not used in remaining execution)
   convergence: strict-unanimous
   max_rounds: 3
-  settle: [opus5, sol]
+  settle: [opus5, sonnet5]                    # was [opus5, sol]; sol (codex) → sonnet5 to keep two DISTINCT arbiters
   panelists:
     - { model: opus,    profile: agj-panelist }
-    - { model: sol,     profile: agj-panelist }
-    - { model: sonnet,  profile: agj-panelist }
+    - { model: sonnet,  profile: agj-panelist }   # (was sol/codex — dropped; panel stays cross-family Claude+grok)
     - { model: grok45,  profile: agj-panelist }
 
-redteam_panel:                               # impl-stage diff-level back gate — the ONLY seats that did not co-plan
+redteam_panel:                               # impl-stage diff-level back gate — the ONLY independent seats
   convergence: bounded-clean
-  N: 3                                        # hard round cap (bounded-clean: ≥1 clean · typical 2 · cap 3)
+  N: 3
   min_clean_rounds: 1
   typical_rounds: 2
   max_rounds: 3
   at_cap: settle-and-agree
   consecutive_clean_requires_jrom_approval_at_discovery: true
-  tiers:
-    budget:   { count: 3, models: [grok45, luna, sonnet] }
-    standard: { count: 3, models: [opus, terra, grok45] }
-    elite:    { count: 6, models: [opus, codex55, sonnet, terra, grok45, grokcompose] }
+  tiers:                                      # CODEX REMOVED — cross-family diversity now Claude + grok only
+    budget:   { count: 3, models: [grok45, haiku, sonnet] }                 # was [grok45, luna, sonnet]; luna(codex)→haiku
+    standard: { count: 3, models: [opus, sonnet, grok45] }                  # was [opus, terra, grok45]; terra(codex)→sonnet
+    elite:    { count: 6, models: [opus, sonnet, sonnet5, haiku, grok45, grokcompose] }  # was [opus, codex55, sonnet, terra, grok45, grokcompose]; codex55+terra→Claude tiers
 
 routing_notes:
-  default_impl_tier: L1                       # target 90-95% landing on glimmer
+  default_impl_tier: L1
   default_validator_tier: L2
-  usage_hygiene: "impl-L1 (glimmer) + validator-L1 (signal) are LOCAL + UNMETERED — prefer them; agent-usage.sh governs only metered seats (grok47/sonnet5/opus5/codex55/sol). OPERATIONAL: local seats need their GPU boxes UP — this effort controls machine power, so never power off .179 (glimmer) or .174 (signal) while the run is live."
+  usage_hygiene: "REV2 (JROM 2026-09-26): CODEX CUT until Monday reset — codex55/terra→sonnet5, sol→opus5, luna→haiku. Claude budget in use for what codex covered; grok (grok47/grok45/grokcompose) + local glimmer/signal unchanged. VERIFIER≠FIXER: never validate a sonnet5-implemented row with sonnet5-L2 — escalate that validation to opus5-L3. OPERATIONAL: never power off .179 (glimmer) or .174 (signal) while the run is live."
 
-coordinator:                                 # escalation-brain seat = grok47 (JROM override of the Opus default)
+coordinator:                                 # grok47 (grok = separate xAI quota, not codex — UNCHANGED)
   primary: { model: grok47, launch: "grok --always-approve --agent projcore -m grok-4.7" }
   backups:
     - { model: sonnet, launch: "claude --dangerously-skip-permissions --model sonnet" }
