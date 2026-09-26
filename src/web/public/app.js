@@ -7855,6 +7855,72 @@ async function attachFleetHistory(payload) {
   }));
 }
 
+function XmachinesAuditPage() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const data = await api('/api/xmachines/audit?limit=200');
+        if (cancelled) return;
+        setRows(Array.isArray(data?.entries) ? data.entries : []);
+      } catch (e) {
+        if (!cancelled) setError(String(e.message || e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    const id = setInterval(load, 30000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+  return html`
+    <div class="xmachines-view" data-testid="xmachines-power-audit">
+      <h2>Power Audit</h2>
+      ${loading ? html`<div>Loading...</div>` : ''}
+      ${error ? html`<div style="color:red">${error}</div>` : ''}
+      <table data-testid="xmachines-audit-table" style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Target</th>
+            <th>Action</th>
+            <th>Classification</th>
+            <th>Actor</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r) => {
+            let details = r.details;
+            let parsed = null;
+            try { parsed = typeof details === 'string' ? JSON.parse(details) : details; } catch {}
+            const cls = parsed?.classification || '';
+            const target = parsed?.target || '';
+            const actor = parsed?.actor_id ?? parsed?.user_id ?? '';
+            return html`
+              <tr data-testid="xmachines-audit-row">
+                <td>${escapeHtml(r.timestamp || '')}</td>
+                <td>${escapeHtml(target)}</td>
+                <td>${escapeHtml(parsed?.action || '')}</td>
+                <td>${escapeHtml(cls)}</td>
+                <td>${escapeHtml(String(actor))}</td>
+                <td>
+                  <div data-testid="xmachines-audit-details">
+                    ${parsed ? html`<pre>${escapeHtml(JSON.stringify(parsed, null, 2))}</pre>` : html`${escapeHtml(String(details))}`}
+                  </div>
+                </td>
+              </tr>
+            `;
+          })}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function XmachinesFleetPage() {
   const [markup, setMarkup] = useState('');
   useEffect(() => {
@@ -7952,7 +8018,7 @@ function TgApp() {
     const KNOWN_PREFIXES = ['/project/', '/xmachines/'];
     const KNOWN_EXACT = new Set([
       '/', '/projects', '/terminals', '/tasks',
-      '/notes', '/settings', '/agent-os', '/mcp-access', '/xmachines'
+      '/notes', '/settings', '/agent-os', '/mcp-access', '/xmachines', '/xmachines/audit'
     ]);
     // Owner-only routing guard for KNOWN_EXACT
     if (initialHash === '/xmachines') {
@@ -8007,6 +8073,8 @@ function TgApp() {
       content = html`<div class="empty-state">Owner role required</div>`;
     } else if (route === '/xmachines') {
       content = html`<${XmachinesFleetPage} />`;
+    } else if (route === '/xmachines/audit') {
+      content = html`<${XmachinesAuditPage} />`;
     } else {
       const name = decodeURIComponent(route.split('/')[2] || '');
       content = html`<${XmachinesDetailPage} name=${name} key=${name} />`;
@@ -8416,6 +8484,8 @@ function App() {
       content = html`<div class="empty-state">Owner role required</div>`;
     } else if (route === '/xmachines') {
       content = html`<${XmachinesFleetPage} />`;
+    } else if (route === '/xmachines/audit') {
+      content = html`<${XmachinesAuditPage} />`;
     } else {
       const name = decodeURIComponent(route.split('/')[2] || '');
       content = html`<${XmachinesDetailPage} name=${name} key=${name} />`;
