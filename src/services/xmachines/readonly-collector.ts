@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import type Database from 'better-sqlite3';
 import { persistReaderResult } from '../../db/xmachines-store.js';
 import type { DiskCliPayload } from './disk-telemetry.js';
+import { registryFleetFromEnv } from './fleet-read-model.js';
 import { SyntheticTelemetry, type MachineTelemetry } from './telemetry.js';
 
 // Fixed contract: a reading at or above this cpu temperature is the alert condition.
@@ -208,11 +209,22 @@ export class ReadOnlyCollector {
     return this.gpuReadings;
   }
 
+  // An installed source (sampler spy, observed fleet) wins. The status fixture
+  // applies only while the collector is still on its default fleet.
+  private registryFleet(): MachineTelemetry[] | null {
+    if (!(this.telemetry instanceof SyntheticTelemetry)) return null;
+    return registryFleetFromEnv(process.env);
+  }
+
   generate(): MachineTelemetry[] {
+    const fleet = this.registryFleet();
+    if (fleet) return fleet;
     return this.telemetry.generate();
   }
 
   forMachine(name: string): MachineTelemetry | undefined {
+    const fleet = this.registryFleet();
+    if (fleet) return fleet.find((machine) => machine.name === name);
     return this.telemetry.forMachine(name);
   }
 

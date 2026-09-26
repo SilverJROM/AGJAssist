@@ -1,3 +1,16 @@
+export interface MachineReadTelemetry {
+  gpuTempMax: number | null;
+  powerWatts: number | null;
+  uptime: string | null;
+}
+
+export interface MachineBusyRead {
+  busyCheckOutput: string;
+  leaseNames: string[];
+  isBusy: boolean;
+  refusalExplanation: string;
+}
+
 export interface MachineTelemetry {
   name: string;
   state: 'up' | 'down' | 'synthetic';
@@ -8,6 +21,10 @@ export interface MachineTelemetry {
   provenance: string;
   sampleAge: string;
   roleHint?: string;
+  offline?: boolean;
+  freshness?: string;
+  telemetry?: MachineReadTelemetry;
+  busy?: MachineBusyRead;
 }
 
 // Fixed local/test fixture. Values are the contract literals, not live sensors.

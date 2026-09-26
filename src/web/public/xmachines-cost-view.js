@@ -12,15 +12,61 @@ function displayAmount(value) {
   return '';
 }
 
-// Fleet overview prints name and state only. Cost fields on a machine are ignored.
+function isOfflineMachine(machine) {
+  return !!(machine && (machine.offline === true || machine.state === 'down'));
+}
+
+function powerStateLabel(machine) {
+  if (!machine) return '';
+  if (isOfflineMachine(machine)) return 'offline';
+  return machine.state != null ? String(machine.state) : '';
+}
+
+function fieldSpan(testId, text) {
+  if (text == null || text === '') return '';
+  return `<span data-testid="${testId}">${escapeHtml(text)}</span>`;
+}
+
+// Cost fields are never printed. Down machines show offline and no live metrics.
+function liveMetricSpans(machine) {
+  if (!machine || isOfflineMachine(machine)) return '';
+  const temp = typeof machine.gpuTemp === 'number' ? `${machine.gpuTemp}°C` : '';
+  const power = typeof machine.powerWatts === 'number' ? `${machine.powerWatts} W` : '';
+  const uptime = typeof machine.uptime === 'string' ? machine.uptime : '';
+  return `${fieldSpan('xmachines-gpu-temp', temp)}${fieldSpan('xmachines-power-draw', power)}${fieldSpan('xmachines-uptime', uptime)}`;
+}
+
+function serviceSpans(machine) {
+  if (!machine) return '';
+  const freshness = typeof machine.freshness === 'string' ? machine.freshness : '';
+  const provenance = typeof machine.provenance === 'string' ? machine.provenance : '';
+  const busy = machine.busy && typeof machine.busy.busyCheckOutput === 'string' ? machine.busy.busyCheckOutput : '';
+  const leases = machine.busy && Array.isArray(machine.busy.leaseNames) && machine.busy.leaseNames.length
+    ? machine.busy.leaseNames.join(', ')
+    : '';
+  return `${fieldSpan('xmachines-freshness', freshness)}${fieldSpan('xmachines-provenance', provenance)}${fieldSpan('xmachines-busy', busy)}${fieldSpan('xmachines-leases', leases)}`;
+}
+
+// Fleet overview prints name and power state. Cost fields on a machine are ignored.
 export function renderFleetOverview(payload) {
   const machines = payload && Array.isArray(payload.machines) ? payload.machines : [];
   const items = machines.map((machine) => {
     const name = escapeHtml(machine && machine.name != null ? machine.name : '');
-    const state = escapeHtml(machine && machine.state != null ? machine.state : '');
-    return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}">${name} ${state}</li>`;
+    const state = escapeHtml(powerStateLabel(machine));
+    const extra = `${liveMetricSpans(machine)}${serviceSpans(machine)}`;
+    const tail = extra ? ` ${extra}` : '';
+    return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}">${name} ${state}${tail}</li>`;
   }).join('');
   return `<section class="xm-fleet" data-testid="xmachines-fleet-overview" role="region" aria-label="Fleet overview"><h1>Fleet overview</h1><ul>${items}</ul></section>`;
+}
+
+function renderReadout(machine) {
+  if (!machine) return '';
+  const hasModel = machine.state != null || machine.offline != null || machine.freshness || machine.telemetry || machine.busy;
+  if (!hasModel) return '';
+  const state = powerStateLabel(machine);
+  const stateHtml = state ? `<p data-testid="xmachines-power-state">${escapeHtml(state)}</p>` : '';
+  return `<div data-testid="xmachines-read-model">${stateHtml}${liveMetricSpans(machine)}${serviceSpans(machine)}</div>`;
 }
 
 // Detail is the only surface that shows PHP cost, the tariff flag, and the short-burst caveat.
@@ -34,7 +80,7 @@ export function renderMachineCostDetail(payload) {
   const flag = placeholder ? 'placeholder tariff' : 'configured tariff';
   const flagAria = placeholder ? 'Tariff is a placeholder' : 'Tariff is configured';
   const caveat = escapeHtml(typeof cost.caveat === 'string' ? cost.caveat : '');
-  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1><p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}</section>`;
+  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine)}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}</section>`;
 }
 
 function renderWolSafety(wolSafety) {
