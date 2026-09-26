@@ -5,6 +5,9 @@ import { ActionCoordinator } from "../../services/xmachines/action-coordinator.j
 import { AuthService } from "../../auth/auth-service.js";
 import { createAuthMiddleware } from "../../auth/auth-middleware.js";
 import type { AuditService } from "../../services/audit-service.js";
+import type BetterSqlite from "better-sqlite3";
+import type { DatabaseService } from "../../db/database.js";
+import { loadMachineEnergyCost, type CostWindow, type MachineCost } from "../../services/xmachines/cost.js";
 
 const CLIENT_ARM_REJECTED = { ok: false, actuated: false, error: "client-arm-rejected" };
 
@@ -274,10 +277,50 @@ function power(
   return reply.code(code).send(result);
 }
 
+function queryString(value: unknown): string {
+  if (Array.isArray(value)) return typeof value[0] === "string" ? value[0] : "";
+  return typeof value === "string" ? value : "";
+}
+
+function costWindowFromQuery(query: unknown): CostWindow | undefined {
+  if (!query || typeof query !== "object") return undefined;
+  const record = query as Record<string, unknown>;
+  const from = queryString(record.from);
+  const to = queryString(record.to);
+  if (!from || !to) return undefined;
+  return { from, to };
+}
+
+function metricDatabase(db: DatabaseService | undefined): BetterSqlite.Database | null {
+  if (!db || typeof db !== "object") return null;
+  try {
+    const raw = db.raw;
+    if (!raw || typeof raw.prepare !== "function") return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+function detailCost(
+  db: DatabaseService | undefined,
+  machine: string,
+  query: unknown
+): MachineCost | undefined {
+  const sqlite = metricDatabase(db);
+  if (!sqlite) return undefined;
+  try {
+    return loadMachineEnergyCost(sqlite, machine, costWindowFromQuery(query));
+  } catch {
+    return undefined;
+  }
+}
+
 export function registerXmachinesRoutes(
   app: FastifyInstance,
   authService?: AuthService,
-  auditService?: AuditService
+  auditService?: AuditService,
+  db?: DatabaseService
 ): void {
   const coordinator = new ActionCoordinator();
   const authMiddleware = authService ? createAuthMiddleware(authService) : async () => {};
@@ -383,10 +426,12 @@ export function registerXmachinesRoutes(
     if (!machine) {
       return reply.code(404).send({ ok: false, actuated: false, error: "unknown-machine" });
     }
+    const cost = detailCost(db, request.params.name, request.query);
     return {
       mode: runtime.armed ? "armed" : "fake",
       armed: runtime.armed,
       machine,
+      ...(cost ? { cost } : {}),
     };
   });
 

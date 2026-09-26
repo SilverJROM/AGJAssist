@@ -15,6 +15,7 @@ import {
   writeBottomNavTabIds,
   writeLandingTab
 } from './nav-helpers.js';
+import { renderFleetOverview, renderMachineCostDetail } from './xmachines-cost-view.js';
 
 const html = htm.bind(h);
 const TERMINAL_FONT_STORAGE_KEY = 'agj_terminal_font_size';
@@ -7803,6 +7804,30 @@ function AgentOS() {
   `;
 }
 
+function XmachinesFleetPage() {
+  const [markup, setMarkup] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    api('/api/xmachines/telemetry')
+      .then((payload) => { if (!cancelled) setMarkup(renderFleetOverview(payload)); })
+      .catch(() => { if (!cancelled) setMarkup(renderFleetOverview({ machines: [] })); });
+    return () => { cancelled = true; };
+  }, []);
+  return html`<div class="xmachines-view" dangerouslySetInnerHTML=${{ __html: markup }}></div>`;
+}
+
+function XmachinesDetailPage({ name }) {
+  const [markup, setMarkup] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    api('/api/xmachines/machines/' + encodeURIComponent(name))
+      .then((payload) => { if (!cancelled) setMarkup(renderMachineCostDetail(payload)); })
+      .catch(() => { if (!cancelled) setMarkup(''); });
+    return () => { cancelled = true; };
+  }, [name]);
+  return html`<div class="xmachines-view" dangerouslySetInnerHTML=${{ __html: markup }}></div>`;
+}
+
 function TgApp() {
   const route = useRoute();
   const user = JSON.parse(localStorage.getItem('agj_user') || 'null');
@@ -7817,10 +7842,10 @@ function TgApp() {
   useEffect(() => {
     if (!authToken || !user) return;
     const initialHash = location.hash.slice(1);
-    const KNOWN_PREFIXES = ['/project/'];
+    const KNOWN_PREFIXES = ['/project/', '/xmachines/'];
     const KNOWN_EXACT = new Set([
       '/', '/projects', '/terminals', '/tasks',
-      '/notes', '/settings', '/agent-os', '/mcp-access'
+      '/notes', '/settings', '/agent-os', '/mcp-access', '/xmachines'
     ]);
     const isKnown =
       initialHash &&
@@ -7863,6 +7888,11 @@ function TgApp() {
     content = user?.role === 'owner'
       ? html`<${McpAccessPage} />`
       : html`<div class="empty-state">Owner role required</div>`;
+  } else if (route === '/xmachines') {
+    content = html`<${XmachinesFleetPage} />`;
+  } else if (route.startsWith('/xmachines/')) {
+    const name = decodeURIComponent(route.split('/')[2] || '');
+    content = html`<${XmachinesDetailPage} name=${name} key=${name} />`;
   } else if (route.startsWith('/project/')) {
     const id = route.split('/')[2];
     content = html`<${ProjectDetail} id=${id} key=${id} />`;
@@ -8263,6 +8293,11 @@ function App() {
     content = user?.role === 'owner'
       ? html`<${McpAccessPage} />`
       : html`<div class="empty-state">Owner role required</div>`;
+  } else if (route === '/xmachines') {
+    content = html`<${XmachinesFleetPage} />`;
+  } else if (route.startsWith('/xmachines/')) {
+    const name = decodeURIComponent(route.split('/')[2] || '');
+    content = html`<${XmachinesDetailPage} name=${name} key=${name} />`;
   } else if (route.startsWith('/project/')) {
     const id = route.split('/')[2];
     content = html`<${ProjectDetail} id=${id} key=${id} />`;

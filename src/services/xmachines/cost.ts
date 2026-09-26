@@ -55,3 +55,59 @@ export function buildCostDetail(kwh: number, cfg: CostConfig): { kwh: number; co
     caveat: BURSTS_CAVEAT,
   };
 }
+
+export interface CostWindow {
+  from: string;
+  to: string;
+}
+
+export interface MachineCost {
+  machine: string;
+  kwh: number;
+  costPhp: number;
+  currency: 'PHP';
+  tariffPhpPerKwh: number;
+  isPlaceholder: boolean;
+  tariffFlag: string;
+  caveat: string;
+}
+
+type SampleRow = { power_watts: number | null; sample_time: string };
+
+// Product path: the displayed cost is the persisted xm_samples feed for one machine.
+export function loadMachineEnergyCost(
+  db: Database.Database,
+  machine: string,
+  window?: CostWindow,
+): MachineCost {
+  const rows = (window
+    ? db.prepare(`
+        SELECT power_watts, sample_time
+        FROM xm_samples
+        WHERE machine_name = ? AND sample_time >= ? AND sample_time < ?
+        ORDER BY sample_time, id
+      `).all(machine, window.from, window.to)
+    : db.prepare(`
+        SELECT power_watts, sample_time
+        FROM xm_samples
+        WHERE machine_name = ?
+        ORDER BY sample_time, id
+      `).all(machine)) as SampleRow[];
+
+  const samples: EnergyReading[] = rows.map((row) => ({
+    powerWatts: typeof row.power_watts === 'number' ? row.power_watts : Number.NaN,
+    sampleTime: row.sample_time,
+  }));
+  const cfg = getCostConfig(db);
+  const detail = buildCostDetail(integrateKwhFromSamples(samples), cfg);
+  return {
+    machine,
+    kwh: detail.kwh,
+    costPhp: detail.costPhp,
+    currency: 'PHP',
+    tariffPhpPerKwh: cfg.tariffPhpPerKwh,
+    isPlaceholder: cfg.isPlaceholder,
+    tariffFlag: detail.tariffFlag,
+    caveat: detail.caveat,
+  };
+}

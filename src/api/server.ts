@@ -192,7 +192,7 @@ export async function createApiServer(
   registerAgentReminderRoutes(app, services.authService, services.db);
   registerAgentWakeupRoutes(app, services.authService, services.db);
   registerSummaryRoutes(app, services.authService, services.db);
-  registerXmachinesRoutes(app, services.authService, services.auditService);
+  registerXmachinesRoutes(app, services.authService, services.auditService, services.db);
 
   if (services.agentEventsStreamManager) {
     registerAgentEventsRoutes(app, services.agentEventsStreamManager);
