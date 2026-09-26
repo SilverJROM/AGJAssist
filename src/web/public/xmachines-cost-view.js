@@ -28,12 +28,57 @@ function fieldSpan(testId, text) {
 }
 
 // Cost fields are never printed. Down machines show offline and no live metrics.
+function isExpiredSample(sampleAge) {
+  if (!sampleAge || typeof sampleAge !== 'string') return false;
+  const m = sampleAge.match(/^(\d+)s$/);
+  if (!m) return false;
+  return parseInt(m[1], 10) > 300;
+}
+
+function severityLabel(machine) {
+  if (!machine || isOfflineMachine(machine)) return null;
+  const gpu = typeof machine.gpuTemp === 'number' ? machine.gpuTemp : null;
+  const cpu = typeof machine.cpuTemp === 'number' ? machine.cpuTemp : null;
+  let level = 'normal';
+  if (cpu != null) {
+    if (cpu >= 95) level = 'critical';
+    else if (cpu >= 85 && level !== 'critical') level = 'warning';
+  }
+  if (gpu != null) {
+    if (gpu >= 90) level = 'critical';
+    else if (gpu >= 80 && level === 'normal') level = 'warning';
+  }
+  return level;
+}
+
+function severityChip(machine) {
+  if (!machine || isOfflineMachine(machine)) return '';
+  const level = severityLabel(machine);
+  if (!level || level === 'normal') return '';
+  const label = level === 'critical' ? 'critical' : 'warning';
+  return ` <span data-testid="xmachines-severity" data-severity="${label}" style="display:inline-block;margin-left:8px;padding:2px 6px;border-radius:6px;font-size:12px;font-weight:600;background:${level === 'critical' ? '#f85149' : '#d29922'};color:#fff">${escapeHtml(label)}</span>`;
+}
+
+function markSpan(machine, testId, text, kind) {
+  if (!text) return '';
+  const suffix = kind === 'estimated' ? ' approx' : ' measured';
+  return ` <span data-testid="${testId}" data-measurement="${kind}">${escapeHtml(text)}${suffix}</span>`;
+}
+
 function liveMetricSpans(machine) {
   if (!machine || isOfflineMachine(machine)) return '';
-  const temp = typeof machine.gpuTemp === 'number' ? `${machine.gpuTemp}°C` : '';
-  const power = typeof machine.powerWatts === 'number' ? `${machine.powerWatts} W` : '';
+  const isStale = isExpiredSample(machine.sampleAge);
+  const styleAttr = isStale ? ' style="opacity:0.5;"' : '';
+  const tempVal = typeof machine.gpuTemp === 'number' ? `${machine.gpuTemp}°C` : '';
+  const powerVal = typeof machine.powerWatts === 'number' ? `${machine.powerWatts} W` : '';
+  const powerIsMeasured = machine.telemetry && machine.telemetry.powerWatts != null;
   const uptime = typeof machine.uptime === 'string' ? machine.uptime : '';
-  return `${fieldSpan('xmachines-gpu-temp', temp)}${fieldSpan('xmachines-power-draw', power)}${fieldSpan('xmachines-uptime', uptime)}`;
+  const powerSpan = markSpan(machine, 'xmachines-power-draw', powerVal, powerIsMeasured ? 'measured' : 'estimated');
+  const tempSpan = ` <span data-testid="xmachines-gpu-temp"${styleAttr}>${escapeHtml(tempVal)}</span>`;
+  const uptimeSpan = ` <span data-testid="xmachines-uptime"${styleAttr}>${escapeHtml(uptime)}</span>`;
+  const ageSpan = typeof machine.sampleAge === 'string' ? ` <span data-testid="xmachines-sample-age" data-sample-age>${escapeHtml(machine.sampleAge)}</span>` : '';
+  const provSpan = typeof machine.provenance === 'string' ? ` <span data-testid="xmachines-provenance" data-provenance>${escapeHtml(machine.provenance)}</span>` : '';
+  return `${tempSpan}${powerSpan}${uptimeSpan}${ageSpan}${provSpan}`;
 }
 
 function serviceSpans(machine) {
@@ -61,9 +106,12 @@ export function renderFleetOverview(payload) {
     const name = escapeHtml(machine && machine.name != null ? machine.name : '');
     const state = escapeHtml(powerStateLabel(machine));
     const stateHtml = fieldSpan('xmachines-power-state', state);
+    const severity = severityChip(machine);
+    const isStale = machine && !isOfflineMachine(machine) && isExpiredSample(machine.sampleAge);
+    const cardStyle = isStale ? 'opacity:0.6;' : '';
     const extra = `${liveMetricSpans(machine)}${serviceSpans(machine)}${roleHintSpan(machine)}`;
     const tail = extra ? ` ${extra}` : '';
-    return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}" style="display:block;margin:0 0 12px;padding:12px 14px;border:1px solid #30363d;border-radius:12px;list-style:none">${name}${stateHtml}${tail}</li>`;
+    return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}" style="display:block;margin:0 0 12px;padding:12px 14px;border:1px solid #30363d;border-radius:12px;list-style:none;${cardStyle}">${name}${stateHtml}${severity}${tail}</li>`;
   }).join('');
   return `<section class="xm-fleet" data-testid="xmachines-fleet-overview" role="region" aria-label="Fleet overview" style="max-width:420px;font:16px/1.4 system-ui,sans-serif"><h1 style="font-size:20px;margin:0 0 12px">Fleet overview</h1><ul style="list-style:none;padding:0;margin:0">${items}</ul></section>`;
 }
