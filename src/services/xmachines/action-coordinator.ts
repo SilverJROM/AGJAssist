@@ -158,7 +158,7 @@ export class ActionCoordinator {
           return { status: 'rejected', reason: 'cannot-confirm-idle', detail: `cannot confirm idle: ${error || 'preflight-failure'}` };
         }
         if (output.length > 0) {
-          return { status: 'rejected', reason: 'cannot-confirm-idle', detail: `busy: ${output.slice(0, 200)}` };
+          return { status: 'rejected', reason: 'cannot-confirm-idle', detail: `cannot confirm idle: ${output.slice(0, 200)}` };
         }
       }
     }

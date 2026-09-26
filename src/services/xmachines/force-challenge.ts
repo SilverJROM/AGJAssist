@@ -106,7 +106,8 @@ export class ForceChallengeService {
       return { ok: false, reason: 'action-mismatch' };
     }
     if (selectedNumber !== ch.number) {
-      ch.consumed = true;
+      // A wrong pick is not consumption. The same challenge stays open until the
+      // returned display number is submitted or the challenge expires.
       return { ok: false, reason: 'wrong-number' };
     }
     ch.consumed = true;

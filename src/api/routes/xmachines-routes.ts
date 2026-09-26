@@ -261,7 +261,17 @@ function power(
     });
   }
   // Force confirmation is a later route. Record the attempt and do not emit --force.
+  // L15b: a missing key is rejected before any WoL challenge is created.
   if (action === "off") {
+    const idempotencyKey = idempotencyKeyFromRequest(request);
+    if (!idempotencyKey) {
+      auditAttempt(
+        "denied",
+        { idempotency: { ok: false, detail: "idempotency-key-required" } },
+        { preState: observed, finalState: observed },
+      );
+      return reply.code(400).send({ status: "rejected", reason: "idempotency-key-required" });
+    }
     const forceReason = forceReasonFromBody(request);
     if (forceReason !== null) {
       auditAttempt(
