@@ -35,34 +35,116 @@ function isExpiredSample(sampleAge) {
   return parseInt(m[1], 10) > 300;
 }
 
-function severityLabel(machine) {
-  if (!machine || isOfflineMachine(machine)) return null;
-  const gpu = typeof machine.gpuTemp === 'number' ? machine.gpuTemp : null;
-  const cpu = typeof machine.cpuTemp === 'number' ? machine.cpuTemp : null;
-  let level = 'normal';
-  if (cpu != null) {
-    if (cpu >= 95) level = 'critical';
-    else if (cpu >= 85 && level !== 'critical') level = 'warning';
-  }
-  if (gpu != null) {
-    if (gpu >= 90) level = 'critical';
-    else if (gpu >= 80 && level === 'normal') level = 'warning';
-  }
-  return level;
+// Same bands as the alert evaluator. Hysteresis holds on the way down only.
+const GPU_WARN_C = 80;
+const GPU_CRIT_C = 90;
+const GPU_HYST_C = 3;
+const CPU_WARN_C = 85;
+const CPU_CRIT_C = 95;
+const SEVERITY_STATE_KEY = 'xmachines-severity-v1';
+const severityMemory = { byName: {} };
+
+function severityRank(level) {
+  if (level === 'critical') return 2;
+  if (level === 'warning') return 1;
+  return 0;
 }
 
-function severityChip(machine) {
-  if (!machine || isOfflineMachine(machine)) return '';
-  const level = severityLabel(machine);
-  if (!level || level === 'normal') return '';
-  const label = level === 'critical' ? 'critical' : 'warning';
-  return ` <span data-testid="xmachines-severity" data-severity="${label}" style="display:inline-block;margin-left:8px;padding:2px 6px;border-radius:6px;font-size:12px;font-weight:600;background:${level === 'critical' ? '#f85149' : '#d29922'};color:#fff">${escapeHtml(label)}</span>`;
+function classifyGpu(prevGpu, gpu) {
+  let severity = 'normal';
+  if (gpu >= GPU_CRIT_C) severity = 'critical';
+  else if (gpu >= GPU_WARN_C) severity = 'warning';
+  if (prevGpu === 'critical' && severity !== 'critical' && gpu > GPU_CRIT_C - GPU_HYST_C) severity = 'critical';
+  if (prevGpu === 'warning' && severity === 'normal' && gpu > GPU_WARN_C - GPU_HYST_C) severity = 'warning';
+  return severity;
+}
+
+function classifyCpu(cpu) {
+  if (cpu >= CPU_CRIT_C) return 'critical';
+  if (cpu >= CPU_WARN_C) return 'warning';
+  return 'normal';
+}
+
+// A rise waits for two samples of the new level. A fall that has already
+// passed the hysteresis band clears on that sample. Page reloads are samples,
+// so the book lives in localStorage rather than module memory.
+function stepSeverity(prev, gpu, cpu) {
+  const prevGpu = prev.lastGpu === 'warning' || prev.lastGpu === 'critical' ? prev.lastGpu : 'normal';
+  const gpuLevel = gpu == null ? prevGpu : classifyGpu(prevGpu, gpu);
+  const cpuLevel = cpu == null ? 'normal' : classifyCpu(cpu);
+  const candidate = severityRank(gpuLevel) >= severityRank(cpuLevel) ? gpuLevel : cpuLevel;
+  const displayed = prev.displayed === 'warning' || prev.displayed === 'critical' ? prev.displayed : 'normal';
+  let streakCount = 1;
+  let nextDisplayed = displayed;
+  if (candidate === displayed) {
+    streakCount = candidate === 'normal' ? 0 : (prev.streakSeverity === candidate ? (prev.streakCount || 0) + 1 : 1);
+  } else if (severityRank(candidate) < severityRank(displayed)) {
+    streakCount = candidate === 'normal' ? 0 : 1;
+    nextDisplayed = candidate;
+  } else {
+    streakCount = prev.streakSeverity === candidate ? (prev.streakCount || 0) + 1 : 1;
+    nextDisplayed = streakCount >= 2 ? candidate : displayed;
+  }
+  return {
+    lastGpu: gpu == null ? prevGpu : gpuLevel,
+    streakSeverity: candidate,
+    streakCount,
+    displayed: nextDisplayed,
+  };
+}
+
+function severityStore() {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+  } catch {}
+  return null;
+}
+
+function readSeverityBook() {
+  const store = severityStore();
+  if (!store) return severityMemory;
+  try {
+    const raw = store.getItem(SEVERITY_STATE_KEY);
+    if (!raw) return { byName: {} };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.byName || typeof parsed.byName !== 'object') return { byName: {} };
+    return parsed;
+  } catch {
+    return { byName: {} };
+  }
+}
+
+function writeSeverityBook(book) {
+  const store = severityStore();
+  if (!store) {
+    severityMemory.byName = book.byName;
+    return;
+  }
+  try { store.setItem(SEVERITY_STATE_KEY, JSON.stringify(book)); } catch {}
+}
+
+function displayedSeverity(machine, book) {
+  if (!machine || isOfflineMachine(machine)) return null;
+  const name = machine.name != null ? String(machine.name) : '';
+  if (!name) return null;
+  const gpu = typeof machine.gpuTemp === 'number' && Number.isFinite(machine.gpuTemp) ? machine.gpuTemp : null;
+  const cpu = typeof machine.cpuTemp === 'number' && Number.isFinite(machine.cpuTemp) ? machine.cpuTemp : null;
+  const prev = book.byName[name] || { lastGpu: 'normal', streakSeverity: 'normal', streakCount: 0, displayed: 'normal' };
+  const next = stepSeverity(prev, gpu, cpu);
+  book.byName[name] = next;
+  return next.displayed;
+}
+
+function severityChip(level) {
+  if (level !== 'critical' && level !== 'warning' && level !== 'normal') return '';
+  const background = level === 'critical' ? '#f85149' : level === 'warning' ? '#d29922' : '#8b949e';
+  return ` <span data-testid="xmachines-severity" data-severity="${level}" style="display:inline-block;margin-left:8px;padding:2px 6px;border-radius:6px;font-size:12px;font-weight:600;background:${background};color:#fff">${level}</span>`;
 }
 
 function markSpan(machine, testId, text, kind) {
   if (!text) return '';
-  const suffix = kind === 'estimated' ? ' approx' : ' measured';
-  return ` <span data-testid="${testId}" data-measurement="${kind}">${escapeHtml(text)}${suffix}</span>`;
+  const word = kind === 'estimated' ? 'approx' : 'measured';
+  return ` <span data-testid="${testId}">${escapeHtml(text)}</span> <span data-testid="xmachines-measurement" data-measurement="${kind}">${word}</span>`;
 }
 
 function liveMetricSpans(machine) {
@@ -102,17 +184,19 @@ function roleHintSpan(machine) {
 // Fleet overview prints name and power state. Cost fields on a machine are ignored.
 export function renderFleetOverview(payload) {
   const machines = payload && Array.isArray(payload.machines) ? payload.machines : [];
+  const severityBook = readSeverityBook();
   const items = machines.map((machine) => {
     const name = escapeHtml(machine && machine.name != null ? machine.name : '');
     const state = escapeHtml(powerStateLabel(machine));
     const stateHtml = fieldSpan('xmachines-power-state', state);
-    const severity = severityChip(machine);
+    const severity = severityChip(displayedSeverity(machine, severityBook));
     const isStale = machine && !isOfflineMachine(machine) && isExpiredSample(machine.sampleAge);
     const cardStyle = isStale ? 'opacity:0.6;' : '';
     const extra = `${liveMetricSpans(machine)}${serviceSpans(machine)}${roleHintSpan(machine)}`;
     const tail = extra ? ` ${extra}` : '';
     return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}" style="display:block;margin:0 0 12px;padding:12px 14px;border:1px solid #30363d;border-radius:12px;list-style:none;${cardStyle}">${name}${stateHtml}${severity}${tail}</li>`;
   }).join('');
+  writeSeverityBook(severityBook);
   return `<section class="xm-fleet" data-testid="xmachines-fleet-overview" role="region" aria-label="Fleet overview" style="max-width:420px;font:16px/1.4 system-ui,sans-serif"><h1 style="font-size:20px;margin:0 0 12px">Fleet overview</h1><ul style="list-style:none;padding:0;margin:0">${items}</ul></section>`;
 }
 
