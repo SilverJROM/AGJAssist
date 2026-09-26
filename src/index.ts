@@ -21,6 +21,8 @@ import { createApiServer } from "./api/server.js";
 import { sampleFleet } from "./services/xmachines/sampler.js";
 import { resolveXmachinesRuntime } from "./services/xmachines/runtime.js";
 import { ReadOnlyCollector } from "./services/xmachines/readonly-collector.js";
+import { AlertEvaluator, type SamplePoint } from "./services/xmachines/alert-evaluator.js";
+import { deliverDueXmachinesAlerts } from "./services/xmachines/alert-delivery.js";
 import { AgentEventsStreamManager } from "./api/websocket/agent-events-stream-manager.js";
 import { AgentAssignmentService } from "./services/agent-assignment-service.js";
 import { AgentEventsService } from "./services/agent-events-service.js";
@@ -161,18 +163,34 @@ async function main(): Promise<void> {
     xmachinesCollector.useReaderStore(db.raw);
   } catch {}
 
+  // One evaluator across sampler cycles so two-sample persistence and the
+  // 30-minute dedupe window survive from one tick to the next.
+  const xmachinesAlertEvaluator = new AlertEvaluator();
+  const publishSampledXmachinesAlerts = () => {
+    try {
+      const fleet = sampleFleet(process.env, xmachinesRuntime);
+      const samples: SamplePoint[] = fleet.map((row) => ({
+        machine: row.name,
+        t1: row.gpuTemp,
+        t2: row.gpuTemp,
+        cpu: row.cpuTemp,
+        // Fleet rows have no fan tachometer. NaN is not 0 RPM, so a missing
+        // reading cannot raise fan-fail.
+        fan: Number.NaN,
+      }));
+      void deliverDueXmachinesAlerts(xmachinesAlertEvaluator, samples, config).catch(() => {});
+    } catch {}
+  };
+
   // Server sampler runs with no browser present; collector is ready on startup
   try {
-    // Prime collector once at startup on the runtime that holds the DB sink
-    sampleFleet(process.env, xmachinesRuntime);
+    publishSampledXmachinesAlerts();
   } catch {}
 
   // 30-minute server sampler scheduler — no new process/listener
   const XmachinesSampleIntervalMs = 30 * 60 * 1000;
   setInterval(() => {
-    try {
-      sampleFleet(process.env, xmachinesRuntime);
-    } catch {}
+    publishSampledXmachinesAlerts();
   }, XmachinesSampleIntervalMs);
 
   // Reminder scheduler — check every 60 seconds for due reminders
