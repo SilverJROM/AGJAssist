@@ -16,6 +16,7 @@ import {
   type StartChallengeResult,
 } from "../../services/xmachines/force-challenge.js";
 import { resolveProtectedRole } from "../../services/xmachines/protected-roles.js";
+import { loadGpuTelemetryRows } from "../../services/xmachines/gpu-edge-states.js";
 import {
   ownerTelegramBaseOverridden,
   sendOwnerMessage,
@@ -707,10 +708,14 @@ export function registerXmachinesRoutes(
     const cost = detailCost(db, request.params.name, request.query);
     const evidence = readWolSafety(request.params.name);
     const wolSafety = evidence ? presentWolSafety(evidence) : null;
+    const nowIso = new Date().toISOString();
+    const roleHint = (machine.roleHint ?? '') as string;
+    const gpuRows = db ? loadGpuTelemetryRows(db as any, { machine: request.params.name, roleHint, nowIso, refresh: false }).apiRows : [];
     return {
       mode: runtime.armed ? "armed" : "fake",
       armed: runtime.armed,
       machine,
+      gpuRows,
       ...(wolSafety ? { wolSafety } : {}),
       ...(cost ? { cost } : {}),
     };

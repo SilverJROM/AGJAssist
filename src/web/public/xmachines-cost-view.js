@@ -223,7 +223,18 @@ export function renderMachineCostDetail(payload) {
   const offButton = machine.name != null
     ? `<button type="button" data-testid="xmachines-off-button" aria-label="Turn ${name} off">Turn Off</button>`
     : '';
-  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine)}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${offButton}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
+  const gpuRows = Array.isArray(payload?.gpuRows) ? payload.gpuRows : [];
+  const gpuRowHtml = gpuRows.map(row => {
+    const uuid = escapeHtml(row.uuid ?? '');
+    const gpuName = escapeHtml(row.name ?? '');
+    const power = escapeHtml(row.power ?? '');
+    const temp = escapeHtml(row.temperature ?? '');
+    const memory = escapeHtml(row.memory ?? '');
+    const util = escapeHtml(row.utilization ?? '');
+    const fan = escapeHtml(row.fan ?? '');
+    return `<div class="gpu-row" data-testid="xmachines-gpu-row" data-gpu-uuid="${uuid}"><span data-testid="xmachines-gpu-name">${gpuName}</span><span data-testid="xmachines-gpu-util">${util}</span><span data-testid="xmachines-gpu-vram">${memory}</span><span data-testid="xmachines-gpu-temp">${temp}</span><span data-testid="xmachines-gpu-power">${power}</span><span data-testid="xmachines-gpu-fan">${fan}</span></div>`;
+  }).join('');
+  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine)}${gpuRowHtml}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${offButton}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
 }
 
 function defaultIdempotencyKey() {
