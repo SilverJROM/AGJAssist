@@ -4,12 +4,12 @@ export interface SampleReading {
   machineName: string;
   gpuUuid: string;
   sampleTime: string;
-  temperature: number;
-  powerWatts: number;
-  utilizationGpu: number;
-  utilizationMem: number;
-  fanSpeed: number;
-  vramMb: number;
+  temperature: number | null;
+  powerWatts: number | null;
+  utilizationGpu: number | null;
+  utilizationMem: number | null;
+  fanSpeed: number | null;
+  vramMb: number | null;
 }
 
 export interface ObservedGpu {

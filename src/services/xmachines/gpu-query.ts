@@ -22,6 +22,9 @@ export interface GpuQueryResult {
   machine: string;
   timedOut: boolean;
   byUuid: Record<string, GpuReading>;
+  stderr: string;
+  exitStatus: number | null;
+  errorCode: string | null;
 }
 
 function parseGpuLine(line: string): GpuReading | null {
@@ -47,9 +50,12 @@ export function queryMachineGpus(machine: string): GpuQueryResult {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const err = result.error as NodeJS.ErrnoException | undefined;
+  const stderr = typeof result.stderr === 'string' ? result.stderr : '';
+  const exitStatus = typeof result.status === 'number' ? result.status : null;
+  const errorCode = typeof err?.code === 'string' ? err.code : null;
   const timedOut = err?.code === 'ETIMEDOUT' || result.signal === 'SIGTERM';
   if (timedOut) {
-    return { machine, timedOut: true, byUuid: {} };
+    return { machine, timedOut: true, byUuid: {}, stderr, exitStatus, errorCode };
   }
   const stdout = typeof result.stdout === 'string' ? result.stdout : '';
   const byUuid: Record<string, GpuReading> = {};
@@ -60,5 +66,5 @@ export function queryMachineGpus(machine: string): GpuQueryResult {
     if (!reading) continue;
     byUuid[reading.uuid] = reading;
   }
-  return { machine, timedOut: false, byUuid };
+  return { machine, timedOut: false, byUuid, stderr, exitStatus, errorCode };
 }
