@@ -272,16 +272,17 @@ export function renderMachineCostDetail(payload) {
   const onRefusal = payload && payload.onRefusal;
   const powerState = powerStateLabel(machine);
   const isOffline = isOfflineMachine(machine);
-  const inProgress = payload && payload.powerActionInProgress === true;
-  const canOn = !machine.state || machine.state === 'down' || machine.state === 'offline';
-  const canOff = !isOffline && machine.state && machine.state !== 'down' && machine.state !== 'offline';
-  const onButton = machine.name != null && canOn && !inProgress
+  const onInFlight = payload && payload.powerActionInProgress === 'on';
+  const offInFlight = payload && payload.powerActionInProgress === 'off';
+  const canOn = !machine.state || machine.state === 'down' || machine.state === 'offline' || offInFlight;
+  const canOff = (!isOffline && machine.state && machine.state !== 'down' && machine.state !== 'offline') || onInFlight;
+  const onButton = machine.name != null && canOn && !onInFlight
     ? `<button type="button" data-testid="xmachines-on-button" aria-label="Turn ${name} on">Turn On</button>`
     : '';
-  const offButton = machine.name != null && canOff && !inProgress
+  const offButton = machine.name != null && canOff && !offInFlight
     ? `<button type="button" data-testid="xmachines-off-button" aria-label="Turn ${name} off">Turn Off</button>`
     : '';
-  const inProgressSpan = inProgress
+  const inProgressSpan = (onInFlight || offInFlight)
     ? `<div data-testid="xmachines-power-inprogress" role="status">In Progress</div>`
     : '';
   const gpuRows = Array.isArray(payload?.gpuRows) ? payload.gpuRows : [];
@@ -330,8 +331,8 @@ export async function handleMachineDetailClick(event, payload, options = {}) {
   let body = null;
   try { body = await res.json(); } catch {}
   if (res.ok) {
-    // Action accepted: mark in-progress state
-    return { ...payload, powerActionInProgress: true, offRefusal: undefined, onRefusal: undefined };
+    // Action accepted: mark which action is in flight, not just that one is
+    return { ...payload, powerActionInProgress: action, offRefusal: undefined, onRefusal: undefined };
   }
   if (!body) return payload;
   // Rejection: store refusal with action-specific key

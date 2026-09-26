@@ -42,6 +42,7 @@ const WAKER = 'pc-d7-waker';     // DOWN, verified WoL   -> the ON specimen
 const IDLER = 'pc-d7-idler';     // UP,   verified WoL   -> the clean Off specimen
 const LEASED = 'pc-d7-leased';   // UP,   active lease   -> the guard-refusal specimen
 const DRIFTER = 'pc-d7-drifter'; // UP,   never-verified -> challenge routing + recovery warning
+const RACER = 'pc-d7-racer';     // UP,   verified WoL   -> the On-during-Off race specimen (own machine: IDLER is consumed by another test)
 
 const LEASE_HOLDER = 'xmac-claim-d7-power-controls';
 
@@ -51,6 +52,7 @@ const FLEET: Row[] = [
   { name: IDLER, ip: '192.0.2.81', state: 'UP', role: 'compute' },
   { name: LEASED, ip: '192.0.2.82', state: 'UP', role: 'compute' },
   { name: DRIFTER, ip: '192.0.2.83', state: 'UP', role: 'compute' },
+  { name: RACER, ip: '192.0.2.84', state: 'UP', role: 'compute' },
 ];
 
 // The exact refusal string the route produces for an active lease
@@ -520,6 +522,39 @@ test('an active-lease Off refusal is rendered exactly as the production route re
 
     const spawnedDown = gatewayRows(scratch!.spyLog).filter((row) => row.argv[0] === 'down' && row.argv[1] === LEASED);
     expect(spawnedDown.length, 'a lease did not block the owner Off before it reached the gateway').toBe(0);
+  } finally {
+    await detail.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// L15j-shaped (fence E10 owns the full race matrix; this is D7's own reachability
+// gate for it): while an Off on a machine is still in flight, the ON control must
+// stay reachable so the A10 coordinator's cross-action guard (machine-busy refusal,
+// or a genuine serialization) is something an owner can actually trigger from the
+// product surface. Silence — no ON control at all during the race — is not
+// accepted, the same way fence E10's own L15j text reads it.
+// ---------------------------------------------------------------------------
+test('ON control stays reachable while an Off on the same machine is still in flight', async ({ browser }) => {
+  test.setTimeout(30_000);
+  test.skip(!!bootError, bootError);
+  const detail = await openDetail(browser, RACER);
+  try {
+    await detail.page.locator(OFF_SEL).first().click({ timeout: 5_000 });
+    // Still inside the gateway's 1s dwell: the Off is genuinely in flight, the
+    // host has not yet reached DOWN.
+    await detail.page.waitForTimeout(300);
+    const evidenceDir = path.join(REPO_ROOT, 'xmachines/projcore-run-2026-09-25/validation');
+    fs.mkdirSync(evidenceDir, { recursive: true });
+    await detail.page.screenshot({ path: path.join(evidenceDir, 'D7-L15j-on-during-off-no-on-control.png'), fullPage: true }).catch(() => {});
+    const domHtml = await detail.page.locator(DETAIL_SEL).first().innerHTML().catch(() => '');
+    fs.writeFileSync(path.join(evidenceDir, 'D7-L15j-on-during-off-no-on-control-dom.html'), domHtml);
+
+    const onReachable = await isVisible(detail.page, ON_SEL);
+    expect(
+      onReachable,
+      "no ON control is reachable while an Off on the same machine is in flight, so the coordinator's machine-busy refusal (or a genuine serialization) can never be exercised from the product surface",
+    ).toBe(true);
   } finally {
     await detail.close();
   }
