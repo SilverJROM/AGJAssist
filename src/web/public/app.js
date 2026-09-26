@@ -708,6 +708,7 @@ function Header({ user }) {
           <a href="#/notes" class=${route === '/notes' ? 'active' : ''}>Notes</a>
           <a href="#/agent-os" class=${route === '/agent-os' ? 'active' : ''}>Agent OS</a>
           <a href="#/settings" class=${route === '/settings' ? 'active' : ''}>Settings</a>
+          ${user?.role === 'owner' && html`<a href="#/xmachines" data-testid="xmachines-nav-link" class=${route === '/xmachines' || route.startsWith('/xmachines/') ? 'active' : ''}>xMachines</a>`}
           ${user?.role === 'owner' && html`<a href="#/mcp-access" data-testid="mcp-nav-access" class=${route === '/mcp-access' ? 'active' : ''}>MCP Access</a>`}
         </nav>
       </div>
@@ -756,6 +757,7 @@ function Dashboard() {
     { label: 'Notes', count: stats.notes, route: '/notes', desc: 'Quick notes, attach to any project' },
     { label: 'Settings', count: null, route: '/settings', desc: 'Templates, safety patterns, 2FA' }
   ];
+  const xmachinesCard = user?.role === 'owner' ? { label: 'xMachines', count: null, route: '/xmachines', desc: 'Machine telemetry and control' } : null;
 
   return html`
     <div>
@@ -770,6 +772,13 @@ function Dashboard() {
             <p style="color:var(--text-secondary);font-size:12px;margin-top:8px">${c.desc}</p>
           </div>
         `)}
+        ${xmachinesCard && html`
+          <div class="project-card" onclick=${() => navigate(xmachinesCard.route)}>
+            <h3>${xmachinesCard.label}</h3>
+            <div class="stats"></div>
+            <p style="color:var(--text-secondary);font-size:12px;margin-top:8px">${xmachinesCard.desc}</p>
+          </div>
+        `}
       </div>
     </div>
   `;
@@ -7355,6 +7364,7 @@ function TgDashboard({ onEditBottomNav }) {
     { icon: '\u{23F0}', label: 'Reminders', count: stats.reminders, route: '/tasks', desc: 'Upcoming events' },
     { icon: '\u{2699}', label: 'Settings', count: null, route: '/settings', desc: 'Config & templates' }
   ];
+  const xmachinesTile = { icon: '\u{1F4BB}', label: 'xMachines', count: 4, route: '/xmachines', desc: 'Machine fleet' };
 
   return html`
     <div>
@@ -7374,6 +7384,17 @@ function TgDashboard({ onEditBottomNav }) {
             <div class="tg-dash-desc">${c.desc}</div>
           </div>
         `)}
+        ${user?.role === 'owner' && html`
+          <div class="tg-dash-card" onclick=${() => {
+            navigate(xmachinesTile.route);
+            try { window.Telegram?.WebApp?.HapticFeedback?.selectionChanged(); } catch {}
+          }}>
+            <div class="tg-dash-icon">${xmachinesTile.icon}</div>
+            <div class="tg-dash-label">${xmachinesTile.label}</div>
+            <div class="tg-dash-count">${xmachinesTile.count}</div>
+            <div class="tg-dash-desc">${xmachinesTile.desc}</div>
+          </div>
+        `}
       </div>
       <div class="tg-home-preferences">
         <${LandingPagePreference} />
@@ -7860,6 +7881,13 @@ function TgApp() {
       '/', '/projects', '/terminals', '/tasks',
       '/notes', '/settings', '/agent-os', '/mcp-access', '/xmachines'
     ]);
+    // Owner-only routing guard for KNOWN_EXACT
+    if (initialHash === '/xmachines') {
+      if (user?.role !== 'owner') {
+        navigate('/');
+        return;
+      }
+    }
     const isKnown =
       initialHash &&
       (KNOWN_EXACT.has(initialHash) || KNOWN_PREFIXES.some(p => initialHash.startsWith(p)));
@@ -8306,11 +8334,15 @@ function App() {
     content = user?.role === 'owner'
       ? html`<${McpAccessPage} />`
       : html`<div class="empty-state">Owner role required</div>`;
-  } else if (route === '/xmachines') {
-    content = html`<${XmachinesFleetPage} />`;
-  } else if (route.startsWith('/xmachines/')) {
-    const name = decodeURIComponent(route.split('/')[2] || '');
-    content = html`<${XmachinesDetailPage} name=${name} key=${name} />`;
+  } else if (route === '/xmachines' || route.startsWith('/xmachines/')) {
+    if (user?.role !== 'owner') {
+      content = html`<div class="empty-state">Owner role required</div>`;
+    } else if (route === '/xmachines') {
+      content = html`<${XmachinesFleetPage} />`;
+    } else {
+      const name = decodeURIComponent(route.split('/')[2] || '');
+      content = html`<${XmachinesDetailPage} name=${name} key=${name} />`;
+    }
   } else if (route.startsWith('/project/')) {
     const id = route.split('/')[2];
     content = html`<${ProjectDetail} id=${id} key=${id} />`;
