@@ -1,6 +1,8 @@
 import fs from 'node:fs';
-import { resolveXmachinesRuntime } from './runtime.js';
-import { buildRegistry, readMachinesConf } from './registry.js';
+import { persistSampleCycle, type SampleReading } from '../../db/xmachines-store.js';
+import { resolveXmachinesRuntime, type XmachinesRuntime } from './runtime.js';
+import { buildRegistry } from './registry.js';
+import { queryMachineGpus } from './gpu-query.js';
 import type { MachineTelemetry } from './telemetry.js';
 import { spawnSync } from 'node:child_process';
 
@@ -33,11 +35,14 @@ function observedFleetFromFile(fixturePath: string) {
   };
 }
 
-// Read boundary for the server sampler. Schedule and history cadence belong to later rows.
+// Read boundary for the server sampler. Pass the runtime whose reader store is
+// already attached; omitting it builds a fresh runtime with no xm_samples sink.
 // With XMACHINES_OBSERVED_FLEET, the collector cycle runs first and remote metric
 // reads are limited to rows observed up. The no-fixture path stays one generate().
-export function sampleFleet(serverEnv: NodeJS.ProcessEnv = process.env) {
-  const runtime = resolveXmachinesRuntime(serverEnv);
+export function sampleFleet(
+  serverEnv: NodeJS.ProcessEnv = process.env,
+  runtime: XmachinesRuntime = resolveXmachinesRuntime(serverEnv),
+) {
   const fixture = serverEnv.XMACHINES_OBSERVED_FLEET;
   if (typeof fixture === 'string' && fixture.length > 0) {
     runtime.telemetry.useTelemetrySource(observedFleetFromFile(fixture));
@@ -67,7 +72,51 @@ export function sampleFleet(serverEnv: NodeJS.ProcessEnv = process.env) {
     });
     runtime.telemetry.runCycle();
   }
+  persistMetricHistory(runtime);
   return runtime.telemetry.generate();
+}
+
+function persistMetricHistory(runtime: XmachinesRuntime): void {
+  const db = runtime.telemetry.metricStore();
+  if (!db) return;
+  const sampleTime = new Date().toISOString();
+  const installed = runtime.telemetry.installedGpuReadings();
+  const readings: SampleReading[] = installed
+    ? installed.map((row) => ({
+      machineName: row.machineName,
+      gpuUuid: row.gpuUuid,
+      sampleTime,
+      temperature: row.temperature,
+      powerWatts: row.powerWatts,
+      utilizationGpu: row.utilizationGpu,
+      utilizationMem: null,
+      fanSpeed: null,
+      vramMb: null,
+    }))
+    : liveGpuReadings(runtime, sampleTime);
+  persistSampleCycle(db, readings);
+}
+
+function liveGpuReadings(runtime: XmachinesRuntime, sampleTime: string): SampleReading[] {
+  const readings: SampleReading[] = [];
+  for (const machine of runtime.telemetry.generate()) {
+    if (machine.state === 'down') continue;
+    const queried = queryMachineGpus(machine.name);
+    for (const gpu of Object.values(queried.byUuid)) {
+      readings.push({
+        machineName: machine.name,
+        gpuUuid: gpu.uuid,
+        sampleTime,
+        temperature: Number.isFinite(gpu.temperatureC) ? gpu.temperatureC : null,
+        powerWatts: Number.isFinite(gpu.powerDrawW) ? gpu.powerDrawW : null,
+        utilizationGpu: Number.isFinite(gpu.utilizationGpu) ? gpu.utilizationGpu : null,
+        utilizationMem: null,
+        fanSpeed: Number.isFinite(gpu.fanSpeedPct) ? gpu.fanSpeedPct : null,
+        vramMb: Number.isFinite(gpu.memoryUsedMiB) ? gpu.memoryUsedMiB : null,
+      });
+    }
+  }
+  return readings;
 }
 
 function runXmacStatusAll(): string {

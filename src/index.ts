@@ -163,15 +163,15 @@ async function main(): Promise<void> {
 
   // Server sampler runs with no browser present; collector is ready on startup
   try {
-    // Prime collector once at startup
-    sampleFleet(process.env);
+    // Prime collector once at startup on the runtime that holds the DB sink
+    sampleFleet(process.env, xmachinesRuntime);
   } catch {}
 
   // 30-minute server sampler scheduler — no new process/listener
   const XmachinesSampleIntervalMs = 30 * 60 * 1000;
   setInterval(() => {
     try {
-      sampleFleet(process.env);
+      sampleFleet(process.env, xmachinesRuntime);
     } catch {}
   }, XmachinesSampleIntervalMs);
 

@@ -1,7 +1,11 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
+import { DatabaseService } from '../../src/db/database.js';
+import { sampleFleet } from '../../src/services/xmachines/sampler.js';
+import { resolveXmachinesRuntime } from '../../src/services/xmachines/runtime.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -28,19 +32,40 @@ describe('xmachines-sampler-history', () => {
     expect(indexSrc).toContain('sampleFleet');
   });
 
-  it('F2c — sampler cycle persists metric history (schema)', () => {
-    const schemaSrc = fs.readFileSync(path.join(REPO, 'src/db/schema.ts'), 'utf8');
-    expect(schemaSrc).toContain('CREATE TABLE IF NOT EXISTS xm_samples');
-    expect(schemaSrc).toContain('machine_name TEXT NOT NULL');
-    expect(schemaSrc).toContain('gpu_uuid TEXT NOT NULL');
-    expect(schemaSrc).toContain('sample_time TEXT NOT NULL');
-    expect(schemaSrc).toContain('temperature REAL');
-    expect(schemaSrc).toContain('power_watts REAL');
-    expect(schemaSrc).toContain('utilization_gpu REAL');
+  it('F2c — a sampler cycle persists installed GPU metric history', () => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'b8-sampler-'));
+    const db = new DatabaseService(path.join(scratch, 'sampler.sqlite'));
+    try {
+      const runtime = resolveXmachinesRuntime({ XMACHINES_ARM: '0' });
+      runtime.telemetry.useReaderStore(db.raw);
+      runtime.telemetry.installGpuReadings([
+        {
+          machineName: 'fixture-host-not-in-fleet',
+          gpuUuid: 'GPU-UUID-SAMPLER-FIXTURE',
+          temperature: 63.5,
+          powerWatts: 187.25,
+          utilizationGpu: 17,
+        },
+      ]);
 
-    const storeSrc = fs.readFileSync(path.join(REPO, 'src/db/xmachines-store.ts'), 'utf8');
-    expect(storeSrc).toContain('persistSampleCycle');
-    expect(storeSrc).toContain('INSERT INTO xm_samples');
+      sampleFleet({ XMACHINES_ARM: '0' }, runtime);
+
+      const rows = db.raw.prepare(
+        'SELECT machine_name, gpu_uuid, temperature, power_watts, utilization_gpu FROM xm_samples',
+      ).all();
+      expect(rows).toEqual([
+        {
+          machine_name: 'fixture-host-not-in-fleet',
+          gpu_uuid: 'GPU-UUID-SAMPLER-FIXTURE',
+          temperature: 63.5,
+          power_watts: 187.25,
+          utilization_gpu: 17,
+        },
+      ]);
+    } finally {
+      db.close();
+      fs.rmSync(scratch, { recursive: true, force: true });
+    }
   });
 
   it('plan defect: F4a/b/c sparkline rendering is UI scope, not sampler persistence', () => {

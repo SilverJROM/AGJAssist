@@ -64,6 +64,16 @@ export interface ReaderResultSink {
 
 const NOOP_READER_RESULT_SINK: ReaderResultSink = { record(): void {} };
 
+// Literal GPU metrics a caller installs before the sampler cycle. The sampler
+// writes these through persistSampleCycle; it does not recompute them.
+export interface InstalledGpuReading {
+  machineName: string;
+  gpuUuid: string;
+  temperature: number;
+  powerWatts: number;
+  utilizationGpu: number;
+}
+
 export interface CycleReading {
   machine: string;
   state: MachineTelemetry['state'];
@@ -124,6 +134,8 @@ export class ReadOnlyCollector {
   private telemetry: CollectorTelemetrySource = new SyntheticTelemetry();
   private source: CollectorReadSource;
   private sink: ReaderResultSink = NOOP_READER_RESULT_SINK;
+  private metricDb: Database.Database | null = null;
+  private gpuReadings: InstalledGpuReading[] | null = null;
 
   constructor(source?: CollectorReadSource) {
     this.source = source ?? new BoundedCommandReadSource();
@@ -147,7 +159,9 @@ export class ReadOnlyCollector {
   }
 
   // Product sqlite sink. The caller names the database; readSmart/readNut write the row.
+  // The same database is the sampler cycle's xm_samples sink.
   useReaderStore(db: Database.Database): void {
+    this.metricDb = db;
     this.sink = {
       record: (entry) => {
         persistReaderResult(db, {
@@ -160,6 +174,18 @@ export class ReadOnlyCollector {
         });
       },
     };
+  }
+
+  metricStore(): Database.Database | null {
+    return this.metricDb;
+  }
+
+  installGpuReadings(readings: readonly InstalledGpuReading[]): void {
+    this.gpuReadings = readings.map((row) => ({ ...row }));
+  }
+
+  installedGpuReadings(): readonly InstalledGpuReading[] | null {
+    return this.gpuReadings;
   }
 
   generate(): MachineTelemetry[] {
