@@ -805,4 +805,21 @@ export function registerXmachinesRoutes(
     });
     return { entries };
   });
+
+  app.post("/api/xmachines/sessions/revoke-all", async (request, reply) => {
+    if (clientArm(request)) {
+      return reply.code(400).send(CLIENT_ARM_REJECTED);
+    }
+    if (!requireCanonicalHost(request, reply)) return;
+    if (!requireCanonicalOrigin(request, reply)) return;
+    if (!request.sessionUser || request.sessionUser.role !== "owner") {
+      return reply.code(403).send({ error: "Owner role required" });
+    }
+    if (!authService) {
+      return reply.code(500).send({ error: "auth_unavailable" });
+    }
+    const userId = request.sessionUser.id;
+    const revoked = authService.revokeAllWebSessions(userId);
+    return { revoked };
+  });
 }
