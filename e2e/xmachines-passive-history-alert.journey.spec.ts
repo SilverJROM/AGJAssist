@@ -490,7 +490,10 @@ test('test_d6_persisted_history_renders_sparklines_and_only_a_visible_xmachines_
       await page.route(/telegram-web-app\.js/, (route) => route.abort());
       if (ownerToken) {
         await page.addInitScript((token) => {
-          try { localStorage.setItem('agj_token', token as string); } catch { /* ignore */ }
+          try {
+            localStorage.setItem('agj_token', token as string);
+            localStorage.setItem('agj_user', JSON.stringify({ id: 1, name: 'owner', username: 'owner', role: 'owner' }));
+          } catch { /* ignore */ }
         }, ownerToken);
       }
       if (opts.hidden) {

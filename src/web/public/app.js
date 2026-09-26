@@ -7832,13 +7832,40 @@ function AgentOS() {
   `;
 }
 
+async function readMetricHistory(name, metric) {
+  try {
+    const body = await api('/api/xmachines/machines/' + encodeURIComponent(name) + '/history?metric=' + metric);
+    return body && Array.isArray(body.series) ? body.series : [];
+  } catch {
+    return [];
+  }
+}
+
+async function attachFleetHistory(payload) {
+  const machines = payload && Array.isArray(payload.machines) ? payload.machines : [];
+  await Promise.all(machines.map(async (machine) => {
+    const name = machine && machine.name != null ? String(machine.name) : '';
+    if (!name) return;
+    const [temperature, power, utilization] = await Promise.all([
+      readMetricHistory(name, 'temperature'),
+      readMetricHistory(name, 'power'),
+      readMetricHistory(name, 'utilization'),
+    ]);
+    machine._history = { temperature, power, utilization };
+  }));
+}
+
 function XmachinesFleetPage() {
   const [markup, setMarkup] = useState('');
   useEffect(() => {
     let cancelled = false;
     const fetchTelemetry = () => {
       api('/api/xmachines/telemetry')
-        .then((payload) => { if (!cancelled) setMarkup(renderFleetOverview(payload)); })
+        .then(async (payload) => {
+          if (cancelled || !payload) return;
+          await attachFleetHistory(payload);
+          if (!cancelled) setMarkup(renderFleetOverview(payload));
+        })
         .catch(() => { if (!cancelled) setMarkup(renderFleetOverview({ machines: [] })); });
     };
     fetchTelemetry();

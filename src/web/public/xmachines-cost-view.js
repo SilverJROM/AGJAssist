@@ -194,7 +194,7 @@ export function renderFleetOverview(payload) {
     const cardStyle = isStale ? 'opacity:0.6;' : '';
     const extra = `${liveMetricSpans(machine)}${serviceSpans(machine)}${roleHintSpan(machine)}`;
     const tail = extra ? ` ${extra}` : '';
-    const spark = '';
+    const spark = sparklineMarkup(machine && machine._history, true);
     return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}" style="display:block;margin:0 0 12px;padding:12px 14px;border:1px solid #30363d;border-radius:12px;list-style:none;${cardStyle}">${name}${stateHtml}${severity}${tail}${spark}</li>`;
   }).join('');
   writeSeverityBook(severityBook);
@@ -218,6 +218,24 @@ function seriesToPoints(series, width, height) {
   return points;
 }
 
+// Fleet cards omit a sparkline until the series has two plotted points.
+// Detail keeps the empty svg so a missing history response still has the nodes.
+function sparklineMarkup(history, omitEmpty) {
+  const hist = history || {};
+  const rows = [
+    ['temp', 'temperature sparkline', hist.temperature],
+    ['power', 'power sparkline', hist.power],
+    ['util', 'utilisation sparkline', hist.utilization],
+  ];
+  return rows.map(([id, label, series]) => {
+    const points = seriesToPoints(series, 120, 30);
+    const pairCount = points ? points.split(' ').filter(Boolean).length : 0;
+    if (omitEmpty && pairCount < 2) return '';
+    const poly = points ? `<polyline points="${points}" fill="none" stroke="currentColor"/>` : '';
+    return `<div data-testid="xmachines-sparkline-${id}" aria-label="${label}"><svg width="120" height="30">${poly}</svg></div>`;
+  }).join('');
+}
+
 function renderReadout(machine, history) {
   if (!machine) return '';
   const hasModel = machine.state != null || machine.offline != null || machine.freshness || machine.telemetry || machine.busy;
@@ -234,14 +252,7 @@ function renderReadout(machine, history) {
   const onHoursSpan = onHours ? `<span data-testid="xmachines-on-hours">${escapeHtml(onHours)}</span> <span data-testid="xmachines-on-hours-provenance">${escapeHtml(machine.sampledOnHours?.label ?? 'estimated')}</span>` : '';
   const roleText = typeof machine.roleHint === 'string' && machine.roleHint.trim() ? machine.roleHint.trim() : '';
   const protectedRoleSpan = roleText ? `<span data-testid="xmachines-protected-role">${escapeHtml(roleText)}</span>` : '';
-  const hist = history || {};
-  const tempPoints = seriesToPoints(hist.temperature, 120, 30);
-  const powerPoints = seriesToPoints(hist.power, 120, 30);
-  const utilPoints = seriesToPoints(hist.utilization, 120, 30);
-  const tempPoly = tempPoints ? `<polyline points="${tempPoints}" fill="none" stroke="currentColor"/>` : '';
-  const powerPoly = powerPoints ? `<polyline points="${powerPoints}" fill="none" stroke="currentColor"/>` : '';
-  const utilPoly = utilPoints ? `<polyline points="${utilPoints}" fill="none" stroke="currentColor"/>` : '';
-  const sparkHtml = `<div data-testid="xmachines-sparkline-temp" aria-label="temperature sparkline"><svg width="120" height="30">${tempPoly}</svg></div><div data-testid="xmachines-sparkline-power" aria-label="power sparkline"><svg width="120" height="30">${powerPoly}</svg></div><div data-testid="xmachines-sparkline-util" aria-label="utilisation sparkline"><svg width="120" height="30">${utilPoly}</svg></div>`;
+  const sparkHtml = sparklineMarkup(history, false);
   return `<div data-testid="xmachines-read-model">${stateHtml}${cpuSpan}${fanSpan}${sessionSpan}${onHoursSpan}${protectedRoleSpan}${liveMetricSpans(machine)}${serviceSpans(machine)}${sparkHtml}</div>`;
 }
 
