@@ -164,6 +164,10 @@ describe("xmachines-readonly-collector-adapters", () => {
       const relPath = rel(file);
       if (relPath === "src/services/xmachines/readonly-collector.ts") return false;
       const text = fs.readFileSync(file, "utf8");
+      // The detail route calls collector.readNut. A local command source there is still a bypass.
+      if (relPath === "src/api/routes/xmachines-routes.ts") {
+        return /\bupsc\b|BoundedCommandReadSource|CollectorReadSource/.test(text);
+      }
       return /\breadNut\b|\bupsc\b|BoundedCommandReadSource|CollectorReadSource/.test(text);
     }).map(rel);
     expect(bypass).toEqual([]);

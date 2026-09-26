@@ -104,6 +104,34 @@ function parseFilesystem(filesystem: string): ParsedFilesystem[] {
   return rows;
 }
 
+export interface ParsedNutStatus {
+  batteryChargePct: number | null;
+  runtimeSeconds: number | null;
+  loadPct: number | null;
+}
+
+// NUT status text is `key: value` lines. The first exact key wins.
+// A longer key such as battery.charge.low must not satisfy battery.charge.
+function nutNumber(raw: string, key: string): number | null {
+  const prefix = `${key}:`;
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith(prefix)) continue;
+    const value = trimmed.slice(prefix.length).trim();
+    if (!/^\d+(?:\.\d+)?$/.test(value)) return null;
+    return Number(value);
+  }
+  return null;
+}
+
+export function parseNutStatus(raw: string): ParsedNutStatus {
+  return {
+    batteryChargePct: nutNumber(raw, 'battery.charge'),
+    runtimeSeconds: nutNumber(raw, 'battery.runtime'),
+    loadPct: nutNumber(raw, 'ups.load'),
+  };
+}
+
 function healthText(health: string): string {
   return health === '' ? 'unavailable' : health;
 }

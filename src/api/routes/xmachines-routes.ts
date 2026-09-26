@@ -17,6 +17,7 @@ import {
 } from "../../services/xmachines/force-challenge.js";
 import { resolveProtectedRole } from "../../services/xmachines/protected-roles.js";
 import { loadGpuTelemetryRows } from "../../services/xmachines/gpu-edge-states.js";
+import { parseNutStatus, renderHddDiskPanel } from "../../services/xmachines/disk-telemetry.js";
 import {
   ownerTelegramBaseOverridden,
   sendOwnerMessage,
@@ -711,10 +712,19 @@ export function registerXmachinesRoutes(
     const nowIso = new Date().toISOString();
     const roleHint = (machine.roleHint ?? '') as string;
     const gpuRows = db ? loadGpuTelemetryRows(db as any, { machine: request.params.name, roleHint, nowIso, refresh: false }).apiRows : [];
-    // D10: add disks, filesystems, ups for storage/UPS panel
-    const disks = [];
-    const filesystems = [];
-    const ups = null;
+    const panel = renderHddDiskPanel(runtime.telemetry, request.params.name);
+    const nut = runtime.telemetry.readNut(request.params.name);
+    const parsed = parseNutStatus(nut.battery);
+    const disks = panel.disks;
+    const filesystems = panel.filesystems;
+    const ups = {
+      availability: nut.availability,
+      freshness: nut.freshness,
+      batteryChargePct: parsed.batteryChargePct,
+      runtimeSeconds: parsed.runtimeSeconds,
+      loadPct: parsed.loadPct,
+      raw: nut.battery,
+    };
     return {
       mode: runtime.armed ? "armed" : "fake",
       armed: runtime.armed,
