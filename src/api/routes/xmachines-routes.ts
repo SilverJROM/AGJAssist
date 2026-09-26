@@ -504,6 +504,55 @@ export function registerXmachinesRoutes(
     };
   });
 
+  app.get<{ Params: { name: string }; Querystring: { metric?: string; from?: string; to?: string } }>("/api/xmachines/machines/:name/history", async (request, reply) => {
+    if (clientArm(request)) {
+      return reply.code(400).send(CLIENT_ARM_REJECTED);
+    }
+    if (!requireCanonicalHost(request, reply)) return;
+    if (!requireCanonicalOrigin(request, reply)) return;
+
+    const sqlite = metricDatabase(db);
+    if (!sqlite) {
+      return reply.code(500).send({ error: "database_unavailable" });
+    }
+
+    const name = request.params.name;
+    const metric = (request.query.metric ?? "").toString().toLowerCase();
+    const from = (request.query.from ?? "").toString();
+    const to = (request.query.to ?? "").toString();
+
+    if (!["temperature", "power", "utilization"].includes(metric)) {
+      return reply.code(400).send({ error: "invalid_metric" });
+    }
+
+    const column = metric === "temperature" ? "temperature" : metric === "power" ? "power_watts" : "utilization_gpu";
+
+    const rows = from && to
+      ? sqlite.prepare(`
+          SELECT sample_time AS time, ${column} AS value
+          FROM xm_samples
+          WHERE machine_name = ? AND sample_time >= ? AND sample_time < ?
+          ORDER BY sample_time ASC, id ASC
+        `).all(name, from, to)
+      : sqlite.prepare(`
+          SELECT sample_time AS time, ${column} AS value
+          FROM xm_samples
+          WHERE machine_name = ?
+          ORDER BY sample_time ASC, id ASC
+        `).all(name);
+
+    const series = rows.map((r: any) => ({
+      time: r.time,
+      value: r.value,
+    }));
+
+    return {
+      machine: name,
+      metric,
+      series,
+    };
+  });
+
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/off",
     async (request, reply) =>
