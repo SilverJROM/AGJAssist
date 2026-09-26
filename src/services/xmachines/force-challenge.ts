@@ -11,12 +11,14 @@ import crypto from 'node:crypto';
  * Service creates no force gateway path by itself.
  */
 
+export type ForceAction = 'off' | 'force';
+
 export interface Challenge {
   id: string;
   ownerId: number;
   sessionId: string;
   machine: string;
-  action: 'off';
+  action: ForceAction;
   number: number;
   expiresAt: number;
   consumed: boolean;
@@ -50,7 +52,7 @@ export class ForceChallengeService {
 
   constructor(private readonly getForceProbe?: ForceProbe) {}
 
-  startChallenge(ownerId: number, sessionId: string, machine: string, action: 'off'): StartChallengeResult {
+  startChallenge(ownerId: number, sessionId: string, machine: string, action: ForceAction): StartChallengeResult {
     const id = crypto.randomUUID();
     const displayNumber = 10 + Math.floor(Math.random() * 90);
     const buttons = new Set<number>([displayNumber]);
@@ -81,7 +83,7 @@ export class ForceChallengeService {
     challengeId: string,
     sessionId: string,
     machine: string,
-    action: 'off',
+    action: ForceAction,
     selectedNumber: number,
   ): ConfirmResult {
     const ch = this.challenges.get(challengeId);
@@ -116,7 +118,7 @@ export class ForceChallengeService {
     return { ok: true, challenge: ch };
   }
 
-  async buildConfirmationText(machine: string, action: 'off'): Promise<string> {
+  async buildConfirmationText(machine: string, action: ForceAction): Promise<string> {
     if (!this.getForceProbe) {
       throw new Error('force-probe-missing');
     }

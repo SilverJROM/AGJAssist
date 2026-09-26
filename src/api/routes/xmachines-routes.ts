@@ -1,4 +1,6 @@
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import fs from "node:fs";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { callCarriesClientArm, resolveXmachinesRuntime } from "../../services/xmachines/runtime.js";
 import { ActionCoordinator } from "../../services/xmachines/action-coordinator.js";
@@ -8,7 +10,11 @@ import type { AuditService } from "../../services/audit-service.js";
 import type BetterSqlite from "better-sqlite3";
 import type { DatabaseService } from "../../db/database.js";
 import { loadMachineEnergyCost, type CostWindow, type MachineCost } from "../../services/xmachines/cost.js";
-import { ForceChallengeService, type StartChallengeResult } from "../../services/xmachines/force-challenge.js";
+import {
+  ForceChallengeService,
+  type ForceProbeSnapshot,
+  type StartChallengeResult,
+} from "../../services/xmachines/force-challenge.js";
 import { resolveProtectedRole } from "../../services/xmachines/protected-roles.js";
 import {
   ownerTelegramBaseOverridden,
@@ -395,14 +401,51 @@ async function power(
   return reply.code(code).send(result);
 }
 
+function readForceProbe(machine: string): Promise<ForceProbeSnapshot> {
+  const file = process.env.XMACHINES_FORCE_PROBE_FIXTURE?.trim() ?? "";
+  if (!file) return Promise.reject(new Error("force-probe-missing"));
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return Promise.reject(new Error("force-probe-missing"));
+  }
+  const record = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {};
+  const nested = record[machine];
+  const row = nested && typeof nested === "object" && !Array.isArray(nested)
+    ? nested as Record<string, unknown>
+    : record;
+  const holders = Array.isArray(row.leaseHolders)
+    ? row.leaseHolders.filter((item): item is string => typeof item === "string")
+    : [];
+  return Promise.resolve({
+    processesText: typeof row.processesText === "string" ? row.processesText : "",
+    leasesText: typeof row.leasesText === "string" ? row.leasesText : "",
+    leaseHolders: holders,
+  });
+}
+
+function spawnForceDown(machine: string, ownerId: string, sessionId: string): void {
+  const child = spawn("xmac.sh", ["down", machine, "--force"], {
+    detached: true,
+    stdio: "ignore",
+    env: {
+      ...process.env,
+      XMAC_CALLER: `${ownerId}+${sessionId}`,
+    },
+  });
+  child.once("error", () => undefined);
+  child.unref();
+}
+
 async function powerForce(
   request: FastifyRequest,
   reply: FastifyReply,
-  coordinator: ActionCoordinator,
   audit: AuditService | undefined,
   name: string,
   wolForceChallenges: ForceChallengeService,
-  telegram?: OwnerTelegram,
 ) {
   const auditAttempt = (
     classification: AttemptClassification,
@@ -462,60 +505,52 @@ async function powerForce(
   const role = resolveProtectedRole(name);
   if (role) {
     auditAttempt("denied", { protected_role: { ok: false, detail: role.detail } }, { preState: observed, finalState: observed });
-    return reply.code(403).send({ status: "rejected", reason: role.reason, role: role.role, detail: role.detail });
+    return reply.code(400).send({ status: "rejected", reason: role.reason, role: role.role, detail: role.detail });
   }
 
-  const body = request.body;
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    auditAttempt("denied", { challenge: { ok: false, detail: "missing-challenge-body" } }, { preState: observed, finalState: observed });
-    return reply.code(400).send({ status: "rejected", reason: "challenge-required" });
+  let confirmation = "";
+  try {
+    confirmation = await wolForceChallenges.buildConfirmationText(name, "force");
+  } catch {
+    auditAttempt("denied", { force_probe: { ok: false, detail: "force-probe-missing" } }, { preState: observed, finalState: observed });
+    return reply.code(400).send({ status: "rejected", reason: "force-probe-missing" });
   }
-  const rec = body as Record<string, unknown>;
-  if (typeof rec.challengeId !== "string" || rec.challengeId.trim() === "" ||
-      typeof rec.selectedNumber !== "number" || !Number.isInteger(rec.selectedNumber)) {
-    auditAttempt("denied", { challenge: { ok: false, detail: "invalid-challenge-body" } }, { preState: observed, finalState: observed });
-    return reply.code(400).send({ status: "rejected", reason: "challenge-required" });
+
+  const confirm = wolConfirmFromBody(request);
+  if (!confirm) {
+    const started = wolForceChallenges.startChallenge(ownerIdNum, sessionId, name, "force");
+    auditAttempt("force", { force_confirmation: { ok: false, detail: "challenge-issued" } }, { preState: observed, finalState: "" });
+    return reply.code(200).send({
+      status: "challenge",
+      challengeId: started.id,
+      displayNumber: started.displayNumber,
+      confirmation,
+      expiresAt: started.expiresAt,
+    });
   }
+
   const confirmed = wolForceChallenges.confirmChallenge(
-    rec.challengeId.trim(),
+    confirm.challengeId,
     sessionId,
     name,
-    "off",
-    rec.selectedNumber
+    "force",
+    confirm.selectedNumber,
   );
   if (!confirmed.ok) {
-    auditAttempt("denied", { force_confirmation: { ok: false, detail: confirmed.reason ?? "force-confirmation-required" } }, { preState: observed, finalState: observed });
-    return reply.code(400).send({ status: "rejected", reason: "force-confirmation-required", detail: confirmed.reason });
+    auditAttempt(
+      "denied",
+      { force_confirmation: { ok: false, detail: confirmed.reason ?? "force-confirmation-required" } },
+      { preState: observed, finalState: observed },
+    );
+    return reply.code(400).send({
+      status: "rejected",
+      reason: confirmed.reason ?? "force-confirmation-required",
+    });
   }
 
-  const { replayed, ...result } = coordinator.handle({
-    machine: name,
-    action: "off",
-    idempotencyKey,
-    ownerId: String(ownerIdNum),
-    sessionId,
-  });
-
-  const classification: AttemptClassification = replayed
-    ? "replayed"
-    : result.status === "rejected"
-      ? "denied"
-      : "off";
-
-  const guards: Record<string, { ok: boolean; detail?: string }> = {};
-  if (replayed) {
-    guards.idempotency = { ok: true, detail: "replayed" };
-  } else if (result.reason) {
-    guards[result.reason] = { ok: false, detail: result.detail };
-  } else {
-    guards.accepted = { ok: true };
-  }
-  auditAttempt(classification, guards, {
-    preState: observed,
-    finalState: result.status === "in-progress" ? "" : observed,
-  });
-  const code = result.status === "in-progress" ? 202 : 400;
-  return reply.code(code).send(result);
+  spawnForceDown(name, String(ownerIdNum), sessionId);
+  auditAttempt("force", { accepted: { ok: true }, force_probe: { ok: true } }, { preState: observed, finalState: "" });
+  return reply.code(202).send({ status: "in-progress", confirmation });
 }
 
 function queryString(value: unknown): string {
@@ -565,7 +600,7 @@ export function registerXmachinesRoutes(
   telegram?: OwnerTelegram,
 ): void {
   const coordinator = new ActionCoordinator();
-  const wolForceChallenges = new ForceChallengeService();
+  const wolForceChallenges = new ForceChallengeService((machine) => readForceProbe(machine));
   const authMiddleware = authService ? createAuthMiddleware(authService) : async () => {};
   const perActionLimit = {
     off: app.createRateLimit({
@@ -745,6 +780,6 @@ export function registerXmachinesRoutes(
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/force",
     async (request, reply) =>
-      powerForce(request, reply, coordinator, auditService, request.params.name, wolForceChallenges, telegram)
+      powerForce(request, reply, auditService, request.params.name, wolForceChallenges)
   );
 }
