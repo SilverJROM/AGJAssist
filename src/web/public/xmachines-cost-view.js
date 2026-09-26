@@ -24,7 +24,7 @@ function powerStateLabel(machine) {
 
 function fieldSpan(testId, text) {
   if (text == null || text === '') return '';
-  return `<span data-testid="${testId}">${escapeHtml(text)}</span>`;
+  return ` <span data-testid="${testId}">${escapeHtml(text)}</span>`;
 }
 
 // Cost fields are never printed. Down machines show offline and no live metrics.
@@ -47,17 +47,25 @@ function serviceSpans(machine) {
   return `${fieldSpan('xmachines-freshness', freshness)}${fieldSpan('xmachines-provenance', provenance)}${fieldSpan('xmachines-busy', busy)}${fieldSpan('xmachines-leases', leases)}`;
 }
 
+// Registry role text is a hint only. It is not the card's accessible name.
+function roleHintSpan(machine) {
+  const role = machine && typeof machine.roleHint === 'string' ? machine.roleHint.trim() : '';
+  if (!role) return '';
+  return `<span data-testid="xmachines-role-hint" class="xm-role-hint" style="display:block;font-size:12px;font-weight:400;opacity:0.72">${escapeHtml(role)}</span>`;
+}
+
 // Fleet overview prints name and power state. Cost fields on a machine are ignored.
 export function renderFleetOverview(payload) {
   const machines = payload && Array.isArray(payload.machines) ? payload.machines : [];
   const items = machines.map((machine) => {
     const name = escapeHtml(machine && machine.name != null ? machine.name : '');
     const state = escapeHtml(powerStateLabel(machine));
-    const extra = `${liveMetricSpans(machine)}${serviceSpans(machine)}`;
+    const stateHtml = fieldSpan('xmachines-power-state', state);
+    const extra = `${liveMetricSpans(machine)}${serviceSpans(machine)}${roleHintSpan(machine)}`;
     const tail = extra ? ` ${extra}` : '';
-    return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}">${name} ${state}${tail}</li>`;
+    return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}" style="display:block;margin:0 0 12px;padding:12px 14px;border:1px solid #30363d;border-radius:12px;list-style:none">${name}${stateHtml}${tail}</li>`;
   }).join('');
-  return `<section class="xm-fleet" data-testid="xmachines-fleet-overview" role="region" aria-label="Fleet overview"><h1>Fleet overview</h1><ul>${items}</ul></section>`;
+  return `<section class="xm-fleet" data-testid="xmachines-fleet-overview" role="region" aria-label="Fleet overview" style="max-width:420px;font:16px/1.4 system-ui,sans-serif"><h1 style="font-size:20px;margin:0 0 12px">Fleet overview</h1><ul style="list-style:none;padding:0;margin:0">${items}</ul></section>`;
 }
 
 function renderReadout(machine) {
