@@ -43,6 +43,7 @@ interface StoredSample {
   utilization_gpu: number | null;
   fan_speed: number | null;
   vram_mb: number | null;
+  vram_total_mb: number | null;
 }
 
 function finiteOrNull(value: number): number | null {
@@ -139,6 +140,15 @@ function rowFromReading(reading: GpuReading): GpuApiRow {
   };
 }
 
+function storedMemory(row: StoredSample, blank: string): string {
+  const used = row.vram_mb;
+  const total = row.vram_total_mb;
+  if (used !== null && total !== null && Number.isFinite(used) && Number.isFinite(total)) {
+    return `${used}/${total} MiB`;
+  }
+  return displayNumber(used, 'MiB', blank);
+}
+
 function rowFromStored(row: StoredSample, chip: string): GpuApiRow {
   const blank = isNonNvidiaName(row.gpu_name ?? '') ? 'not-applicable' : 'unavailable';
   return {
@@ -147,7 +157,7 @@ function rowFromStored(row: StoredSample, chip: string): GpuApiRow {
     chip: chip || (blank === 'not-applicable' ? 'non-nvidia' : ''),
     power: displayNumber(row.power_watts, 'W', blank),
     temperature: displayNumber(row.temperature, 'C', blank),
-    memory: displayNumber(row.vram_mb, 'MiB', blank),
+    memory: storedMemory(row, blank),
     utilization: displayNumber(row.utilization_gpu, '%', blank),
     fan: displayNumber(row.fan_speed, '%', blank),
   };
@@ -156,7 +166,7 @@ function rowFromStored(row: StoredSample, chip: string): GpuApiRow {
 function latestSamples(db: Database.Database, machine: string): StoredSample[] {
   const rows = db.prepare(`
     SELECT s.gpu_uuid, d.gpu_name, s.sample_time, s.temperature, s.power_watts,
-           s.utilization_gpu, s.fan_speed, s.vram_mb
+           s.utilization_gpu, s.fan_speed, s.vram_mb, s.vram_total_mb
     FROM xm_samples s
     LEFT JOIN xm_devices d ON d.gpu_uuid = s.gpu_uuid
     WHERE s.machine_name = ?
@@ -190,6 +200,7 @@ function persistReadings(db: Database.Database, machine: string, readings: reado
       utilizationMem: null,
       fanSpeed: suppress ? null : finiteOrNull(reading.fanSpeedPct),
       vramMb: suppress ? null : finiteOrNull(reading.memoryUsedMiB),
+      vramTotalMb: suppress ? null : finiteOrNull(reading.memoryTotalMiB),
     };
   });
   reconcileGpuIdentities(db, machine, observed, nowIso);

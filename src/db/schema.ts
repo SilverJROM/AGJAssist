@@ -551,7 +551,8 @@ CREATE TABLE IF NOT EXISTS xm_samples (
   utilization_gpu REAL,
   utilization_mem REAL,
   fan_speed REAL,
-  vram_mb REAL
+  vram_mb REAL,
+  vram_total_mb REAL
 );
 CREATE INDEX IF NOT EXISTS idx_xm_samples_machine_time ON xm_samples(machine_name, sample_time);
 CREATE INDEX IF NOT EXISTS idx_xm_samples_gpu_uuid ON xm_samples(gpu_uuid);
@@ -622,9 +623,18 @@ export function applyXmachinesAdditiveFixes(db: Database.Database): void {
   const devices = db
     .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='xm_devices'")
     .get() as { name: string } | undefined;
-  if (!devices) return;
-  const cols = db.pragma("table_info(xm_devices)") as { name: string }[];
-  if (!cols.some((col) => col.name === "ordinal")) {
-    db.exec("ALTER TABLE xm_devices ADD COLUMN ordinal INTEGER NOT NULL DEFAULT 0");
+  if (devices) {
+    const cols = db.pragma("table_info(xm_devices)") as { name: string }[];
+    if (!cols.some((col) => col.name === "ordinal")) {
+      db.exec("ALTER TABLE xm_devices ADD COLUMN ordinal INTEGER NOT NULL DEFAULT 0");
+    }
+  }
+  const samples = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='xm_samples'")
+    .get() as { name: string } | undefined;
+  if (!samples) return;
+  const sampleCols = db.pragma("table_info(xm_samples)") as { name: string }[];
+  if (!sampleCols.some((col) => col.name === "vram_total_mb")) {
+    db.exec("ALTER TABLE xm_samples ADD COLUMN vram_total_mb REAL");
   }
 }

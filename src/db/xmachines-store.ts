@@ -10,6 +10,7 @@ export interface SampleReading {
   utilizationMem: number | null;
   fanSpeed: number | null;
   vramMb: number | null;
+  vramTotalMb: number | null;
 }
 
 export interface ObservedGpu {
@@ -39,8 +40,8 @@ export function persistSampleCycle(db: Database.Database, readings: readonly Sam
   const insert = db.prepare(`
     INSERT INTO xm_samples (
       machine_name, gpu_uuid, sample_time, temperature, power_watts,
-      utilization_gpu, utilization_mem, fan_speed, vram_mb
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      utilization_gpu, utilization_mem, fan_speed, vram_mb, vram_total_mb
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const write = db.transaction((rows: readonly SampleReading[]) => {
     for (const row of rows) {
@@ -54,6 +55,7 @@ export function persistSampleCycle(db: Database.Database, readings: readonly Sam
         row.utilizationMem,
         row.fanSpeed,
         row.vramMb,
+        row.vramTotalMb ?? null,
       );
     }
   });

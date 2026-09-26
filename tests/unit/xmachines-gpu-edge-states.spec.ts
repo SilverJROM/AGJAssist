@@ -6,6 +6,7 @@ import path from 'node:path';
 import { JSDOM } from 'jsdom';
 import { DatabaseService } from '../../src/db/database.js';
 import { loadGpuTelemetryRows } from '../../src/services/xmachines/gpu-edge-states.js';
+import { renderMachineCostDetail } from '../../src/web/public/xmachines-cost-view.js';
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
@@ -319,6 +320,45 @@ describe('B16 GPU edge rows', () => {
     expect(row?.querySelector('.metric-power')?.textContent).toBe('95.2 W');
     expect(surface.html).not.toContain('error-timeout');
     expect(surface.html).not.toContain(ROLE_TEXT);
+    db.close();
+  });
+
+  it('C1c – stored VRAM total is rendered by the non-refresh production read', () => {
+    const storedUuid = 'GPU-D4-STORED';
+    const storedName = 'NVIDIA GeForce RTX 3090';
+    vi.mocked(spawnSync).mockReturnValue(spawnOk(
+      `${storedUuid}, ${storedName}, 41, 2048, 24576, 67, 220, 55`,
+    ) as never);
+    const db = tempDb();
+
+    loadGpuTelemetryRows(db.raw, {
+      machine: 'gpu',
+      roleHint: ROLE_TEXT,
+      nowIso: READ_NOW,
+      refresh: true,
+    });
+    const stored = db.raw.prepare(
+      'SELECT vram_mb, vram_total_mb FROM xm_samples WHERE gpu_uuid = ?',
+    ).get(storedUuid) as { vram_mb: number; vram_total_mb: number };
+    expect(stored).toEqual({ vram_mb: 2048, vram_total_mb: 24576 });
+
+    vi.mocked(spawnSync).mockReset();
+    const surface = loadGpuTelemetryRows(db.raw, {
+      machine: 'gpu',
+      roleHint: ROLE_TEXT,
+      nowIso: READ_NOW,
+      refresh: false,
+    });
+    const detail = renderMachineCostDetail({
+      machine: { name: 'gpu' },
+      gpuRows: surface.apiRows,
+    });
+    const cell = documentOf(detail).querySelector('[data-testid="xmachines-gpu-vram"]');
+
+    expect(vi.mocked(spawnSync)).not.toHaveBeenCalled();
+    expect(surface.apiRows).toHaveLength(1);
+    expect(surface.apiRows[0].memory).toBe('2048/24576 MiB');
+    expect(cell?.textContent).toBe('2048/24576 MiB');
     db.close();
   });
 });

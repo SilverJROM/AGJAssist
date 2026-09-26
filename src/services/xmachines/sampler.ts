@@ -92,6 +92,7 @@ function persistMetricHistory(runtime: XmachinesRuntime): void {
       utilizationMem: null,
       fanSpeed: null,
       vramMb: null,
+      vramTotalMb: null,
     }))
     : liveGpuReadings(runtime, sampleTime);
   persistSampleCycle(db, readings);
@@ -113,6 +114,7 @@ function liveGpuReadings(runtime: XmachinesRuntime, sampleTime: string): SampleR
         utilizationMem: null,
         fanSpeed: Number.isFinite(gpu.fanSpeedPct) ? gpu.fanSpeedPct : null,
         vramMb: Number.isFinite(gpu.memoryUsedMiB) ? gpu.memoryUsedMiB : null,
+        vramTotalMb: Number.isFinite(gpu.memoryTotalMiB) ? gpu.memoryTotalMiB : null,
       });
     }
   }

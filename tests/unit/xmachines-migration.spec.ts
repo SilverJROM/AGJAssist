@@ -116,9 +116,49 @@ describe("xmachines migration A11", () => {
     const sampleCols = db.raw.pragma("table_info(xm_samples)") as Array<{ name: string }>;
     expect(sampleCols.map((c) => c.name)).toContain("gpu_uuid");
     expect(sampleCols.map((c) => c.name)).toContain("machine_name");
+    expect(sampleCols.map((c) => c.name)).toContain("vram_total_mb");
     const deviceCols = db.raw.pragma("table_info(xm_devices)") as Array<{ name: string }>;
     expect(deviceCols.map((c) => c.name)).toContain("ordinal");
     expectActionStateShape(db);
+    db.close();
+  });
+
+  it("stamped v40 database gains vram_total_mb without a version bump", () => {
+    const dbPath = tempDb("stamped40.sqlite");
+    const raw = new Database(dbPath);
+    raw.exec(`
+      CREATE TABLE schema_version (version INTEGER NOT NULL);
+      INSERT INTO schema_version (version) VALUES (40);
+      CREATE TABLE xm_devices (
+        id INTEGER PRIMARY KEY,
+        machine_name TEXT NOT NULL,
+        gpu_uuid TEXT NOT NULL UNIQUE,
+        gpu_name TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        ordinal INTEGER NOT NULL DEFAULT 0,
+        first_seen TEXT NOT NULL DEFAULT (datetime('now')),
+        last_seen TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE xm_samples (
+        id INTEGER PRIMARY KEY,
+        machine_name TEXT NOT NULL,
+        gpu_uuid TEXT NOT NULL,
+        sample_time TEXT NOT NULL DEFAULT (datetime('now')),
+        temperature REAL,
+        power_watts REAL,
+        utilization_gpu REAL,
+        utilization_mem REAL,
+        fan_speed REAL,
+        vram_mb REAL
+      );
+    `);
+    raw.close();
+
+    const db = new DatabaseService(dbPath);
+    const version = db.prepare("SELECT version FROM schema_version").get() as { version: number };
+    expect(version.version).toBe(40);
+    const sampleCols = db.raw.pragma("table_info(xm_samples)") as Array<{ name: string }>;
+    expect(sampleCols.map((col) => col.name)).toContain("vram_total_mb");
     db.close();
   });
 
