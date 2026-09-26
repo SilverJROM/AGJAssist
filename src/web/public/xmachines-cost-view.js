@@ -194,13 +194,31 @@ export function renderFleetOverview(payload) {
     const cardStyle = isStale ? 'opacity:0.6;' : '';
     const extra = `${liveMetricSpans(machine)}${serviceSpans(machine)}${roleHintSpan(machine)}`;
     const tail = extra ? ` ${extra}` : '';
-    return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}" style="display:block;margin:0 0 12px;padding:12px 14px;border:1px solid #30363d;border-radius:12px;list-style:none;${cardStyle}">${name}${stateHtml}${severity}${tail}</li>`;
+    const spark = '';
+    return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}" style="display:block;margin:0 0 12px;padding:12px 14px;border:1px solid #30363d;border-radius:12px;list-style:none;${cardStyle}">${name}${stateHtml}${severity}${tail}${spark}</li>`;
   }).join('');
   writeSeverityBook(severityBook);
   return `<section class="xm-fleet" data-testid="xmachines-fleet-overview" role="region" aria-label="Fleet overview" style="max-width:420px;font:16px/1.4 system-ui,sans-serif"><h1 style="font-size:20px;margin:0 0 12px">Fleet overview</h1><ul style="list-style:none;padding:0;margin:0">${items}</ul></section>`;
 }
 
-function renderReadout(machine) {
+function seriesToPoints(series, width, height) {
+  if (!Array.isArray(series) || series.length === 0) return '';
+  const values = series.map(s => Number(s.value)).filter(v => Number.isFinite(v));
+  if (values.length === 0) return '';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const n = values.length;
+  const step = width / (n - 1 || 1);
+  const points = values.map((v, i) => {
+    const x = Math.round(i * step);
+    const y = Math.round(height - ((v - min) / range) * height);
+    return `${x},${y}`;
+  }).join(' ');
+  return points;
+}
+
+function renderReadout(machine, history) {
   if (!machine) return '';
   const hasModel = machine.state != null || machine.offline != null || machine.freshness || machine.telemetry || machine.busy;
   if (!hasModel) return '';
@@ -216,13 +234,22 @@ function renderReadout(machine) {
   const onHoursSpan = onHours ? `<span data-testid="xmachines-on-hours">${escapeHtml(onHours)}</span> <span data-testid="xmachines-on-hours-provenance">${escapeHtml(machine.sampledOnHours?.label ?? 'estimated')}</span>` : '';
   const roleText = typeof machine.roleHint === 'string' && machine.roleHint.trim() ? machine.roleHint.trim() : '';
   const protectedRoleSpan = roleText ? `<span data-testid="xmachines-protected-role">${escapeHtml(roleText)}</span>` : '';
-  return `<div data-testid="xmachines-read-model">${stateHtml}${cpuSpan}${fanSpan}${sessionSpan}${onHoursSpan}${protectedRoleSpan}${liveMetricSpans(machine)}${serviceSpans(machine)}</div>`;
+  const hist = history || {};
+  const tempPoints = seriesToPoints(hist.temperature, 120, 30);
+  const powerPoints = seriesToPoints(hist.power, 120, 30);
+  const utilPoints = seriesToPoints(hist.utilization, 120, 30);
+  const tempPoly = tempPoints ? `<polyline points="${tempPoints}" fill="none" stroke="currentColor"/>` : '';
+  const powerPoly = powerPoints ? `<polyline points="${powerPoints}" fill="none" stroke="currentColor"/>` : '';
+  const utilPoly = utilPoints ? `<polyline points="${utilPoints}" fill="none" stroke="currentColor"/>` : '';
+  const sparkHtml = `<div data-testid="xmachines-sparkline-temp" aria-label="temperature sparkline"><svg width="120" height="30">${tempPoly}</svg></div><div data-testid="xmachines-sparkline-power" aria-label="power sparkline"><svg width="120" height="30">${powerPoly}</svg></div><div data-testid="xmachines-sparkline-util" aria-label="utilisation sparkline"><svg width="120" height="30">${utilPoly}</svg></div>`;
+  return `<div data-testid="xmachines-read-model">${stateHtml}${cpuSpan}${fanSpan}${sessionSpan}${onHoursSpan}${protectedRoleSpan}${liveMetricSpans(machine)}${serviceSpans(machine)}${sparkHtml}</div>`;
 }
 
 // Detail is the only surface that shows PHP cost, the tariff flag, and the short-burst caveat.
 export function renderMachineCostDetail(payload) {
   const machine = payload && payload.machine ? payload.machine : {};
   const cost = payload && payload.cost ? payload.cost : {};
+  const history = payload && payload._history ? payload._history : {};
   const name = escapeHtml(machine.name ?? '');
   const phpAmount = escapeHtml(displayAmount(cost.costPhp));
   const kwhAmount = escapeHtml(displayAmount(cost.kwh));
@@ -244,7 +271,7 @@ export function renderMachineCostDetail(payload) {
     const fan = escapeHtml(row.fan ?? '');
     return `<div class="gpu-row" data-testid="xmachines-gpu-row" data-gpu-uuid="${uuid}"><span data-testid="xmachines-gpu-name">${gpuName}</span><span data-testid="xmachines-gpu-util">${util}</span><span data-testid="xmachines-gpu-vram">${memory}</span><span data-testid="xmachines-gpu-temp">${temp}</span><span data-testid="xmachines-gpu-power">${power}</span><span data-testid="xmachines-gpu-fan">${fan}</span></div>`;
   }).join('');
-  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine)}${gpuRowHtml}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${offButton}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
+  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine, history)}${gpuRowHtml}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${offButton}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
 }
 
 function defaultIdempotencyKey() {

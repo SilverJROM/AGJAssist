@@ -7836,10 +7836,23 @@ function XmachinesFleetPage() {
   const [markup, setMarkup] = useState('');
   useEffect(() => {
     let cancelled = false;
-    api('/api/xmachines/telemetry')
-      .then((payload) => { if (!cancelled) setMarkup(renderFleetOverview(payload)); })
-      .catch(() => { if (!cancelled) setMarkup(renderFleetOverview({ machines: [] })); });
-    return () => { cancelled = true; };
+    const fetchTelemetry = () => {
+      api('/api/xmachines/telemetry')
+        .then((payload) => { if (!cancelled) setMarkup(renderFleetOverview(payload)); })
+        .catch(() => { if (!cancelled) setMarkup(renderFleetOverview({ machines: [] })); });
+    };
+    fetchTelemetry();
+    const intervalMs = 30_000;
+    let intervalId = null;
+    const tick = () => {
+      if (cancelled) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchTelemetry();
+    };
+    intervalId = setInterval(tick, intervalMs);
+    const onVisibilityChange = () => { if (!document.hidden) fetchTelemetry(); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => { cancelled = true; if (intervalId) clearInterval(intervalId); document.removeEventListener('visibilitychange', onVisibilityChange); };
   }, []);
   return html`<div class="xmachines-view" dangerouslySetInnerHTML=${{ __html: markup }}></div>`;
 }
@@ -7849,10 +7862,36 @@ function XmachinesDetailPage({ name }) {
   const [markup, setMarkup] = useState('');
   useEffect(() => {
     let cancelled = false;
-    api('/api/xmachines/machines/' + encodeURIComponent(name))
-      .then((data) => { if (!cancelled) setPayload(data); })
-      .catch(() => { if (!cancelled) setPayload(null); });
-    return () => { cancelled = true; };
+    const fetchDetail = async () => {
+      try {
+        const data = await api('/api/xmachines/machines/' + encodeURIComponent(name));
+        if (cancelled) return;
+        const [tempHist, powerHist, utilHist] = await Promise.all([
+          api('/api/xmachines/machines/' + encodeURIComponent(name) + '/history?metric=temperature'),
+          api('/api/xmachines/machines/' + encodeURIComponent(name) + '/history?metric=power'),
+          api('/api/xmachines/machines/' + encodeURIComponent(name) + '/history?metric=utilization')
+        ]).catch(() => [null, null, null]);
+        if (cancelled) return;
+        if (data) data._history = { temperature: tempHist?.series ?? [], power: powerHist?.series ?? [], utilization: utilHist?.series ?? [] };
+        setPayload(data);
+      } catch {
+        if (!cancelled) setPayload(null);
+      }
+    };
+    fetchDetail();
+    const intervalMs = 30_000;
+    let intervalId = null;
+    const tick = () => {
+      if (cancelled) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      const currentHash = location.hash;
+      if (!currentHash.startsWith('#/xmachines/')) return;
+      fetchDetail();
+    };
+    intervalId = setInterval(tick, intervalMs);
+    const onVisibilityChange = () => { if (!document.hidden) fetchDetail(); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => { cancelled = true; if (intervalId) clearInterval(intervalId); document.removeEventListener('visibilitychange', onVisibilityChange); };
   }, [name]);
   useEffect(() => {
     setMarkup(payload ? renderMachineCostDetail(payload) : '');
