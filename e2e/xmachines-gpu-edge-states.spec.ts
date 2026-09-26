@@ -60,6 +60,16 @@ const ROWS: GpuRow[] = [
     utilization: '10%',
     fan: '30%',
   },
+  {
+    uuid: 'GPU-EDGE-DRIVER-TIMEOUT',
+    name: 'NVIDIA RTX 3090',
+    chip: 'error-timeout',
+    power: '180.5 W',
+    temperature: '71 C',
+    memory: '2048/24576 MiB',
+    utilization: '12%',
+    fan: '40%',
+  },
 ];
 
 const PAYLOAD = {
@@ -69,8 +79,15 @@ const PAYLOAD = {
   gpuRows: ROWS,
 };
 
+const NO_NVIDIA_PAYLOAD = {
+  mode: 'fake',
+  armed: false,
+  machine: { name: 'gpu', state: 'up', roleHint: 'compute' },
+  gpuRows: [],
+};
+
 test.describe('D13 GPU edge states', () => {
-  test('renders one row per GPU UUID plus unavailable, no-nvidia, driver-timeout, non-nvidia and stale states from production read route', async ({ page }) => {
+  test('renders one row per GPU UUID plus unavailable, driver-timeout, non-nvidia and stale states from production read route', async ({ page }) => {
     await page.addInitScript((sessionUser) => {
       localStorage.setItem('agj_token', 'd13-owner-token');
       localStorage.setItem('agj_user', JSON.stringify(sessionUser));
@@ -103,11 +120,42 @@ test.describe('D13 GPU edge states', () => {
       const row = rows.nth(i);
       const r = ROWS[i];
       await expect(row.locator('[data-testid="xmachines-gpu-name"]')).toHaveText(r.name);
+      await expect(row.locator('[data-testid="xmachines-gpu-chip"]')).toHaveText(r.chip);
       await expect(row.locator('[data-testid="xmachines-gpu-power"]')).toHaveText(r.power);
       await expect(row.locator('[data-testid="xmachines-gpu-temp"]')).toHaveText(r.temperature);
       await expect(row.locator('[data-testid="xmachines-gpu-vram"]')).toHaveText(r.memory);
       await expect(row.locator('[data-testid="xmachines-gpu-util"]')).toHaveText(r.utilization);
       await expect(row.locator('[data-testid="xmachines-gpu-fan"]')).toHaveText(r.fan);
     }
+  });
+
+  test('no-nvidia machine renders empty GPU rows', async ({ page }) => {
+    await page.addInitScript((sessionUser) => {
+      localStorage.setItem('agj_token', 'd13-owner-token');
+      localStorage.setItem('agj_user', JSON.stringify(sessionUser));
+    }, OWNER);
+
+    await page.route(/\/api\/auth\/me(?:\?.*)?$/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ...OWNER, display_name: OWNER.displayName, totp_enabled: false }),
+      })
+    );
+
+    await page.route(/\/api\/xmachines\/machines\/gpu(?:\?.*)?$/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(NO_NVIDIA_PAYLOAD),
+      })
+    );
+
+    await page.goto('/index.html#/xmachines/gpu', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator('[data-testid="xmachines-machine-detail"]')).toBeVisible();
+
+    const rows = page.locator('[data-testid="xmachines-gpu-row"]');
+    await expect(rows).toHaveCount(0);
   });
 });
