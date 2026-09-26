@@ -1,0 +1,37 @@
+- banner:
+  - heading "AGJAssist" [level=1]
+  - navigation:
+    - link "Dashboard":
+      - /url: "#/"
+    - link "Projects":
+      - /url: "#/projects"
+    - link "Terminals":
+      - /url: "#/terminals"
+    - link "Tasks":
+      - /url: "#/tasks"
+    - link "Notes":
+      - /url: "#/notes"
+    - link "Agent OS":
+      - /url: "#/agent-os"
+    - link "Settings":
+      - /url: "#/settings"
+  - text: shell-only viewer
+  - button "Logout"
+- main:
+  - heading "Settings" [level=2]
+  - heading "▼ Account" [level=3]
+  - text: "d12-owner-fixture Role: owner 2FA ON"
+  - heading "Two-Factor Authentication" [level=4]
+  - paragraph: 2FA is enabled. Your account is protected.
+  - text: "Enter current 2FA code to disable:"
+  - textbox "000000"
+  - button "Disable 2FA" [disabled]
+  - heading "Web Sessions" [level=4]
+  - button "Revoke All Web Sessions"
+  - heading "▼ Terminal Conversation" [level=3]
+  - text: Conversation font size
+  - slider: "17"
+  - text: 17px
+  - heading "▶ Agent Registry" [level=3]
+  - heading "▶ Step Templates" [level=3]
+  - heading "▶ Safety Patterns" [level=3]

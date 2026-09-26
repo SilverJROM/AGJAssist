@@ -482,8 +482,13 @@ async function openShell(
       };
     }
     try {
-      localStorage.setItem('agj_token', token as string);
-      localStorage.setItem('agj_user', JSON.stringify({ id: 1, name: role, username: role, role }));
+      // Seed once per tab. Revoke clears localStorage and reloads; writing the
+      // bearer again on that reload would hide the signed-out page.
+      if (!sessionStorage.getItem('e11-session-seeded')) {
+        sessionStorage.setItem('e11-session-seeded', '1');
+        localStorage.setItem('agj_token', token as string);
+        localStorage.setItem('agj_user', JSON.stringify({ id: 1, name: role, username: role, role }));
+      }
     } catch { /* ignore */ }
   }, [opts.token, opts.shell, opts.role] as [string, string, string]);
 

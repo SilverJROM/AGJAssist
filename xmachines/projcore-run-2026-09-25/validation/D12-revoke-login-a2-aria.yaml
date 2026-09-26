@@ -1,0 +1,9 @@
+- heading "AGJAssist" [level=2]
+- paragraph:
+  - text: Enter your
+  - strong: 2FA code
+  - text: from your authenticator app.
+- text: 2FA Code
+- textbox "000000"
+- button "Continue" [disabled]
+- button "Use a login code instead"

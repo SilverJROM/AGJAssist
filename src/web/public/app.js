@@ -7199,13 +7199,13 @@ function Settings({ onEditBottomNav } = {}) {
 
       <${SettingsSection} title="Account" defaultOpen=${true}>
         <div style="margin-bottom:16px">
-          ${userInfo ? html`
+          ${userInfo?.user ? html`
             <div class="item-card" style="padding:12px 16px;margin-bottom:12px">
               <div style="display:flex;justify-content:space-between;align-items:center">
                 <div>
-                  <div style="font-weight:500;margin-bottom:4px">${userInfo.display_name || userInfo.username || 'User'}</div>
+                  <div style="font-weight:500;margin-bottom:4px">${userInfo.user.display_name || userInfo.user.displayName || userInfo.user.username || 'User'}</div>
                   <div style="font-size:12px;color:var(--text-secondary)">
-                    Role: <span class="badge badge-${userInfo.role === 'owner' ? 'active' : 'draft'}">${userInfo.role}</span>
+                    Role: <span class="badge badge-${userInfo.user.role === 'owner' ? 'active' : 'draft'}">${userInfo.user.role}</span>
                     ${userInfo.totp_enabled ? html` <span class="badge badge-active" style="font-size:10px">2FA ON</span>` : ''}
                   </div>
                 </div>
@@ -7215,7 +7215,7 @@ function Settings({ onEditBottomNav } = {}) {
           <h4 style="font-size:13px;margin-bottom:8px">Two-Factor Authentication</h4>
           <${TwoFactorSetup} />
         </div>
-        ${userInfo?.role === 'owner' && html`
+        ${userInfo?.user?.role === 'owner' && html`
           <div style="margin-top:16px">
             <h4 style="font-size:13px;margin-bottom:8px">Web Sessions</h4>
             <div class="item-card" style="padding:12px 16px">
