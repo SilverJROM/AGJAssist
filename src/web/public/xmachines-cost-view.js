@@ -214,15 +214,9 @@ function renderReadout(machine) {
   const sessionSpan = sessionDur ? `<span data-testid="xmachines-power-session">${escapeHtml(sessionDur)}</span> <span data-testid="xmachines-power-session-provenance">${escapeHtml(machine.powerSession?.provenance ?? '')}</span>` : `<span data-testid="xmachines-power-session">unknown</span>`;
   const onHours = machine.sampledOnHours && typeof machine.sampledOnHours.hours === 'number' ? `${machine.sampledOnHours.hours} h` : '';
   const onHoursSpan = onHours ? `<span data-testid="xmachines-on-hours">${escapeHtml(onHours)}</span> <span data-testid="xmachines-on-hours-provenance">${escapeHtml(machine.sampledOnHours?.label ?? 'estimated')}</span>` : '';
-  const busyOut = machine.busy && typeof machine.busy.busyCheckOutput === 'string' ? machine.busy.busyCheckOutput : '';
-  const busySpan = busyOut ? `<span data-testid="xmachines-busy">${escapeHtml(busyOut)}</span>` : '';
-  const leasesText = machine.busy && Array.isArray(machine.busy.leaseNames) && machine.busy.leaseNames.length ? machine.busy.leaseNames.join(', ') : '';
-  const leasesSpan = leasesText ? `<span data-testid="xmachines-leases">${escapeHtml(leasesText)}</span>` : '';
   const roleText = typeof machine.roleHint === 'string' && machine.roleHint.trim() ? machine.roleHint.trim() : '';
   const protectedRoleSpan = roleText ? `<span data-testid="xmachines-protected-role">${escapeHtml(roleText)}</span>` : '';
-  const uptime = typeof machine.uptime === 'string' ? machine.uptime : '';
-  const uptimeSpan = uptime ? `<span data-testid="xmachines-uptime">${escapeHtml(uptime)}</span>` : '';
-  return `<div data-testid="xmachines-read-model">${stateHtml}${uptimeSpan}${cpuSpan}${fanSpan}${sessionSpan}${onHoursSpan}${busySpan}${leasesSpan}${protectedRoleSpan}${liveMetricSpans(machine)}${serviceSpans(machine)}</div>`;
+  return `<div data-testid="xmachines-read-model">${stateHtml}${cpuSpan}${fanSpan}${sessionSpan}${onHoursSpan}${protectedRoleSpan}${liveMetricSpans(machine)}${serviceSpans(machine)}</div>`;
 }
 
 // Detail is the only surface that shows PHP cost, the tariff flag, and the short-burst caveat.
