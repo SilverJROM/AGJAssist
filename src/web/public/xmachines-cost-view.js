@@ -34,5 +34,32 @@ export function renderMachineCostDetail(payload) {
   const flag = placeholder ? 'placeholder tariff' : 'configured tariff';
   const flagAria = placeholder ? 'Tariff is a placeholder' : 'Tariff is configured';
   const caveat = escapeHtml(typeof cost.caveat === 'string' ? cost.caveat : '');
-  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1><p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p></section>`;
+  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1><p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}</section>`;
+}
+
+function renderWolSafety(wolSafety) {
+  if (!wolSafety || typeof wolSafety !== 'object') return '';
+  const status = wolSafety.status;
+  let label = '';
+  let aria = '';
+  if (status === 'never-verified') {
+    label = 'never verified';
+    aria = 'WoL safety never verified';
+  } else if (status === 'stale') {
+    label = 'stale';
+    aria = 'WoL safety stale';
+  } else if (status === 'verified') {
+    label = 'verified';
+    aria = 'WoL safety verified';
+  } else {
+    return '';
+  }
+  const warningText = typeof wolSafety.warning === 'string' ? wolSafety.warning.trim() : '';
+  const warning = warningText && status !== 'verified'
+    ? `<p data-testid="xmachines-wol-warning" role="alert" aria-label="${escapeHtml(warningText)}">${escapeHtml(warningText)}</p>`
+    : '';
+  const times = status === 'verified'
+    ? `<p data-testid="xmachines-wol-last-wake" aria-label="Last WAKE">${escapeHtml(wolSafety.lastWake ?? '')}</p><p data-testid="xmachines-wol-verified-up" aria-label="Verified UP">${escapeHtml(wolSafety.verifiedUp ?? '')}</p>`
+    : '';
+  return `<div data-testid="xmachines-wol-safety" role="group" aria-label="WoL safety"><p data-testid="xmachines-wol-status" aria-label="${aria}">${label}</p>${times}${warning}</div>`;
 }

@@ -8,6 +8,13 @@ import type { AuditService } from "../../services/audit-service.js";
 import type BetterSqlite from "better-sqlite3";
 import type { DatabaseService } from "../../db/database.js";
 import { loadMachineEnergyCost, type CostWindow, type MachineCost } from "../../services/xmachines/cost.js";
+import { ForceChallengeService } from "../../services/xmachines/force-challenge.js";
+import {
+  presentWolSafety,
+  readWolSafety,
+  WOL_UNVERIFIED_WARNING,
+  type WolSafetyEvidence,
+} from "../../services/xmachines/uptime.js";
 
 const CLIENT_ARM_REJECTED = { ok: false, actuated: false, error: "client-arm-rejected" };
 
@@ -184,13 +191,28 @@ function requireCanonicalOrigin(request: FastifyRequest, reply: FastifyReply): b
   return true;
 }
 
+function wolConfirmFromBody(request: FastifyRequest): { challengeId: string; selectedNumber: number } | null {
+  const body = request.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const record = body as Record<string, unknown>;
+  if (typeof record.challengeId !== "string" || record.challengeId.trim() === "") return null;
+  if (typeof record.selectedNumber !== "number" || !Number.isInteger(record.selectedNumber)) return null;
+  return { challengeId: record.challengeId.trim(), selectedNumber: record.selectedNumber };
+}
+
+function wolConfirmationCopy(machine: string, evidence: WolSafetyEvidence): string {
+  const view = presentWolSafety(evidence);
+  return [`Force confirmation for ${machine} off`, view.warning ?? WOL_UNVERIFIED_WARNING, `status=${evidence.status}`].join("\n");
+}
+
 function power(
   request: FastifyRequest,
   reply: FastifyReply,
   coordinator: ActionCoordinator,
   audit: AuditService | undefined,
   name: string,
-  action: "on" | "off"
+  action: "on" | "off",
+  wolForceChallenges: ForceChallengeService,
 ) {
   const auditAttempt = (
     classification: AttemptClassification,
@@ -248,6 +270,49 @@ function power(
         { forceReason, preState: observed, finalState: "" }
       );
       return reply.code(400).send({ status: "rejected", reason: "force-confirmation-required" });
+    }
+    const evidence = readWolSafety(name);
+    if (evidence && evidence.status !== "verified") {
+      const sessionId = bearerToken(request) || `owner:${ownerKey(request)}`;
+      const ownerId = typeof request.sessionUser?.id === "number" ? request.sessionUser.id : 0;
+      const confirm = wolConfirmFromBody(request);
+      if (!confirm) {
+        const started = wolForceChallenges.startChallenge(ownerId, sessionId, name, "off");
+        auditAttempt(
+          "force",
+          {
+            force_confirmation: { ok: false, detail: "force-confirmation-required" },
+            wol_safety: { ok: false, detail: evidence.status },
+          },
+          { preState: observed, finalState: "" },
+        );
+        return reply.code(400).send({
+          status: "rejected",
+          reason: "force-confirmation-required",
+          confirmation: wolConfirmationCopy(name, evidence),
+          challengeId: started.id,
+          displayNumber: started.displayNumber,
+        });
+      }
+      const confirmed = wolForceChallenges.confirmChallenge(
+        confirm.challengeId,
+        sessionId,
+        name,
+        "off",
+        confirm.selectedNumber,
+      );
+      if (!confirmed.ok) {
+        auditAttempt(
+          "force",
+          { force_confirmation: { ok: false, detail: confirmed.reason ?? "force-confirmation-required" } },
+          { preState: observed, finalState: "" },
+        );
+        return reply.code(400).send({
+          status: "rejected",
+          reason: "force-confirmation-required",
+          confirmation: wolConfirmationCopy(name, evidence),
+        });
+      }
     }
   }
   const { replayed, ...result } = coordinator.handle({
@@ -323,6 +388,7 @@ export function registerXmachinesRoutes(
   db?: DatabaseService
 ): void {
   const coordinator = new ActionCoordinator();
+  const wolForceChallenges = new ForceChallengeService();
   const authMiddleware = authService ? createAuthMiddleware(authService) : async () => {};
   const perActionLimit = {
     off: app.createRateLimit({
@@ -427,10 +493,13 @@ export function registerXmachinesRoutes(
       return reply.code(404).send({ ok: false, actuated: false, error: "unknown-machine" });
     }
     const cost = detailCost(db, request.params.name, request.query);
+    const evidence = readWolSafety(request.params.name);
+    const wolSafety = evidence ? presentWolSafety(evidence) : null;
     return {
       mode: runtime.armed ? "armed" : "fake",
       armed: runtime.armed,
       machine,
+      ...(wolSafety ? { wolSafety } : {}),
       ...(cost ? { cost } : {}),
     };
   });
@@ -438,12 +507,12 @@ export function registerXmachinesRoutes(
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/off",
     async (request, reply) =>
-      power(request, reply, coordinator, auditService, request.params.name, "off")
+      power(request, reply, coordinator, auditService, request.params.name, "off", wolForceChallenges)
   );
 
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/on",
     async (request, reply) =>
-      power(request, reply, coordinator, auditService, request.params.name, "on")
+      power(request, reply, coordinator, auditService, request.params.name, "on", wolForceChallenges)
   );
 }
