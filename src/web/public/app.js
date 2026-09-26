@@ -15,7 +15,7 @@ import {
   writeBottomNavTabIds,
   writeLandingTab
 } from './nav-helpers.js';
-import { renderFleetOverview, renderMachineCostDetail, handleMachineDetailClick } from './xmachines-cost-view.js';
+import { renderFleetOverview, renderMachineCostDetail, handleMachineDetailClick, escapeHtml } from './xmachines-cost-view.js';
 
 const html = htm.bind(h);
 const TERMINAL_FONT_STORAGE_KEY = 'agj_terminal_font_size';
@@ -7900,6 +7900,13 @@ function XmachinesAuditPage() {
             const cls = parsed?.classification || '';
             const target = parsed?.target || '';
             const actor = parsed?.actor_id ?? parsed?.user_id ?? '';
+            const requestId = parsed?.request_id || '';
+            // Accepted ON/OFF/force rows are labeled allowed so they stay distinct
+            // from a replay of the same action and target.
+            const allowed = cls === 'on' || cls === 'off' || cls === 'force';
+            const summary = allowed
+              ? `allowed production ${cls} request_id=${requestId} target=${target} action=${parsed?.action || ''}`
+              : '';
             return html`
               <tr data-testid="xmachines-audit-row">
                 <td>${escapeHtml(r.timestamp || '')}</td>
@@ -7909,7 +7916,8 @@ function XmachinesAuditPage() {
                 <td>${escapeHtml(String(actor))}</td>
                 <td>
                   <div data-testid="xmachines-audit-details">
-                    ${parsed ? html`<pre>${escapeHtml(JSON.stringify(parsed, null, 2))}</pre>` : html`${escapeHtml(String(details))}`}
+                    ${summary ? html`<div>${escapeHtml(summary)}</div>` : ''}
+                    ${parsed ? html`<pre>${JSON.stringify(parsed, null, 2)}</pre>` : html`${escapeHtml(String(details))}`}
                   </div>
                 </td>
               </tr>
