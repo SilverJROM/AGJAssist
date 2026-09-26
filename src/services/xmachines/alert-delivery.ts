@@ -18,6 +18,40 @@ function telegramApiBase(): string {
   return raw.replace(/\/$/, '');
 }
 
+/** True when a caller pointed the production sender at a capture base. */
+export function ownerTelegramBaseOverridden(env: NodeJS.ProcessEnv = process.env): boolean {
+  return Boolean(
+    env.TELEGRAM_API_BASE?.trim()
+    || env.TELEGRAM_API_BASE_URL?.trim()
+    || env.TELEGRAM_API_ROOT?.trim()
+    || env.XMACHINES_TELEGRAM_API_BASE?.trim()
+  );
+}
+
+/**
+ * POST /bot<token>/sendMessage through the same fetch the alert sender uses.
+ * Token and chat_id come from config, not from caller-supplied ids.
+ */
+export async function sendOwnerMessage(
+  message: { text: string; reply_markup?: unknown },
+  config?: OwnerTelegramConfig,
+): Promise<boolean> {
+  const owner = ownerConfig(config);
+  const url = `${telegramApiBase()}/bot${owner.telegram.botToken}/sendMessage`;
+  const body: Record<string, unknown> = {
+    chat_id: owner.telegram.authorizedUserId,
+    text: message.text,
+    parse_mode: 'HTML',
+  };
+  if (message.reply_markup !== undefined) body.reply_markup = message.reply_markup;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return res.ok;
+}
+
 function ownerConfig(config?: OwnerTelegramConfig): OwnerTelegramConfig {
   if (config?.telegram?.botToken && Number.isFinite(config.telegram.authorizedUserId)) {
     return config;
@@ -33,21 +67,10 @@ function ownerConfig(config?: OwnerTelegramConfig): OwnerTelegramConfig {
  */
 export async function deliverAlerts(alerts: readonly Alert[], config?: OwnerTelegramConfig): Promise<number> {
   if (alerts.length === 0) return 0;
-  const owner = ownerConfig(config);
-  const url = `${telegramApiBase()}/bot${owner.telegram.botToken}/sendMessage`;
   let sent = 0;
   for (const a of alerts) {
     const text = `[xmachines alert] ${a.machine} ${a.type}${a.level ? ` ${a.level}` : ''}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: owner.telegram.authorizedUserId,
-        text,
-        parse_mode: 'HTML',
-      }),
-    });
-    if (res.ok) sent++;
+    if (await sendOwnerMessage({ text }, config)) sent++;
   }
   return sent;
 }

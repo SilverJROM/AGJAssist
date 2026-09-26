@@ -8,7 +8,11 @@ import type { AuditService } from "../../services/audit-service.js";
 import type BetterSqlite from "better-sqlite3";
 import type { DatabaseService } from "../../db/database.js";
 import { loadMachineEnergyCost, type CostWindow, type MachineCost } from "../../services/xmachines/cost.js";
-import { ForceChallengeService } from "../../services/xmachines/force-challenge.js";
+import { ForceChallengeService, type StartChallengeResult } from "../../services/xmachines/force-challenge.js";
+import {
+  ownerTelegramBaseOverridden,
+  sendOwnerMessage,
+} from "../../services/xmachines/alert-delivery.js";
 import {
   presentWolSafety,
   readWolSafety,
@@ -205,7 +209,40 @@ function wolConfirmationCopy(machine: string, evidence: WolSafetyEvidence): stri
   return [`Force confirmation for ${machine} off`, view.warning ?? WOL_UNVERIFIED_WARNING, `status=${evidence.status}`].join("\n");
 }
 
-function power(
+const FORCE_NUMBER_MATCH_PROMPT = "Force off number-match: tap the number shown on your screen";
+
+type OwnerTelegram = { botToken: string; authorizedUserId: number };
+
+// Vitest must not POST the live Telegram API. An explicit API base is the capture fixture.
+async function deliverForceNumberMatch(
+  telegram: OwnerTelegram | undefined,
+  machine: string,
+  started: StartChallengeResult,
+): Promise<void> {
+  if (!telegram?.botToken || !Number.isFinite(telegram.authorizedUserId)) return;
+  if (!ownerTelegramBaseOverridden(process.env) && (process.env.VITEST || process.env.VITEST_WORKER_ID)) return;
+  const text = [FORCE_NUMBER_MATCH_PROMPT, machine, String(started.displayNumber)].join("\n");
+  try {
+    await sendOwnerMessage(
+      {
+        text,
+        reply_markup: {
+          inline_keyboard: [
+            started.buttons.map((n) => ({
+              text: String(n),
+              callback_data: `xmacforce:${started.id}:${n}`,
+            })),
+          ],
+        },
+      },
+      { telegram },
+    );
+  } catch {
+    // A down owner chat must not hide the challenge the route already created.
+  }
+}
+
+async function power(
   request: FastifyRequest,
   reply: FastifyReply,
   coordinator: ActionCoordinator,
@@ -213,6 +250,7 @@ function power(
   name: string,
   action: "on" | "off",
   wolForceChallenges: ForceChallengeService,
+  telegram?: OwnerTelegram,
 ) {
   const auditAttempt = (
     classification: AttemptClassification,
@@ -288,6 +326,7 @@ function power(
       const confirm = wolConfirmFromBody(request);
       if (!confirm) {
         const started = wolForceChallenges.startChallenge(ownerId, sessionId, name, "off");
+        await deliverForceNumberMatch(telegram, name, started);
         auditAttempt(
           "force",
           {
@@ -397,7 +436,8 @@ export function registerXmachinesRoutes(
   app: FastifyInstance,
   authService?: AuthService,
   auditService?: AuditService,
-  db?: DatabaseService
+  db?: DatabaseService,
+  telegram?: OwnerTelegram,
 ): void {
   const coordinator = new ActionCoordinator();
   const wolForceChallenges = new ForceChallengeService();
@@ -568,12 +608,12 @@ export function registerXmachinesRoutes(
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/off",
     async (request, reply) =>
-      power(request, reply, coordinator, auditService, request.params.name, "off", wolForceChallenges)
+      power(request, reply, coordinator, auditService, request.params.name, "off", wolForceChallenges, telegram)
   );
 
   app.post<{ Params: { name: string } }>(
     "/api/xmachines/machines/:name/power/on",
     async (request, reply) =>
-      power(request, reply, coordinator, auditService, request.params.name, "on", wolForceChallenges)
+      power(request, reply, coordinator, auditService, request.params.name, "on", wolForceChallenges, telegram)
   );
 }
