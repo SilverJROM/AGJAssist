@@ -281,14 +281,10 @@ export function loadGpuTelemetryRows(
   if (readings.length === 0) {
     return renderSurface(request.machine, 'empty', 'no GPUs', [], false, []);
   }
-  // Stale is the age of the stored sample. A successful view poll must not
-  // restamp an inventory that is already expired; timeout and no-NVIDIA above
-  // are the poll results that replace that stored surface.
-  const prior = latestSamples(db, request.machine)
-    .filter((row) => row.gpu_uuid !== GPU_POLL_MARKER_UUID);
-  if (prior.length > 0 && prior.every((row) => isExpired(row.sample_time, request.nowIso))) {
-    return renderStored(db, request, 'read');
-  }
+  // A poll that just succeeded is the current truth for this machine right
+  // now, however old the previously stored sample was. Stale only describes
+  // a stored sample rendered without a fresh poll behind it (see renderStored
+  // above); it must never suppress a live reading this call just obtained.
   persistReadings(db, request.machine, readings, request.nowIso);
   const rows = readings.map((reading) => rowFromReading(reading));
   const nonNvidia = rows.every((row) => row.chip === 'non-nvidia');

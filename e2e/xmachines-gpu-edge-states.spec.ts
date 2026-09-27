@@ -460,17 +460,22 @@ test.describe('D13 GPU edge states from the production read route', () => {
     }
   });
 
-  test('renders a stale row from a stored sample without polling again', async ({ browser }) => {
+  // A poll that just succeeded is the current truth, however old the sample it
+  // replaces was: this machine's prior stored reading was seeded at STALE_AT
+  // (2020), but its nvidia-smi still answers, so the view read must show fresh
+  // live data, not the expired one. Regression guard for the mechanism this
+  // slice fixed: a prior-sample-age check must never suppress a successful poll.
+  test('a successful poll on read replaces an expired stored sample with live data', async ({ browser }) => {
     const opened = await openDetail(browser, proxy.base, STALE_MACHINE, scratch.gpuDir);
     try {
       expect(opened.payload, server.stderr()).toMatchObject({
-        gpuState: 'stale',
-        gpuChip: 'stale',
+        gpuState: 'live',
+        gpuChip: '',
       });
       expect(opened.payload?.gpuRows).toEqual([{
         uuid: STALE_UUID,
         name: STALE_NAME,
-        chip: 'stale',
+        chip: '',
         power: '95.2 W',
         temperature: '44 C',
         memory: '1024/24576 MiB',
@@ -478,10 +483,10 @@ test.describe('D13 GPU edge states from the production read route', () => {
         fan: '30%',
       }]);
       const row = opened.page.locator(`[data-testid="xmachines-gpu-row"][data-gpu-uuid="${STALE_UUID}"]`);
-      await expect(row.locator('[data-testid="xmachines-gpu-chip"]')).toHaveText('stale');
       await expect(row.locator('[data-testid="xmachines-gpu-name"]')).toHaveText(STALE_NAME);
       await expect(row.locator('[data-testid="xmachines-gpu-temp"]')).toHaveText('44 C');
       await expect(row.locator('[data-testid="xmachines-gpu-power"]')).toHaveText('95.2 W');
+      await expect(row.locator('[data-testid="xmachines-gpu-chip"]')).not.toHaveText('stale');
       await expect(row.locator('[data-testid="xmachines-gpu-chip"]')).not.toHaveText('error-timeout');
     } finally {
       await opened.close();
