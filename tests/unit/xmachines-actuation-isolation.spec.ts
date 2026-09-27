@@ -207,7 +207,8 @@ describe("xmachines actuation isolation A0.3", () => {
     expect(telemetry.statusCode).toBe(200);
     expect(telemetry.json()).toEqual({ mode: "fake", armed: false, machines: SYNTHETIC_FLEET });
     expect(read.statusCode).toBe(200);
-    expect(read.json()).toEqual({ mode: "fake", armed: false, machine: SYNTHETIC_FLEET[1] });
+    // Detail route also returns gpu/disk/ups panels; assert the fixture is surfaced as `machine`.
+    expect(read.json()).toMatchObject({ mode: "fake", armed: false, machine: SYNTHETIC_FLEET[1] });
     expect(off.statusCode).toBe(403);
     expect(off.json()).toEqual(unarmedPower("gpu", "off"));
     expect(on.statusCode).toBe(403);

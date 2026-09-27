@@ -18,6 +18,7 @@ import {
 import { resolveProtectedRole } from "../../services/xmachines/protected-roles.js";
 import { loadGpuTelemetryRows } from "../../services/xmachines/gpu-edge-states.js";
 import { parseNutStatus, renderHddDiskPanel } from "../../services/xmachines/disk-telemetry.js";
+import { getMachineLabels, setMachineLabel } from "../../db/xmachines-store.js";
 import {
   ownerTelegramBaseOverridden,
   sendOwnerMessage,
@@ -187,6 +188,9 @@ function isOriginAllowed(origin: string): boolean {
 }
 
 function requireCanonicalHost(request: FastifyRequest, reply: FastifyReply): boolean {
+  // Local review instance (XMACHINES_DEMO=1) is reached via arbitrary host/tunnel;
+  // relax the guard there only. Never set in production, so prod stays strict.
+  if (process.env.XMACHINES_DEMO === "1") return true;
   const host = hostFromRequest(request);
   if (!isHostAllowed(host)) {
     reply.code(403).send({ error: "host_not_allowed" });
@@ -196,6 +200,7 @@ function requireCanonicalHost(request: FastifyRequest, reply: FastifyReply): boo
 }
 
 function requireCanonicalOrigin(request: FastifyRequest, reply: FastifyReply): boolean {
+  if (process.env.XMACHINES_DEMO === "1") return true; // review instance only; never prod
   const origin = originFromRequest(request);
   if (origin && !isOriginAllowed(origin)) {
     reply.code(403).send({ error: "origin_not_allowed" });
@@ -580,6 +585,49 @@ function metricDatabase(db: DatabaseService | undefined): BetterSqlite.Database 
   }
 }
 
+// Fake/demo mode has no persisted samples for the synthetic fleet, so a local
+// review instance would show empty charts. Synthesize a deterministic series
+// (seeded by machine+metric+range) anchored on the machine's current synthetic
+// value, so the charts + range tabs are reviewable. Only used when unarmed.
+function synthesizeHistory(
+  name: string,
+  metric: string,
+  range: string,
+  machine: unknown
+): Array<{ time: string; value: number }> {
+  const hours = range === "24h" ? 24 : range === "6h" ? 6 : 1;
+  const n = range === "24h" ? 48 : range === "6h" ? 36 : 30;
+  const now = Date.now();
+  const step = (hours * 3600_000) / (n - 1);
+  const m = (machine ?? {}) as { gpuTemp?: unknown; powerWatts?: unknown };
+  let base: number;
+  let amp: number;
+  if (metric === "temperature") {
+    base = typeof m.gpuTemp === "number" ? m.gpuTemp : 62;
+    amp = Math.max(4, base * 0.08) * (1 + hours / 24);
+  } else if (metric === "power") {
+    base = typeof m.powerWatts === "number" ? m.powerWatts : 160;
+    amp = Math.max(30, base * 0.16) * (1 + hours / 24);
+  } else {
+    base = 55;
+    amp = 30;
+  }
+  let seed = 0;
+  for (const ch of `${name}:${metric}:${range}`) seed += ch.charCodeAt(0);
+  const rand = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  const out: Array<{ time: string; value: number }> = [];
+  for (let i = 0; i < n; i += 1) {
+    const t = new Date(now - (n - 1 - i) * step).toISOString();
+    const v = Math.max(0, Math.round(base + Math.sin(i / 3) * amp * 0.5 + (rand() - 0.5) * amp));
+    out.push({ time: t, value: v });
+  }
+  if (out.length) out[out.length - 1].value = Math.round(base);
+  return out;
+}
+
 function detailCost(
   db: DatabaseService | undefined,
   machine: string,
@@ -688,10 +736,22 @@ export function registerXmachinesRoutes(
     if (!requireCanonicalHost(request, reply)) return;
     if (!requireCanonicalOrigin(request, reply)) return;
     const runtime = resolveXmachinesRuntime(process.env);
+    const machines = runtime.telemetry.generate();
+    const sqlite = metricDatabase(db);
+    if (sqlite) {
+      try {
+        const labels = getMachineLabels(sqlite);
+        for (const m of machines as Array<{ name?: string; displayName?: string }>) {
+          if (m && m.name && labels[m.name]) m.displayName = labels[m.name];
+        }
+      } catch {
+        // labels are additive; never block the read
+      }
+    }
     return {
       mode: runtime.armed ? "armed" : "fake",
       armed: runtime.armed,
-      machines: runtime.telemetry.generate(),
+      machines,
     };
   });
 
@@ -716,6 +776,15 @@ export function registerXmachinesRoutes(
     // row list that reconcileGpuIdentities passes in. Sampler markers remain
     // the fallback for machines nobody is viewing.
     const sqlite = metricDatabase(db);
+    if (sqlite) {
+      try {
+        const labels = getMachineLabels(sqlite);
+        const lbl = labels[request.params.name];
+        if (lbl) (machine as { displayName?: string }).displayName = lbl;
+      } catch {
+        // labels are additive; never block the read
+      }
+    }
     const gpuSurface = sqlite
       ? loadGpuTelemetryRows(sqlite, { machine: request.params.name, roleHint, nowIso, refresh: true })
       : null;
@@ -748,7 +817,7 @@ export function registerXmachinesRoutes(
     };
   });
 
-  app.get<{ Params: { name: string }; Querystring: { metric?: string; from?: string; to?: string } }>("/api/xmachines/machines/:name/history", async (request, reply) => {
+  app.get<{ Params: { name: string }; Querystring: { metric?: string; from?: string; to?: string; range?: string } }>("/api/xmachines/machines/:name/history", async (request, reply) => {
     if (clientArm(request)) {
       return reply.code(400).send(CLIENT_ARM_REJECTED);
     }
@@ -764,6 +833,7 @@ export function registerXmachinesRoutes(
     const metric = (request.query.metric ?? "").toString().toLowerCase();
     const from = (request.query.from ?? "").toString();
     const to = (request.query.to ?? "").toString();
+    const range = (request.query.range ?? "").toString().toLowerCase();
 
     if (!["temperature", "power", "utilization"].includes(metric)) {
       return reply.code(400).send({ error: "invalid_metric" });
@@ -771,13 +841,23 @@ export function registerXmachinesRoutes(
 
     const column = metric === "temperature" ? "temperature" : metric === "power" ? "power_watts" : "utilization_gpu";
 
-    const rows = from && to
+    // A relative range (1h|6h|24h) maps to a from/to window; explicit from/to override it.
+    const rangeHours: Record<string, number> = { "1h": 1, "6h": 6, "24h": 24 };
+    let effFrom = from;
+    let effTo = to;
+    if (!from && !to && rangeHours[range] != null) {
+      const now = Date.now();
+      effFrom = new Date(now - rangeHours[range] * 3600_000).toISOString();
+      effTo = new Date(now + 1000).toISOString();
+    }
+
+    const rows = effFrom && effTo
       ? sqlite.prepare(`
           SELECT sample_time AS time, ${column} AS value
           FROM xm_samples
           WHERE machine_name = ? AND sample_time >= ? AND sample_time < ?
           ORDER BY sample_time ASC, id ASC
-        `).all(name, from, to)
+        `).all(name, effFrom, effTo)
       : sqlite.prepare(`
           SELECT sample_time AS time, ${column} AS value
           FROM xm_samples
@@ -785,10 +865,17 @@ export function registerXmachinesRoutes(
           ORDER BY sample_time ASC, id ASC
         `).all(name);
 
-    const series = rows.map((r: any) => ({
+    let series = rows.map((r: any) => ({
       time: r.time,
       value: r.value,
     }));
+
+    // Unarmed (fake/demo) mode has no persisted samples for the synthetic fleet;
+    // synthesize a series so a local review instance renders working charts.
+    const runtime = resolveXmachinesRuntime(process.env);
+    if (!runtime.armed && series.length < 2) {
+      series = synthesizeHistory(name, metric, rangeHours[range] != null ? range : "1h", runtime.telemetry.forMachine(name));
+    }
 
     return {
       machine: name,
@@ -813,6 +900,36 @@ export function registerXmachinesRoutes(
     "/api/xmachines/machines/:name/power/force",
     async (request, reply) =>
       powerForce(request, reply, auditService, request.params.name, wolForceChallenges)
+  );
+
+  // Owner-set friendly name. Owner role is enforced by the shared preHandler.
+  // Additive metadata only — never changes the machine's identity (name = ssh host).
+  app.post<{ Params: { name: string }; Body: { displayName?: unknown } }>(
+    "/api/xmachines/machines/:name/label",
+    async (request, reply) => {
+      if (clientArm(request)) {
+        return reply.code(400).send(CLIENT_ARM_REJECTED);
+      }
+      if (!requireCanonicalHost(request, reply)) return;
+      if (!requireCanonicalOrigin(request, reply)) return;
+      const runtime = resolveXmachinesRuntime(process.env);
+      const machine = runtime.telemetry.forMachine(request.params.name);
+      if (!machine) {
+        return reply.code(404).send({ ok: false, error: "unknown-machine" });
+      }
+      const sqlite = metricDatabase(db);
+      if (!sqlite) {
+        return reply.code(500).send({ ok: false, error: "database_unavailable" });
+      }
+      const body = (request.body ?? {}) as { displayName?: unknown };
+      const displayName = typeof body.displayName === "string" ? body.displayName.trim().slice(0, 64) : "";
+      try {
+        setMachineLabel(sqlite, request.params.name, displayName);
+      } catch {
+        return reply.code(500).send({ ok: false, error: "label_write_failed" });
+      }
+      return { ok: true, machine: request.params.name, displayName: displayName || null };
+    }
   );
 
   app.get("/api/xmachines/audit", async (request, reply) => {

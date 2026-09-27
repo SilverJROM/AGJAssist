@@ -87,7 +87,7 @@ export async function deliverDueXmachinesAlerts(
 ): Promise<number> {
   const alerts = [
     ...evaluator.evaluateSamples(samples),
-    ...(wakeStatuses ? evaluator.evaluateWakeStatus(wakeStatuses) : []),
+    ...(wakeStatuses ? evaluator.evaluateWakeStatus([...wakeStatuses]) : []),
   ];
   return deliverAlerts(alerts, config);
 }

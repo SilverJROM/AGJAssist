@@ -32,7 +32,8 @@ export function estimateMachinePower(input: PowerEstimateInput): PowerEstimateOu
 
   const totalInternalWatts = gpuWatts + nonGpuWatts;
 
-  const efficiency = Number.isFinite(input.psuEfficiency) && input.psuEfficiency > 0 ? input.psuEfficiency : DEFAULT_PSU_EFFICIENCY;
+  const psu = input.psuEfficiency;
+  const efficiency = typeof psu === "number" && Number.isFinite(psu) && psu > 0 ? psu : DEFAULT_PSU_EFFICIENCY;
 
   let wallWatts: number;
   let wallProvenance: 'measured' | 'estimated';

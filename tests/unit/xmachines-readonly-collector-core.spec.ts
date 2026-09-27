@@ -200,7 +200,8 @@ describe("xmachines-readonly-collector-core", () => {
       headers: ownerHeaders(),
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ mode: "fake", armed: false, machine: gate.machine });
+    // Detail route also returns gpu/disk/ups panels; assert the spy fixture is surfaced as `machine`.
+    expect(res.json()).toMatchObject({ mode: "fake", armed: false, machine: gate.machine });
     expect(gate.forMachineCalls).toEqual(["spy-only"]);
   });
 

@@ -28,6 +28,40 @@ export interface ReaderResultRow {
   sampleTime: string;
 }
 
+// Owner-set friendly display names, keyed by canonical machine name. Rename is
+// additive metadata — it never changes the machine's identity (name = ssh host).
+export function getMachineLabels(db: Database.Database): Record<string, string> {
+  try {
+    const rows = db
+      .prepare("SELECT machine_name, display_name FROM xm_machine_labels")
+      .all() as Array<{ machine_name: string; display_name: string }>;
+    const out: Record<string, string> = {};
+    for (const r of rows) {
+      if (r && r.machine_name && typeof r.display_name === "string" && r.display_name.trim()) {
+        out[r.machine_name] = r.display_name;
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function setMachineLabel(db: Database.Database, machineName: string, displayName: string): void {
+  const name = String(machineName || "").trim();
+  const label = String(displayName || "").trim().slice(0, 64);
+  if (!name) return;
+  if (!label) {
+    db.prepare("DELETE FROM xm_machine_labels WHERE machine_name = ?").run(name);
+    return;
+  }
+  db.prepare(`
+    INSERT INTO xm_machine_labels (machine_name, display_name, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(machine_name) DO UPDATE SET display_name = excluded.display_name, updated_at = excluded.updated_at
+  `).run(name, label);
+}
+
 export function persistReaderResult(db: Database.Database, row: ReaderResultRow): void {
   db.prepare(`
     INSERT INTO xm_reader_results (

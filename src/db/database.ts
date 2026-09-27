@@ -878,6 +878,11 @@ export class DatabaseService {
         // are created via SCHEMA_SQL above. Additive-only; existing rows stay.
       }
 
+      // Migration: v40 → v41: additive xmachines machine labels (owner rename)
+      if (current && current.version < 41) {
+        // Table xm_machine_labels is created via SCHEMA_SQL above. Additive-only.
+      }
+
       this.db
         .prepare("UPDATE schema_version SET version = ?")
         .run(SCHEMA_VERSION);

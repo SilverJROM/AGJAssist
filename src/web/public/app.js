@@ -7979,19 +7979,30 @@ function XmachinesFleetPage() {
 function XmachinesDetailPage({ name }) {
   const [payload, setPayload] = useState(null);
   const [markup, setMarkup] = useState('');
+  const [range, setRange] = useState('1h');
+  const editingRef = useRef(false);
+  const authedFetch = useCallback((path, opts) => fetch(API_BASE + path, {
+    ...opts,
+    headers: { ...(opts && opts.headers), ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
+  }), []);
   useEffect(() => {
     let cancelled = false;
     const fetchDetail = async () => {
+      if (editingRef.current) return;
       try {
         const data = await api('/api/xmachines/machines/' + encodeURIComponent(name));
         if (cancelled) return;
+        const rq = '&range=' + encodeURIComponent(range);
         const [tempHist, powerHist, utilHist] = await Promise.all([
-          api('/api/xmachines/machines/' + encodeURIComponent(name) + '/history?metric=temperature'),
-          api('/api/xmachines/machines/' + encodeURIComponent(name) + '/history?metric=power'),
-          api('/api/xmachines/machines/' + encodeURIComponent(name) + '/history?metric=utilization')
+          api('/api/xmachines/machines/' + encodeURIComponent(name) + '/history?metric=temperature' + rq),
+          api('/api/xmachines/machines/' + encodeURIComponent(name) + '/history?metric=power' + rq),
+          api('/api/xmachines/machines/' + encodeURIComponent(name) + '/history?metric=utilization' + rq)
         ]).catch(() => [null, null, null]);
         if (cancelled) return;
-        if (data) data._history = { temperature: tempHist?.series ?? [], power: powerHist?.series ?? [], utilization: utilHist?.series ?? [] };
+        if (data) {
+          data._history = { temperature: tempHist?.series ?? [], power: powerHist?.series ?? [], utilization: utilHist?.series ?? [] };
+          data._historyRange = range;
+        }
         setPayload(data);
       } catch {
         if (!cancelled) setPayload(null);
@@ -8003,27 +8014,70 @@ function XmachinesDetailPage({ name }) {
     const tick = () => {
       if (cancelled) return;
       if (typeof document !== 'undefined' && document.hidden) return;
-      const currentHash = location.hash;
-      if (!currentHash.startsWith('#/xmachines/')) return;
+      if (editingRef.current) return;
+      if (!location.hash.startsWith('#/xmachines/')) return;
       fetchDetail();
     };
     intervalId = setInterval(tick, intervalMs);
-    const onVisibilityChange = () => { if (!document.hidden) fetchDetail(); };
+    const onVisibilityChange = () => { if (!document.hidden && !editingRef.current) fetchDetail(); };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => { cancelled = true; if (intervalId) clearInterval(intervalId); document.removeEventListener('visibilitychange', onVisibilityChange); };
-  }, [name]);
+  }, [name, range]);
   useEffect(() => {
+    if (editingRef.current) return;
     setMarkup(payload ? renderMachineCostDetail(payload) : '');
   }, [payload]);
-  const onDetailClick = useCallback((event) => {
-    if (!payload) return;
-    handleMachineDetailClick(event, payload, {
-      fetch: (path, opts) => fetch(API_BASE + path, {
-        ...opts,
-        headers: { ...(opts && opts.headers), ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
-      }),
-    }).then((next) => { if (next !== payload) setPayload(next); });
+  const cancelRename = useCallback(() => {
+    editingRef.current = false;
+    setMarkup(payload ? renderMachineCostDetail(payload) : '');
   }, [payload]);
+  const commitRename = useCallback(async () => {
+    const input = document.getElementById('xm-name-input');
+    const val = input ? String(input.value || '').trim() : '';
+    editingRef.current = false;
+    try {
+      await authedFetch('/api/xmachines/machines/' + encodeURIComponent(name) + '/label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: val }),
+      });
+    } catch {}
+    try {
+      const data = await api('/api/xmachines/machines/' + encodeURIComponent(name));
+      if (data) { data._history = payload && payload._history ? payload._history : {}; data._historyRange = range; setPayload(data); }
+      else setMarkup(payload ? renderMachineCostDetail(payload) : '');
+    } catch { setMarkup(payload ? renderMachineCostDetail(payload) : ''); }
+  }, [name, payload, range, authedFetch]);
+  const beginRename = useCallback(() => {
+    const row = document.getElementById('xm-name-row');
+    if (!row || !payload || !payload.machine) return;
+    const m = payload.machine;
+    const current = (m.displayName && String(m.displayName).trim()) ? m.displayName : (m.name || '');
+    editingRef.current = true;
+    row.innerHTML = '<div class="xm-name-edit">'
+      + '<input id="xm-name-input" maxlength="24" autocomplete="off" spellcheck="false">'
+      + '<button type="button" class="xm-btn xm-btn-primary mini" data-action="rename-save">Save</button>'
+      + '<button type="button" class="xm-btn xm-btn-ghost mini" data-action="rename-cancel">Cancel</button>'
+      + '</div>';
+    const input = document.getElementById('xm-name-input');
+    if (input) {
+      input.value = current;
+      input.focus();
+      input.select();
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') commitRename(); else if (e.key === 'Escape') cancelRename(); });
+    }
+  }, [payload, commitRename, cancelRename]);
+  const onDetailClick = useCallback((event) => {
+    const target = event && event.target;
+    const actionEl = target && typeof target.closest === 'function' ? target.closest('[data-action]') : null;
+    const action = actionEl ? actionEl.getAttribute('data-action') : '';
+    if (action === 'range') { const r = actionEl.getAttribute('data-range') || '1h'; if (r !== range) setRange(r); return; }
+    if (action === 'rename') { if (event.preventDefault) event.preventDefault(); beginRename(); return; }
+    if (action === 'rename-save') { if (event.preventDefault) event.preventDefault(); commitRename(); return; }
+    if (action === 'rename-cancel') { if (event.preventDefault) event.preventDefault(); cancelRename(); return; }
+    if (!payload) return;
+    handleMachineDetailClick(event, payload, { fetch: authedFetch }).then((next) => { if (next !== payload) setPayload(next); });
+  }, [payload, range, beginRename, commitRename, cancelRename, authedFetch]);
   return html`<div class="xmachines-view" onClick=${onDetailClick} dangerouslySetInnerHTML=${{ __html: markup }}></div>`;
 }
 

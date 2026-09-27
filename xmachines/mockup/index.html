@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Machines — AGJAsst</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f5; --surface-3:#e6eaf0;
+  --border:#dde2e9; --border-strong:#cbd3dd;
+  --text:#131820; --muted:#5a6473; --faint:#8b95a3;
+  --accent:#0e9bb0; --accent-strong:#0b7f90; --accent-weak:#d7f0f4; --on-accent:#ffffff;
+  --ok:#1f9d57; --ok-weak:#dcf3e6;
+  --warn:#bd8300; --warn-weak:#f7eccf;
+  --hot:#d43a3a; --hot-weak:#f8dede;
+  --cool:#2f74d0; --cool-weak:#dde9fa;
+  --off:#8b95a3; --off-weak:#e9edf2;
+  --shadow:0 1px 2px rgba(20,30,45,.06), 0 4px 16px rgba(20,30,45,.05);
+  --shadow-lift:0 6px 24px rgba(20,30,45,.12);
+  --radius:16px; --radius-sm:11px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1016; --surface:#141a23; --surface-2:#1b222e; --surface-3:#222b3a;
+  --border:#26303f; --border-strong:#334053;
+  --text:#e7ecf3; --muted:#98a4b4; --faint:#6c7787;
+  --accent:#2bc0d4; --accent-strong:#4fd0e2; --accent-weak:#0f353d; --on-accent:#04222a;
+  --ok:#3ac47f; --ok-weak:#123324;
+  --warn:#e0a83a; --warn-weak:#3a2f11;
+  --hot:#f26a60; --hot-weak:#3d1c1c;
+  --cool:#5aa0f2; --cool-weak:#122439;
+  --off:#6c7787; --off-weak:#1e2632;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+  --shadow-lift:0 8px 28px rgba(0,0,0,.45);
+}}
+:root[data-theme="dark"]{
+  --bg:#0c1016; --surface:#141a23; --surface-2:#1b222e; --surface-3:#222b3a;
+  --border:#26303f; --border-strong:#334053;
+  --text:#e7ecf3; --muted:#98a4b4; --faint:#6c7787;
+  --accent:#2bc0d4; --accent-strong:#4fd0e2; --accent-weak:#0f353d; --on-accent:#04222a;
+  --ok:#3ac47f; --ok-weak:#123324;
+  --warn:#e0a83a; --warn-weak:#3a2f11;
+  --hot:#f26a60; --hot-weak:#3d1c1c;
+  --cool:#5aa0f2; --cool-weak:#122439;
+  --off:#6c7787; --off-weak:#1e2632;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+  --shadow-lift:0 8px 28px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Inter",system-ui,-apple-system,sans-serif;
+  font-size:15px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+button{font-family:inherit; cursor:pointer}
+h1,h2,h3{font-family:"Sora",sans-serif; margin:0; text-wrap:balance}
+
+/* ---- shell ---- */
+.app{max-width:520px; margin:0 auto; min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; background:var(--bg); position:relative}
+.topbar{
+  position:sticky; top:0; z-index:30;
+  display:flex; align-items:center; gap:10px;
+  padding:12px 16px; padding-top:max(12px,env(safe-area-inset-top));
+  background:color-mix(in srgb,var(--bg) 88%,transparent); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+.topbar .brand{font-family:"Sora"; font-weight:700; font-size:17px; letter-spacing:-.01em}
+.topbar .spacer{flex:1}
+.iconbtn{
+  width:36px; height:36px; border-radius:10px; border:1px solid var(--border);
+  background:var(--surface); color:var(--muted); display:grid; place-items:center; font-size:16px;
+  transition:.15s;
+}
+.iconbtn:hover{color:var(--text); border-color:var(--border-strong)}
+.iconbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.backbtn{display:flex; align-items:center; gap:6px; padding:7px 12px 7px 8px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-weight:600; font-size:14px}
+.backbtn:hover{border-color:var(--border-strong)}
+
+.ribbon{
+  display:flex; align-items:center; gap:8px; justify-content:center;
+  font-size:11.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--warn); background:var(--warn-weak);
+  padding:6px 12px; border-bottom:1px solid color-mix(in srgb,var(--warn) 30%,var(--border));
+}
+main{flex:1; padding:16px; padding-bottom:96px; animation:fade .25s ease}
+@keyframes fade{from{opacity:0; transform:translateY(4px)}to{opacity:1; transform:none}}
+
+/* ---- list header ---- */
+.page-head{margin:2px 2px 14px}
+.page-head h1{font-size:26px; font-weight:700; letter-spacing:-.02em}
+.page-head p{margin:3px 0 0; color:var(--muted); font-size:13.5px}
+
+.summary{
+  display:flex; gap:8px; overflow-x:auto; padding:2px 2px 12px; margin:0 -2px 6px;
+  scrollbar-width:none;
+}
+.summary::-webkit-scrollbar{display:none}
+.sumchip{
+  flex:0 0 auto; display:flex; flex-direction:column; gap:2px;
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:9px 13px; min-width:76px; box-shadow:var(--shadow);
+}
+.sumchip .n{font-family:"Sora"; font-weight:700; font-size:18px; line-height:1}
+.sumchip .l{font-size:11px; color:var(--muted); font-weight:500}
+.sumchip.alert .n{color:var(--hot)}
+
+/* ---- machine card ---- */
+.cards{display:flex; flex-direction:column; gap:12px}
+.mcard{
+  position:relative; display:block; width:100%; text-align:left;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:15px 16px 15px 20px; box-shadow:var(--shadow); overflow:hidden;
+  transition:.16s; color:inherit;
+}
+.mcard:hover{transform:translateY(-2px); box-shadow:var(--shadow-lift); border-color:var(--border-strong)}
+.mcard:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.mcard::before{content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--stripe,var(--off))}
+.mcard .row1{display:flex; align-items:center; gap:10px; margin-bottom:12px}
+.mcard .name{font-family:"Sora"; font-weight:700; font-size:18px; letter-spacing:-.01em}
+.mcard .host{font-size:12px; color:var(--faint)}
+.mcard .chev{margin-left:auto; color:var(--faint); font-size:20px; line-height:1}
+
+.pill{
+  display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600;
+  padding:3px 9px; border-radius:999px; letter-spacing:.01em; white-space:nowrap;
+}
+.pill .dot{width:7px; height:7px; border-radius:50%; background:currentColor}
+.pill.on{color:var(--ok); background:var(--ok-weak)}
+.pill.off{color:var(--off); background:var(--off-weak)}
+.pill.norm{color:var(--ok); background:var(--ok-weak)}
+.pill.warn{color:var(--warn); background:var(--warn-weak)}
+.pill.hot{color:var(--hot); background:var(--hot-weak)}
+.pill.busy{color:var(--cool); background:var(--cool-weak)}
+
+.stats{display:grid; grid-template-columns:repeat(4,1fr); gap:2px 8px}
+.stat{display:flex; flex-direction:column; gap:1px; min-width:0}
+.stat .k{font-size:10.5px; color:var(--faint); font-weight:500; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap}
+.stat .v{font-family:"JetBrains Mono"; font-weight:600; font-size:15px; font-variant-numeric:tabular-nums; display:flex; align-items:baseline; gap:3px}
+.stat .v .u{font-size:11px; color:var(--muted); font-weight:500}
+.tval.t-cool{color:var(--cool)} .tval.t-ok{color:var(--ok)} .tval.t-warn{color:var(--warn)} .tval.t-hot{color:var(--hot)}
+.est{font-size:9.5px; font-weight:600; color:var(--muted); background:var(--surface-2); padding:1px 5px; border-radius:5px; letter-spacing:.02em; text-transform:uppercase; align-self:center}
+
+/* ---- detail ---- */
+.dhead{margin:0 2px 4px; display:flex; align-items:flex-start; gap:10px}
+.dhead h1{font-size:24px; font-weight:700; letter-spacing:-.02em}
+.dhead .host{font-size:13px; color:var(--faint); margin-top:2px}
+.dhead .pills{display:flex; gap:6px; flex-wrap:wrap; margin-top:9px}
+.name-row{display:flex; align-items:center; gap:8px}
+.editname{border:1px solid var(--border); background:var(--surface); color:var(--faint); font-size:14px; width:30px; height:30px; border-radius:8px; display:grid; place-items:center; flex:0 0 auto}
+.editname:hover{color:var(--accent); border-color:var(--accent)}
+.name-edit{display:flex; gap:7px; align-items:center; flex-wrap:wrap}
+.name-edit input{font-family:"Sora"; font-weight:700; font-size:20px; padding:5px 10px; border-radius:9px; border:1px solid var(--border-strong); background:var(--surface); color:var(--text); width:170px; max-width:52vw}
+.name-edit input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+.name-edit .mini{flex:0 0 auto; min-width:0; padding:8px 14px; font-size:13.5px}
+.fresh{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--muted); font-family:"JetBrains Mono"}
+.fresh .dot{width:6px; height:6px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 3px var(--ok-weak); animation:pulse 2.4s infinite}
+.fresh.stale .dot{background:var(--warn); box-shadow:0 0 0 3px var(--warn-weak); animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+.section{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:15px 16px; box-shadow:var(--shadow); margin-top:12px}
+.section > h2{font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:12px; display:flex; align-items:center; gap:8px}
+.section > h2 .badge{margin-left:auto; text-transform:none; letter-spacing:0}
+
+/* power block — discreet state */
+.power-hero{display:flex; align-items:center; gap:14px; margin-bottom:15px}
+.pstate{display:flex; flex-direction:column; gap:6px; align-items:flex-start}
+.psub{font-size:12px; color:var(--muted); font-family:"JetBrains Mono"}
+.power-draw{margin-left:auto; text-align:right}
+.power-draw .n{font-family:"JetBrains Mono"; font-weight:600; font-size:26px; font-variant-numeric:tabular-nums}
+.power-draw .n .u{font-size:14px; color:var(--muted)}
+.power-draw .lab{font-size:11px; color:var(--faint); display:flex; gap:6px; justify-content:flex-end; align-items:center; margin-top:2px}
+
+.controls{display:flex; gap:9px; flex-wrap:wrap}
+.btn{flex:1; min-width:120px; display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:12px 14px; border-radius:12px; font-weight:600; font-size:14px; border:1px solid transparent; transition:.15s}
+.btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.btn-primary{background:var(--accent); color:var(--on-accent); box-shadow:0 2px 8px color-mix(in srgb,var(--accent) 35%,transparent)}
+.btn-primary:hover{background:var(--accent-strong)}
+.btn-ghost{background:var(--surface-2); color:var(--text); border-color:var(--border)}
+.btn-ghost:hover{border-color:var(--border-strong)}
+.btn-danger{background:transparent; color:var(--hot); border-color:color-mix(in srgb,var(--hot) 40%,var(--border))}
+.btn-danger:hover{background:var(--hot-weak)}
+.btn[disabled]{opacity:.5; cursor:not-allowed; box-shadow:none}
+.guard-note{display:flex; gap:8px; align-items:flex-start; margin-top:11px; padding:10px 12px; border-radius:11px; background:var(--warn-weak); color:var(--warn); font-size:12.5px; font-weight:500; line-height:1.4}
+.guard-note.info{background:var(--surface-2); color:var(--muted)}
+.guard-note .ic{flex:0 0 auto}
+
+/* gpu / fan rows */
+.tile{border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; background:var(--surface-2)}
+.tile + .tile{margin-top:9px}
+.tile .th{display:flex; align-items:center; gap:8px; margin-bottom:10px}
+.tile .th .nm{font-weight:600; font-size:14px}
+.tile .th .vram{font-size:11px; color:var(--faint); font-family:"JetBrains Mono"}
+.metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:10px 8px}
+.metrics.three{grid-template-columns:repeat(3,1fr)}
+.m{display:flex; flex-direction:column; gap:2px}
+.m .k{font-size:10px; color:var(--faint); text-transform:uppercase; letter-spacing:.03em}
+.m .v{font-family:"JetBrains Mono"; font-weight:600; font-size:14.5px; font-variant-numeric:tabular-nums}
+.bar{height:6px; border-radius:4px; background:var(--surface-3); overflow:hidden; margin-top:5px}
+.bar > i{display:block; height:100%; border-radius:4px; background:var(--accent)}
+.bar > i.hot{background:var(--hot)} .bar > i.warn{background:var(--warn)} .bar > i.ok{background:var(--ok)}
+
+.fanrow{display:flex; align-items:center; gap:12px; padding:10px 2px; border-bottom:1px dashed var(--border)}
+.fanrow:last-child{border-bottom:0; padding-bottom:0}
+.fanrow .fname{font-weight:600; font-size:13.5px; min-width:96px}
+.fanrow .fname small{display:block; font-weight:500; color:var(--faint); font-size:10.5px; text-transform:uppercase; letter-spacing:.03em}
+.fanrow .duty{flex:1; min-width:60px}
+.fanrow .rpm{font-family:"JetBrains Mono"; font-weight:600; font-size:14px; text-align:right; min-width:74px}
+.fanrow .rpm small{color:var(--faint); font-weight:500}
+.na{color:var(--faint); font-style:italic; font-size:12.5px}
+
+/* charts */
+.chart-block{margin-top:6px}
+.chart-block .ctitle{display:flex; justify-content:space-between; align-items:baseline; font-size:12px; color:var(--muted); font-weight:600; margin-bottom:6px}
+.chart-block .ctitle b{font-family:"JetBrains Mono"; font-weight:600; color:var(--text); font-size:12.5px}
+svg.chart{display:block; width:100%; height:auto; overflow:visible}
+svg.chart .grid{stroke:var(--border)}
+svg.chart .axis{stroke:var(--border-strong)}
+svg.chart text{fill:var(--faint); font-family:"JetBrains Mono"}
+svg.chart text.axttl{fill:var(--muted); font-family:"Inter"; font-weight:600}
+.rangetabs{display:inline-flex; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:3px; gap:2px}
+.rangetabs button{border:none; background:transparent; color:var(--muted); font-weight:600; font-size:12px; padding:6px 13px; border-radius:7px; font-family:"JetBrains Mono"; text-transform:none; letter-spacing:0}
+.rangetabs button.active{background:var(--surface); color:var(--accent); box-shadow:var(--shadow)}
+.rangetabs button:hover:not(.active){color:var(--text)}
+
+.kv{display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px dashed var(--border); font-size:13.5px}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--muted)}
+.kv .v{font-family:"JetBrains Mono"; font-weight:600; font-variant-numeric:tabular-nums}
+
+.offline-panel{display:flex; flex-direction:column; align-items:center; gap:8px; padding:22px 12px; color:var(--muted); text-align:center}
+.offline-panel .big{font-size:34px}
+.offline-panel .t{font-weight:600; color:var(--text)}
+
+/* modal confirm */
+.modal-backdrop{position:fixed; inset:0; background:rgba(8,12,18,.55); backdrop-filter:blur(2px); display:none; align-items:center; justify-content:center; z-index:80; padding:22px}
+.modal-backdrop.show{display:flex}
+.modal{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:22px; max-width:360px; width:100%; box-shadow:var(--shadow-lift); animation:pop .16s ease}
+@keyframes pop{from{transform:scale(.96); opacity:0}to{transform:none; opacity:1}}
+.modal .mic{font-size:30px; line-height:1}
+.modal h3{font-size:18px; margin:10px 0 7px; color:var(--hot); letter-spacing:-.01em}
+.modal p{font-size:13.5px; color:var(--muted); margin:0 0 18px; line-height:1.5}
+.modal p b{color:var(--text)}
+.modal .mrow{display:flex; gap:10px}
+.modal .mrow .btn{flex:1; min-width:0}
+
+/* toast */
+.toast{position:fixed; left:50%; bottom:104px; transform:translateX(-50%) translateY(20px); background:var(--text); color:var(--bg); padding:11px 18px; border-radius:12px; font-size:13.5px; font-weight:600; box-shadow:var(--shadow-lift); opacity:0; pointer-events:none; transition:.3s; z-index:90; max-width:88%; text-align:center}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+/* bottom nav */
+.bottomnav{position:fixed; left:0; right:0; bottom:0; z-index:20; display:flex; max-width:520px; margin:0 auto; background:color-mix(in srgb,var(--surface) 92%,transparent); backdrop-filter:blur(10px); border-top:1px solid var(--border); padding-bottom:env(safe-area-inset-bottom)}
+.navitem{flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:9px 0 8px; color:var(--faint); font-size:10.5px; font-weight:600}
+.navitem .ic{font-size:18px; opacity:.7}
+.navitem.active{color:var(--accent)}
+.navitem.active .ic{opacity:1}
+
+@media(min-width:560px){ .stats{gap:6px 12px} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <button class="backbtn" id="backBtn" style="display:none" onclick="location.hash='#/'">‹ Fleet</button>
+    <span class="brand" id="brandLabel">AGJAsst</span>
+    <span class="spacer"></span>
+    <button class="iconbtn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+    <button class="iconbtn" id="refreshBtn" title="Refresh now" aria-label="Refresh">↻</button>
+  </header>
+  <div class="ribbon">◆ Mockup · sample data for design approval · not wired to the real fleet</div>
+  <main id="view"></main>
+  <nav class="bottomnav">
+    <div class="navitem"><span class="ic">🏠</span>Home</div>
+    <div class="navitem"><span class="ic">📝</span>Notes</div>
+    <div class="navitem active"><span class="ic">🖥️</span>Machines</div>
+    <div class="navitem"><span class="ic">⌨️</span>Terminal</div>
+  </nav>
+</div>
+<div class="toast" id="toast"></div>
+<div class="modal-backdrop" id="modal"></div>
+
+<script>
+// ---------- sample fleet (representative values; a mockup, not live) ----------
+const spark = (base, amp, n=30, seed=1)=>{let a=[],s=seed; for(let i=0;i<n;i++){s=(s*9301+49297)%233280; a.push(Math.round(base+Math.sin(i/3)*amp*0.5+((s/233280)-0.5)*amp));} return a;};
+
+const MACHINES = [
+  {
+    id:"gpu", name:"gpu", host:"jromhost", ip:"192.168.254.174", role:"Primary GPU host — 3 cards, ~80 GB VRAM",
+    power:"on", severity:"norm", busy:true, busyReason:"3 GPUs busy · signal-27b (vLLM) serving",
+    uptime:"4d 6h 12m", wokenByXmac:false,
+    watts:{val:780, kind:"est"}, cpu_c:58, hottest_c:71, ambient_c:29,
+    fanKit:false,
+    gpus:[
+      {model:"RTX PRO 4500", vram:"32 GB", temp:71, power:210, util:96, mem:"28.4 / 32 GB", busy:"signal-27b (vLLM)"},
+      {model:"RTX PRO 4000 Blackwell", vram:"24 GB", temp:64, power:95, util:40, mem:"12.1 / 24 GB", busy:"signal-27b (vLLM)"},
+      {model:"RTX PRO 4000 Blackwell", vram:"24 GB", temp:62, power:88, util:35, mem:"10.8 / 24 GB", busy:"signal-27b (vLLM)"},
+    ],
+    fans:[
+      {name:"CPU fan", sub:"cpu", duty:52, rpm:1420, mode:"auto"},
+      {name:"Case front", sub:"chassis", duty:null, rpm:null, mode:"no board sensor"},
+      {name:"Case rear", sub:"chassis", duty:null, rpm:null, mode:"no board sensor"},
+    ],
+    wattHist:spark(760,120,30,7), tempHist:spark(69,8,30,3),
+    cost:{kwh:6.4, php:58.9},
+    source:"nvidia-smi + lm-sensors (fancurve kit lands later on .174)",
+    fresh:8,
+  },
+  {
+    id:"gpu2", name:"gpu2", host:"jromnet", ip:"192.168.254.179", role:"Box-b GPU node — 2 cards, ~48 GB VRAM",
+    power:"on", severity:"hot", busy:true, busyReason:"2 GPUs busy · glimmer-30b (vLLM) serving",
+    uptime:"6d 1h 40m", wokenByXmac:false,
+    watts:{val:430, kind:"est"}, cpu_c:61, hottest_c:82, ambient_c:31,
+    fanKit:true, alert:"hot", fancurveActive:true,
+    gpus:[
+      {model:"RTX PRO 4000 Blackwell", vram:"24 GB", temp:82, power:118, util:99, mem:"23.1 / 24 GB", busy:"glimmer-30b (vLLM)"},
+      {model:"RTX PRO 4000 Blackwell", vram:"24 GB", temp:79, power:112, util:97, mem:"22.4 / 24 GB", busy:"glimmer-30b (vLLM)"},
+    ],
+    fans:[
+      {name:"Case front", sub:"chassis · curve", duty:78, rpm:1980, mode:"curve"},
+      {name:"Case rear", sub:"chassis · curve", duty:78, rpm:1875, mode:"curve"},
+      {name:"Top exhaust", sub:"chassis · curve", duty:78, rpm:1930, mode:"curve"},
+      {name:"CPU fan", sub:"cpu", duty:65, rpm:1520, mode:"auto"},
+    ],
+    wattHist:spark(420,70,30,11), tempHist:spark(79,7,30,5),
+    cost:{kwh:3.9, php:35.9},
+    source:"fancurve kit — ssh .179 /opt/fancurve/fanstatus.py (real rpm)",
+    fresh:5,
+  },
+  {
+    id:"media", name:"media", host:"dbtrain", ip:"192.168.254.182", role:"RTX 3090 — LLM-bench + Qwen media-edit",
+    power:"off", severity:"off", busy:false, busyReason:null,
+    uptime:"—", lastSeen:"2h 14m ago", coldWake:"~40 s", wokenByXmac:false,
+    watts:{val:0, kind:"off"}, cpu_c:null, hottest_c:null, ambient_c:null,
+    fanKit:false,
+    gpus:[{model:"RTX 3090", vram:"24 GB", offline:true}],
+    fans:[],
+    cost:{kwh:0.0, php:0.0},
+    source:"last poll before power-off",
+    fresh:null,
+  },
+  {
+    id:"hdd", name:"hdd", host:"datasvr", ip:"192.168.254.169", role:"Data / storage server — ~47 TB array",
+    power:"on", severity:"norm", busy:false, busyReason:null,
+    uptime:"22d 3h", coldWake:"~40 s", wokenByXmac:false,
+    watts:{val:72, kind:"est"}, cpu_c:41, hottest_c:39, ambient_c:27,
+    fanKit:false, storage:true,
+    gpus:[],
+    disks:[
+      {name:"WD Red 12TB", slot:"sda", temp:37, health:"PASSED", used:78},
+      {name:"WD Red 12TB", slot:"sdb", temp:38, health:"PASSED", used:78},
+      {name:"WD Red 12TB", slot:"sdc", temp:36, health:"PASSED", used:52},
+      {name:"WD Red 12TB", slot:"sdd", temp:39, health:"PASSED", used:52},
+      {name:"Seagate 8TB", slot:"sde", temp:34, health:"PASSED", used:61},
+    ],
+    arrayTotal:"47 TB", arrayUsed:"31.2 TB", arrayPct:66,
+    fans:[
+      {name:"Chassis 1", sub:"chassis", duty:45, rpm:920, mode:"auto"},
+      {name:"Chassis 2", sub:"chassis", duty:45, rpm:935, mode:"auto"},
+    ],
+    wattHist:spark(70,14,30,2), tempHist:spark(38,3,30,9),
+    cost:{kwh:0.7, php:6.4},
+    source:"SMART (smartctl) + lm-sensors + NUT UPS",
+    ups:{model:"APC 1500", load:18, battery:100, runtime:"48 min"},
+    fresh:12,
+  },
+];
+
+const M = Object.fromEntries(MACHINES.map(m=>[m.id,m]));
+
+// ---------- editable names (per-viewer, persisted) ----------
+let CUSTOM={}; try{CUSTOM=JSON.parse(localStorage.getItem('xm-names')||'{}');}catch(e){CUSTOM={};}
+const displayName = m => (CUSTOM[m.id] && CUSTOM[m.id].trim()) ? CUSTOM[m.id] : m.name;
+function saveName(id,val){ val=(val||'').trim(); if(val && val!==M[id].name) CUSTOM[id]=val; else delete CUSTOM[id]; try{localStorage.setItem('xm-names',JSON.stringify(CUSTOM));}catch(e){} }
+
+// ---------- history time-ranges ----------
+const RANGES = {
+  '1h':  {label:'1H',  n:31, x:['-60m','-40m','-20m','now'], hours:1},
+  '6h':  {label:'6H',  n:37, x:['-6h','-4h','-2h','now'],    hours:6},
+  '24h': {label:'24H', n:49, x:['-24h','-16h','-8h','now'],  hours:24},
+};
+let HIST_RANGE='1h';
+function histData(m, range){
+  const cfg=RANGES[range]||RANGES['1h'];
+  const seed=(m.id.split('').reduce((a,c)=>a+c.charCodeAt(0),0))+cfg.hours;
+  const wbase=m.watts.val||0, tbase=m.hottest_c||0;
+  const wamp=Math.max(35, wbase*0.16)*(1+cfg.hours/24*0.9);
+  const tamp=Math.max(3, tbase*0.07)*(1+cfg.hours/24*0.7);
+  const watts=spark(wbase, wamp, cfg.n, seed+1);
+  const temp=spark(tbase, tamp, cfg.n, seed+13);
+  watts[watts.length-1]=wbase; temp[temp.length-1]=tbase;   // anchor "now" to the current reading
+  return {watts, temp, x:cfg.x, label:cfg.label,
+          kwh:+(m.cost.kwh*cfg.hours/24).toFixed(2), php:+(m.cost.php*cfg.hours/24).toFixed(1)};
+}
+function setRange(id, r){ HIST_RANGE=r; const el=document.getElementById('histSection'); if(el) el.outerHTML=historySection(M[id]); }
+
+// ---------- helpers ----------
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const tClass = t => t==null?"":(t<50?"t-cool":t<70?"t-ok":t<80?"t-warn":"t-hot");
+const sevPill = m => {
+  if(m.power==="off") return `<span class="pill off"><span class="dot"></span>Off</span>`;
+  if(m.severity==="hot") return `<span class="pill hot"><span class="dot"></span>Hot</span>`;
+  if(m.severity==="warn") return `<span class="pill warn"><span class="dot"></span>Warning</span>`;
+  return `<span class="pill norm"><span class="dot"></span>Normal</span>`;
+};
+const stripeVar = m => m.power==="off"?"var(--off)":m.severity==="hot"?"var(--hot)":m.severity==="warn"?"var(--warn)":"var(--ok)";
+const wattBadge = k => k==="est"?`<span class="est">≈ est</span>`:k==="off"?`<span class="est">off</span>`:`<span class="est" style="color:var(--ok)">measured</span>`;
+
+// ---------- time-series line chart (X = time, Y = value) ----------
+function lineChart(data, unit, hot, xlabels){
+  const W=328, H=168, padL=40, padR=14, padT=14, padB=32;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const mn=Math.min(...data), mx=Math.max(...data);
+  const room=Math.max(1,(mx-mn)*0.18);
+  let lo=Math.floor(mn-room), hi=Math.ceil(mx+room); if(lo===hi) hi=lo+1;
+  const X=i=>padL + i*plotW/(data.length-1);
+  const Y=v=>padT + plotH - ((v-lo)/(hi-lo))*plotH;
+  const c=hot?'var(--hot)':'var(--accent)';
+  // Y gridlines + labels
+  let g='';
+  const yT=4;
+  for(let t=0;t<=yT;t++){ const val=lo+(hi-lo)*t/yT, yy=Y(val);
+    g+=`<line class="grid" x1="${padL}" y1="${yy.toFixed(1)}" x2="${(W-padR).toFixed(1)}" y2="${yy.toFixed(1)}"/>`;
+    g+=`<text x="${(padL-7).toFixed(1)}" y="${(yy+3).toFixed(1)}" text-anchor="end" font-size="9">${Math.round(val)}</text>`;
+  }
+  // X gridlines + time labels
+  const N=data.length-1;
+  const labs=(xlabels&&xlabels.length===4)?xlabels:['-30m','-20m','-10m','now'];
+  const xpos=[0, Math.round(N/3), Math.round(2*N/3), N];
+  labs.forEach((lab,k)=>{ const i=xpos[k], xx=X(i);
+    g+=`<line class="grid" x1="${xx.toFixed(1)}" y1="${padT}" x2="${xx.toFixed(1)}" y2="${(padT+plotH).toFixed(1)}"/>`;
+    g+=`<text x="${xx.toFixed(1)}" y="${(H-padB+15).toFixed(1)}" text-anchor="${k===0?'start':k===3?'end':'middle'}" font-size="9">${lab}</text>`;
+  });
+  const pts=data.map((v,i)=>[X(i),Y(v)]);
+  const line=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const area=line+` L${(W-padR).toFixed(1)} ${(padT+plotH).toFixed(1)} L${padL.toFixed(1)} ${(padT+plotH).toFixed(1)} Z`;
+  const last=pts[pts.length-1];
+  const gid=hot?'gh':'ga';
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${unit} over the last 30 minutes">
+    <defs><linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="${c}" stop-opacity=".20"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs>
+    ${g}
+    <line class="axis" x1="${padL}" y1="${padT}" x2="${padL}" y2="${(padT+plotH).toFixed(1)}"/>
+    <line class="axis" x1="${padL}" y1="${(padT+plotH).toFixed(1)}" x2="${(W-padR).toFixed(1)}" y2="${(padT+plotH).toFixed(1)}"/>
+    <path d="${area}" fill="url(#${gid})"/>
+    <path d="${line}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.6" fill="${c}"/>
+    <text class="axttl" x="2" y="${(padT-3).toFixed(1)}" text-anchor="start" font-size="9.5">${unit}</text>
+    <text class="axttl" x="${(padL+plotW/2).toFixed(1)}" y="${(H-3).toFixed(1)}" text-anchor="middle" font-size="9.5">time →</text>
+  </svg>`;
+}
+
+function toast(msg){const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2600);}
+
+// ---------- list ----------
+function renderList(){
+  document.getElementById('backBtn').style.display='none';
+  document.getElementById('brandLabel').textContent='AGJAsst';
+  const on=MACHINES.filter(m=>m.power==="on").length;
+  const off=MACHINES.length-on;
+  const totalW=MACHINES.reduce((s,m)=>s+(m.watts.val||0),0);
+  const busyGpu=MACHINES.reduce((s,m)=>s+(m.gpus?m.gpus.filter(g=>g.busy).length:0),0);
+  const hot=MACHINES.filter(m=>m.severity==="hot").length;
+  const v=document.getElementById('view');
+  v.innerHTML=`
+  <div class="page-head"><h1>Machines</h1><p>LAN fleet · self-detected · updates every 30 s while open</p></div>
+  <div class="summary">
+    <div class="sumchip"><span class="n">${on}</span><span class="l">Online</span></div>
+    <div class="sumchip"><span class="n">${off}</span><span class="l">Off</span></div>
+    <div class="sumchip"><span class="n mono">${totalW}<span style="font-size:12px;color:var(--muted)"> W</span></span><span class="l">Fleet draw ≈</span></div>
+    <div class="sumchip"><span class="n">${busyGpu}</span><span class="l">GPUs busy</span></div>
+    ${hot?`<div class="sumchip alert"><span class="n">${hot}</span><span class="l">Hot alert</span></div>`:``}
+  </div>
+  <div class="cards">${MACHINES.map(cardHtml).join("")}</div>`;
+}
+
+function cardHtml(m){
+  const busyBadge = m.busy?`<span class="pill busy" style="margin-left:6px"><span class="dot"></span>busy</span>`:``;
+  const gpuStat = m.storage
+    ? `<div class="stat"><span class="k">Storage</span><span class="v">${m.arrayPct}<span class="u">% used</span></span></div>`
+    : m.power==="off"
+      ? `<div class="stat"><span class="k">GPUs</span><span class="v">${m.gpus.length}<span class="u">idle</span></span></div>`
+      : `<div class="stat"><span class="k">GPUs</span><span class="v">${m.gpus.length}<span class="u">${m.gpus.filter(g=>g.busy).length} busy</span></span></div>`;
+  const tempStat = m.power==="off"
+    ? `<div class="stat"><span class="k">Temp</span><span class="v">—</span></div>`
+    : `<div class="stat"><span class="k">Hottest</span><span class="v tval ${tClass(m.hottest_c)}">${m.hottest_c}<span class="u">°C</span></span></div>`;
+  return `<button class="mcard" style="--stripe:${stripeVar(m)}" onclick="location.hash='#/m/${m.id}'">
+    <div class="row1">
+      <div>
+        <div class="name">${esc(displayName(m))}${busyBadge}</div>
+        <div class="host mono">${m.host} · ${m.ip}</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center">${sevPill(m)}<span class="chev">›</span></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="k">Power</span><span class="v" style="color:${m.power==='on'?'var(--ok)':'var(--off)'}">${m.power==='on'?'On':'Off'}</span></div>
+      ${tempStat}
+      <div class="stat"><span class="k">Draw</span><span class="v">${m.power==='off'?'0':m.watts.val}<span class="u">W</span></span></div>
+      ${gpuStat}
+      <div class="stat" style="grid-column:span 4;margin-top:6px"><span class="k">Uptime</span><span class="v" style="font-size:13.5px">${m.power==='off'?('Off · last seen '+m.lastSeen):m.uptime}</span></div>
+    </div>
+  </button>`;
+}
+
+// ---------- detail ----------
+function renderDetail(id){
+  const m=M[id]; if(!m){location.hash='#/'; return;}
+  document.getElementById('backBtn').style.display='flex';
+  document.getElementById('brandLabel').textContent='';
+  closeModal();
+  const v=document.getElementById('view');
+  v.innerHTML = `
+    <div class="dhead"><div style="flex:1">
+      <div class="name-row" id="nameRow">
+        <h1>${esc(displayName(m))}</h1>
+        <button class="editname" title="Rename this machine" aria-label="Rename" onclick="startRename('${m.id}')">✎</button>
+      </div>
+      <div class="host mono">${m.host} · ${m.ip}</div>
+      <div class="pills">
+        ${sevPill(m)}
+        ${m.busy?`<span class="pill busy"><span class="dot"></span>busy</span>`:``}
+        ${m.fresh!=null?`<span class="fresh"><span class="dot"></span>updated <span id="freshN">${m.fresh}</span>s ago</span>`:`<span class="fresh stale"><span class="dot"></span>${m.lastSeen}</span>`}
+      </div>
+    </div></div>
+    ${powerSection(m)}
+    ${m.power==="off" ? offlineSection(m) : thermalsSection(m) + gpuOrStorageSection(m) + fansSection(m) + historySection(m)}
+    ${provenanceSection(m)}
+  `;
+  if(m.fresh!=null) tickFresh();
+}
+
+// rename
+function startRename(id){
+  const m=M[id]; const row=document.getElementById('nameRow'); if(!row) return;
+  row.innerHTML=`<div class="name-edit">
+    <input id="nameInput" value="${esc(displayName(m))}" maxlength="24" autocomplete="off" spellcheck="false">
+    <button class="btn btn-primary mini" onclick="commitRename('${id}')">Save</button>
+    <button class="btn btn-ghost mini" onclick="renderDetail('${id}')">Cancel</button>
+  </div>`;
+  const inp=document.getElementById('nameInput'); inp.focus(); inp.select();
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter') commitRename(id); if(e.key==='Escape') renderDetail(id); });
+}
+function commitRename(id){ const el=document.getElementById('nameInput'); saveName(id, el?el.value:''); renderDetail(id); toast('Name updated — mockup'); }
+
+function powerSection(m){
+  const on=m.power==="on";
+  let controls;
+  if(!on){
+    controls = `<div class="controls">
+      <button class="btn btn-primary" onclick="act('wake','${m.id}')">⏻ Turn on (Wake-on-LAN)</button>
+    </div>
+    <div class="guard-note info"><span class="ic">↻</span><span>Cold wake ${m.coldWake||"~40 s"}. xmac sends the magic packet to ${m.ip} and waits for the machine to answer.</span></div>`;
+  } else if(m.busy){
+    controls = `<div class="controls">
+      <button class="btn btn-ghost" disabled>⏻ Turn off</button>
+      <button class="btn btn-danger" onclick="openForceModal('${m.id}')">⚠ Force off…</button>
+    </div>
+    <div class="guard-note"><span class="ic">⛔</span><span><b>Power-off blocked.</b> ${m.busyReason}. The busy guard is fail-closed — a machine actively serving models won't power off. Force asks for confirmation first.</span></div>`;
+  } else {
+    controls = `<div class="controls">
+      <button class="btn btn-ghost" onclick="openOffModal('${m.id}')">⏻ Turn off</button>
+    </div>
+    <div class="guard-note info"><span class="ic">✓</span><span>Safe to power off — no active GPU/compute or storage sessions. xmac checks the lease, live busy state, and wake-origin before it acts.</span></div>`;
+  }
+  return `<div class="section">
+    <h2>Power &amp; control</h2>
+    <div class="power-hero">
+      <div class="pstate">
+        <span class="pill ${on?'on':'off'}"><span class="dot"></span>${on?'On':'Off'}</span>
+        <span class="psub">${on?('up '+m.uptime):('last seen '+m.lastSeen)}</span>
+      </div>
+      <div class="power-draw">
+        <div class="n mono">${on?m.watts.val:0}<span class="u"> W</span></div>
+        <div class="lab">${wattBadge(on?m.watts.kind:'off')} current draw</div>
+      </div>
+    </div>
+    ${controls}
+  </div>`;
+}
+
+function thermalsSection(m){
+  return `<div class="section">
+    <h2>Thermals</h2>
+    <div class="metrics three">
+      <div class="m"><span class="k">CPU</span><span class="v tval ${tClass(m.cpu_c)}">${m.cpu_c}°C</span></div>
+      <div class="m"><span class="k">Hottest</span><span class="v tval ${tClass(m.hottest_c)}">${m.hottest_c}°C</span></div>
+      <div class="m"><span class="k">Ambient ≈</span><span class="v tval ${tClass(m.ambient_c)}">${m.ambient_c}°C</span></div>
+    </div>
+    ${m.alert==="hot"?`<div class="guard-note"><span class="ic">🔥</span><span><b>Hot.</b> Hottest sensor ≥ 80 °C — fancurve is driving fans to max. Monitor reads the curve, it doesn't fight it.</span></div>`:``}
+  </div>`;
+}
+
+function gpuOrStorageSection(m){
+  if(m.storage) return storageSection(m);
+  if(!m.gpus.length) return "";
+  return `<div class="section">
+    <h2>GPUs <span class="badge pill norm" style="font-size:10px">${m.gpus.length} self-detected</span></h2>
+    ${m.gpus.map(g=>`
+      <div class="tile">
+        <div class="th"><span class="nm">${g.model}</span><span class="vram">${g.vram}</span>
+          ${g.busy?`<span class="pill busy" style="margin-left:auto"><span class="dot"></span>busy</span>`:`<span class="pill norm" style="margin-left:auto"><span class="dot"></span>idle</span>`}</div>
+        <div class="metrics">
+          <div class="m"><span class="k">Temp</span><span class="v tval ${tClass(g.temp)}">${g.temp}°C</span></div>
+          <div class="m"><span class="k">Power</span><span class="v">${g.power} W</span></div>
+          <div class="m"><span class="k">Util</span><span class="v">${g.util}%</span></div>
+          <div class="m"><span class="k">Memory</span><span class="v" style="font-size:12.5px">${g.mem}</span></div>
+        </div>
+        ${g.busy?`<div class="bar"><i class="${tClass(g.temp)==='t-hot'?'hot':'ok'}" style="width:${g.util}%"></i></div><div style="font-size:11px;color:var(--faint);margin-top:5px">running · ${g.busy}</div>`:``}
+      </div>`).join("")}
+  </div>`;
+}
+
+function storageSection(m){
+  return `<div class="section">
+    <h2>Storage &amp; SMART <span class="badge pill norm" style="font-size:10px">${m.disks.length} disks</span></h2>
+    <div class="kv"><span class="k">Array</span><span class="v">${m.arrayUsed} / ${m.arrayTotal} · ${m.arrayPct}%</span></div>
+    <div class="bar" style="margin:6px 0 14px"><i class="${m.arrayPct>85?'hot':m.arrayPct>70?'warn':'ok'}" style="width:${m.arrayPct}%"></i></div>
+    ${m.disks.map(d=>`
+      <div class="fanrow">
+        <div class="fname">${d.name}<small>${d.slot}</small></div>
+        <div class="duty"><div class="bar"><i class="${d.used>85?'hot':'ok'}" style="width:${d.used}%"></i></div></div>
+        <div class="rpm tval ${tClass(d.temp)}">${d.temp}°C <small style="color:var(--ok)">${d.health}</small></div>
+      </div>`).join("")}
+    ${m.ups?`<div class="guard-note info" style="margin-top:12px"><span class="ic">🔋</span><span><b>UPS</b> ${m.ups.model} · load ${m.ups.load}% · battery ${m.ups.battery}% · ~${m.ups.runtime} runtime</span></div>`:``}
+  </div>`;
+}
+
+function fansSection(m){
+  if(!m.fans||!m.fans.length) return "";
+  const badge = m.fanKit ? `<span class="badge pill norm" style="font-size:10px">fancurve kit</span>` : `<span class="badge" style="font-size:10px;color:var(--faint)">lm-sensors</span>`;
+  return `<div class="section">
+    <h2>Fans ${badge}</h2>
+    ${m.fans.map(f=>`
+      <div class="fanrow">
+        <div class="fname">${f.name}<small>${f.sub}</small></div>
+        <div class="duty">${f.duty!=null?`<div class="bar"><i class="${f.duty>=90?'hot':f.duty>=70?'warn':'ok'}" style="width:${f.duty}%"></i></div><div style="font-size:10.5px;color:var(--faint);margin-top:3px">${f.duty}% · ${f.mode}</div>`:`<span class="na">${f.mode}</span>`}</div>
+        <div class="rpm">${f.rpm!=null?`${f.rpm} <small>rpm</small>`:`<span class="na">—</span>`}</div>
+      </div>`).join("")}
+    ${m.fancurveActive?`<div class="guard-note info" style="margin-top:11px"><span class="ic">🌀</span><span>fancurve.service active — auto 30 % → 100 % by hottest temp.</span></div>`:``}
+  </div>`;
+}
+
+function historySection(m){
+  if(m.power==="off") return "";
+  const r=HIST_RANGE, d=histData(m,r), hot=m.severity==="hot";
+  return `<div class="section" id="histSection">
+    <h2>History
+      <span class="rangetabs" style="margin-left:auto">
+        ${Object.keys(RANGES).map(k=>`<button class="${k===r?'active':''}" onclick="setRange('${m.id}','${k}')">${RANGES[k].label}</button>`).join('')}
+      </span>
+    </h2>
+    <div class="chart-block">
+      <div class="ctitle"><span>Power draw · watts</span><b>now ${d.watts[d.watts.length-1]} W</b></div>
+      ${lineChart(d.watts,'W',false,d.x)}
+    </div>
+    <div class="chart-block" style="margin-top:18px">
+      <div class="ctitle"><span>Hottest temp · °C</span><b>now ${d.temp[d.temp.length-1]} °C</b></div>
+      ${lineChart(d.temp,'°C',hot,d.x)}
+    </div>
+    <div class="kv" style="margin-top:14px"><span class="k">Energy · last ${d.label}</span><span class="v">${d.kwh} kWh · ₱${d.php}</span></div>
+  </div>`;
+}
+
+function offlineSection(m){
+  return `<div class="section">
+    <div class="offline-panel">
+      <span class="big">🌙</span>
+      <span class="t">Machine is powered off</span>
+      <span>Telemetry pauses while off. Last poll ${m.lastSeen}.<br>Wake it above to see live GPU, thermal &amp; fan detail.</span>
+    </div>
+    <div class="kv"><span class="k">GPU (last known)</span><span class="v">${m.gpus[0].model} · ${m.gpus[0].vram}</span></div>
+    <div class="kv"><span class="k">Cold wake</span><span class="v">${m.coldWake}</span></div>
+  </div>`;
+}
+
+function provenanceSection(m){
+  return `<div class="section">
+    <h2>Data &amp; freshness</h2>
+    <div class="kv"><span class="k">Source</span><span class="v" style="font-size:12px;font-weight:500;text-align:right;max-width:60%">${m.source}</span></div>
+    <div class="kv"><span class="k">Cadence</span><span class="v" style="font-size:12.5px">30 s open · 30 min background</span></div>
+    <div class="kv"><span class="k">Started by xmac</span><span class="v">${m.wokenByXmac?'yes':'no'}</span></div>
+    <div class="kv"><span class="k">Machine ID</span><span class="v">${m.id}</span></div>
+  </div>`;
+}
+
+// ---------- actions (mock) ----------
+function act(kind,id){
+  const m=M[id];
+  if(kind==='wake') toast(`⏻ Wake-on-LAN sent to ${displayName(m)} (${m.ip}) — mockup`);
+  if(kind==='off')  toast(`⏻ Power-off queued for ${displayName(m)} — mockup`);
+}
+
+// confirm modals (guards accidental clicks)
+function openModal(html){ const mb=document.getElementById('modal'); mb.innerHTML=`<div class="modal" role="dialog" aria-modal="true">${html}</div>`; mb.classList.add('show'); const c=document.getElementById('mCancel'); if(c) c.focus(); }
+function closeModal(){ const mb=document.getElementById('modal'); mb.classList.remove('show'); mb.innerHTML=''; }
+function openOffModal(id){
+  const m=M[id];
+  openModal(`<div class="mic">⏻</div>
+    <h3 style="color:var(--text)">Turn off ${esc(displayName(m))}?</h3>
+    <p>This powers down <b>${esc(displayName(m))}</b> (${m.host}). Cold wake back on is ${m.coldWake||'~40 s'}.</p>
+    <div class="mrow">
+      <button class="btn btn-ghost" id="mCancel" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="closeModal();act('off','${id}')">Turn off</button>
+    </div>`);
+}
+function openForceModal(id){
+  const m=M[id];
+  openModal(`<div class="mic">⚠️</div>
+    <h3>Force power-off ${esc(displayName(m))}?</h3>
+    <p>This clears the busy guard and <b>kills the work currently running</b> on ${esc(displayName(m))} (${m.busyReason||'active session'}). This can't be undone.</p>
+    <div class="mrow">
+      <button class="btn btn-ghost" id="mCancel" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="closeModal();toast('⚠ Force power-off authorised for ${esc(displayName(m)).replace(/'/g,'')} — mockup')">Force power-off</button>
+    </div>`);
+}
+
+let freshTimer=null;
+function tickFresh(){
+  clearInterval(freshTimer);
+  freshTimer=setInterval(()=>{const el=document.getElementById('freshN'); if(!el){clearInterval(freshTimer);return;} el.textContent=(+el.textContent+1);},1000);
+}
+
+// ---------- routing ----------
+function route(){
+  const h=location.hash||'#/';
+  clearInterval(freshTimer);
+  const mm=h.match(/^#\/m\/(.+)$/);
+  if(mm) renderDetail(mm[1]); else renderList();
+  window.scrollTo(0,0);
+}
+window.addEventListener('hashchange',route);
+
+// theme
+const themeBtn=document.getElementById('themeBtn');
+function applyTheme(t){ if(t)document.documentElement.setAttribute('data-theme',t); else document.documentElement.removeAttribute('data-theme'); }
+try{ const saved=localStorage.getItem('xm-theme'); if(saved) applyTheme(saved); }catch(e){}
+themeBtn.onclick=()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  const dark=cur? cur==='dark' : window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const next=dark?'light':'dark'; applyTheme(next);
+  try{localStorage.setItem('xm-theme',next);}catch(e){}
+};
+document.getElementById('refreshBtn').onclick=()=>{route(); toast('Refreshed — mockup');};
+
+// dismiss modal on backdrop click / ESC
+document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') closeModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+route();
+</script>
+</body>
+</html>

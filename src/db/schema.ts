@@ -7,7 +7,7 @@
 
 import type Database from "better-sqlite3";
 
-export const SCHEMA_VERSION = 40;
+export const SCHEMA_VERSION = 41;
 
 export const XM_ACTION_STATE_SQL = `
 CREATE TABLE IF NOT EXISTS xm_action_state (
@@ -586,6 +586,12 @@ CREATE INDEX IF NOT EXISTS idx_xm_alerts_dedupe ON xm_alerts(dedupe_key);
 CREATE TABLE IF NOT EXISTS xm_config (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS xm_machine_labels (
+  machine_name TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ${XM_ACTION_STATE_SQL}

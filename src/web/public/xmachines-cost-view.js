@@ -181,24 +181,100 @@ function roleHintSpan(machine) {
   return `<span data-testid="xmachines-role-hint" class="xm-role-hint" style="display:block;font-size:12px;font-weight:400;opacity:0.72">${escapeHtml(role)}</span>`;
 }
 
+function tempClassOf(t) {
+  if (typeof t !== 'number' || !Number.isFinite(t)) return '';
+  return t < 50 ? 't-cool' : t < 70 ? 't-ok' : t < 80 ? 't-warn' : 't-hot';
+}
+
 // Fleet overview prints name and power state. Cost fields on a machine are ignored.
+// Card layout matches the approved xmachines mockup; every data-testid/attribute the
+// tests pin is emitted exactly once (offline cards omit the live-metric nodes).
 export function renderFleetOverview(payload) {
   const machines = payload && Array.isArray(payload.machines) ? payload.machines : [];
   const severityBook = readSeverityBook();
+
+  let onCount = 0, offCount = 0, totalW = 0, hotCount = 0;
+  machines.forEach((m) => {
+    if (isOfflineMachine(m)) offCount += 1; else onCount += 1;
+    if (typeof m.powerWatts === 'number' && Number.isFinite(m.powerWatts)) totalW += m.powerWatts;
+  });
+
   const items = machines.map((machine) => {
-    const name = escapeHtml(machine && machine.name != null ? machine.name : '');
+    const rawName = machine && machine.name != null ? String(machine.name) : '';
+    const name = escapeHtml(rawName);
+    const offline = isOfflineMachine(machine);
     const state = escapeHtml(powerStateLabel(machine));
+    const sevLevel = displayedSeverity(machine, severityBook);
+    if (sevLevel === 'critical' || sevLevel === 'warning') hotCount += 1;
+    const severity = severityChip(sevLevel);
+    const isStale = machine && !offline && isExpiredSample(machine.sampleAge);
+    const staleStyle = isStale ? ' style="opacity:0.5;"' : '';
+    const stripe = offline ? 'var(--xm-off)'
+      : sevLevel === 'critical' ? 'var(--xm-hot)'
+      : sevLevel === 'warning' ? 'var(--xm-warn)'
+      : 'var(--xm-ok)';
+
     const stateHtml = fieldSpan('xmachines-power-state', state);
-    const severity = severityChip(displayedSeverity(machine, severityBook));
-    const isStale = machine && !isOfflineMachine(machine) && isExpiredSample(machine.sampleAge);
-    const cardStyle = isStale ? 'opacity:0.6;' : '';
-    const extra = `${liveMetricSpans(machine)}${serviceSpans(machine)}${roleHintSpan(machine)}`;
-    const tail = extra ? ` ${extra}` : '';
+    const tempVal = typeof machine.gpuTemp === 'number' ? `${machine.gpuTemp}°C` : '';
+    const powerVal = typeof machine.powerWatts === 'number' ? `${machine.powerWatts} W` : '';
+    const powerIsMeasured = !!(machine && machine.telemetry && machine.telemetry.powerWatts != null);
+    const measWord = powerIsMeasured ? 'measured' : 'approx';
+    const measKind = powerIsMeasured ? 'measured' : 'estimated';
+    const uptimeVal = typeof machine.uptime === 'string' ? machine.uptime : '';
+
+    const powerStat = `<div class="xm-stat"><span class="k">Power</span><span class="v" style="color:${offline ? 'var(--xm-off)' : 'var(--xm-ok)'}">${stateHtml}</span></div>`;
+    const tempStat = offline
+      ? `<div class="xm-stat"><span class="k">Temp</span><span class="v">—</span></div>`
+      : `<div class="xm-stat"><span class="k">Hottest</span><span class="v"><span class="xm-tval ${tempClassOf(machine.gpuTemp)}" data-testid="xmachines-gpu-temp"${staleStyle}>${escapeHtml(tempVal)}</span></span></div>`;
+    const drawStat = offline
+      ? `<div class="xm-stat"><span class="k">Draw</span><span class="v">—</span></div>`
+      : `<div class="xm-stat"><span class="k">Draw</span><span class="v"><span data-testid="xmachines-power-draw">${escapeHtml(powerVal)}</span>${powerVal ? ` <span data-testid="xmachines-measurement" data-measurement="${measKind}" class="xm-est">${measWord}</span>` : ''}</span></div>`;
+    const uptimeStat = offline
+      ? ''
+      : `<div class="xm-stat" style="grid-column:span 2"><span class="k">Uptime</span><span class="v" style="font-size:13px"><span data-testid="xmachines-uptime"${staleStyle}>${escapeHtml(uptimeVal)}</span></span></div>`;
+
+    const ageSpan = (!offline && typeof machine.sampleAge === 'string') ? `<span data-testid="xmachines-sample-age" data-sample-age>${escapeHtml(machine.sampleAge)}</span>` : '';
+    const provText = typeof machine.provenance === 'string' ? machine.provenance : '';
+    const provSpan = provText ? `<span data-testid="xmachines-provenance" data-provenance>${escapeHtml(provText)}</span>` : '';
+    const freshText = typeof machine.freshness === 'string' ? machine.freshness : '';
+    const freshSpan = freshText ? `<span data-testid="xmachines-freshness">${escapeHtml(freshText)}</span>` : '';
+    const busyText = machine && machine.busy && typeof machine.busy.busyCheckOutput === 'string' ? machine.busy.busyCheckOutput : '';
+    const busySpan = busyText ? `<span data-testid="xmachines-busy">${escapeHtml(busyText)}</span>` : '';
+    const leasesText = machine && machine.busy && Array.isArray(machine.busy.leaseNames) && machine.busy.leaseNames.length ? machine.busy.leaseNames.join(', ') : '';
+    const leasesSpan = leasesText ? `<span data-testid="xmachines-leases">${escapeHtml(leasesText)}</span>` : '';
+    const isBusy = !!(machine && machine.busy && machine.busy.isBusy);
+    const busyPill = isBusy ? ` <span class="xm-pill busy"><span class="xm-dot"></span>busy</span>` : '';
+    const roleHint = roleHintSpan(machine);
     const spark = sparklineMarkup(machine && machine._history, true);
-    return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}" style="display:block;margin:0 0 12px;padding:12px 14px;border:1px solid #30363d;border-radius:12px;list-style:none;${cardStyle}">${name}${stateHtml}${severity}${tail}${spark}</li>`;
+
+    const metaBits = [freshSpan, provSpan, ageSpan, busySpan, leasesSpan].filter(Boolean).join('');
+    const metaLine = metaBits ? `<div class="xm-cardmeta" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;color:var(--xm-faint);font-family:var(--xm-mono)">${metaBits}</div>` : '';
+    const cardOpacity = isStale ? 'opacity:0.6;' : '';
+
+    return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}" class="xm-card" style="--xm-stripe:${stripe};${cardOpacity}list-style:none">`
+      + `<a class="xm-card-link" href="#/xmachines/${encodeURIComponent(rawName)}" style="display:block;color:inherit;text-decoration:none">`
+      + `<div class="xm-row1"><div style="min-width:0"><div class="xm-name">${name}${busyPill}</div>${roleHint}</div>`
+      + `<div style="margin-left:auto;display:flex;gap:6px;align-items:center">${severity}<span class="xm-chev">›</span></div></div>`
+      + `<div class="xm-stats">${powerStat}${tempStat}${drawStat}${uptimeStat}</div>`
+      + metaLine
+      + `<div class="xm-sparks" style="display:none">${spark}</div>`
+      + `</a></li>`;
   }).join('');
   writeSeverityBook(severityBook);
-  return `<section class="xm-fleet" data-testid="xmachines-fleet-overview" role="region" aria-label="Fleet overview" style="max-width:420px;font:16px/1.4 system-ui,sans-serif"><h1 style="font-size:20px;margin:0 0 12px">Fleet overview</h1><ul style="list-style:none;padding:0;margin:0">${items}</ul></section>`;
+
+  const summary = machines.length
+    ? `<div class="xm-summary">`
+      + `<div class="xm-sumchip"><span class="n">${onCount}</span><span class="l">Online</span></div>`
+      + `<div class="xm-sumchip"><span class="n">${offCount}</span><span class="l">Off</span></div>`
+      + `<div class="xm-sumchip"><span class="n xm-mono">${totalW}<span style="font-size:12px;color:var(--xm-muted)"> W</span></span><span class="l">Fleet draw &#8776;</span></div>`
+      + (hotCount ? `<div class="xm-sumchip alert"><span class="n">${hotCount}</span><span class="l">Alert</span></div>` : '')
+      + `</div>`
+    : '';
+
+  return `<section class="xm-fleet" data-testid="xmachines-fleet-overview" role="region" aria-label="Fleet overview">`
+    + `<div class="xm-page-head"><h1>Fleet overview</h1><p>LAN fleet &middot; self-detected &middot; updates every 30s while open</p></div>`
+    + summary
+    + `<ul class="xm-cards">${items}</ul></section>`;
 }
 
 function seriesToPoints(series, width, height) {
@@ -256,6 +332,63 @@ function renderReadout(machine, history) {
   return `<div data-testid="xmachines-read-model">${stateHtml}${cpuSpan}${fanSpan}${sessionSpan}${onHoursSpan}${protectedRoleSpan}${liveMetricSpans(machine)}${serviceSpans(machine)}${sparkHtml}</div>`;
 }
 
+const XM_RANGES = {
+  '1h':  { label: '1H',  x: ['-60m', '-40m', '-20m', 'now'] },
+  '6h':  { label: '6H',  x: ['-6h', '-4h', '-2h', 'now'] },
+  '24h': { label: '24H', x: ['-24h', '-16h', '-8h', 'now'] },
+};
+
+function seriesValues(series) {
+  if (!Array.isArray(series)) return [];
+  return series.map((s) => Number(s && s.value)).filter((v) => Number.isFinite(v));
+}
+
+// Time-series line chart (X = time, Y = value). Returns an SVG string.
+function lineChart(values, unit, hot, xlabels) {
+  if (!Array.isArray(values) || values.length < 2) {
+    return `<div class="xm-na" style="padding:20px 0;text-align:center">no history yet for this range</div>`;
+  }
+  const W = 328, H = 168, padL = 40, padR = 14, padT = 14, padB = 32;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const mn = Math.min(...values), mx = Math.max(...values);
+  const room = Math.max(1, (mx - mn) * 0.18);
+  let lo = Math.floor(mn - room), hi = Math.ceil(mx + room);
+  if (lo === hi) hi = lo + 1;
+  const X = (i) => padL + (i * plotW) / (values.length - 1);
+  const Y = (v) => padT + plotH - ((v - lo) / (hi - lo)) * plotH;
+  const color = hot ? 'var(--xm-hot)' : 'var(--xm-accent)';
+  let g = '';
+  for (let t = 0; t <= 4; t += 1) {
+    const val = lo + ((hi - lo) * t) / 4, yy = Y(val);
+    g += `<line class="grid" x1="${padL}" y1="${yy.toFixed(1)}" x2="${(W - padR).toFixed(1)}" y2="${yy.toFixed(1)}"/>`;
+    g += `<text x="${(padL - 7).toFixed(1)}" y="${(yy + 3).toFixed(1)}" text-anchor="end" font-size="9">${Math.round(val)}</text>`;
+  }
+  const N = values.length - 1;
+  const labs = (Array.isArray(xlabels) && xlabels.length === 4) ? xlabels : ['-30m', '-20m', '-10m', 'now'];
+  const xpos = [0, Math.round(N / 3), Math.round((2 * N) / 3), N];
+  labs.forEach((lab, k) => {
+    const xx = X(xpos[k]);
+    g += `<line class="grid" x1="${xx.toFixed(1)}" y1="${padT}" x2="${xx.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}"/>`;
+    g += `<text x="${xx.toFixed(1)}" y="${(H - padB + 15).toFixed(1)}" text-anchor="${k === 0 ? 'start' : k === 3 ? 'end' : 'middle'}" font-size="9">${escapeHtml(lab)}</text>`;
+  });
+  const pts = values.map((v, i) => [X(i), Y(v)]);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const area = line + ` L${(W - padR).toFixed(1)} ${(padT + plotH).toFixed(1)} L${padL.toFixed(1)} ${(padT + plotH).toFixed(1)} Z`;
+  const last = pts[pts.length - 1];
+  const gid = hot ? 'xmgh' : 'xmga';
+  return `<svg class="xm-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(unit)} over time">`
+    + `<defs><linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".20"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>`
+    + g
+    + `<line class="axis" x1="${padL}" y1="${padT}" x2="${padL}" y2="${(padT + plotH).toFixed(1)}"/>`
+    + `<line class="axis" x1="${padL}" y1="${(padT + plotH).toFixed(1)}" x2="${(W - padR).toFixed(1)}" y2="${(padT + plotH).toFixed(1)}"/>`
+    + `<path d="${area}" fill="url(#${gid})"/>`
+    + `<path d="${line}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`
+    + `<circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.6" fill="${color}"/>`
+    + `<text class="axttl" x="2" y="${(padT - 3).toFixed(1)}" text-anchor="start" font-size="9.5">${escapeHtml(unit)}</text>`
+    + `<text class="axttl" x="${(padL + plotW / 2).toFixed(1)}" y="${(H - 3).toFixed(1)}" text-anchor="middle" font-size="9.5">time →</text>`
+    + `</svg>`;
+}
+
 // Detail is the only surface that shows PHP cost, the tariff flag, and the short-burst caveat.
 export function renderMachineCostDetail(payload) {
   const machine = payload && payload.machine ? payload.machine : {};
@@ -309,7 +442,159 @@ export function renderMachineCostDetail(payload) {
   const upsPanel = ups
     ? `<div class="ups-panel" data-machine="${escapeHtml(name)}"><span class="ups-battery">${escapeHtml(ups.batteryChargePct ?? 'unavailable')}</span><span class="ups-runtime">${escapeHtml(ups.runtimeSeconds != null ? `${ups.runtimeSeconds}s` : 'unavailable')}</span><span class="ups-load">${escapeHtml(ups.loadPct ?? 'unavailable')}</span></div>`
     : `<div class="ups-panel" data-machine="${escapeHtml(name)}"><span class="ups-battery">unavailable</span><span class="ups-runtime">unavailable</span><span class="ups-load">unavailable</span></div>`;
-  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail"><h1 class="xm-detail-name">${name}</h1>${renderReadout(machine, history)}${gpuBanner}${gpuRowHtml}${hddPanel}${upsPanel}<p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours">${kwhAmount} kWh</p><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP">PHP ${phpAmount}</p><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}">${flag}</p><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat">${caveat}</p>${renderWolSafety(payload && payload.wolSafety)}${offButton}${forceButton}${challengeBlock}${forceRefusalBlock}${renderNormalOffRefusal(payload && payload.offRefusal)}</section>`;
+  // ---------- section-based layout (approved mockup contract) ----------
+  const rawName = machine.name != null ? String(machine.name) : '';
+  const offline = isOfflineMachine(machine);
+  const state = powerStateLabel(machine);
+  const isStale = !offline && isExpiredSample(machine.sampleAge);
+  const staleStyle = isStale ? ' style="opacity:0.5;"' : '';
+  const displayName = escapeHtml(machine.displayName != null && String(machine.displayName).trim() ? machine.displayName : rawName);
+
+  // header
+  const hostLine = (machine.host || machine.ip)
+    ? `${escapeHtml(machine.host || '')}${machine.host && machine.ip ? ' · ' : ''}${escapeHtml(machine.ip || '')}`
+    : (typeof machine.roleHint === 'string' ? escapeHtml(machine.roleHint) : '');
+  const busyPill = machine.busy && machine.busy.isBusy ? `<span class="xm-pill busy"><span class="xm-dot"></span>busy</span>` : '';
+  const roleText = typeof machine.roleHint === 'string' && machine.roleHint.trim() ? machine.roleHint.trim() : '';
+  const protectedRoleSpan = roleText ? `<span data-testid="xmachines-protected-role" class="xm-pill" style="background:var(--xm-surface-2);color:var(--xm-muted)">${escapeHtml(roleText)}</span>` : '';
+  const simpleSev = offline ? 'off'
+    : (machine.gpuTemp >= 90 || machine.cpuTemp >= 95) ? 'hot'
+    : (machine.gpuTemp >= 80 || machine.cpuTemp >= 85) ? 'warn' : 'norm';
+  const sevPillHtml = offline ? '<span class="xm-pill off"><span class="xm-dot"></span>Off</span>'
+    : simpleSev === 'hot' ? '<span class="xm-pill hot"><span class="xm-dot"></span>Hot</span>'
+    : simpleSev === 'warn' ? '<span class="xm-pill warn"><span class="xm-dot"></span>Warning</span>'
+    : '<span class="xm-pill norm"><span class="xm-dot"></span>Normal</span>';
+  const freshChip = offline
+    ? `<span class="xm-fresh stale"><span class="xm-dot"></span>${escapeHtml(typeof machine.freshness === 'string' ? machine.freshness : 'offline')}</span>`
+    : `<span class="xm-fresh"><span class="xm-dot"></span>${escapeHtml(typeof machine.sampleAge === 'string' ? machine.sampleAge : 'live')}</span>`;
+  const powerStateHook = `<span data-testid="xmachines-power-state" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden">${escapeHtml(state)}</span>`;
+  const header = `<div class="xm-dhead">`
+    + `<div class="xm-name-row" id="xm-name-row"><h1 id="xm-name-h1">${displayName}</h1>`
+    + `<button type="button" class="xm-editname" data-action="rename" aria-label="Rename machine" title="Rename">✎</button></div>`
+    + (hostLine ? `<div class="xm-host">${hostLine}</div>` : '')
+    + `<div class="xm-pills">${sevPillHtml}${busyPill}${protectedRoleSpan}${freshChip}</div>`
+    + `</div>`;
+
+  // power & control
+  const tempVal = typeof machine.gpuTemp === 'number' ? `${machine.gpuTemp}°C` : '';
+  const powerVal = typeof machine.powerWatts === 'number' ? `${machine.powerWatts} W` : '';
+  const powerIsMeasured = !!(machine.telemetry && machine.telemetry.powerWatts != null);
+  const measWord = powerIsMeasured ? 'measured' : 'approx';
+  const measKind = powerIsMeasured ? 'measured' : 'estimated';
+  const uptimeVal = typeof machine.uptime === 'string' ? machine.uptime : '';
+  const statePill = offline ? '<span class="xm-pill off"><span class="xm-dot"></span>Off</span>' : '<span class="xm-pill on"><span class="xm-dot"></span>On</span>';
+  const uptimeHook = offline ? '' : `<span data-testid="xmachines-uptime"${staleStyle}>${escapeHtml(uptimeVal)}</span>`;
+  const drawHook = offline ? '0 W'
+    : `<span data-testid="xmachines-power-draw">${escapeHtml(powerVal)}</span>${powerVal ? ` <span data-testid="xmachines-measurement" data-measurement="${measKind}" class="xm-est">${measWord}</span>` : ''}`;
+  const sessionDur = machine.powerSession && typeof machine.powerSession.duration === 'number' ? `${machine.powerSession.duration}s` : '';
+  const sessionSpan = sessionDur
+    ? `<span data-testid="xmachines-power-session">${escapeHtml(sessionDur)}</span> <span data-testid="xmachines-power-session-provenance">${escapeHtml(machine.powerSession && machine.powerSession.provenance != null ? machine.powerSession.provenance : '')}</span>`
+    : `<span data-testid="xmachines-power-session">unknown</span>`;
+  const onHours = machine.sampledOnHours && typeof machine.sampledOnHours.hours === 'number' ? `${machine.sampledOnHours.hours} h` : '';
+  const onHoursSpan = onHours
+    ? `<span data-testid="xmachines-on-hours">${escapeHtml(onHours)}</span> <span data-testid="xmachines-on-hours-provenance">${escapeHtml(machine.sampledOnHours && machine.sampledOnHours.label != null ? machine.sampledOnHours.label : 'estimated')}</span>`
+    : '';
+  const guardNote = offline
+    ? `<div class="xm-guard info"><span class="ic">↻</span><span>Machine is off. Turning it on sends a Wake-on-LAN packet; xmac waits for it to answer.</span></div>`
+    : (machine.busy && machine.busy.isBusy
+      ? `<div class="xm-guard"><span class="ic">⛔</span><span><b>Busy.</b> ${escapeHtml(machine.busy.refusalExplanation || 'machine is serving work')} — a normal power-off is blocked; Force asks for confirmation first.</span></div>`
+      : `<div class="xm-guard info"><span class="ic">✓</span><span>xmac checks the lease, live busy state, and wake-origin before it powers a machine off.</span></div>`);
+  const powerSection = `<div class="xm-sec"><h2>Power &amp; control</h2>`
+    + `<div class="xm-power-hero"><div class="xm-pstate">${statePill}<span class="xm-psub">${offline ? 'powered off' : 'up '}${uptimeHook}</span></div>`
+    + `<div class="xm-draw"><div class="n">${drawHook}</div><div class="lab">current draw</div></div></div>`
+    + `<div class="xm-controls">${offButton}${forceButton}</div>`
+    + guardNote
+    + `<div class="xm-kv" style="margin-top:12px"><span class="k">Power session</span><span class="v">${sessionSpan}</span></div>`
+    + (onHoursSpan ? `<div class="xm-kv"><span class="k">On-hours</span><span class="v">${onHoursSpan}</span></div>` : '')
+    + `${challengeBlock}${forceRefusalBlock}${renderNormalOffRefusal(payload && payload.offRefusal)}`
+    + powerStateHook
+    + `</div>`;
+
+  // thermals (online only)
+  const cpuVal = typeof machine.cpuTemp === 'number' && Number.isFinite(machine.cpuTemp) ? `${machine.cpuTemp}°C` : '';
+  const ambientVal = typeof machine.ambientTemp === 'number' ? `${machine.ambientTemp}°C` : '';
+  const thermalsSection = offline ? '' : `<div class="xm-sec"><h2>Thermals</h2><div class="xm-metrics three">`
+    + `<div class="xm-m"><span class="k">CPU</span><span class="v xm-tval ${tempClassOf(machine.cpuTemp)}">${cpuVal ? `<span data-testid="xmachines-cpu-temp">${escapeHtml(cpuVal)}</span>` : '—'}</span></div>`
+    + `<div class="xm-m"><span class="k">Hottest</span><span class="v xm-tval ${tempClassOf(machine.gpuTemp)}"><span data-testid="xmachines-gpu-temp"${staleStyle}>${escapeHtml(tempVal)}</span></span></div>`
+    + `<div class="xm-m"><span class="k">Ambient ≈</span><span class="v xm-tval ${tempClassOf(machine.ambientTemp)}">${ambientVal || '—'}</span></div>`
+    + `</div>${simpleSev === 'hot' ? '<div class="xm-guard"><span class="ic">🔥</span><span><b>Hot.</b> A sensor is in the alert band — fans are being driven up.</span></div>' : ''}</div>`;
+
+  // gpus
+  const gpuSection = (gpuRowHtml || gpuBanner)
+    ? `<div class="xm-sec"><h2>GPUs${gpuRowHtml ? ` <span class="xm-badge xm-pill norm" style="font-size:10px">self-detected</span>` : ''}</h2>${gpuBanner}${gpuRowHtml}</div>`
+    : '';
+
+  // fans (online only)
+  const fanRpmText = Array.isArray(machine.fanRpm) && machine.fanRpm.length ? machine.fanRpm.join(', ') : '';
+  const fansSection = offline ? '' : `<div class="xm-sec"><h2>Fans</h2>`
+    + (fanRpmText
+      ? `<div class="xm-kv"><span class="k">Fan RPM</span><span class="v"><span data-testid="xmachines-fan-rpm">${escapeHtml(fanRpmText)}</span></span></div>`
+      : `<span class="xm-na">no fan data reported</span>`)
+    + `</div>`;
+
+  // storage / ups (keep class-based panels exactly; show only for storage boxes
+  // or machines with a real UPS, so plain GPU nodes don't show an empty panel)
+  const upsHasData = !!(ups && (ups.batteryChargePct != null || ups.loadPct != null || ups.runtimeSeconds != null));
+  const storageSection = (disks.length > 0 || filesystems.length > 0 || upsHasData)
+    ? `<div class="xm-sec"><h2>Storage &amp; UPS</h2>${hddPanel}${upsHasData ? upsPanel : ''}</div>`
+    : '';
+
+  // history charts with range tabs (online only)
+  const range = payload && payload._historyRange && XM_RANGES[payload._historyRange] ? payload._historyRange : '1h';
+  const rc = XM_RANGES[range];
+  const hist = payload && payload._history ? payload._history : {};
+  const powerVals = seriesValues(hist.power);
+  const tempVals = seriesValues(hist.temperature);
+  const chartHot = typeof machine.gpuTemp === 'number' && machine.gpuTemp >= 80;
+  const rangeTabs = Object.keys(XM_RANGES).map((k) => `<button type="button" data-action="range" data-range="${k}" class="${k === range ? 'active' : ''}">${XM_RANGES[k].label}</button>`).join('');
+  const historySection = offline ? '' : `<div class="xm-sec" id="xm-hist"><h2>History<span class="xm-rangetabs" style="margin-left:auto">${rangeTabs}</span></h2>`
+    + `<div class="xm-chart-block"><div class="ctitle"><span>Power draw · watts</span>${powerVal ? `<b>now ${escapeHtml(powerVal)}</b>` : ''}</div>${lineChart(powerVals, 'W', false, rc.x)}</div>`
+    + `<div class="xm-chart-block" style="margin-top:18px"><div class="ctitle"><span>Hottest temp · °C</span>${tempVal ? `<b>now ${escapeHtml(tempVal)}</b>` : ''}</div>${lineChart(tempVals, '°C', chartHot, rc.x)}</div>`
+    + `</div>`;
+
+  // energy & cost (keep exact cost hooks)
+  const costSection = `<div class="xm-sec"><h2>Energy &amp; cost</h2>`
+    + `<div class="xm-kv"><span class="k">Integrated</span><span class="v"><p data-testid="xmachines-cost-kwh" aria-label="Integrated kilowatt hours" style="margin:0">${kwhAmount} kWh</p></span></div>`
+    + `<div class="xm-kv"><span class="k">Cost</span><span class="v"><p data-testid="xmachines-cost-php" aria-label="Energy cost in PHP" style="margin:0">PHP ${phpAmount}</p></span></div>`
+    + `<div class="xm-kv"><span class="k">Tariff</span><span class="v" style="font-weight:400"><p data-testid="xmachines-tariff-flag" aria-label="${flagAria}" style="margin:0">${flag}</p></span></div>`
+    + `<div class="xm-kv"><span class="k">Note</span><span class="v" style="font-weight:400;font-size:12px"><p data-testid="xmachines-cost-caveat" aria-label="Short burst caveat" style="margin:0">${caveat}</p></span></div>`
+    + `</div>`;
+
+  const wolBlock = renderWolSafety(payload && payload.wolSafety);
+  const wolSection = wolBlock ? `<div class="xm-sec"><h2>Wake-on-LAN safety</h2>${wolBlock}</div>` : '';
+
+  // data & freshness
+  const provText = typeof machine.provenance === 'string' ? machine.provenance : '';
+  const freshText = typeof machine.freshness === 'string' ? machine.freshness : '';
+  const ageText = typeof machine.sampleAge === 'string' ? machine.sampleAge : '';
+  const busyOut = machine.busy && typeof machine.busy.busyCheckOutput === 'string' ? machine.busy.busyCheckOutput : '';
+  const leasesText = machine.busy && Array.isArray(machine.busy.leaseNames) && machine.busy.leaseNames.length ? machine.busy.leaseNames.join(', ') : '';
+  const dataSection = `<div class="xm-sec"><h2>Data &amp; freshness</h2>`
+    + (freshText ? `<div class="xm-kv"><span class="k">Freshness</span><span class="v"><span data-testid="xmachines-freshness">${escapeHtml(freshText)}</span></span></div>` : '')
+    + (provText ? `<div class="xm-kv"><span class="k">Provenance</span><span class="v"><span data-testid="xmachines-provenance" data-provenance>${escapeHtml(provText)}</span></span></div>` : '')
+    + (ageText && !offline ? `<div class="xm-kv"><span class="k">Sample age</span><span class="v"><span data-testid="xmachines-sample-age" data-sample-age>${escapeHtml(ageText)}</span></span></div>` : '')
+    + (busyOut ? `<div class="xm-kv"><span class="k">Busy check</span><span class="v" style="font-weight:400;font-size:12px"><span data-testid="xmachines-busy">${escapeHtml(busyOut)}</span></span></div>` : '')
+    + (leasesText ? `<div class="xm-kv"><span class="k">Leases</span><span class="v"><span data-testid="xmachines-leases">${escapeHtml(leasesText)}</span></span></div>` : '')
+    + `<div class="xm-kv"><span class="k">Machine ID</span><span class="v">${name}</span></div>`
+    + `</div>`;
+
+  const offlinePanel = offline
+    ? `<div class="xm-sec"><div class="xm-offline"><span class="big">🌙</span><span class="t">Machine is powered off</span><span>Telemetry pauses while off. Turn it on above to see live GPU, thermal &amp; fan detail.</span></div></div>`
+    : '';
+
+  return `<section class="xm-detail" data-testid="xmachines-machine-detail" role="region" aria-label="Machine detail">`
+    + header
+    + powerSection
+    + offlinePanel
+    + thermalsSection
+    + gpuSection
+    + fansSection
+    + storageSection
+    + historySection
+    + costSection
+    + wolSection
+    + dataSection
+    + `</section>`;
 }
 
 function defaultIdempotencyKey() {
