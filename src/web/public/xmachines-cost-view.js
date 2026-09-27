@@ -292,7 +292,8 @@ export function renderMachineCostDetail(payload) {
     const memory = escapeHtml(row.memory ?? '');
     const util = escapeHtml(row.utilization ?? '');
     const fan = escapeHtml(row.fan ?? '');
-    return `<div class="gpu-row" data-testid="xmachines-gpu-row" data-gpu-uuid="${uuid}"><span data-testid="xmachines-gpu-name">${gpuName}</span><span data-testid="xmachines-gpu-chip" role="status">${chip}</span><span data-testid="xmachines-gpu-util">${util}</span><span data-testid="xmachines-gpu-vram">${memory}</span><span data-testid="xmachines-gpu-temp">${temp}</span><span data-testid="xmachines-gpu-power">${power}</span><span data-testid="xmachines-gpu-fan">${fan}</span></div>`;
+    const sampleTime = escapeHtml(row.sampleTime ?? '');
+    return `<div class="gpu-row" data-testid="xmachines-gpu-row" data-gpu-uuid="${uuid}" data-sample-time="${sampleTime}"><span data-testid="xmachines-gpu-name">${gpuName}</span><span data-testid="xmachines-gpu-chip" role="status">${chip}</span><span data-testid="xmachines-gpu-util">${util}</span><span data-testid="xmachines-gpu-vram">${memory}</span><span data-testid="xmachines-gpu-temp">${temp}</span><span data-testid="xmachines-gpu-power">${power}</span><span data-testid="xmachines-gpu-fan">${fan}</span></div>`;
   }).join('');
   const challenge = payload && payload.forceChallenge;
   const confirmationText = typeof payload?.forceConfirmation === 'string' ? payload.forceConfirmation : '';

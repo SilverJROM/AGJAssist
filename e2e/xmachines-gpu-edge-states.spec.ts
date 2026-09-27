@@ -354,7 +354,7 @@ test.describe('D13 GPU edge states from the production read route', () => {
       const rows = opened.payload?.gpuRows ?? [];
       expect(rows).toHaveLength(3);
       const byUuid = Object.fromEntries(rows.map((row) => [row.uuid, row]));
-      expect(byUuid[LIVE_UUID]).toEqual({
+      expect(byUuid[LIVE_UUID]).toMatchObject({
         uuid: LIVE_UUID,
         name: LIVE_NAME,
         chip: '',
@@ -364,7 +364,7 @@ test.describe('D13 GPU edge states from the production read route', () => {
         utilization: '41%',
         fan: '55%',
       });
-      expect(byUuid[NA_UUID]).toEqual({
+      expect(byUuid[NA_UUID]).toMatchObject({
         uuid: NA_UUID,
         name: NA_NAME,
         chip: '',
@@ -374,7 +374,7 @@ test.describe('D13 GPU edge states from the production read route', () => {
         utilization: '37%',
         fan: '45%',
       });
-      expect(byUuid[OTHER_UUID]).toEqual({
+      expect(byUuid[OTHER_UUID]).toMatchObject({
         uuid: OTHER_UUID,
         name: OTHER_NAME,
         chip: 'non-nvidia',
@@ -420,7 +420,7 @@ test.describe('D13 GPU edge states from the production read route', () => {
         gpuState: 'driver-timeout',
         gpuChip: 'error-timeout',
       });
-      expect(opened.payload?.gpuRows).toEqual([{
+      expect(opened.payload?.gpuRows).toMatchObject([{
         uuid: TIMEOUT_UUID,
         name: TIMEOUT_NAME,
         chip: 'error-timeout',
@@ -460,6 +460,42 @@ test.describe('D13 GPU edge states from the production read route', () => {
     }
   });
 
+  // Drives the zero-readings arm directly: nvidia-smi exits 0 with no CSV line
+  // at all (not a timeout, not the no-NVIDIA stderr pattern), so byUuid is
+  // empty for a reason other than either named failure. With a stored
+  // inventory on file, that must fall back to it rather than report "no GPUs".
+  // Runs before the next test, which permanently ages this machine's stored
+  // sample forward — order matters here.
+  test('falls back to the stored sample when a poll succeeds with zero rows', async ({ browser }) => {
+    const csvPath = path.join(scratch.gpuDir, `${STALE_MACHINE}.csv`);
+    const originalCsv = fs.readFileSync(csvPath, 'utf8');
+    fs.writeFileSync(csvPath, '');
+    const opened = await openDetail(browser, proxy.base, STALE_MACHINE, scratch.gpuDir);
+    try {
+      expect(opened.payload, server.stderr()).toMatchObject({
+        gpuState: 'stale',
+        gpuChip: 'stale',
+      });
+      expect(opened.payload?.gpuRows).toMatchObject([{
+        uuid: STALE_UUID,
+        name: STALE_NAME,
+        chip: 'stale',
+        power: '95.2 W',
+        temperature: '44 C',
+        memory: '1024/24576 MiB',
+        utilization: '10%',
+        fan: '30%',
+      }]);
+      expect(opened.payload?.gpuRows?.[0]?.sampleTime).toBe(STALE_AT);
+      const row = opened.page.locator(`[data-testid="xmachines-gpu-row"][data-gpu-uuid="${STALE_UUID}"]`);
+      await expect(row.locator('[data-testid="xmachines-gpu-chip"]')).toHaveText('stale');
+      await expect(row).toHaveAttribute('data-sample-time', STALE_AT);
+    } finally {
+      await opened.close();
+      fs.writeFileSync(csvPath, originalCsv);
+    }
+  });
+
   // A poll that just succeeded is the current truth, however old the sample it
   // replaces was: this machine's prior stored reading was seeded at STALE_AT
   // (2020), but its nvidia-smi still answers, so the view read must show fresh
@@ -472,7 +508,7 @@ test.describe('D13 GPU edge states from the production read route', () => {
         gpuState: 'live',
         gpuChip: '',
       });
-      expect(opened.payload?.gpuRows).toEqual([{
+      expect(opened.payload?.gpuRows).toMatchObject([{
         uuid: STALE_UUID,
         name: STALE_NAME,
         chip: '',
@@ -482,12 +518,18 @@ test.describe('D13 GPU edge states from the production read route', () => {
         utilization: '10%',
         fan: '30%',
       }]);
+      // The discriminator that must not be chip-text-only (D13 correction
+      // finding 3): even though the fresh poll returns the same numbers as
+      // the 2020 seed, the sample time it renders with must have moved on.
+      expect(opened.payload?.gpuRows?.[0]?.sampleTime).not.toBe(STALE_AT);
       const row = opened.page.locator(`[data-testid="xmachines-gpu-row"][data-gpu-uuid="${STALE_UUID}"]`);
       await expect(row.locator('[data-testid="xmachines-gpu-name"]')).toHaveText(STALE_NAME);
       await expect(row.locator('[data-testid="xmachines-gpu-temp"]')).toHaveText('44 C');
       await expect(row.locator('[data-testid="xmachines-gpu-power"]')).toHaveText('95.2 W');
       await expect(row.locator('[data-testid="xmachines-gpu-chip"]')).not.toHaveText('stale');
       await expect(row.locator('[data-testid="xmachines-gpu-chip"]')).not.toHaveText('error-timeout');
+      const sampleTimeAttr = await row.getAttribute('data-sample-time');
+      expect(sampleTimeAttr).not.toBe(STALE_AT);
     } finally {
       await opened.close();
     }

@@ -25,6 +25,10 @@ export interface GpuApiRow {
   memory: string;
   utilization: string;
   fan: string;
+  // ISO time of the sample this row renders: request.nowIso on a fresh poll,
+  // the stored row's own sample_time otherwise. The one rendered value that
+  // tells a caller "live" and "stale" apart independently of chip text.
+  sampleTime: string;
 }
 
 export interface GpuTelemetrySurface {
@@ -33,6 +37,10 @@ export interface GpuTelemetrySurface {
   apiRows: GpuApiRow[];
   html: string;
 }
+
+// Metric fields, before renderSurface attaches the sample time each row
+// actually rendered with.
+type GpuMetricRow = Omit<GpuApiRow, 'sampleTime'>;
 
 interface StoredSample {
   gpu_uuid: string;
@@ -98,7 +106,7 @@ function renderSurface(
   machine: string,
   state: GpuTelemetrySurface['state'],
   chip: string,
-  rows: GpuApiRow[],
+  rows: GpuMetricRow[],
   lastGood: boolean,
   sampleTimes: readonly string[],
 ): GpuTelemetrySurface {
@@ -110,10 +118,11 @@ function renderSurface(
     ? `<span class="chip" role="status">${escapeHtml(chip)}</span>`
     : '';
   const html = `<div class="gpu-telemetry" data-machine="${escapeHtml(machine)}" data-state="${state}" data-chip="${escapeHtml(chip)}">${banner}${rowHtml}</div>`;
-  return { state, chip, apiRows: rows, html };
+  const apiRows = rows.map((row, index) => ({ ...row, sampleTime: sampleTimes[index] ?? '' }));
+  return { state, chip, apiRows, html };
 }
 
-function rowFromReading(reading: GpuReading): GpuApiRow {
+function rowFromReading(reading: GpuReading): GpuMetricRow {
   if (isNonNvidiaName(reading.name)) {
     return {
       uuid: reading.uuid,
@@ -150,7 +159,7 @@ function storedMemory(row: StoredSample, blank: string): string {
   return displayNumber(used, 'MiB', blank);
 }
 
-function rowFromStored(row: StoredSample, chip: string): GpuApiRow {
+function rowFromStored(row: StoredSample, chip: string): GpuMetricRow {
   const blank = isNonNvidiaName(row.gpu_name ?? '') ? 'not-applicable' : 'unavailable';
   return {
     uuid: row.gpu_uuid,
@@ -279,6 +288,11 @@ export function loadGpuTelemetryRows(
   }
   const readings = Object.values(polled.byUuid);
   if (readings.length === 0) {
+    const priorInventory = latestSamples(db, request.machine)
+      .filter((row) => row.gpu_uuid !== GPU_POLL_MARKER_UUID);
+    if (priorInventory.length > 0) {
+      return renderStored(db, request, 'read');
+    }
     return renderSurface(request.machine, 'empty', 'no GPUs', [], false, []);
   }
   // A poll that just succeeded is the current truth for this machine right
