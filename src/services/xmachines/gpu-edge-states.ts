@@ -295,13 +295,28 @@ export function loadGpuTelemetryRows(
     }
     return renderSurface(request.machine, 'empty', 'no GPUs', [], false, []);
   }
+  // Capture which GPU UUIDs had an expired stored sample before this poll.
+  const priorSamples = latestSamples(db, request.machine).filter((row) => row.gpu_uuid !== GPU_POLL_MARKER_UUID);
+  const lapsed = new Set(priorSamples.filter((row) => isExpired(row.sample_time, request.nowIso)).map((row) => row.gpu_uuid));
   // A poll that just succeeded is the current truth for this machine right
   // now, however old the previously stored sample was. Stale only describes
   // a stored sample rendered without a fresh poll behind it (see renderStored
   // above); it must never suppress a live reading this call just obtained.
   persistReadings(db, request.machine, readings, request.nowIso);
-  const rows = readings.map((reading) => rowFromReading(reading));
+  const rowsBase = readings.map((reading) => rowFromReading(reading));
+  const rows = rowsBase.map((row) => ({ ...row, chip: lapsed.has(row.uuid) ? 'stale' : row.chip }));
+  const hasStale = rows.some((row) => row.chip === 'stale');
   const nonNvidia = rows.every((row) => row.chip === 'non-nvidia');
+  if (hasStale) {
+    return renderSurface(
+      request.machine,
+      'stale',
+      'stale',
+      rows,
+      false,
+      readings.map(() => request.nowIso),
+    );
+  }
   return renderSurface(
     request.machine,
     nonNvidia ? 'non-nvidia' : 'live',

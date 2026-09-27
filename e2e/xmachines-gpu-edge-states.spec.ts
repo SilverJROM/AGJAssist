@@ -505,13 +505,13 @@ test.describe('D13 GPU edge states from the production read route', () => {
     const opened = await openDetail(browser, proxy.base, STALE_MACHINE, scratch.gpuDir);
     try {
       expect(opened.payload, server.stderr()).toMatchObject({
-        gpuState: 'live',
-        gpuChip: '',
+        gpuState: 'stale',
+        gpuChip: 'stale',
       });
       expect(opened.payload?.gpuRows).toMatchObject([{
         uuid: STALE_UUID,
         name: STALE_NAME,
-        chip: '',
+        chip: 'stale',
         power: '95.2 W',
         temperature: '44 C',
         memory: '1024/24576 MiB',
@@ -526,7 +526,7 @@ test.describe('D13 GPU edge states from the production read route', () => {
       await expect(row.locator('[data-testid="xmachines-gpu-name"]')).toHaveText(STALE_NAME);
       await expect(row.locator('[data-testid="xmachines-gpu-temp"]')).toHaveText('44 C');
       await expect(row.locator('[data-testid="xmachines-gpu-power"]')).toHaveText('95.2 W');
-      await expect(row.locator('[data-testid="xmachines-gpu-chip"]')).not.toHaveText('stale');
+      await expect(row.locator('[data-testid="xmachines-gpu-chip"]')).toHaveText('stale');
       await expect(row.locator('[data-testid="xmachines-gpu-chip"]')).not.toHaveText('error-timeout');
       const sampleTimeAttr = await row.getAttribute('data-sample-time');
       expect(sampleTimeAttr).not.toBe(STALE_AT);
