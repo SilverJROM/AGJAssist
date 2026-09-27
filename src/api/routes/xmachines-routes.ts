@@ -711,9 +711,13 @@ export function registerXmachinesRoutes(
     const wolSafety = evidence ? presentWolSafety(evidence) : null;
     const nowIso = new Date().toISOString();
     const roleHint = (machine.roleHint ?? '') as string;
-    // live poll on read for timeout/no-NVIDIA detection; sampler marker remains fallback for non-viewed machines.
-    const gpuSurface = db
-      ? loadGpuTelemetryRows(db as any, { machine: request.params.name, roleHint, nowIso, refresh: true })
+    // Live poll on read so a timeout or no-NVIDIA answer is visible. The
+    // service needs the raw driver: DatabaseService.transaction drops the
+    // row list that reconcileGpuIdentities passes in. Sampler markers remain
+    // the fallback for machines nobody is viewing.
+    const sqlite = metricDatabase(db);
+    const gpuSurface = sqlite
+      ? loadGpuTelemetryRows(sqlite, { machine: request.params.name, roleHint, nowIso, refresh: true })
       : null;
     const gpuRows = gpuSurface ? gpuSurface.apiRows : [];
     const panel = renderHddDiskPanel(runtime.telemetry, request.params.name);

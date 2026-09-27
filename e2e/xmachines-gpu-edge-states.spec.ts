@@ -41,7 +41,7 @@ const STALE_CSV = `${STALE_UUID}, ${STALE_NAME}, 10, 1024, 24576, 44, 95.2, 30\n
 
 const MACHINES = [ROWS_MACHINE, TIMEOUT_MACHINE, NONE_MACHINE, STALE_MACHINE];
 
-type Scratch = { dir: string; env: NodeJS.ProcessEnv };
+type Scratch = { dir: string; gpuDir: string; env: NodeJS.ProcessEnv };
 type Server = { child: ChildProcessWithoutNullStreams; port: number; stderr: () => string };
 type GpuPayload = {
   gpuRows?: Array<Record<string, string>>;
@@ -53,26 +53,39 @@ function statusText(names: string[]): string {
   return names.map((name, index) => `${name}  192.0.2.${20 + index}  UP  leases=()  compute`).join('\n') + '\n';
 }
 
+function viewing(gpuDir: string, machine: string): void {
+  fs.writeFileSync(path.join(gpuDir, 'current'), `${machine}\n`);
+}
+
 function newScratch(): Scratch {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'd13-gpu-edge-'));
   const bin = path.join(dir, 'bin');
+  const gpuDir = path.join(dir, 'gpu');
   const stateDir = path.join(dir, 'xmac-state');
   fs.mkdirSync(bin);
+  fs.mkdirSync(gpuDir);
   fs.mkdirSync(stateDir, { recursive: true });
-  const modePath = path.join(dir, 'gpu-mode');
-  const stdoutPath = path.join(dir, 'gpu-stdout');
   const statusPath = path.join(dir, 'status.txt');
   const confPath = path.join(dir, 'machines.conf');
   const metricsPath = path.join(dir, 'metrics.json');
-  const rowsPath = path.join(dir, 'rows.csv');
-  const timeoutPath = path.join(dir, 'timeout.csv');
-  const stalePath = path.join(dir, 'stale.csv');
   const dbPath = path.join(dir, 'edge.sqlite');
-  fs.writeFileSync(modePath, 'live');
-  fs.writeFileSync(stdoutPath, '');
-  fs.writeFileSync(rowsPath, ROWS_CSV);
-  fs.writeFileSync(timeoutPath, TIMEOUT_CSV);
-  fs.writeFileSync(stalePath, STALE_CSV);
+  const csvByMachine: Record<string, string> = {
+    [ROWS_MACHINE]: ROWS_CSV,
+    [TIMEOUT_MACHINE]: TIMEOUT_CSV,
+    [NONE_MACHINE]: '',
+    [STALE_MACHINE]: STALE_CSV,
+  };
+  const modeByMachine: Record<string, string> = {
+    [ROWS_MACHINE]: 'live',
+    [TIMEOUT_MACHINE]: 'live',
+    [NONE_MACHINE]: 'none',
+    [STALE_MACHINE]: 'live',
+  };
+  for (const name of MACHINES) {
+    fs.writeFileSync(path.join(gpuDir, `${name}.csv`), csvByMachine[name]);
+    fs.writeFileSync(path.join(gpuDir, `${name}.mode`), `${modeByMachine[name]}\n`);
+  }
+  viewing(gpuDir, ROWS_MACHINE);
   fs.writeFileSync(statusPath, statusText(MACHINES));
   fs.writeFileSync(confPath, MACHINES.map((name, index) => (
     `${name}|192.0.2.${20 + index}|02:00:00:00:00:${(index + 1).toString(16).padStart(2, '0')}|agjrom|compute|true`
@@ -89,8 +102,12 @@ function newScratch(): Scratch {
   for (const name of ['ping', 'wakeonlan', 'xmac.sh', 'xmac', 'ssh']) {
     fs.writeFileSync(path.join(bin, name), '#!/bin/bash\nexit 0\n', { mode: 0o755 });
   }
+  // One stand-in for every machine. queryMachineGpus does not pass the host,
+  // so the file `current` names the machine whose mode and csv to answer.
   const nvidia = `#!/bin/bash
-MODE=$(cat ${JSON.stringify(modePath)})
+DIR=${JSON.stringify(gpuDir)}
+M="$(cat "$DIR/current" 2>/dev/null || true)"
+MODE="$(cat "$DIR/$M.mode" 2>/dev/null || echo live)"
 if [ "$MODE" = "timeout" ]; then
   kill -TERM $$
 fi
@@ -98,7 +115,7 @@ if [ "$MODE" = "none" ]; then
   echo "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running." >&2
   exit 1
 fi
-cat ${JSON.stringify(stdoutPath)}
+cat "$DIR/$M.csv" 2>/dev/null || true
 exit 0
 `;
   fs.writeFileSync(path.join(bin, 'nvidia-smi'), nvidia, { mode: 0o755 });
@@ -112,11 +129,7 @@ exit 0
     D13_OWNER_TOKEN: OWNER_TOKEN,
     D13_DB_PATH: dbPath,
     D13_STATUS_PATH: statusPath,
-    D13_GPU_MODE: modePath,
-    D13_GPU_STDOUT: stdoutPath,
-    D13_ROWS_CSV: rowsPath,
-    D13_TIMEOUT_CSV: timeoutPath,
-    D13_STALE_CSV: stalePath,
+    D13_GPU_DIR: gpuDir,
     D13_STALE_AT: STALE_AT,
     D13_ROWS_MACHINE: ROWS_MACHINE,
     D13_TIMEOUT_MACHINE: TIMEOUT_MACHINE,
@@ -127,7 +140,7 @@ exit 0
   delete env.XMACHINES_OBSERVED_FLEET;
   delete env.XMACHINES_USE_REGISTRY;
   delete env.XMACHINES_PROTECTED_FIXTURE_DIR;
-  return { dir, env };
+  return { dir, gpuDir, env };
 }
 
 const SERVER_CHILD = `
@@ -140,8 +153,7 @@ import { resolveXmachinesRuntime } from '__SRC__/services/xmachines/runtime.js';
 
 const OWNER_TOKEN = process.env.D13_OWNER_TOKEN;
 const statusPath = process.env.D13_STATUS_PATH;
-const modePath = process.env.D13_GPU_MODE;
-const stdoutPath = process.env.D13_GPU_STDOUT;
+const gpuDir = process.env.D13_GPU_DIR;
 const machines = {
   rows: process.env.D13_ROWS_MACHINE,
   timeout: process.env.D13_TIMEOUT_MACHINE,
@@ -159,31 +171,29 @@ function writeStatus(names) {
   const text = names.map((name) => name + '  ' + ips[name] + '  UP  leases=()  compute').join('\\n') + '\\n';
   fs.writeFileSync(statusPath, text);
 }
-function writeMode(mode) { fs.writeFileSync(modePath, mode); }
-function writeStdout(file) { fs.copyFileSync(file, stdoutPath); }
+function writeCurrent(name) { fs.writeFileSync(gpuDir + '/current', name + '\\n'); }
+function writeMode(name, mode) { fs.writeFileSync(gpuDir + '/' + name + '.mode', mode + '\\n'); }
 
 const db = new DatabaseService(process.env.D13_DB_PATH);
 const runtime = resolveXmachinesRuntime(process.env);
 runtime.telemetry.useReaderStore(db.raw);
 
 writeStatus([machines.rows]);
-writeMode('live');
-writeStdout(process.env.D13_ROWS_CSV);
+writeCurrent(machines.rows);
 sampleFleet(process.env, runtime);
 
 writeStatus([machines.timeout]);
-writeMode('live');
-writeStdout(process.env.D13_TIMEOUT_CSV);
+writeCurrent(machines.timeout);
+writeMode(machines.timeout, 'live');
 sampleFleet(process.env, runtime);
-writeMode('timeout');
+writeMode(machines.timeout, 'timeout');
 sampleFleet(process.env, runtime);
 
 writeStatus([machines.none]);
-writeMode('none');
+writeCurrent(machines.none);
 sampleFleet(process.env, runtime);
 
-writeMode('live');
-writeStdout(process.env.D13_STALE_CSV);
+writeCurrent(machines.stale);
 loadGpuTelemetryRows(db.raw, {
   machine: machines.stale,
   roleHint: 'compute',
@@ -192,6 +202,7 @@ loadGpuTelemetryRows(db.raw, {
 });
 
 writeStatus([machines.rows, machines.timeout, machines.none, machines.stale]);
+writeCurrent(machines.rows);
 
 const config = {
   telegram: { botToken: '123:ABC', authorizedUserId: 1, authorizedChatIds: [1], testMode: true, updateMode: 'polling', webhookUrl: null, webhookPath: '/api/telegram/webhook', webhookSecretToken: 's' },
@@ -266,13 +277,21 @@ async function startProxy(targetPort: number): Promise<{ base: string; close: ()
   };
 }
 
-async function openDetail(browser: Browser, base: string, machine: string): Promise<{ page: Page; payload: GpuPayload | null; close: () => Promise<void> }> {
+async function openDetail(browser: Browser, base: string, machine: string, gpuDir: string): Promise<{ page: Page; payload: GpuPayload | null; close: () => Promise<void> }> {
+  viewing(gpuDir, machine);
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   let payload: GpuPayload | null = null;
+  let apiStatus = 0;
+  let apiBody = '';
   page.on('response', async (response) => {
     if (!new RegExp(`/api/xmachines/machines/${machine}(?:\\?|$)`).test(response.url())) return;
-    try { payload = await response.json() as GpuPayload; } catch { /* non-json */ }
+    apiStatus = response.status();
+    try {
+      const text = await response.text();
+      apiBody = text.slice(0, 600);
+      payload = JSON.parse(text) as GpuPayload;
+    } catch { /* non-json */ }
   });
   await page.route(/telegram-web-app\.js|cdn\.jsdelivr\.net\/npm\/xterm/, (route) => route.fulfill({
     status: 200,
@@ -297,7 +316,11 @@ async function openDetail(browser: Browser, base: string, machine: string): Prom
     localStorage.setItem('agj_user', JSON.stringify({ id: 1, name: 'owner', username: 'owner', role: 'owner' }));
   }, OWNER_TOKEN);
   await page.goto(`${base}/index.html#/xmachines/${machine}`, { waitUntil: 'domcontentloaded' });
-  await page.locator('[data-testid="xmachines-machine-detail"]').waitFor({ timeout: 20_000 });
+  try {
+    await page.locator('[data-testid="xmachines-machine-detail"]').waitFor({ timeout: 20_000 });
+  } catch (error) {
+    throw new Error(`detail for ${machine} did not render (HTTP ${apiStatus} ${apiBody}): ${error instanceof Error ? error.message : error}`);
+  }
   const deadline = Date.now() + 5_000;
   while (payload === null && Date.now() < deadline) {
     await page.waitForTimeout(50);
@@ -325,7 +348,7 @@ test.describe('D13 GPU edge states from the production read route', () => {
   });
 
   test('renders one row per GPU UUID, unavailable power, and a non-NVIDIA device', async ({ browser }) => {
-    const opened = await openDetail(browser, proxy.base, ROWS_MACHINE);
+    const opened = await openDetail(browser, proxy.base, ROWS_MACHINE, scratch.gpuDir);
     try {
       expect(opened.payload, server.stderr()).toMatchObject({ gpuState: 'live' });
       const rows = opened.payload?.gpuRows ?? [];
@@ -391,7 +414,7 @@ test.describe('D13 GPU edge states from the production read route', () => {
   });
 
   test('renders last-good metrics with a driver-timeout chip', async ({ browser }) => {
-    const opened = await openDetail(browser, proxy.base, TIMEOUT_MACHINE);
+    const opened = await openDetail(browser, proxy.base, TIMEOUT_MACHINE, scratch.gpuDir);
     try {
       expect(opened.payload, server.stderr()).toMatchObject({
         gpuState: 'driver-timeout',
@@ -420,7 +443,7 @@ test.describe('D13 GPU edge states from the production read route', () => {
   });
 
   test('renders a no-NVIDIA banner and no GPU rows', async ({ browser }) => {
-    const opened = await openDetail(browser, proxy.base, NONE_MACHINE);
+    const opened = await openDetail(browser, proxy.base, NONE_MACHINE, scratch.gpuDir);
     try {
       expect(opened.payload, server.stderr()).toMatchObject({
         gpuState: 'no-nvidia',
@@ -438,7 +461,7 @@ test.describe('D13 GPU edge states from the production read route', () => {
   });
 
   test('renders a stale row from a stored sample without polling again', async ({ browser }) => {
-    const opened = await openDetail(browser, proxy.base, STALE_MACHINE);
+    const opened = await openDetail(browser, proxy.base, STALE_MACHINE, scratch.gpuDir);
     try {
       expect(opened.payload, server.stderr()).toMatchObject({
         gpuState: 'stale',
