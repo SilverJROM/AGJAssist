@@ -179,6 +179,7 @@ describe("xmachines read routes C1", () => {
           provenance: "collector-cli",
           sampleAge: "41s",
           cpuTemp: 48,
+          boardTemp: 39,
         },
         slate: {
           gpuTempsC: [61, 73],
@@ -210,6 +211,8 @@ describe("xmachines read routes C1", () => {
       expect(quartz.state).toBe("up");
       expect(quartz.offline).toBe(false);
       expect(quartz.gpuTemp).toBe(73);
+      expect(quartz.gpuCount).toBe(2);
+      expect(quartz.gpusBusy).toBe(2);
       expect(quartz.powerWatts).toBe(187);
       expect(quartz.uptime).toBe("9d 4h 12m");
       expect(quartz.freshness).toBe("fresh");
@@ -269,6 +272,8 @@ describe("xmachines read routes C1", () => {
       expect(cards[0].textContent).toContain("up");
       expect(cards[0].textContent).not.toContain("offline");
       expect(cards[0].querySelector('[data-testid="xmachines-gpu-temp"]')?.textContent).toBe("73°C");
+      expect(cards[0].querySelector('[data-testid="xmachines-gpu-count"]')?.textContent).toBe("2/2");
+      expect(cards[0].querySelector('[data-testid="xmachines-box-temp"]')?.textContent).toBe("39°C");
       expect(cards[0].querySelector('[data-testid="xmachines-power-draw"]')?.textContent).toBe("187 W");
       expect(cards[0].querySelector('[data-testid="xmachines-uptime"]')?.textContent).toBe("9d 4h 12m");
       expect(cards[0].querySelector('[data-testid="xmachines-freshness"]')?.textContent).toBe("fresh");
@@ -280,6 +285,8 @@ describe("xmachines read routes C1", () => {
       expect(cards[1].textContent?.toLowerCase()).not.toContain("error");
       expect(cards[1].querySelector('[role="alert"]')).toBeNull();
       expect(cards[1].querySelector('[data-testid="xmachines-gpu-temp"]')).toBeNull();
+      expect(cards[1].querySelector('[data-testid="xmachines-gpu-count"]')).toBeNull();
+      expect(cards[1].querySelector('[data-testid="xmachines-box-temp"]')).toBeNull();
       expect(cards[1].querySelector('[data-testid="xmachines-power-draw"]')).toBeNull();
       expect(cards[1].querySelector('[data-testid="xmachines-uptime"]')).toBeNull();
       expect(cards[1].textContent).not.toContain("73");
@@ -292,6 +299,7 @@ describe("xmachines read routes C1", () => {
       const quartzDetail = quartzDoc.querySelector('[data-testid="xmachines-machine-detail"]');
       expect(quartzDetail?.querySelector('[data-testid="xmachines-power-state"]')?.textContent).toBe("up");
       expect(quartzDetail?.querySelector('[data-testid="xmachines-gpu-temp"]')?.textContent).toBe("73°C");
+      expect(quartzDetail?.querySelector('[data-testid="xmachines-board-temp"]')?.textContent).toBe("39°C");
       expect(quartzDetail?.querySelector('[data-testid="xmachines-power-draw"]')?.textContent).toBe("187 W");
       expect(quartzDetail?.querySelector('[data-testid="xmachines-uptime"]')?.textContent).toBe("9d 4h 12m");
       expect(quartzDetail?.querySelector('[data-testid="xmachines-freshness"]')?.textContent).toBe("fresh");

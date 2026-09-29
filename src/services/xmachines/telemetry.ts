@@ -29,7 +29,13 @@ export interface MachineTelemetry {
   host?: string;
   ip?: string;
   ambientTemp?: number;
+  cpuWatts?: number;
+  boardTemp?: number;
+  gpuCount?: number;
+  gpusBusy?: number;
   fanRpm?: number[];
+  fans?: Array<{ header?: string; dutyPct?: number | null; rpm?: number | null; mode?: string }>;
+  fancurveActive?: boolean;
   displayName?: string;
   powerSession?: { duration: number; provenance: string };
   sampledOnHours?: { hours: number; label: string };

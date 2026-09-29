@@ -8,6 +8,7 @@ export const AVAILABLE_BOTTOM_NAV_TABS = [
   { id: '/tasks', icon: '\u{2705}', label: 'Tasks' },
   { id: '/notes', icon: '\u{1F4DD}', label: 'Notes' },
   { id: '/terminals', icon: '\u{1F5A5}', label: 'Terminal' },
+  { id: '/xmachines', icon: '\u{26A1}', label: 'xMachines' },
   { id: '/settings', icon: '\u{2699}', label: 'Settings' }
 ];
 

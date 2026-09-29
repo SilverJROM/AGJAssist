@@ -3979,29 +3979,39 @@ body.tg-miniapp {
    teal accent + thermal semantics are the approved section identity.
    ============================================================ */
 .xmachines-view{
-  --xm-bg: var(--bg, #0c1016);
-  --xm-surface: var(--surface, #141a23);
-  --xm-surface-2: var(--surface-2, #1b222e);
-  --xm-surface-3: color-mix(in srgb, var(--surface, #141a23) 60%, var(--bg, #0c1016));
-  --xm-border: var(--border, #26303f);
-  --xm-border-strong: color-mix(in srgb, var(--border, #26303f) 55%, var(--text, #e7ecf3) 22%);
-  --xm-text: var(--text, #e7ecf3);
-  --xm-muted: var(--text-secondary, #98a4b4);
-  --xm-faint: color-mix(in srgb, var(--text-secondary, #98a4b4) 68%, transparent);
-  --xm-accent:#2bc0d4; --xm-accent-strong:#4fd0e2; --xm-accent-weak:color-mix(in srgb,#2bc0d4 18%,transparent); --xm-on-accent:#04222a;
-  --xm-ok:#31b877; --xm-ok-weak:color-mix(in srgb,#31b877 17%,transparent);
-  --xm-warn:#dd9e33; --xm-warn-weak:color-mix(in srgb,#dd9e33 17%,transparent);
-  --xm-hot:#f0685e; --xm-hot-weak:color-mix(in srgb,#f0685e 17%,transparent);
-  --xm-cool:#5aa0f2; --xm-cool-weak:color-mix(in srgb,#5aa0f2 17%,transparent);
-  --xm-off:#8b95a3; --xm-off-weak:color-mix(in srgb,#8b95a3 17%,transparent);
-  --xm-shadow:0 1px 2px rgba(0,0,0,.25), 0 4px 16px rgba(0,0,0,.18);
-  --xm-shadow-lift:0 8px 28px rgba(0,0,0,.32);
+  /* Inherit the app's OWN neutral palette (--bg/--surface/--text/...), so text and
+     surface are always the app's matched pair and the section tracks the app theme
+     exactly in both light and dark. Only the teal accent + thermal semantics are ours. */
+  --xm-bg: var(--bg, #0d1117);
+  --xm-surface: var(--surface, #161b22);
+  /* Derive raised surfaces from tokens the app flips reliably (--surface/--text);
+     the app's own --surface-2 does NOT flip to light, which caused dark GPU cards. */
+  --xm-surface-2: color-mix(in srgb, var(--surface, #161b22) 88%, var(--text, #e6edf3) 12%);
+  --xm-surface-3: color-mix(in srgb, var(--surface, #161b22) 80%, var(--text, #e6edf3) 20%);
+  --xm-border: var(--border, #30363d);
+  --xm-border-strong: color-mix(in srgb, var(--border, #30363d) 45%, var(--text, #e6edf3) 30%);
+  --xm-text: var(--text, #e6edf3);
+  --xm-muted: var(--text-secondary, #8b949e);
+  --xm-faint: color-mix(in srgb, var(--text-secondary, #8b949e) 72%, transparent);
+  --xm-accent:#2bc0d4; --xm-accent-strong:#4fd0e2; --xm-accent-weak:rgba(43,192,212,.16); --xm-on-accent:#04222a;
+  --xm-ok:#35c07a; --xm-ok-weak:rgba(53,192,122,.16);
+  --xm-warn:#e0a83a; --xm-warn-weak:rgba(224,168,58,.16);
+  --xm-hot:#f0685e; --xm-hot-weak:rgba(240,104,94,.16);
+  --xm-cool:#5aa0f2; --xm-cool-weak:rgba(90,160,242,.16);
+  --xm-off:#8b95a3; --xm-off-weak:rgba(139,149,163,.16);
+  --xm-shadow:0 1px 2px rgba(0,0,0,.22), 0 4px 16px rgba(0,0,0,.16);
+  --xm-shadow-lift:0 8px 28px rgba(0,0,0,.30);
   --xm-radius:16px; --xm-radius-sm:11px;
   --xm-mono: ui-monospace,"JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
   color:var(--xm-text);
   font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   max-width:560px; margin:0 auto;
 }
+/* back-to-fleet link on the detail view */
+.xmachines-view .xm-back{display:inline-flex; align-items:center; gap:5px; color:var(--xm-accent); text-decoration:none; font-weight:600; font-size:14px; margin:0 0 12px; padding:6px 4px 6px 0}
+.xmachines-view .xm-back:hover{text-decoration:underline}
+/* diagnostic hooks kept in the DOM for tests but never shown (raw who/nvidia dumps) */
+.xmachines-view .xm-hooks{position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
 .xmachines-view *{box-sizing:border-box}
 .xmachines-view .xm-mono{font-family:var(--xm-mono); font-variant-numeric:tabular-nums}
 .xmachines-view h1,.xmachines-view h2,.xmachines-view h3{margin:0}
@@ -4028,6 +4038,11 @@ body.tg-miniapp {
 .xmachines-view .xm-card .xm-name{font-weight:700; font-size:18px; letter-spacing:-.01em}
 .xmachines-view .xm-card .xm-host{font-size:12px; color:var(--xm-faint); font-family:var(--xm-mono)}
 .xmachines-view .xm-card .xm-chev{margin-left:auto; color:var(--xm-faint); font-size:20px; line-height:1}
+.xmachines-view .xm-card-min{padding:11px 14px 11px 18px; opacity:.82}
+.xmachines-view .xm-card-min:hover{opacity:1}
+.xmachines-view .xm-card-min .xm-name{font-size:15px; font-weight:700}
+.xmachines-view .xm-card-min .xm-pill.off{padding:2px 8px; font-size:11px}
+.xmachines-view .xm-card-min .xm-chev{margin-left:0; font-size:18px}
 
 /* pills */
 .xmachines-view .xm-pill{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap}
@@ -4175,21 +4190,12 @@ body.tg-miniapp {
 .xmachines-view [data-testid="xmachines-force-number"]{ font-family:var(--xm-mono); font-weight:600; }
 .xmachines-view [data-testid$="-refusal-block"]{ margin-top:11px; padding:10px 12px; border-radius:11px; background:var(--xm-hot-weak); color:var(--xm-hot); font-size:12.5px; }
 
-/* GPU rows — readable, labelled (labels are ::before so text assertions are unaffected) */
-.xmachines-view .gpu-row{ display:flex; flex-wrap:wrap; gap:8px 18px; align-items:baseline; padding:12px; border:1px solid var(--xm-border); border-radius:var(--xm-radius-sm); background:var(--xm-surface-2); margin-bottom:9px; }
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-name"]{ flex-basis:100%; font-weight:600; font-size:14px; }
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-chip"]:empty{ display:none; }
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-chip"]:not(:empty){ flex-basis:100%; font-family:var(--xm-mono); font-size:11px; color:var(--xm-warn); }
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-util"],
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-vram"],
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-temp"],
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-power"],
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-fan"]{ font-family:var(--xm-mono); font-size:13px; font-variant-numeric:tabular-nums; color:var(--xm-text); }
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-util"]::before{ content:"util "; color:var(--xm-faint); font-family:system-ui; font-size:10px; text-transform:uppercase; letter-spacing:.03em; }
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-vram"]::before{ content:"vram "; color:var(--xm-faint); font-family:system-ui; font-size:10px; text-transform:uppercase; letter-spacing:.03em; }
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-temp"]::before{ content:"temp "; color:var(--xm-faint); font-family:system-ui; font-size:10px; text-transform:uppercase; letter-spacing:.03em; }
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-power"]::before{ content:"power "; color:var(--xm-faint); font-family:system-ui; font-size:10px; text-transform:uppercase; letter-spacing:.03em; }
-.xmachines-view .gpu-row [data-testid="xmachines-gpu-fan"]::before{ content:"fan "; color:var(--xm-faint); font-family:system-ui; font-size:10px; text-transform:uppercase; letter-spacing:.03em; }
+/* GPU rows — card with the same label-above-value grid as CPU/Thermals */
+.xmachines-view .gpu-row{ padding:12px 13px; border:1px solid var(--xm-border); border-radius:var(--xm-radius-sm); background:var(--xm-surface-2); margin-bottom:9px; }
+.xmachines-view .gpu-row .gpu-head{ display:flex; align-items:center; gap:8px; margin-bottom:11px; }
+.xmachines-view .gpu-row .gpu-head .nm{ font-weight:600; font-size:14px; }
+.xmachines-view .gpu-row .gpu-chip:empty{ display:none; }
+.xmachines-view .gpu-row .gpu-chip:not(:empty){ margin-left:auto; font-family:var(--xm-mono); font-size:11px; color:var(--xm-warn); background:var(--xm-warn-weak); padding:2px 7px; border-radius:6px; }
 
 /* storage / UPS panels — readable, labelled */
 .xmachines-view .hdd-panel{ display:flex; flex-direction:column; gap:2px; }

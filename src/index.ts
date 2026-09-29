@@ -187,8 +187,8 @@ async function main(): Promise<void> {
     publishSampledXmachinesAlerts();
   } catch {}
 
-  // 30-minute server sampler scheduler — no new process/listener
-  const XmachinesSampleIntervalMs = 30 * 60 * 1000;
+  // Server sampler scheduler (10 min) — denser history for the 30-min activity view
+  const XmachinesSampleIntervalMs = 10 * 60 * 1000;
   setInterval(() => {
     publishSampledXmachinesAlerts();
   }, XmachinesSampleIntervalMs);

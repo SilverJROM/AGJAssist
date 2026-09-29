@@ -32,7 +32,7 @@ export function getCostConfig(db: Database.Database | null): CostConfig {
 
 export function integrateKwhFromSamples(samples: readonly EnergyReading[]): number {
   if (!samples.length) return 0;
-  const intervalHours = 0.5;
+  const intervalHours = 10 / 60; // must match the sampler cadence (10-min) in index.ts
   let total = 0;
   for (const s of samples) {
     if (!Number.isFinite(s.powerWatts)) continue;

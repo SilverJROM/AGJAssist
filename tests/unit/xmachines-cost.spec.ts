@@ -171,8 +171,8 @@ describe('xmachines cost integration B13', () => {
       };
     };
     expect(body.machine.name).toBe('hdd');
-    expect(body.cost.kwh).toBe(0.75);
-    expect(body.cost.costPhp).toBe(0.75);
+    expect(body.cost.kwh).toBe(0.25);
+    expect(body.cost.costPhp).toBe(0.25);
     expect(body.cost.currency).toBe('PHP');
     expect(body.cost.tariffPhpPerKwh).toBe(1);
     expect(body.cost.isPlaceholder).toBe(true);
@@ -185,8 +185,8 @@ describe('xmachines cost integration B13', () => {
     const res = await app!.inject({ method: 'GET', url: detailUrl(), headers: ownerHeaders() });
     expect(res.statusCode).toBe(200);
     const cost = (res.json() as { cost: { kwh: number; costPhp: number; tariffPhpPerKwh: number; isPlaceholder: boolean; tariffFlag: string; currency: string; caveat: string } }).cost;
-    expect(cost.kwh).toBe(0.75);
-    expect(cost.costPhp).toBe(3);
+    expect(cost.kwh).toBe(0.25);
+    expect(cost.costPhp).toBe(1);
     expect(cost.currency).toBe('PHP');
     expect(cost.tariffPhpPerKwh).toBe(4);
     expect(cost.isPlaceholder).toBe(false);

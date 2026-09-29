@@ -152,7 +152,7 @@ function liveMetricSpans(machine) {
   const isStale = isExpiredSample(machine.sampleAge);
   const styleAttr = isStale ? ' style="opacity:0.5;"' : '';
   const tempVal = typeof machine.gpuTemp === 'number' ? `${machine.gpuTemp}°C` : '';
-  const powerVal = typeof machine.powerWatts === 'number' ? `${machine.powerWatts} W` : '';
+  const powerVal = typeof machine.powerWatts === 'number' ? `${Math.round(machine.powerWatts)} W` : '';
   const powerIsMeasured = machine.telemetry && machine.telemetry.powerWatts != null;
   const uptime = typeof machine.uptime === 'string' ? machine.uptime : '';
   const powerSpan = markSpan(machine, 'xmachines-power-draw', powerVal, powerIsMeasured ? 'measured' : 'estimated');
@@ -186,6 +186,20 @@ function tempClassOf(t) {
   return t < 50 ? 't-cool' : t < 70 ? 't-ok' : t < 80 ? 't-warn' : 't-hot';
 }
 
+// "23158/24467 MiB" -> "22.6/23.9 GB" (compact); passes through non-MiB strings.
+function compactMem(value) {
+  if (typeof value !== 'string') return '';
+  const m = value.match(/^\s*([\d.]+)\s*\/\s*([\d.]+)\s*MiB\s*$/i);
+  if (!m) return value;
+  return `${(parseFloat(m[1]) / 1024).toFixed(1)}/${(parseFloat(m[2]) / 1024).toFixed(1)} GB`;
+}
+
+// Owner-set display name, falling back to the machine's canonical name.
+function machineDisplayName(machine) {
+  const raw = machine && machine.name != null ? String(machine.name) : '';
+  return (machine && machine.displayName && String(machine.displayName).trim()) ? String(machine.displayName) : raw;
+}
+
 // Fleet overview prints name and power state. Cost fields on a machine are ignored.
 // Card layout matches the approved xmachines mockup; every data-testid/attribute the
 // tests pin is emitted exactly once (offline cards omit the live-metric nodes).
@@ -197,9 +211,22 @@ export function renderFleetOverview(payload) {
   machines.forEach((m) => {
     if (isOfflineMachine(m)) offCount += 1; else onCount += 1;
     if (typeof m.powerWatts === 'number' && Number.isFinite(m.powerWatts)) totalW += m.powerWatts;
+    if (typeof m.cpuWatts === 'number' && Number.isFinite(m.cpuWatts)) totalW += m.cpuWatts;
   });
 
-  const items = machines.map((machine) => {
+  // Order: busy machines first, idle-online next, offline last. Stable within a rank.
+  const busyRank = (m) => {
+    if (isOfflineMachine(m)) return 2;
+    const leaseBusy = !!(m && m.busy && m.busy.isBusy);
+    const gpuBusy = typeof m.gpusBusy === 'number' && m.gpusBusy > 0;
+    return (leaseBusy || gpuBusy) ? 0 : 1;
+  };
+  const ordered = machines
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => busyRank(a.m) - busyRank(b.m) || a.i - b.i)
+    .map((x) => x.m);
+
+  const items = ordered.map((machine) => {
     const rawName = machine && machine.name != null ? String(machine.name) : '';
     const name = escapeHtml(rawName);
     const offline = isOfflineMachine(machine);
@@ -215,17 +242,45 @@ export function renderFleetOverview(payload) {
       : 'var(--xm-ok)';
 
     const stateHtml = fieldSpan('xmachines-power-state', state);
-    const tempVal = typeof machine.gpuTemp === 'number' ? `${machine.gpuTemp}°C` : '';
-    const powerVal = typeof machine.powerWatts === 'number' ? `${machine.powerWatts} W` : '';
+    // Two temps on the card: hottest GPU, and the board / inside-case sensor.
+    const gpuT = typeof machine.gpuTemp === 'number' && Number.isFinite(machine.gpuTemp) && machine.gpuTemp > 0 ? machine.gpuTemp : null;
+    const boardT = typeof machine.boardTemp === 'number' && Number.isFinite(machine.boardTemp) && machine.boardTemp > 0 ? machine.boardTemp : null;
+    const ambientT = typeof machine.ambientTemp === 'number' && Number.isFinite(machine.ambientTemp) && machine.ambientTemp > 0 ? machine.ambientTemp : null;
+    const boxTemp = boardT != null ? boardT : ambientT;
+    const gpuTempVal = gpuT != null ? `${gpuT}°C` : '';
+    const boxTempVal = boxTemp != null ? `${boxTemp}°C` : '';
+    // Draw = total board power = GPU draw + CPU package power.
+    const gpuW = typeof machine.powerWatts === 'number' && Number.isFinite(machine.powerWatts) ? machine.powerWatts : null;
+    const cpuW = typeof machine.cpuWatts === 'number' && Number.isFinite(machine.cpuWatts) ? machine.cpuWatts : 0;
+    const drawTotal = (gpuW != null || cpuW > 0) ? Math.round((gpuW ?? 0) + cpuW) : null;
+    const powerVal = drawTotal != null ? `${drawTotal} W` : '';
     const powerIsMeasured = !!(machine && machine.telemetry && machine.telemetry.powerWatts != null);
     const measWord = powerIsMeasured ? 'measured' : 'approx';
     const measKind = powerIsMeasured ? 'measured' : 'estimated';
     const uptimeVal = typeof machine.uptime === 'string' ? machine.uptime : '';
 
+    // GPUs: how many are busy out of how many answered the poll. Green = some busy,
+    // muted = up but idle, amber "none" = box is up but no GPU reported (check driver/cable).
+    const gpuCount = typeof machine.gpuCount === 'number' ? machine.gpuCount : null;
+    const gpusBusy = typeof machine.gpusBusy === 'number' ? machine.gpusBusy : null;
+    const gpuWorking = gpuCount != null ? gpuCount > 0 : (gpuT != null);
+    const gpuHasBusy = gpuCount != null && gpuCount > 0 && gpusBusy != null;
+    const gpuLabel = gpuCount != null
+      ? (gpuCount > 0 ? (gpusBusy != null ? `${gpusBusy}/${gpuCount}` : String(gpuCount)) : 'none')
+      : (gpuT != null ? 'ok' : '—');
+    const gpuStatKey = gpuHasBusy ? 'GPUs busy' : 'GPUs';
+    const gpuColor = !gpuWorking ? 'var(--xm-warn)' : (gpusBusy != null && gpusBusy > 0 ? 'var(--xm-ok)' : 'var(--xm-muted)');
+
     const powerStat = `<div class="xm-stat"><span class="k">Power</span><span class="v" style="color:${offline ? 'var(--xm-off)' : 'var(--xm-ok)'}">${stateHtml}</span></div>`;
-    const tempStat = offline
-      ? `<div class="xm-stat"><span class="k">Temp</span><span class="v">—</span></div>`
-      : `<div class="xm-stat"><span class="k">Hottest</span><span class="v"><span class="xm-tval ${tempClassOf(machine.gpuTemp)}" data-testid="xmachines-gpu-temp"${staleStyle}>${escapeHtml(tempVal)}</span></span></div>`;
+    const gpuStat = offline
+      ? `<div class="xm-stat"><span class="k">GPUs</span><span class="v">—</span></div>`
+      : `<div class="xm-stat"><span class="k">${gpuStatKey}</span><span class="v"><span data-testid="xmachines-gpu-count"${gpuCount != null ? ` data-gpu-count="${gpuCount}"` : ''}${gpusBusy != null ? ` data-gpu-busy="${gpusBusy}"` : ''} style="color:${gpuColor}">${escapeHtml(gpuLabel)}</span></span></div>`;
+    const gpuTempStat = offline
+      ? `<div class="xm-stat"><span class="k">GPU temp</span><span class="v">—</span></div>`
+      : `<div class="xm-stat"><span class="k">GPU temp</span><span class="v"><span class="xm-tval ${tempClassOf(gpuT)}" data-testid="xmachines-gpu-temp"${staleStyle}>${gpuTempVal ? escapeHtml(gpuTempVal) : '—'}</span></span></div>`;
+    const boxTempStat = offline
+      ? `<div class="xm-stat"><span class="k">Box temp</span><span class="v">—</span></div>`
+      : `<div class="xm-stat"><span class="k">Box temp</span><span class="v"><span class="xm-tval ${tempClassOf(boxTemp)}" data-testid="xmachines-box-temp"${staleStyle}>${boxTempVal ? escapeHtml(boxTempVal) : '—'}</span></span></div>`;
     const drawStat = offline
       ? `<div class="xm-stat"><span class="k">Draw</span><span class="v">—</span></div>`
       : `<div class="xm-stat"><span class="k">Draw</span><span class="v"><span data-testid="xmachines-power-draw">${escapeHtml(powerVal)}</span>${powerVal ? ` <span data-testid="xmachines-measurement" data-measurement="${measKind}" class="xm-est">${measWord}</span>` : ''}</span></div>`;
@@ -247,16 +302,37 @@ export function renderFleetOverview(payload) {
     const roleHint = roleHintSpan(machine);
     const spark = sparklineMarkup(machine && machine._history, true);
 
-    const metaBits = [freshSpan, provSpan, ageSpan, busySpan, leasesSpan].filter(Boolean).join('');
+    // Visible meta stays short (freshness/provenance/age). busy/leases carry a
+    // raw who/nvidia dump — keep them in the DOM for the tests but never render them.
+    const metaBits = [freshSpan, provSpan, ageSpan].filter(Boolean).join('');
     const metaLine = metaBits ? `<div class="xm-cardmeta" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11px;color:var(--xm-faint);font-family:var(--xm-mono)">${metaBits}</div>` : '';
+    const hiddenHooks = (busySpan || leasesSpan) ? `<span class="xm-hooks">${busySpan}${leasesSpan}</span>` : '';
     const cardOpacity = isStale ? 'opacity:0.6;' : '';
+
+    // Offline machines collapse to a 2-row card: name + a single detail line.
+    if (offline) {
+      const roleHintRaw = typeof machine.roleHint === 'string' ? machine.roleHint : '';
+      return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}" class="xm-card xm-card-min" style="--xm-stripe:var(--xm-off);list-style:none">`
+        + `<a class="xm-card-link" href="#/xmachines/${encodeURIComponent(rawName)}" style="display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none">`
+        + `<div style="min-width:0;flex:1">`
+        + `<div class="xm-name" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${escapeHtml(machineDisplayName(machine))}<span class="xm-pill off" data-testid="xmachines-power-state">${state}</span></div>`
+        + `<div class="xm-min-meta" style="margin-top:3px;display:flex;align-items:center;gap:8px;min-width:0;font-size:11px;color:var(--xm-faint);font-family:var(--xm-mono)">`
+        + (roleHintRaw ? `<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(roleHintRaw)}</span>` : `<span style="flex:1"></span>`)
+        + freshSpan + provSpan
+        + `</div>`
+        + `</div>`
+        + `<span class="xm-chev">›</span>`
+        + hiddenHooks
+        + `</a></li>`;
+    }
 
     return `<li data-testid="xmachines-fleet-card" aria-label="${name} ${state}" class="xm-card" style="--xm-stripe:${stripe};${cardOpacity}list-style:none">`
       + `<a class="xm-card-link" href="#/xmachines/${encodeURIComponent(rawName)}" style="display:block;color:inherit;text-decoration:none">`
-      + `<div class="xm-row1"><div style="min-width:0"><div class="xm-name">${name}${busyPill}</div>${roleHint}</div>`
+      + `<div class="xm-row1"><div style="min-width:0"><div class="xm-name">${escapeHtml(machineDisplayName(machine))}${busyPill}</div>${roleHint}</div>`
       + `<div style="margin-left:auto;display:flex;gap:6px;align-items:center">${severity}<span class="xm-chev">›</span></div></div>`
-      + `<div class="xm-stats">${powerStat}${tempStat}${drawStat}${uptimeStat}</div>`
+      + `<div class="xm-stats">${powerStat}${gpuStat}${gpuTempStat}${boxTempStat}${drawStat}${uptimeStat}</div>`
       + metaLine
+      + hiddenHooks
       + `<div class="xm-sparks" style="display:none">${spark}</div>`
       + `</a></li>`;
   }).join('');
@@ -266,7 +342,7 @@ export function renderFleetOverview(payload) {
     ? `<div class="xm-summary">`
       + `<div class="xm-sumchip"><span class="n">${onCount}</span><span class="l">Online</span></div>`
       + `<div class="xm-sumchip"><span class="n">${offCount}</span><span class="l">Off</span></div>`
-      + `<div class="xm-sumchip"><span class="n xm-mono">${totalW}<span style="font-size:12px;color:var(--xm-muted)"> W</span></span><span class="l">Fleet draw &#8776;</span></div>`
+      + `<div class="xm-sumchip"><span class="n xm-mono">${Math.round(totalW)}<span style="font-size:12px;color:var(--xm-muted)"> W</span></span><span class="l">Fleet draw &#8776;</span></div>`
       + (hotCount ? `<div class="xm-sumchip alert"><span class="n">${hotCount}</span><span class="l">Alert</span></div>` : '')
       + `</div>`
     : '';
@@ -333,10 +409,35 @@ function renderReadout(machine, history) {
 }
 
 const XM_RANGES = {
-  '1h':  { label: '1H',  x: ['-60m', '-40m', '-20m', 'now'] },
-  '6h':  { label: '6H',  x: ['-6h', '-4h', '-2h', 'now'] },
-  '24h': { label: '24H', x: ['-24h', '-16h', '-8h', 'now'] },
+  '1h':  { label: '1H',  offsetsMin: [60, 40, 20, 0] },
+  '6h':  { label: '6H',  offsetsMin: [360, 240, 120, 0] },
+  '24h': { label: '24H', offsetsMin: [1440, 960, 480, 0] },
 };
+
+// Format a timestamp as Philippine (Asia/Manila) clock time for an X-axis tick.
+// Prepends a short weekday when the tick lands on a different PH day than "now"
+// so a 24h span's left edge doesn't read the same clock time as its right edge.
+function phAxisTime(d, nowD) {
+  try {
+    const t = d.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' });
+    const day = d.toLocaleDateString('en-US', { timeZone: 'Asia/Manila' });
+    const nowDay = nowD.toLocaleDateString('en-US', { timeZone: 'Asia/Manila' });
+    if (day !== nowDay) {
+      const wd = d.toLocaleDateString('en-US', { timeZone: 'Asia/Manila', weekday: 'short' });
+      return `${wd} ${t}`;
+    }
+    return t;
+  } catch {
+    return '';
+  }
+}
+
+// The four X-axis tick labels for a range, as actual PH times counted back from now.
+function rangeAxisLabels(rc) {
+  const offs = rc && Array.isArray(rc.offsetsMin) ? rc.offsetsMin : [30, 20, 10, 0];
+  const now = new Date();
+  return offs.map((m) => phAxisTime(new Date(now.getTime() - m * 60000), now));
+}
 
 function seriesValues(series) {
   if (!Array.isArray(series)) return [];
@@ -422,11 +523,20 @@ export function renderMachineCostDetail(payload) {
     const chip = escapeHtml(row.chip ?? '');
     const power = escapeHtml(row.power ?? '');
     const temp = escapeHtml(row.temperature ?? '');
-    const memory = escapeHtml(row.memory ?? '');
+    const memory = escapeHtml(compactMem(row.memory ?? ''));
     const util = escapeHtml(row.utilization ?? '');
     const fan = escapeHtml(row.fan ?? '');
     const sampleTime = escapeHtml(row.sampleTime ?? '');
-    return `<div class="gpu-row" data-testid="xmachines-gpu-row" data-gpu-uuid="${uuid}" data-sample-time="${sampleTime}"><span data-testid="xmachines-gpu-name">${gpuName}</span><span data-testid="xmachines-gpu-chip" role="status">${chip}</span><span data-testid="xmachines-gpu-util">${util}</span><span data-testid="xmachines-gpu-vram">${memory}</span><span data-testid="xmachines-gpu-temp">${temp}</span><span data-testid="xmachines-gpu-power">${power}</span><span data-testid="xmachines-gpu-fan">${fan}</span></div>`;
+    const tempClass = tempClassOf(parseInt(String(row.temperature ?? ''), 10));
+    return `<div class="gpu-row" data-testid="xmachines-gpu-row" data-gpu-uuid="${uuid}" data-sample-time="${sampleTime}">`
+      + `<div class="gpu-head"><span class="nm" data-testid="xmachines-gpu-name">${gpuName}</span><span class="gpu-chip" data-testid="xmachines-gpu-chip" role="status">${chip}</span></div>`
+      + `<div class="xm-metrics" style="grid-template-columns:repeat(3,1fr);gap:12px 8px">`
+      + `<div class="xm-m"><span class="k">Util</span><span class="v"><span data-testid="xmachines-gpu-util">${util}</span></span></div>`
+      + `<div class="xm-m"><span class="k">VRAM</span><span class="v" style="font-size:13px"><span data-testid="xmachines-gpu-vram">${memory}</span></span></div>`
+      + `<div class="xm-m"><span class="k">Temp</span><span class="v xm-tval ${tempClass}"><span data-testid="xmachines-gpu-temp">${temp}</span></span></div>`
+      + `<div class="xm-m"><span class="k">Power</span><span class="v"><span data-testid="xmachines-gpu-power">${power}</span></span></div>`
+      + `<div class="xm-m"><span class="k">Fan</span><span class="v"><span data-testid="xmachines-gpu-fan">${fan}</span></span></div>`
+      + `</div></div>`;
   }).join('');
   const challenge = payload && payload.forceChallenge;
   const confirmationText = typeof payload?.forceConfirmation === 'string' ? payload.forceConfirmation : '';
@@ -469,6 +579,7 @@ export function renderMachineCostDetail(payload) {
     : `<span class="xm-fresh"><span class="xm-dot"></span>${escapeHtml(typeof machine.sampleAge === 'string' ? machine.sampleAge : 'live')}</span>`;
   const powerStateHook = `<span data-testid="xmachines-power-state" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden">${escapeHtml(state)}</span>`;
   const header = `<div class="xm-dhead">`
+    + `<a class="xm-back" href="#/xmachines">‹ All machines</a>`
     + `<div class="xm-name-row" id="xm-name-row"><h1 id="xm-name-h1">${displayName}</h1>`
     + `<button type="button" class="xm-editname" data-action="rename" aria-label="Rename machine" title="Rename">✎</button></div>`
     + (hostLine ? `<div class="xm-host">${hostLine}</div>` : '')
@@ -477,7 +588,7 @@ export function renderMachineCostDetail(payload) {
 
   // power & control
   const tempVal = typeof machine.gpuTemp === 'number' ? `${machine.gpuTemp}°C` : '';
-  const powerVal = typeof machine.powerWatts === 'number' ? `${machine.powerWatts} W` : '';
+  const powerVal = typeof machine.powerWatts === 'number' ? `${Math.round(machine.powerWatts)} W` : '';
   const powerIsMeasured = !!(machine.telemetry && machine.telemetry.powerWatts != null);
   const measWord = powerIsMeasured ? 'measured' : 'approx';
   const measKind = powerIsMeasured ? 'measured' : 'estimated';
@@ -497,7 +608,7 @@ export function renderMachineCostDetail(payload) {
   const guardNote = offline
     ? `<div class="xm-guard info"><span class="ic">↻</span><span>Machine is off. Turning it on sends a Wake-on-LAN packet; xmac waits for it to answer.</span></div>`
     : (machine.busy && machine.busy.isBusy
-      ? `<div class="xm-guard"><span class="ic">⛔</span><span><b>Busy.</b> ${escapeHtml(machine.busy.refusalExplanation || 'machine is serving work')} — a normal power-off is blocked; Force asks for confirmation first.</span></div>`
+      ? `<div class="xm-guard"><span class="ic">⛔</span><span><b>Busy — a normal power-off is blocked.</b> This machine is serving work; Force asks for confirmation first.</span></div>`
       : `<div class="xm-guard info"><span class="ic">✓</span><span>xmac checks the lease, live busy state, and wake-origin before it powers a machine off.</span></div>`);
   const powerSection = `<div class="xm-sec"><h2>Power &amp; control</h2>`
     + `<div class="xm-power-hero"><div class="xm-pstate">${statePill}<span class="xm-psub">${offline ? 'powered off' : 'up '}${uptimeHook}</span></div>`
@@ -512,24 +623,50 @@ export function renderMachineCostDetail(payload) {
 
   // thermals (online only)
   const cpuVal = typeof machine.cpuTemp === 'number' && Number.isFinite(machine.cpuTemp) ? `${machine.cpuTemp}°C` : '';
-  const ambientVal = typeof machine.ambientTemp === 'number' ? `${machine.ambientTemp}°C` : '';
-  const thermalsSection = offline ? '' : `<div class="xm-sec"><h2>Thermals</h2><div class="xm-metrics three">`
-    + `<div class="xm-m"><span class="k">CPU</span><span class="v xm-tval ${tempClassOf(machine.cpuTemp)}">${cpuVal ? `<span data-testid="xmachines-cpu-temp">${escapeHtml(cpuVal)}</span>` : '—'}</span></div>`
-    + `<div class="xm-m"><span class="k">Hottest</span><span class="v xm-tval ${tempClassOf(machine.gpuTemp)}"><span data-testid="xmachines-gpu-temp"${staleStyle}>${escapeHtml(tempVal)}</span></span></div>`
-    + `<div class="xm-m"><span class="k">Ambient ≈</span><span class="v xm-tval ${tempClassOf(machine.ambientTemp)}">${ambientVal || '—'}</span></div>`
+  const boardTempC = typeof machine.boardTemp === 'number' && Number.isFinite(machine.boardTemp) ? machine.boardTemp
+    : (typeof machine.ambientTemp === 'number' && Number.isFinite(machine.ambientTemp) ? machine.ambientTemp : null);
+  const boardVal = boardTempC != null ? `${boardTempC}°C` : '';
+  const cpuWattsVal = typeof machine.cpuWatts === 'number' && Number.isFinite(machine.cpuWatts) ? `${Math.round(machine.cpuWatts)} W` : '—';
+  const thermalsSection = offline ? '' : `<div class="xm-sec"><h2>Thermals &amp; CPU</h2><div class="xm-metrics" style="grid-template-columns:repeat(2,1fr);gap:12px 8px">`
+    + `<div class="xm-m"><span class="k">CPU temp</span><span class="v xm-tval ${tempClassOf(machine.cpuTemp)}">${cpuVal ? `<span data-testid="xmachines-cpu-temp">${escapeHtml(cpuVal)}</span>` : '—'}</span></div>`
+    + `<div class="xm-m"><span class="k">CPU power</span><span class="v">${cpuWattsVal}</span></div>`
+    + `<div class="xm-m"><span class="k">Hottest GPU</span><span class="v xm-tval ${tempClassOf(machine.gpuTemp)}"><span data-testid="xmachines-gpu-temp"${staleStyle}>${escapeHtml(tempVal)}</span></span></div>`
+    + `<div class="xm-m"><span class="k">Box / board temp</span><span class="v xm-tval ${tempClassOf(boardTempC)}"><span data-testid="xmachines-board-temp">${boardVal || '—'}</span></span></div>`
     + `</div>${simpleSev === 'hot' ? '<div class="xm-guard"><span class="ic">🔥</span><span><b>Hot.</b> A sensor is in the alert band — fans are being driven up.</span></div>' : ''}</div>`;
 
   // gpus
-  const gpuSection = (gpuRowHtml || gpuBanner)
+  const gpuSection = (!offline && (gpuRowHtml || gpuBanner))
     ? `<div class="xm-sec"><h2>GPUs${gpuRowHtml ? ` <span class="xm-badge xm-pill norm" style="font-size:10px">self-detected</span>` : ''}</h2>${gpuBanner}${gpuRowHtml}</div>`
     : '';
 
-  // fans (online only)
-  const fanRpmText = Array.isArray(machine.fanRpm) && machine.fanRpm.length ? machine.fanRpm.join(', ') : '';
-  const fansSection = offline ? '' : `<div class="xm-sec"><h2>Fans</h2>`
-    + (fanRpmText
-      ? `<div class="xm-kv"><span class="k">Fan RPM</span><span class="v"><span data-testid="xmachines-fan-rpm">${escapeHtml(fanRpmText)}</span></span></div>`
-      : `<span class="xm-na">no fan data reported</span>`)
+  // fans (online only) — rich per-fan rows from the fancurve kit; graceful when absent
+  const fanList = Array.isArray(machine.fans) ? machine.fans.filter((f) => f) : [];
+  const fanRpmArr = (Array.isArray(machine.fanRpm) && machine.fanRpm.length)
+    ? machine.fanRpm
+    : fanList.map((f) => f.rpm).filter((x) => typeof x === 'number');
+  const fanRpmText = fanRpmArr.length ? fanRpmArr.join(', ') : '';
+  const fanRows = fanList.length ? fanList.map((f) => {
+    const hdr = f.header == null ? 'fan' : (/^\d+$/.test(String(f.header)) ? 'Fan ' + f.header : String(f.header));
+    const duty = typeof f.dutyPct === 'number' ? f.dutyPct : null;
+    const dutyBar = duty != null
+      ? `<div class="xm-bar"><i class="${duty >= 90 ? 'hot' : duty >= 70 ? 'warn' : 'ok'}" style="width:${Math.max(0, Math.min(100, duty))}%"></i></div><div style="font-size:10.5px;color:var(--xm-faint);margin-top:3px">${duty}% · ${escapeHtml(f.mode || '')}</div>`
+      : `<span class="xm-na">${escapeHtml(f.mode || '—')}</span>`;
+    // A fan driven (duty>0) but with no tach reading is a daisy-chained partner —
+    // it spins at the same speed, the board just can't sense its RPM on a shared header.
+    const rpm = typeof f.rpm === 'number' ? f.rpm : null;
+    const driven = duty != null && duty > 0;
+    const rpmCell = (rpm && rpm > 0)
+      ? `${rpm} <small>rpm</small>`
+      : (driven ? `<span class="xm-na" style="font-size:11px">spinning · no tach</span>` : `<span class="xm-na">—</span>`);
+    return `<div class="xm-fanrow"><div class="fname">${escapeHtml(hdr)}</div><div class="duty">${dutyBar}</div><div class="rpm">${rpmCell}</div></div>`;
+  }).join('') : '';
+  const fansSection = offline ? '' : `<div class="xm-sec"><h2>Fans${machine.fancurveActive ? ` <span class="xm-badge xm-pill norm" style="font-size:10px">fancurve</span>` : ''}</h2>`
+    + (fanRows
+        ? fanRows + `<span class="xm-hooks"><span data-testid="xmachines-fan-rpm">${escapeHtml(fanRpmText)}</span></span>`
+        : (fanRpmText
+            ? `<div class="xm-kv"><span class="k">Fan RPM</span><span class="v"><span data-testid="xmachines-fan-rpm">${escapeHtml(fanRpmText)}</span></span></div>`
+            : `<span class="xm-na">no fan data reported (needs the fancurve kit on this box)</span>`))
+    + (machine.fancurveActive ? `<div class="xm-guard info" style="margin-top:11px"><span class="ic">🌀</span><span>fancurve active — fans auto-driven by hottest temp.</span></div>` : '')
     + `</div>`;
 
   // storage / ups (keep class-based panels exactly; show only for storage boxes
@@ -547,9 +684,10 @@ export function renderMachineCostDetail(payload) {
   const tempVals = seriesValues(hist.temperature);
   const chartHot = typeof machine.gpuTemp === 'number' && machine.gpuTemp >= 80;
   const rangeTabs = Object.keys(XM_RANGES).map((k) => `<button type="button" data-action="range" data-range="${k}" class="${k === range ? 'active' : ''}">${XM_RANGES[k].label}</button>`).join('');
+  const xlabels = rangeAxisLabels(rc);
   const historySection = offline ? '' : `<div class="xm-sec" id="xm-hist"><h2>History<span class="xm-rangetabs" style="margin-left:auto">${rangeTabs}</span></h2>`
-    + `<div class="xm-chart-block"><div class="ctitle"><span>Power draw · watts</span>${powerVal ? `<b>now ${escapeHtml(powerVal)}</b>` : ''}</div>${lineChart(powerVals, 'W', false, rc.x)}</div>`
-    + `<div class="xm-chart-block" style="margin-top:18px"><div class="ctitle"><span>Hottest temp · °C</span>${tempVal ? `<b>now ${escapeHtml(tempVal)}</b>` : ''}</div>${lineChart(tempVals, '°C', chartHot, rc.x)}</div>`
+    + `<div class="xm-chart-block"><div class="ctitle"><span>Power draw · watts</span>${powerVal ? `<b>now ${escapeHtml(powerVal)}</b>` : ''}</div>${lineChart(powerVals, 'W', false, xlabels)}</div>`
+    + `<div class="xm-chart-block" style="margin-top:18px"><div class="ctitle"><span>Hottest temp · °C</span>${tempVal ? `<b>now ${escapeHtml(tempVal)}</b>` : ''}</div>${lineChart(tempVals, '°C', chartHot, xlabels)}</div>`
     + `</div>`;
 
   // energy & cost (keep exact cost hooks)
@@ -573,7 +711,7 @@ export function renderMachineCostDetail(payload) {
     + (freshText ? `<div class="xm-kv"><span class="k">Freshness</span><span class="v"><span data-testid="xmachines-freshness">${escapeHtml(freshText)}</span></span></div>` : '')
     + (provText ? `<div class="xm-kv"><span class="k">Provenance</span><span class="v"><span data-testid="xmachines-provenance" data-provenance>${escapeHtml(provText)}</span></span></div>` : '')
     + (ageText && !offline ? `<div class="xm-kv"><span class="k">Sample age</span><span class="v"><span data-testid="xmachines-sample-age" data-sample-age>${escapeHtml(ageText)}</span></span></div>` : '')
-    + (busyOut ? `<div class="xm-kv"><span class="k">Busy check</span><span class="v" style="font-weight:400;font-size:12px"><span data-testid="xmachines-busy">${escapeHtml(busyOut)}</span></span></div>` : '')
+    + (busyOut ? `<span class="xm-hooks"><span data-testid="xmachines-busy">${escapeHtml(busyOut)}</span></span>` : '')
     + (leasesText ? `<div class="xm-kv"><span class="k">Leases</span><span class="v"><span data-testid="xmachines-leases">${escapeHtml(leasesText)}</span></span></div>` : '')
     + `<div class="xm-kv"><span class="k">Machine ID</span><span class="v">${name}</span></div>`
     + `</div>`;

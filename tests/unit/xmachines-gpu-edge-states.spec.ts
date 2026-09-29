@@ -358,7 +358,8 @@ describe('B16 GPU edge rows', () => {
     expect(vi.mocked(spawnSync)).not.toHaveBeenCalled();
     expect(surface.apiRows).toHaveLength(1);
     expect(surface.apiRows[0].memory).toBe('2048/24576 MiB');
-    expect(cell?.textContent).toBe('2048/24576 MiB');
+    // the UI renders VRAM compactly in GB (the backend row stays MiB)
+    expect(cell?.textContent).toBe('2.0/24.0 GB');
     db.close();
   });
 });

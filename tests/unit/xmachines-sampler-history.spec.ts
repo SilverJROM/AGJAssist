@@ -25,9 +25,9 @@ describe('xmachines-sampler-history', () => {
     expect(runtimeSrc).toContain('new ReadOnlyCollector');
   });
 
-  it('F2b — server sampler schedules on a 30-minute cadence', () => {
+  it('F2b — server sampler schedules on a 10-minute cadence', () => {
     const indexSrc = fs.readFileSync(path.join(REPO, 'src/index.ts'), 'utf8');
-    const hasInterval = indexSrc.includes('30 * 60 * 1000') || indexSrc.includes('1800000') || /setInterval\s*\([^,]+,\s*30\s*\*\s*60\s*\*\s*1000/.test(indexSrc);
+    const hasInterval = indexSrc.includes('10 * 60 * 1000') || indexSrc.includes('600000') || /setInterval\s*\([^,]+,\s*10\s*\*\s*60\s*\*\s*1000/.test(indexSrc);
     expect(hasInterval).toBe(true);
     expect(indexSrc).toContain('sampleFleet');
   });

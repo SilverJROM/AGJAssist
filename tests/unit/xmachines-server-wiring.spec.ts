@@ -97,10 +97,10 @@ describe('xmachines-server-wiring', () => {
     expect(rows).toContain('telemetry.generate');
   });
 
-  it('F2b — server sampler schedules on a 30-minute cadence', () => {
+  it('F2b — server sampler schedules on a 10-minute cadence', () => {
     const src = fs.readFileSync(path.join(REPO, 'src/index.ts'), 'utf8');
-    const thirtyMin = src.includes('30 * 60 * 1000') || src.includes('1800000') || /setInterval\s*\([^,]+,\s*30\s*\*\s*60\s*\*\s*1000/.test(src);
-    expect(thirtyMin).toBe(true);
+    const tenMin = src.includes('10 * 60 * 1000') || src.includes('600000') || /setInterval\s*\([^,]+,\s*10\s*\*\s*60\s*\*\s*1000/.test(src);
+    expect(tenMin).toBe(true);
     const mentionsSampler = src.includes('sampleFleet') || src.includes('ReadOnlyCollector') || src.includes('xmachines');
     expect(mentionsSampler).toBe(true);
   });

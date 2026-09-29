@@ -851,18 +851,25 @@ export function registerXmachinesRoutes(
       effTo = new Date(now + 1000).toISOString();
     }
 
+    // One point per poll, not one per GPU: xm_samples holds a row per GPU, so a
+    // multi-GPU box (e.g. 174: one idle GPU + two loaded) would otherwise plot as a
+    // line zig-zagging between GPUs. Aggregate each timestamp — SUM watts for total
+    // board draw, MAX for hottest temp / peak utilization.
+    const agg = metric === "power" ? "SUM" : "MAX";
     const rows = effFrom && effTo
       ? sqlite.prepare(`
-          SELECT sample_time AS time, ${column} AS value
+          SELECT sample_time AS time, ${agg}(${column}) AS value
           FROM xm_samples
           WHERE machine_name = ? AND sample_time >= ? AND sample_time < ?
-          ORDER BY sample_time ASC, id ASC
+          GROUP BY sample_time
+          ORDER BY sample_time ASC
         `).all(name, effFrom, effTo)
       : sqlite.prepare(`
-          SELECT sample_time AS time, ${column} AS value
+          SELECT sample_time AS time, ${agg}(${column}) AS value
           FROM xm_samples
           WHERE machine_name = ?
-          ORDER BY sample_time ASC, id ASC
+          GROUP BY sample_time
+          ORDER BY sample_time ASC
         `).all(name);
 
     let series = rows.map((r: any) => ({
