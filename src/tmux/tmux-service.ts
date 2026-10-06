@@ -25,6 +25,10 @@ export interface TmuxPane {
   command: string;
   title: string;
   activity?: number;
+  // True when the pane is on the alternate screen — i.e. a full-screen TUI
+  // (grok, some codex TUIs). The friendly chat parser can't handle those, so
+  // the UI renders them raw instead.
+  alternate_on: boolean;
 }
 
 export interface SendCommandResult {
@@ -73,7 +77,7 @@ export class TmuxService {
 
   async listPanes(): Promise<TmuxPane[]> {
     try {
-      const format = "#{session_name}|#{window_index}|#{pane_index}|#{pane_current_command}|#{pane_title}|#{window_activity}|#{session_activity}";
+      const format = "#{session_name}|#{window_index}|#{pane_index}|#{pane_current_command}|#{pane_title}|#{window_activity}|#{session_activity}|#{alternate_on}";
       const { stdout } = await execFileAsync("tmux", ["list-panes", "-a", "-F", format]);
 
       return stdout
@@ -81,7 +85,7 @@ export class TmuxService {
         .map((line) => line.trim())
         .filter(Boolean)
         .map((line) => {
-          const [session, window, pane, command, title, windowActivity, sessionActivity] = line.split("|");
+          const [session, window, pane, command, title, windowActivity, sessionActivity, alternateOn] = line.split("|");
           const activity = Number(windowActivity || sessionActivity || 0);
           return {
             target: `${session}:${window}.${pane}`,
@@ -90,7 +94,8 @@ export class TmuxService {
             pane,
             command,
             title,
-            activity: Number.isFinite(activity) ? activity : 0
+            activity: Number.isFinite(activity) ? activity : 0,
+            alternate_on: alternateOn === "1"
           };
         });
     } catch {

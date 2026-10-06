@@ -87,7 +87,7 @@ describe("TmuxService listPanes", () => {
 
   it("includes tmux activity seconds for panes", async () => {
     execFileMock.mockResolvedValueOnce({
-      stdout: "AGJ|0|0|claude|title|1787240400|1787240000\n"
+      stdout: "AGJ|0|0|claude|title|1787240400|1787240000|0\n"
     });
     const service = new TmuxService();
 
@@ -99,9 +99,20 @@ describe("TmuxService listPanes", () => {
         pane: "0",
         command: "claude",
         title: "title",
-        activity: 1787240400
+        activity: 1787240400,
+        alternate_on: false
       }
     ]);
+  });
+
+  it("flags alternate-screen (full-screen TUI) panes via alternate_on", async () => {
+    execFileMock.mockResolvedValueOnce({
+      stdout: "grok47|0|0|grok|grok dashboard|1787240400|1787240000|1\n"
+    });
+    const service = new TmuxService();
+    const panes = await service.listPanes();
+    expect(panes[0].command).toBe("grok");
+    expect(panes[0].alternate_on).toBe(true);
   });
 });
 

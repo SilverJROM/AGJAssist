@@ -170,6 +170,28 @@ export function cleanTerminalOutput(text) {
   return _cleanTerminalLines(text).trim();
 }
 
+/**
+ * Plain ANSI/control strip that KEEPS all visible text and layout. Unlike
+ * cleanTerminalOutput, it does NOT filter Claude-TUI "chrome" (boxes, status
+ * lines) — for a full-screen TUI CLI like grok that chrome IS the content.
+ * Used as the raw fallback so non-Claude / alt-screen sessions are always
+ * visible in the friendly view instead of rendering blank.
+ */
+export function stripAnsiPlain(text) {
+  if (!text) return "";
+  return String(text)
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "")
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")            // CSI (colors, cursor)
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")   // OSC (titles)
+    .replace(/\x1b./g, "")                                // lone ESC + char
+    .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "")            // other controls (keep \n, \t)
+    .replace(/[ \t]+$/gm, "")                             // trailing ws per line
+    .replace(/\n{3,}/g, "\n\n")                           // collapse big gaps
+    .replace(/^\n+/, "")
+    .replace(/\n+$/, "");
+}
+
 function _isBlankLine(line) {
   return line.trim() === "";
 }

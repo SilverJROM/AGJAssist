@@ -1,7 +1,7 @@
 import { h, render, Component } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
-import { normalizeTerminalOutput, diffTerminalOutput, extractStatus, appendYou, extractStrippedChromeLines, applyAgentPatch, sanitizeOutgoingCommand, detectSelectionPrompt, readTerminalDraft, writeTerminalDraft, clearTerminalDraft } from './terminal-chat-state.js';
+import { normalizeTerminalOutput, diffTerminalOutput, extractStatus, appendYou, extractStrippedChromeLines, applyAgentPatch, sanitizeOutgoingCommand, detectSelectionPrompt, readTerminalDraft, writeTerminalDraft, clearTerminalDraft, stripAnsiPlain } from './terminal-chat-state.js';
 import {
   AVAILABLE_BOTTOM_NAV_TABS,
   DEFAULT_BOTTOM_NAV_TAB_IDS,
@@ -199,6 +199,8 @@ const TERM_KEYS = {
   ctrlc: 'C-c',
   up: 'Up',
   down: 'Down',
+  pageUp: 'PageUp',
+  pageDown: 'PageDown',
   tab: 'Tab',
   shiftTab: 'BTab',
   space: 'Space',
@@ -2489,6 +2491,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                     lineLimit=${lineLimit}
                     refreshTick=${friendlyRefreshTick}
                     showRawChrome=${showRawChrome}
+                    isTui=${!!activePane?.alternate_on}
                     onStatusChange=${setTerminalStatus}
                     onLastUpdated=${setLastUpdatedAt}
                     onToggleFullScreen=${isTgMiniAppContext ? () => {
@@ -2875,7 +2878,7 @@ function CollapsibleBubbleContent({ content, role, limit, query }) {
   `;
 }
 
-function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, showRawChrome = false, onStatusChange, onLastUpdated, projectId, onReloadSessions }) {
+function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, showRawChrome = false, isTui = false, onStatusChange, onLastUpdated, projectId, onReloadSessions }) {
   const [status, setStatus] = useState('loading');
   const [statusLine, setStatusLine] = useState('');
   const [entries, setEntries] = useState([]);
@@ -3521,6 +3524,15 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   }
 
   const rawChrome = showRawChrome ? extractStrippedChromeLines(snapshot) : '';
+  // Raw fallback: the friendly parser is built for Claude Code's line-based output.
+  // A full-screen TUI CLI (e.g. grok, codex TUIs on the alternate screen — isTui)
+  // produces no parseable agent turns, so the transcript would show the user's
+  // messages but never the agent's reply (blank). For a TUI pane we always render
+  // the ANSI-stripped live screen; for any other pane we show it only when nothing
+  // parsed at all. Updates live as `snapshot` polls.
+  const hasAgentContent = entries.some((e) => e.role === 'agent' && String(e.content || '').trim());
+  const hasChatContent = entries.some((e) => (e.role === 'agent' || e.role === 'user') && String(e.content || '').trim());
+  const rawFallback = (isTui ? !hasAgentContent : !hasChatContent) && !rawChrome ? stripAnsiPlain(snapshot) : '';
   const statusBusy = /drizzl|working|thinking|running/i.test(statusLine || '');
   const selection = useMemo(() => detectSelectionPrompt(snapshot), [snapshot]);
   // Instant-dismiss: hide the card the moment an option is tapped (before the
@@ -3834,6 +3846,22 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
             </div>
           `;
         })}
+        ${rawFallback ? html`
+          <div class="terminal-chat-rawfull" data-testid="terminal-raw-fallback" data-raw-fallback>
+            <div class="terminal-chat-rawfull-head">
+              <span class="terminal-chat-rawfull-label">Live terminal (raw)</span>
+              ${isTui ? html`
+                <div class="terminal-chat-rawfull-scroll" role="group" aria-label="Scroll the terminal">
+                  <button type="button" title="Scroll up" aria-label="Scroll up" data-testid="raw-scroll-up"
+                          onclick=${() => sendKeys(TERM_KEYS.pageUp)}>▲</button>
+                  <button type="button" title="Scroll down" aria-label="Scroll down" data-testid="raw-scroll-down"
+                          onclick=${() => sendKeys(TERM_KEYS.pageDown)}>▼</button>
+                  <button type="button" title="Jump to latest" aria-label="Jump to latest" data-testid="raw-scroll-latest"
+                          onclick=${() => sendKeys(Array(20).fill(TERM_KEYS.pageDown))}>⤓</button>
+                </div>` : ''}
+            </div>
+            <pre>${rawFallback}</pre>
+          </div>` : ''}
         <div class=${'terminal-chat-status' + (statusBusy ? ' busy' : '') + (!statusLine ? ' empty' : '')} data-testid="terminal-status">
           ${statusBusy ? html`<span class="terminal-chat-pulse"></span>` : ''}
           ${statusLine}

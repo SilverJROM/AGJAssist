@@ -11,8 +11,39 @@ import {
   formatFriendlyTerminalOutput,
   normalizeTerminalOutput,
   sanitizeOutgoingCommand,
+  stripAnsiPlain,
   tailTerminalOutput
 } from "../../src/web/public/terminal-chat-state.js";
+
+describe("stripAnsiPlain (raw fallback for TUI CLIs)", () => {
+  it("strips ANSI/control sequences but keeps all visible text and box-drawing layout", () => {
+    const pane = [
+      "\x1b[48;5;233m  ~/websites/test            \x1b[38;5;141m◆ 2\x1b[39m",
+      "     \x1b[38;5;242m▾ Tasks\x1b[0m 1",
+      "     ⋅ Task Run GLM check      \x1b[33m54m36s\x1b[0m [↗][✗]",
+      "     ❯ Where are we here?",
+    ].join("\n");
+    const out = stripAnsiPlain(pane);
+    expect(out).not.toMatch(/\x1b/); // no escapes remain
+    expect(out).toContain("~/websites/test");
+    expect(out).toContain("▾ Tasks"); // box-drawing / TUI chrome is kept, not filtered
+    expect(out).toContain("Task Run GLM check");
+    expect(out).toContain("54m36s");
+    expect(out).toContain("❯ Where are we here?");
+  });
+
+  it("keeps content that cleanTerminalOutput would filter as chrome", () => {
+    // A full-screen TUI's content IS its 'chrome' — the chrome-filtering clean
+    // path drops it, so the raw fallback must not.
+    const tui = "     ▾ Watchers 1\n     ⋅ Monitor Watch GLM temperature check   53m1s";
+    expect(stripAnsiPlain(tui)).toContain("Watchers 1");
+  });
+
+  it("returns empty string for empty/undefined input", () => {
+    expect(stripAnsiPlain("")).toBe("");
+    expect(stripAnsiPlain(undefined as unknown as string)).toBe("");
+  });
+});
 
 describe("terminal chat state", () => {
   it("normalizes terminal output line endings", () => {
