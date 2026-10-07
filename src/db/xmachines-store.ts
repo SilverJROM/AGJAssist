@@ -105,15 +105,20 @@ export function reconcileGpuIdentities(
   const selectExisting = db.prepare(
     "SELECT id, gpu_uuid FROM xm_devices WHERE machine_name = ?",
   );
-  const insertGpu = db.prepare(`
+  // Upsert on the globally-UNIQUE gpu_uuid. A GPU physically moved to another box
+  // (its UUID already recorded under a different machine_name) must REASSIGN to the
+  // observing machine here — a plain INSERT would violate UNIQUE(gpu_uuid), and that
+  // 500 blanked the whole detail page. first_seen is preserved on conflict.
+  const upsertGpu = db.prepare(`
     INSERT INTO xm_devices (
       machine_name, gpu_uuid, gpu_name, status, ordinal, first_seen, last_seen
     ) VALUES (?, ?, ?, 'active', ?, ?, ?)
-  `);
-  const updateGpu = db.prepare(`
-    UPDATE xm_devices
-    SET gpu_name = ?, status = 'active', ordinal = ?, last_seen = ?
-    WHERE machine_name = ? AND gpu_uuid = ?
+    ON CONFLICT(gpu_uuid) DO UPDATE SET
+      machine_name = excluded.machine_name,
+      gpu_name = excluded.gpu_name,
+      status = 'active',
+      ordinal = excluded.ordinal,
+      last_seen = excluded.last_seen
   `);
   const retireGpu = db.prepare(
     "UPDATE xm_devices SET status = 'retired' WHERE machine_name = ? AND gpu_uuid = ?",
@@ -121,18 +126,16 @@ export function reconcileGpuIdentities(
 
   const apply = db.transaction((rows: readonly ObservedGpu[]) => {
     const existing = selectExisting.all(machineName) as Array<{ id: number; gpu_uuid: string }>;
-    const existingUuids = new Set(existing.map((row) => row.gpu_uuid));
     const seen = new Set<string>();
 
     for (const gpu of rows) {
       if (seen.has(gpu.gpuUuid)) {
-        // Repeated UUID hits UNIQUE inside this transaction so a bad observation cannot partially apply.
-        insertGpu.run(machineName, gpu.gpuUuid, gpu.gpuName, gpu.ordinal, seenAt, seenAt);
-      } else if (existingUuids.has(gpu.gpuUuid)) {
-        updateGpu.run(gpu.gpuName, gpu.ordinal, seenAt, machineName, gpu.gpuUuid);
-      } else {
-        insertGpu.run(machineName, gpu.gpuUuid, gpu.gpuName, gpu.ordinal, seenAt, seenAt);
+        // A UUID repeated within one observation is a corrupt poll — fail the whole
+        // transaction (rolls back) so it cannot partially apply. Distinct from the
+        // cross-machine case below, which the upsert reassigns rather than rejects.
+        throw new Error(`duplicate gpu_uuid in observation for ${machineName}: ${gpu.gpuUuid}`);
       }
+      upsertGpu.run(machineName, gpu.gpuUuid, gpu.gpuName, gpu.ordinal, seenAt, seenAt);
       seen.add(gpu.gpuUuid);
     }
 

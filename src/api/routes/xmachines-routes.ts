@@ -785,9 +785,16 @@ export function registerXmachinesRoutes(
         // labels are additive; never block the read
       }
     }
-    const gpuSurface = sqlite
-      ? loadGpuTelemetryRows(sqlite, { machine: request.params.name, roleHint, nowIso, refresh: true })
-      : null;
+    // GPU inventory is best-effort: a failure here must not blank the whole
+    // detail page (a stale/moved-GPU reconcile once threw a UNIQUE 500 → blank).
+    let gpuSurface: ReturnType<typeof loadGpuTelemetryRows> | null = null;
+    if (sqlite) {
+      try {
+        gpuSurface = loadGpuTelemetryRows(sqlite, { machine: request.params.name, roleHint, nowIso, refresh: true });
+      } catch (err) {
+        request.log?.warn?.({ err, machine: request.params.name }, "xmachines gpu inventory failed; serving detail without gpu rows");
+      }
+    }
     const gpuRows = gpuSurface ? gpuSurface.apiRows : [];
     const panel = renderHddDiskPanel(runtime.telemetry, request.params.name);
     const nut = runtime.telemetry.readNut(request.params.name);
