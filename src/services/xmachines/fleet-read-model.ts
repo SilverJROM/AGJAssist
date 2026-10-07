@@ -8,6 +8,7 @@ interface MetricFixtureRow {
   gpuTempsC?: number[];
   gpuPowerWatts?: number[];
   gpuUtil?: number[];
+  gpuMemUsed?: number[];
   uptime?: string;
   freshness?: string;
   provenance?: string;
@@ -39,20 +40,34 @@ function maxGpuTemp(values: number[] | undefined): number | null {
   return Math.max(...nums);
 }
 
-// A GPU counts as busy when it is actively computing (util) or clearly loaded
-// (power well above idle). Arrays are index-aligned per GPU; a missing signal on
-// one axis can still be caught by the other.
+// A GPU counts as in-use when it is actively computing (util), drawing load
+// (power), OR has a model resident in VRAM. The VRAM signal matters because an
+// optimized inference stack (speculative decoding, context lookup, prefix cache)
+// can serve hundreds of tok/s while GPU util/power sit near idle — the model is
+// still loaded and serving, so the box IS working. Arrays are index-aligned per
+// GPU; a missing signal on one axis can still be caught by another.
 const GPU_BUSY_UTIL_PCT = 15;
 const GPU_BUSY_WATTS = 60;
-function countBusyGpus(utils: number[] | undefined, powers: number[] | undefined): number {
+const GPU_BUSY_MEM_MIB = 2048; // a loaded model holds GB of VRAM; idle/headless GPUs sit well under this
+function countBusyGpus(
+  utils: number[] | undefined,
+  powers: number[] | undefined,
+  mems: number[] | undefined,
+): number {
   const u = finiteNumbers(utils);
   const p = finiteNumbers(powers);
-  const n = Math.max(u.length, p.length);
+  const m = finiteNumbers(mems);
+  const n = Math.max(u.length, p.length, m.length);
   let busy = 0;
   for (let i = 0; i < n; i += 1) {
     const util = u[i];
     const watts = p[i];
-    if ((typeof util === 'number' && util >= GPU_BUSY_UTIL_PCT) || (typeof watts === 'number' && watts >= GPU_BUSY_WATTS)) {
+    const mem = m[i];
+    if (
+      (typeof util === 'number' && util >= GPU_BUSY_UTIL_PCT) ||
+      (typeof watts === 'number' && watts >= GPU_BUSY_WATTS) ||
+      (typeof mem === 'number' && mem >= GPU_BUSY_MEM_MIB)
+    ) {
       busy += 1;
     }
   }
@@ -82,7 +97,7 @@ function toReadModel(
   const gpuCount = offline
     ? 0
     : (finiteNumbers(metric.gpuTempsC).length || finiteNumbers(metric.gpuPowerWatts).length);
-  const gpusBusy = offline ? 0 : countBusyGpus(metric.gpuUtil, metric.gpuPowerWatts);
+  const gpusBusy = offline ? 0 : countBusyGpus(metric.gpuUtil, metric.gpuPowerWatts, metric.gpuMemUsed);
   const uptime = offline ? null : (typeof metric.uptime === 'string' && metric.uptime ? metric.uptime : null);
   const busy = buildBusyDetail(machine.name);
   const provenance = typeof metric.provenance === 'string' && metric.provenance
