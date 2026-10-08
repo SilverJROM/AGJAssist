@@ -766,6 +766,12 @@ export function registerXmachinesRoutes(
     if (!machine) {
       return reply.code(404).send({ ok: false, actuated: false, error: "unknown-machine" });
     }
+    // DGX Spark pairs are remote, read-only, and carry their own per-node data on
+    // machine.dgx — skip the LAN-only GPU/disk/UPS/cost/WoL work (none applies, and
+    // it would needlessly ssh the app host for nvidia-smi).
+    if ((machine as { dgx?: unknown }).dgx) {
+      return { mode: runtime.armed ? "armed" : "fake", armed: runtime.armed, machine, gpuRows: [] };
+    }
     const cost = detailCost(db, request.params.name, request.query);
     const evidence = readWolSafety(request.params.name);
     const wolSafety = evidence ? presentWolSafety(evidence) : null;

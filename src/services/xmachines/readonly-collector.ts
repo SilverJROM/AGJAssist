@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3';
 import { persistReaderResult } from '../../db/xmachines-store.js';
 import type { DiskCliPayload } from './disk-telemetry.js';
 import { registryFleetFromEnv } from './fleet-read-model.js';
+import { dgxFleetFromEnv } from './dgx-read-model.js';
 import { SyntheticTelemetry, type MachineTelemetry } from './telemetry.js';
 
 // Fixed contract: a reading at or above this cpu temperature is the alert condition.
@@ -216,13 +217,21 @@ export class ReadOnlyCollector {
     return registryFleetFromEnv(process.env);
   }
 
+  // DGX Spark pairs come from their own tunnel poller, merged in alongside the LAN
+  // fleet so they show in the overview + detail without touching the xmac/WoL path.
+  private dgxFleet(): MachineTelemetry[] {
+    return dgxFleetFromEnv(process.env);
+  }
+
   generate(): MachineTelemetry[] {
-    const fleet = this.registryFleet();
-    if (fleet) return fleet;
-    return this.telemetry.generate();
+    const base = this.registryFleet() ?? this.telemetry.generate();
+    const dgx = this.dgxFleet();
+    return dgx.length ? [...base, ...dgx] : base;
   }
 
   forMachine(name: string): MachineTelemetry | undefined {
+    const dgx = this.dgxFleet().find((machine) => machine.name === name);
+    if (dgx) return dgx;
     const fleet = this.registryFleet();
     if (fleet) return fleet.find((machine) => machine.name === name);
     return this.telemetry.forMachine(name);

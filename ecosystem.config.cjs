@@ -13,6 +13,7 @@ module.exports = {
         XMACHINES_USE_REGISTRY: "1",
         XMACHINES_STATUS_FIXTURE: "/home/agjrom/.xmac/xm-status.txt",
         XMACHINES_TELEMETRY_FIXTURE: "/home/agjrom/.xmac/xm-telemetry.json",
+        XMACHINES_DGX_FIXTURE: "/home/agjrom/.xmac/xm-dgx.json",
         XMAC_CONF: "/home/agjrom/.config/agent-protocols/xmac/machines.conf"
       },
       max_memory_restart: "2048M",

@@ -271,7 +271,8 @@ export function renderFleetOverview(payload) {
     const gpuStatKey = gpuHasBusy ? 'GPUs busy' : 'GPUs';
     const gpuColor = !gpuWorking ? 'var(--xm-warn)' : (gpusBusy != null && gpusBusy > 0 ? 'var(--xm-ok)' : 'var(--xm-muted)');
 
-    const powerStat = `<div class="xm-stat"><span class="k">Power</span><span class="v" style="color:${offline ? 'var(--xm-off)' : 'var(--xm-ok)'}">${stateHtml}</span></div>`;
+    const powerColor = offline ? 'var(--xm-off)' : (machine.state === 'unknown' ? 'var(--xm-warn)' : 'var(--xm-ok)');
+    const powerStat = `<div class="xm-stat"><span class="k">Power</span><span class="v" style="color:${powerColor}">${stateHtml}</span></div>`;
     const gpuStat = offline
       ? `<div class="xm-stat"><span class="k">GPUs</span><span class="v">—</span></div>`
       : `<div class="xm-stat"><span class="k">${gpuStatKey}</span><span class="v"><span data-testid="xmachines-gpu-count"${gpuCount != null ? ` data-gpu-count="${gpuCount}"` : ''}${gpusBusy != null ? ` data-gpu-busy="${gpusBusy}"` : ''} style="color:${gpuColor}">${escapeHtml(gpuLabel)}</span></span></div>`;
@@ -490,9 +491,72 @@ function lineChart(values, unit, hot, xlabels) {
     + `</svg>`;
 }
 
+// DGX Spark pairs render their own detail: remote GB10 nodes, served model + health,
+// no power control / cost / fans / history.
+function renderDgxDetail(payload) {
+  const machine = payload && payload.machine ? payload.machine : {};
+  const dgx = machine.dgx || {};
+  const nodes = Array.isArray(dgx.nodes) ? dgx.nodes : [];
+  const name = escapeHtml(machineDisplayName(machine));
+  const unreachable = machine.state === 'unknown';
+  const stateLabel = unreachable ? 'unreachable' : 'up';
+  const stateColor = unreachable ? 'var(--xm-warn)' : 'var(--xm-ok)';
+  const reqs = typeof dgx.requestsRunning === 'number' ? dgx.requestsRunning : null;
+  const serviceLine = reqs != null
+    ? `${reqs} request${reqs === 1 ? '' : 's'} running`
+    : (dgx.serviceOk === true ? 'healthy' : dgx.serviceOk === false ? 'not responding' : 'status unknown');
+
+  const header = `<div class="xm-dhead">`
+    + `<a class="xm-back" href="#/xmachines">‹ All machines</a>`
+    + `<div class="xm-name-row"><h1>${name}</h1></div>`
+    + `<div class="xm-host">${escapeHtml(dgx.model || '')}${dgx.route ? ` · route ${escapeHtml(dgx.route)}` : ''}</div>`
+    + `<div class="xm-pills"><span class="xm-pill ${unreachable ? 'warn' : 'on'}" data-testid="xmachines-power-state">${stateLabel}</span>`
+    + `<span class="xm-pill norm" style="font-size:10px">read-only</span></div>`
+    + `</div>`;
+
+  const serviceSection = `<div class="xm-sec"><h2>Service</h2><div class="xm-metrics" style="grid-template-columns:repeat(2,1fr);gap:12px 8px">`
+    + `<div class="xm-m"><span class="k">Model</span><span class="v" style="font-size:13px">${escapeHtml(dgx.model || '—')}</span></div>`
+    + `<div class="xm-m"><span class="k">Serving</span><span class="v" style="font-size:13px;color:${stateColor}">${escapeHtml(serviceLine)}</span></div>`
+    + `</div></div>`;
+
+  const nodeCards = nodes.map((n) => {
+    const reach = n && n.reachable;
+    const temp = typeof n.gpuTempC === 'number' ? `${n.gpuTempC}°C` : '—';
+    const util = typeof n.gpuUtil === 'number' ? `${Math.round(n.gpuUtil)}%` : '—';
+    const pw = typeof n.gpuPowerW === 'number' ? `${Math.round(n.gpuPowerW)} W` : '—';
+    const clk = typeof n.clockMHz === 'number' ? `${n.clockMHz} MHz` : '—';
+    const mem = (typeof n.memUsedMB === 'number' && typeof n.memTotalMB === 'number')
+      ? `${(n.memUsedMB / 1024).toFixed(1)}/${(n.memTotalMB / 1024).toFixed(1)} GB` : '—';
+    const up = typeof n.uptime === 'string' ? n.uptime : '—';
+    const head = `<div class="gpu-head"><span class="nm">${escapeHtml(n.label || n.host || 'node')}</span>`
+      + `<span class="gpu-chip ${reach ? '' : 'stale'}">${reach ? escapeHtml(n.gpuName || 'GB10') : 'unreachable'}</span></div>`;
+    if (!reach) {
+      return `<div class="gpu-row" data-testid="xmachines-dgx-node"><div style="opacity:.75">${head}`
+        + `<div class="xm-na" style="padding:6px 0">node unreachable — treat as unknown, not off</div></div></div>`;
+    }
+    return `<div class="gpu-row" data-testid="xmachines-dgx-node">${head}`
+      + `<div class="xm-metrics" style="grid-template-columns:repeat(3,1fr);gap:10px 8px;margin-top:8px">`
+      + `<div class="xm-m"><span class="k">GPU temp</span><span class="v xm-tval ${tempClassOf(n.gpuTempC)}">${temp}</span></div>`
+      + `<div class="xm-m"><span class="k">Util</span><span class="v">${util}</span></div>`
+      + `<div class="xm-m"><span class="k">Power</span><span class="v">${pw}</span></div>`
+      + `<div class="xm-m"><span class="k">Clock</span><span class="v">${clk}</span></div>`
+      + `<div class="xm-m"><span class="k">Unified mem</span><span class="v">${mem}</span></div>`
+      + `<div class="xm-m"><span class="k">Uptime</span><span class="v" style="font-size:12px">${escapeHtml(up)}</span></div>`
+      + `</div></div>`;
+  }).join('');
+  const nodesSection = `<div class="xm-sec"><h2>Nodes <span class="xm-badge xm-pill norm" style="font-size:10px">GB10 · unified memory</span></h2>${nodeCards}</div>`;
+
+  const note = `<div class="xm-sec"><div class="xm-guard info"><span class="ic">🛰️</span><span>Remote DGX Spark pair over SSH tunnel — read-only monitoring, no power control. A node that can't be reached shows as <b>unknown</b>, not off.</span></div></div>`;
+
+  return `<div class="xmachines-view"><div class="xm-detail" data-testid="xmachines-machine-detail" data-machine="${escapeHtml(machine.name || '')}">`
+    + header + serviceSection + nodesSection + note
+    + `</div></div>`;
+}
+
 // Detail is the only surface that shows PHP cost, the tariff flag, and the short-burst caveat.
 export function renderMachineCostDetail(payload) {
   const machine = payload && payload.machine ? payload.machine : {};
+  if (machine && machine.dgx) return renderDgxDetail(payload);
   const cost = payload && payload.cost ? payload.cost : {};
   const history = payload && payload._history ? payload._history : {};
   const name = escapeHtml(machine.name ?? '');

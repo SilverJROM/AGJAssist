@@ -11,9 +11,25 @@ export interface MachineBusyRead {
   refusalExplanation: string;
 }
 
+export interface DgxNode {
+  label: string;
+  host?: string;
+  reachable: boolean;
+  gpuName?: string;
+  gpuTempC?: number;
+  gpuPowerW?: number;
+  gpuUtil?: number;
+  clockMHz?: number;
+  memUsedMB?: number;
+  memTotalMB?: number;
+  uptime?: string;
+}
+
 export interface MachineTelemetry {
   name: string;
-  state: 'up' | 'down' | 'synthetic';
+  // 'unknown' = a DGX pair we could not reach over the tunnel (NOT powered off — the
+  // path may be down while the node is up), so it must never render as "offline".
+  state: 'up' | 'down' | 'synthetic' | 'unknown';
   cpuTemp: number;
   gpuTemp: number;
   powerWatts: number;
@@ -37,6 +53,15 @@ export interface MachineTelemetry {
   fans?: Array<{ header?: string; dutyPct?: number | null; rpm?: number | null; mode?: string }>;
   fancurveActive?: boolean;
   displayName?: string;
+  // DGX Spark pairs: remote, read-only, tunnel-reached, no power control.
+  noPowerControl?: boolean;
+  dgx?: {
+    model: string;
+    route: string;
+    requestsRunning?: number;
+    serviceOk?: boolean;
+    nodes: DgxNode[];
+  };
   powerSession?: { duration: number; provenance: string };
   sampledOnHours?: { hours: number; label: string };
 }
