@@ -7382,6 +7382,7 @@ function BottomNavEditor({ tabIds, onChange, onClose }) {
 function TgDashboard({ onEditBottomNav, user }) {
   const [stats, setStats] = useState({ projects: 0, tasks: 0, reminders: 0, notes: 0 });
   const [machineCount, setMachineCount] = useState(0);
+  const [machineOnline, setMachineOnline] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -7403,6 +7404,8 @@ function TgDashboard({ onEditBottomNav, user }) {
         notes: n.notes?.length || 0
       });
       setMachineCount(machines.length);
+      // Online = anything not powered off/down (an unreachable DGX pair is "unknown", still counted up).
+      setMachineOnline(machines.filter((m) => !(m && (m.offline === true || m.state === 'down'))).length);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [user?.role]);
@@ -7417,7 +7420,7 @@ function TgDashboard({ onEditBottomNav, user }) {
     { icon: '\u{23F0}', label: 'Reminders', count: stats.reminders, route: '/tasks', desc: 'Upcoming events' },
     { icon: '\u{2699}', label: 'Settings', count: null, route: '/settings', desc: 'Config & templates' }
   ];
-  const xmachinesTile = { icon: '\u{1F4BB}', label: 'xMachines', count: machineCount, route: '/xmachines', desc: 'Machine fleet' };
+  const xmachinesTile = { icon: '\u{1F4BB}', label: 'xMachines', count: machineCount ? `${machineOnline}/${machineCount}` : machineCount, route: '/xmachines', desc: 'online / total' };
 
   return html`
     <div>
