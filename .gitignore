@@ -22,3 +22,16 @@ test-results/
 .claude/settings.local.json
 .claude/*.lock
 .reboot-ready-*
+
+# secrets: env variants, keys/certs, and local docs that hold real tokens
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+id_rsa*
+id_ed25519*
+/AGJ_Upgrade/command-center-2026-08-26/parked-patches/G1.patch
+/plan/overmind/projcore-run-2026-05-21/batch-A2/changes.md
+/plan/overmind/projcore-run-2026-05-21/prompts/batch-A2.md
+/RESUME.md
