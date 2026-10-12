@@ -2843,8 +2843,21 @@ function ImageViewer() {
   const gesture = useRef(null);
   const moved = useRef(false);
   const lastTap = useRef(0);
+  const dialogRef = useRef(null);
 
   const close = useCallback(() => { setReq(null); }, []);
+
+  // A modal <dialog> renders in the browser's top layer, above every stacking
+  // context — Telegram's WebKit view otherwise painted the chat over the viewer.
+  useEffect(() => {
+    const dlg = dialogRef.current;
+    if (!req || !dlg) return;
+    if (typeof dlg.showModal === 'function' && !dlg.open) {
+      try { dlg.showModal(); } catch { dlg.setAttribute('open', ''); }
+    } else if (!dlg.open) {
+      dlg.setAttribute('open', '');
+    }
+  }, [req]);
 
   useEffect(() => {
     const onOpen = (e) => setReq(e.detail || null);
@@ -2937,7 +2950,8 @@ function ImageViewer() {
 
   const label = req.path || req.url || '';
   return html`
-    <div class="image-viewer" role="dialog" aria-modal="true" aria-label="Image viewer">
+    <dialog ref=${dialogRef} class="image-viewer" aria-label="Image viewer"
+      onCancel=${(e) => { e.preventDefault(); close(); }}>
       <div class="image-viewer-bar">
         <span class="image-viewer-name" title=${label}>${label.split('/').pop()}</span>
         <button type="button" class="image-viewer-btn" aria-label="Zoom out" onClick=${() => zoomBy(1 / 1.5)}>−</button>
@@ -2956,7 +2970,7 @@ function ImageViewer() {
                 onError=${() => setError('Could not load image')}
                 style=${`transform: translate(${view.x}px, ${view.y}px) scale(${view.scale})`} />`}
       </div>
-    </div>
+    </dialog>
   `;
 }
 
