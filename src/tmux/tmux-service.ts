@@ -5,6 +5,33 @@ import { SafetyService, SafetyCheckResult } from "../services/safety-service.js"
 
 const execFileAsync = promisify(execFile);
 
+// Remote tmux hosts (ssh aliases, e.g. "140") whose sessions the app also shows.
+// A remote pane's target is "<host>~<session>:<window>.<pane>"; every tmux call
+// for it runs over one multiplexed ssh connection to that host.
+const REMOTE_SEP = "~";
+const SSH_OPTS = [
+  "-o", "BatchMode=yes",
+  "-o", "ConnectTimeout=4",
+  "-o", "ControlMaster=auto",
+  "-o", "ControlPath=/tmp/agj-tmux-ssh-%r@%h:%p",
+  "-o", "ControlPersist=10m"
+];
+const REMOTE_TIMEOUT_MS = 15000;
+// After an unreachable host fails a listing, skip it this long so the session
+// list (polled every few seconds) doesn't stall on the ssh connect timeout.
+const REMOTE_DOWN_BACKOFF_MS = 30000;
+
+function parseRemoteHosts(raw: string | undefined): string[] {
+  return (raw || "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter((h) => /^[a-zA-Z0-9_.-]+$/.test(h));
+}
+
+function shQuote(arg: string): string {
+  return `'${arg.replace(/'/g, `'\\''`)}'`;
+}
+
 // Coordinator-message submit tuning. A modern TUI composer (Claude Code / codex)
 // ingests a bracketed paste ASYNCHRONOUSLY: the text is not in the composer the
 // instant `send-keys -l` returns. So we must (1) wait for the paste to actually
@@ -70,22 +97,66 @@ export const TMUX_NAMED_KEYS = new Set([
 
 export class TmuxService {
   private safetyService: SafetyService | null = null;
+  readonly remoteHosts: string[];
+  private remoteDownUntil = new Map<string, number>();
 
-  setSafetyService(safety: SafetyService): void {
-    this.safetyService = safety;
+  constructor(remoteHosts: string[] = parseRemoteHosts(process.env.TMUX_REMOTE_HOSTS)) {
+    this.remoteHosts = remoteHosts;
   }
 
-  async listPanes(): Promise<TmuxPane[]> {
+  // Split "<host>~<rest>" into its remote host and local tmux target. A target
+  // without a known host prefix is local.
+  splitHost(target: string): { host: string | null; local: string } {
+    const i = target.indexOf(REMOTE_SEP);
+    if (i > 0 && this.remoteHosts.includes(target.slice(0, i))) {
+      return { host: target.slice(0, i), local: target.slice(i + 1) };
+    }
+    return { host: null, local: target };
+  }
+
+  isRemote(target: string): boolean {
+    return this.splitHost(target).host !== null;
+  }
+
+  // Run a tmux command locally, or over ssh when its -t/-s target carries a
+  // remote host prefix (the prefix is stripped before tmux sees it).
+  private exec(args: string[], host: string | null = null): Promise<{ stdout: string; stderr: string }> {
+    const out = [...args];
+    for (let i = 0; i < out.length - 1; i++) {
+      if (out[i] === "--") break;
+      if (out[i] === "-t" || out[i] === "-s") {
+        const split = this.splitHost(out[i + 1]);
+        if (split.host) {
+          host = split.host;
+          out[i + 1] = split.local;
+        }
+      }
+    }
+    if (!host) return execFileAsync("tmux", out);
+    const remoteCmd = ["tmux", ...out].map(shQuote).join(" ");
+    return execFileAsync("ssh", [...SSH_OPTS, host, remoteCmd], { timeout: REMOTE_TIMEOUT_MS });
+  }
+
+  // Raw keystrokes from the terminal WebSocket (may include newlines).
+  async sendRawInput(target: string, input: string): Promise<void> {
+    this.ensureValidTarget(target);
+    await this.exec(["send-keys", "-t", target, "--", input]);
+  }
+
+  private async listPanesOn(host: string | null): Promise<TmuxPane[]> {
+    const prefix = host ? `${host}${REMOTE_SEP}` : "";
+    if (host && (this.remoteDownUntil.get(host) ?? 0) > Date.now()) return [];
     try {
       const format = "#{session_name}|#{window_index}|#{pane_index}|#{pane_current_command}|#{pane_title}|#{window_activity}|#{session_activity}|#{alternate_on}";
-      const { stdout } = await execFileAsync("tmux", ["list-panes", "-a", "-F", format]);
+      const { stdout } = await this.exec(["list-panes", "-a", "-F", format], host);
 
       return stdout
         .split("\n")
         .map((line) => line.trim())
         .filter(Boolean)
         .map((line) => {
-          const [session, window, pane, command, title, windowActivity, sessionActivity, alternateOn] = line.split("|");
+          const [bareSession, window, pane, command, title, windowActivity, sessionActivity, alternateOn] = line.split("|");
+          const session = prefix + bareSession;
           const activity = Number(windowActivity || sessionActivity || 0);
           return {
             target: `${session}:${window}.${pane}`,
@@ -98,9 +169,23 @@ export class TmuxService {
             alternate_on: alternateOn === "1"
           };
         });
-    } catch {
+    } catch (error) {
+      // ssh exits 255 when it can't reach the host; tmux's own "no server
+      // running" exits 1 and just means there are no sessions there.
+      if (host && (error as { code?: number }).code === 255) {
+        this.remoteDownUntil.set(host, Date.now() + REMOTE_DOWN_BACKOFF_MS);
+      }
       return [];
     }
+  }
+
+  setSafetyService(safety: SafetyService): void {
+    this.safetyService = safety;
+  }
+
+  async listPanes(): Promise<TmuxPane[]> {
+    const lists = await Promise.all([null, ...this.remoteHosts].map((h) => this.listPanesOn(h)));
+    return lists.flat();
   }
 
   async listJobsSummary(): Promise<string> {
@@ -119,7 +204,7 @@ export class TmuxService {
     // Friendly /output path: allow a 2000-row window so the ❯ user run stays
     // in-frame. Do not raise this to capturePane's 5000-row scrollback cap.
     const safeLines = Math.max(20, Math.min(lines, 2000));
-    const { stdout } = await execFileAsync("tmux", [
+    const { stdout } = await this.exec([
       "capture-pane",
       "-p",
       "-t",
@@ -134,7 +219,7 @@ export class TmuxService {
     this.ensureValidTarget(target);
     const sessionName = target.split(":")[0];
     try {
-      await execFileAsync("tmux", ["has-session", "-t", sessionName]);
+      await this.exec(["has-session", "-t", sessionName]);
       return true;
     } catch {
       return false;
@@ -147,11 +232,11 @@ export class TmuxService {
   // (JROM). Exit copy-mode first so input lands in the live prompt.
   private async exitCopyMode(target: string): Promise<void> {
     try {
-      const { stdout } = await execFileAsync("tmux", [
+      const { stdout } = await this.exec([
         "display-message", "-p", "-t", target, "#{pane_in_mode}"
       ]);
       if (stdout.trim() === "1") {
-        await execFileAsync("tmux", ["send-keys", "-X", "-t", target, "cancel"]);
+        await this.exec(["send-keys", "-X", "-t", target, "cancel"]);
         await new Promise((resolve) => setTimeout(resolve, 60));
       }
     } catch {
@@ -187,14 +272,14 @@ export class TmuxService {
     }
 
     await this.exitCopyMode(target);
-    await execFileAsync("tmux", ["send-keys", "-l", "-t", target, "--", trimmed]);
+    await this.exec(["send-keys", "-l", "-t", target, "--", trimmed]);
     if (pressEnter) {
       // Let Claude's Ink composer fully ingest the typed text BEFORE Enter, or the
       // Enter races ahead and the message sits pending/unsubmitted (JROM). A short
       // settle (~0.35s, a touch longer for very long messages) submits reliably.
       const settleMs = Math.min(600, 350 + Math.floor(trimmed.length / 200) * 100);
       await new Promise((resolve) => setTimeout(resolve, settleMs));
-      await execFileAsync("tmux", ["send-keys", "-t", target, "C-m"]);
+      await this.exec(["send-keys", "-t", target, "C-m"]);
     }
     return {
       message: `Sent command to ${target}${pressEnter ? " and pressed Enter" : ""}: ${trimmed}`,
@@ -228,7 +313,7 @@ export class TmuxService {
       const chunk = trimmed.replace(/\s+/g, "").slice(0, 40);
 
       // Phase 1: paste the literal text, then wait for it to actually render.
-      await execFileAsync("tmux", ["send-keys", "-l", "-t", target, "--", trimmed]);
+      await this.exec(["send-keys", "-l", "-t", target, "--", trimmed]);
       for (let poll = 0; poll < COMPOSER_RENDER_MAX_POLLS; poll++) {
         await setTimeoutPromise(COMPOSER_POLL_MS);
         const pane = await this.capturePane(target);
@@ -240,7 +325,7 @@ export class TmuxService {
 
       // Phase 2: submit, then verify the composer cleared; re-press if it didn't.
       for (let press = 0; press < SUBMIT_MAX_PRESSES; press++) {
-        await execFileAsync("tmux", ["send-keys", "-t", target, "C-m"]);
+        await this.exec(["send-keys", "-t", target, "C-m"]);
         await setTimeoutPromise(SUBMIT_VERIFY_DELAY_MS);
         const pane = await this.capturePane(target);
         if (this.isTextSubmitted(pane, chunk)) return true;
@@ -275,7 +360,7 @@ export class TmuxService {
   async sendEnter(target: string): Promise<SendCommandResult> {
     this.ensureValidTarget(target);
     await this.exitCopyMode(target);
-    await execFileAsync("tmux", ["send-keys", "-t", target, "C-m"]);
+    await this.exec(["send-keys", "-t", target, "C-m"]);
     return {
       message: `Sent Enter to ${target}`,
       blocked: false
@@ -308,7 +393,7 @@ export class TmuxService {
     // TUI (e.g. "Down Down Enter" would select option 1 instead of 3); a gap
     // guarantees each key is processed and re-rendered before the next.
     for (let i = 0; i < keys.length; i++) {
-      await execFileAsync("tmux", ["send-keys", "-t", target, keys[i]]);
+      await this.exec(["send-keys", "-t", target, keys[i]]);
       if (i < keys.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, 120));
       }
@@ -322,7 +407,7 @@ export class TmuxService {
     if (cwd) {
       args.push("-c", cwd);
     }
-    await execFileAsync("tmux", args);
+    await this.exec(args);
     return `${name}:0.0`;
   }
 
@@ -332,7 +417,7 @@ export class TmuxService {
     if (cwd) {
       args.push("-c", cwd);
     }
-    await execFileAsync("tmux", args);
+    await this.exec(args);
 
     // Get the new pane target
     const panes = await this.listPanes();
@@ -344,19 +429,19 @@ export class TmuxService {
 
   async terminateSession(sessionName: string): Promise<void> {
     this.ensureValidSessionName(sessionName);
-    await execFileAsync("tmux", ["kill-session", "-t", sessionName]);
+    await this.exec(["kill-session", "-t", sessionName]);
   }
 
   async terminatePane(target: string): Promise<void> {
     this.ensureValidTarget(target);
-    await execFileAsync("tmux", ["kill-pane", "-t", target]);
+    await this.exec(["kill-pane", "-t", target]);
   }
 
   async capturePane(target: string, lines = 200): Promise<string> {
     this.ensureValidTarget(target);
     const safeLines = Math.max(20, Math.min(lines, 5000));
     try {
-      const { stdout } = await execFileAsync("tmux", [
+      const { stdout } = await this.exec([
         "capture-pane",
         "-p",
         "-e",
@@ -377,7 +462,7 @@ export class TmuxService {
   async paneCurrentPath(session: string): Promise<string | null> {
     this.ensureValidTarget(session);
     try {
-      const { stdout } = await execFileAsync("tmux", [
+      const { stdout } = await this.exec([
         "display-message",
         "-p",
         "-t",
@@ -391,7 +476,8 @@ export class TmuxService {
     }
   }
 
-  ensureValidTarget(target: string): void {
+  ensureValidTarget(rawTarget: string): void {
+    const target = this.splitHost(rawTarget).local;
     const bareSession = /^[a-zA-Z0-9_.-]+$/.test(target);
     const paneTarget = /^[a-zA-Z0-9_.-]+:[0-9]+\.[0-9]+$/.test(target);
     if (!bareSession && !paneTarget) {
@@ -400,7 +486,7 @@ export class TmuxService {
   }
 
   private ensureValidSessionName(name: string): void {
-    if (!/^[a-zA-Z0-9_.-]+$/.test(name)) {
+    if (!/^[a-zA-Z0-9_.-]+$/.test(this.splitHost(name).local)) {
       throw new Error("Invalid session name. Use alphanumeric, underscore, dot, or dash only.");
     }
   }

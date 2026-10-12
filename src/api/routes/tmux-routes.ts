@@ -427,6 +427,11 @@ export function registerTmuxRoutes(
     maxBytes: number,
     noun: string
   ): Promise<{ real: string } | { code: number; error: string }> {
+    // Files a remote pane mentions live on that host, not here — never serve a
+    // same-named local file in their place.
+    if (target && tmuxService.isRemote(target)) {
+      return { code: 501, error: `Viewing files from a remote ${noun} host isn't supported yet` };
+    }
     let resolved: string;
     if (raw.startsWith("~/")) {
       resolved = path.join(os.homedir(), raw.slice(2));

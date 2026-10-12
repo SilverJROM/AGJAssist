@@ -26,7 +26,7 @@ describe('GET /api/tmux/image', () => {
         ? { id: 1, role: 'owner', username: 'o' }
         : t.includes('viewer') ? { id: 2, role: 'viewer', username: 'v' } : null),
     } as unknown as AuthService;
-    const tmux = { paneCurrentPath: async (t: string) => (t === 'agent:0.0' ? dir : null) };
+    const tmux = { isRemote: () => false, paneCurrentPath: async (t: string) => (t === 'agent:0.0' ? dir : null) };
     const noop = {} as never;
     registerTmuxRoutes(app, authService, tmux as never, noop, noop, noop, noop);
     await app.ready();
@@ -96,7 +96,7 @@ describe('GET /api/tmux/doc', () => {
         ? { id: 1, role: 'owner', username: 'o' }
         : t.includes('viewer') ? { id: 2, role: 'viewer', username: 'v' } : null),
     } as unknown as AuthService;
-    const tmux = { paneCurrentPath: async (t: string) => (t === 'agent:0.0' ? dir : null) };
+    const tmux = { isRemote: () => false, paneCurrentPath: async (t: string) => (t === 'agent:0.0' ? dir : null) };
     const noop = {} as never;
     registerTmuxRoutes(app, authService, tmux as never, noop, noop, noop, noop);
     await app.ready();

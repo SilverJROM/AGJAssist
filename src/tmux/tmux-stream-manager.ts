@@ -101,13 +101,8 @@ export class TmuxStreamManager {
     }
 
     // Send raw input to tmux pane (including newlines for Enter)
-    const args = ["send-keys", "-t", target, "--", input];
-    const { execFile } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execFileAsync = promisify(execFile);
-
     try {
-      await execFileAsync("tmux", args);
+      await this.tmuxService.sendRawInput(target, input);
     } catch {
       ws.send(JSON.stringify({ type: "error", message: "Failed to send input to pane" }));
     }
