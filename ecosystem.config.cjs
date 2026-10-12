@@ -15,8 +15,9 @@ module.exports = {
         XMACHINES_TELEMETRY_FIXTURE: "/home/agjrom/.xmac/xm-telemetry.json",
         XMACHINES_DGX_FIXTURE: "/home/agjrom/.xmac/xm-dgx.json",
         XMAC_CONF: "/home/agjrom/.config/agent-protocols/xmac/machines.conf",
-        // Remote tmux hosts (ssh aliases) whose sessions show in the app as "140~name".
-        TMUX_REMOTE_HOSTS: "140"
+        // Remote tmux hosts (ssh alias=label) whose sessions show in the app as
+        // "name (MN)" — 140 = minisserver, 182 = media.
+        TMUX_REMOTE_HOSTS: "140=MN,182=HS"
       },
       max_memory_restart: "2048M",
       restart_delay: 3000,

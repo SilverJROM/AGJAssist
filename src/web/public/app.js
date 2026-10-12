@@ -1549,7 +1549,7 @@ function TerminalTab({ projectId, projectName } = {}) {
     } catch (e) { alert(e.message); }
   }
 
-  const allPanes = sessions.flatMap(s => s.panes.map(p => ({ ...p, session_name: s.session_name })));
+  const allPanes = sessions.flatMap(s => s.panes.map(p => ({ ...p, session_name: s.session_name, display_name: s.display_name || s.session_name })));
   const activePane = allPanes.find(p => p.target === activeTarget) || null;
   const isListView = viewMode === 'list' || !activeTarget;
   const hasTarget = !!activeTarget && !isListView;
@@ -1842,7 +1842,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                  title=${activePane?.awaiting_selection ? 'This agent is waiting for you to pick an option below' : ''}>
               <div class="terminal-topbar-name terminal-topbar-name-static" data-testid="terminal-session-name">
                 <span class=${'terminal-topbar-dot' + (activePane?.awaiting_selection ? ' awaiting' : (hasTarget && (terminalStatus === 'connected' || terminalStatus === 'running') ? ' on' : ''))}></span>
-                <span class="terminal-topbar-name-text">${activePane?.awaiting_selection ? '🔴 ' : ''}${activePane?.session_name || (friendlyMode ? 'Terminal Chat' : 'Raw Terminal')}</span>
+                <span class="terminal-topbar-name-text">${activePane?.awaiting_selection ? '🔴 ' : ''}${activePane?.display_name || activePane?.session_name || (friendlyMode ? 'Terminal Chat' : 'Raw Terminal')}</span>
               </div>
               <div class="terminal-topbar-sub">
                 ${hasTarget ? (targetSubtitle || activeTarget) : 'Select a pane'}
@@ -2302,7 +2302,7 @@ function TerminalTab({ projectId, projectName } = {}) {
               : html`<select value=${activeTarget || ''} onChange=${e => switchActiveTarget(e.target.value)}>
                   <option value="">${allPanes.length === 0 ? 'Loading panes...' : 'Select a pane...'}</option>
                   ${allPanes.map(p => html`
-                    <option value=${p.target}>${p.session_name} · ${p.target} · ${p.command}</option>
+                    <option value=${p.target}>${p.display_name || p.session_name} · ${p.target} · ${p.command}</option>
                   `)}
                 </select>`
             }
@@ -2374,7 +2374,7 @@ function TerminalTab({ projectId, projectName } = {}) {
             </div>
             ${sessions.map(s => html`
               <div>
-                <div style="font-size:11px;color:var(--text-secondary);padding:4px 8px;margin-top:4px">${s.session_name}</div>
+                <div style="font-size:11px;color:var(--text-secondary);padding:4px 8px;margin-top:4px">${s.display_name || s.session_name}</div>
                 ${s.panes.map(p => html`
                   <div class="tree-item ${activeTarget === p.target ? 'active' : ''}${p.awaiting_selection ? ' awaiting-selection' : ''}"
                        onclick=${() => activeTarget === p.target ? backToTerminalList() : switchActiveTarget(p.target)}>
@@ -2460,7 +2460,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                                }}>
                             <span class=${'terminal-list-dot ' + (row.awaiting ? 'awaiting' : row.busy ? 'busy' : row.connected ? 'connected' : 'offline')} aria-hidden="true"></span>
                             <span class="terminal-list-main">
-                              <span class="terminal-list-name">${row.awaiting ? '🔴 ' : ''}${row.session.session_name}</span>
+                              <span class="terminal-list-name">${row.awaiting ? '🔴 ' : ''}${row.session.display_name || row.session.session_name}</span>
                               ${row.awaiting
                                 ? html`<span class="terminal-list-status awaiting-selection-label">waiting for your selection</span>`
                                 : row.busy
@@ -2571,7 +2571,7 @@ function TerminalTab({ projectId, projectName } = {}) {
                          onchange=${(event) => toggleSessionInGroup(editingGroup.id, row.session.session_name, event.target.checked)} />
                   <span class=${'terminal-list-dot ' + (row.busy ? 'busy' : row.connected ? 'connected' : 'offline')} aria-hidden="true"></span>
                   <span class="terminal-group-edit-main">
-                    <span class="terminal-list-name">${row.session.session_name}</span>
+                    <span class="terminal-list-name">${row.session.display_name || row.session.session_name}</span>
                     <span class="terminal-list-status">${row.busy ? 'working…' : row.connected ? 'ready' : 'not connected'}</span>
                   </span>
                 </label>

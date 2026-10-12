@@ -5,7 +5,8 @@ import { SafetyService, SafetyCheckResult } from "../services/safety-service.js"
 
 const execFileAsync = promisify(execFile);
 
-// Remote tmux hosts (ssh aliases, e.g. "140") whose sessions the app also shows.
+// Remote tmux hosts (ssh aliases, e.g. "140") whose sessions the app also shows,
+// each with an optional short label for the UI: TMUX_REMOTE_HOSTS="140=MN,182=HS".
 // A remote pane's target is "<host>~<session>:<window>.<pane>"; every tmux call
 // for it runs over one multiplexed ssh connection to that host.
 const REMOTE_SEP = "~";
@@ -21,11 +22,13 @@ const REMOTE_TIMEOUT_MS = 15000;
 // list (polled every few seconds) doesn't stall on the ssh connect timeout.
 const REMOTE_DOWN_BACKOFF_MS = 30000;
 
-function parseRemoteHosts(raw: string | undefined): string[] {
-  return (raw || "")
-    .split(",")
-    .map((h) => h.trim())
-    .filter((h) => /^[a-zA-Z0-9_.-]+$/.test(h));
+function parseRemoteHosts(raw: string | undefined): Map<string, string> {
+  const hosts = new Map<string, string>();
+  for (const entry of (raw || "").split(",")) {
+    const [host, label] = entry.split("=").map((part) => part.trim());
+    if (host && /^[a-zA-Z0-9_.-]+$/.test(host)) hosts.set(host, label || host);
+  }
+  return hosts;
 }
 
 function shQuote(arg: string): string {
@@ -98,10 +101,21 @@ export const TMUX_NAMED_KEYS = new Set([
 export class TmuxService {
   private safetyService: SafetyService | null = null;
   readonly remoteHosts: string[];
+  private readonly hostLabels: Map<string, string>;
   private remoteDownUntil = new Map<string, number>();
 
-  constructor(remoteHosts: string[] = parseRemoteHosts(process.env.TMUX_REMOTE_HOSTS)) {
-    this.remoteHosts = remoteHosts;
+  // remoteHosts: ssh aliases, or a host→label map; defaults to TMUX_REMOTE_HOSTS.
+  constructor(remoteHosts: string[] | Map<string, string> = parseRemoteHosts(process.env.TMUX_REMOTE_HOSTS)) {
+    this.hostLabels = Array.isArray(remoteHosts)
+      ? new Map(remoteHosts.map((h) => [h, h]))
+      : remoteHosts;
+    this.remoteHosts = [...this.hostLabels.keys()];
+  }
+
+  // UI name for a session: "wflow" locally, "wflow (MN)" on a labelled remote host.
+  displayName(session: string): string {
+    const { host, local } = this.splitHost(session);
+    return host ? `${local} (${this.hostLabels.get(host) ?? host})` : session;
   }
 
   // Split "<host>~<rest>" into its remote host and local tmux target. A target

@@ -116,6 +116,7 @@ export function registerTmuxRoutes(
 
         result.push({
           session_name: sessionName,
+          display_name: tmuxService.displayName(sessionName),
           db_id: dbSession?.id || null,
           project_id: dbSession?.project_id || null,
           panes: sessionPanes

@@ -24,4 +24,11 @@ describe('TmuxService remote hosts', () => {
   it('has no remote hosts unless configured', () => {
     expect(new TmuxService([]).isRemote('140~agj:0.0')).toBe(false);
   });
+
+  it('labels remote sessions for the UI', () => {
+    const labelled = new TmuxService(new Map([['140', 'MN'], ['182', 'HS']]));
+    expect(labelled.displayName('140~wflow')).toBe('wflow (MN)');
+    expect(labelled.displayName('182~media')).toBe('media (HS)');
+    expect(labelled.displayName('agj')).toBe('agj');
+  });
 });
