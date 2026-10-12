@@ -1,4 +1,7 @@
 import { FastifyInstance } from "fastify";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { TmuxService } from "../../tmux/tmux-service.js";
 import { TmuxStreamManager } from "../../tmux/tmux-stream-manager.js";
 import { DatabaseService } from "../../db/database.js";
@@ -28,6 +31,23 @@ const VIEW_IMAGE_TYPES: Record<string, string> = {
   avif: "image/avif",
 };
 const VIEW_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
+
+type ViewDocKind = "pdf" | "markdown" | "text" | "docx" | "doc";
+const VIEW_DOC_KINDS: Record<string, ViewDocKind> = {
+  pdf: "pdf",
+  md: "markdown",
+  markdown: "markdown",
+  txt: "text",
+  docx: "docx",
+  doc: "doc",
+};
+const VIEW_DOC_MAX_BYTES: Record<ViewDocKind, number> = {
+  pdf: 50 * 1024 * 1024,
+  markdown: 5 * 1024 * 1024,
+  text: 5 * 1024 * 1024,
+  docx: 25 * 1024 * 1024,
+  doc: 25 * 1024 * 1024,
+};
 
 export function registerTmuxRoutes(
   app: FastifyInstance,
@@ -398,58 +418,107 @@ export function registerTmuxRoutes(
     }
   );
 
-  // Serve an image an agent mentioned in the terminal chat (absolute, ~/, or relative
-  // to the pane's cwd) so the owner can tap the path and view it. Image types only,
-  // and the resolved real path must stay under the home dir or /tmp.
+  // Resolve a file path an agent mentioned in the terminal chat (absolute, ~/, or
+  // relative to the pane's cwd) to a real file under the home dir or /tmp. Returns
+  // the real path, or an HTTP status + message to send back.
+  async function resolveViewablePath(
+    raw: string,
+    target: string,
+    maxBytes: number,
+    noun: string
+  ): Promise<{ real: string } | { code: number; error: string }> {
+    let resolved: string;
+    if (raw.startsWith("~/")) {
+      resolved = path.join(os.homedir(), raw.slice(2));
+    } else if (path.isAbsolute(raw)) {
+      resolved = raw;
+    } else {
+      let base: string | null = null;
+      if (target) {
+        try { base = await tmuxService.paneCurrentPath(target); } catch { base = null; }
+      }
+      resolved = path.resolve(base || process.cwd(), raw);
+    }
+
+    let real: string;
+    try {
+      real = fs.realpathSync(resolved);
+    } catch {
+      return { code: 404, error: `${noun} not found` };
+    }
+    const roots = [os.homedir(), "/tmp"].map((r) => {
+      try { return fs.realpathSync(r); } catch { return r; }
+    });
+    if (!roots.some((root) => real.startsWith(root + path.sep))) {
+      return { code: 403, error: "Access denied" };
+    }
+    const stat = fs.statSync(real);
+    if (!stat.isFile()) return { code: 404, error: `${noun} not found` };
+    if (stat.size > maxBytes) {
+      return { code: 413, error: `${noun} exceeds ${Math.round(maxBytes / 1024 / 1024)}MB limit` };
+    }
+    return { real };
+  }
+
+  // Serve an image an agent mentioned in the terminal chat so the owner can tap the
+  // path and view it. Image types only.
   app.get<{ Querystring: { path?: string; target?: string } }>(
     "/api/tmux/image",
     { preHandler: [authMiddleware, requireOwner] },
     async (request, reply) => {
-      const fs = await import("node:fs");
-      const os = await import("node:os");
-      const pathMod = await import("node:path");
       const raw = String(request.query.path || "").trim();
       if (!raw) return reply.code(400).send({ error: "path is required" });
 
-      const ext = pathMod.extname(raw).slice(1).toLowerCase();
+      const ext = path.extname(raw).slice(1).toLowerCase();
       const contentType = VIEW_IMAGE_TYPES[ext];
       if (!contentType) return reply.code(400).send({ error: "not a supported image type" });
 
-      let resolved: string;
-      if (raw.startsWith("~/")) {
-        resolved = pathMod.join(os.homedir(), raw.slice(2));
-      } else if (pathMod.isAbsolute(raw)) {
-        resolved = raw;
-      } else {
-        let base: string | null = null;
-        const target = String(request.query.target || "").trim();
-        if (target) {
-          try { base = await tmuxService.paneCurrentPath(target); } catch { base = null; }
-        }
-        resolved = pathMod.resolve(base || process.cwd(), raw);
-      }
-
-      let real: string;
-      try {
-        real = fs.realpathSync(resolved);
-      } catch {
-        return reply.code(404).send({ error: "image not found" });
-      }
-      const roots = [os.homedir(), "/tmp"].map((r) => {
-        try { return fs.realpathSync(r); } catch { return r; }
-      });
-      if (!roots.some((root) => real.startsWith(root + pathMod.sep))) {
-        return reply.code(403).send({ error: "Access denied" });
-      }
-      const stat = fs.statSync(real);
-      if (!stat.isFile()) return reply.code(404).send({ error: "image not found" });
-      if (stat.size > VIEW_IMAGE_MAX_BYTES) return reply.code(413).send({ error: "image exceeds 25MB limit" });
+      const found = await resolveViewablePath(raw, String(request.query.target || "").trim(), VIEW_IMAGE_MAX_BYTES, "image");
+      if ("code" in found) return reply.code(found.code).send({ error: found.error });
 
       return reply
         .header("Content-Type", contentType)
         .header("X-Content-Type-Options", "nosniff")
         .header("Cache-Control", "private, no-store")
-        .send(fs.readFileSync(real));
+        .send(fs.readFileSync(found.real));
+    }
+  );
+
+  // Serve a document an agent mentioned: PDF as bytes (rendered client-side by
+  // PDF.js), Markdown/text as JSON text, .docx converted to HTML (sanitized again in
+  // the browser). Nothing is ever served as text/html from the app's origin.
+  app.get<{ Querystring: { path?: string; target?: string } }>(
+    "/api/tmux/doc",
+    { preHandler: [authMiddleware, requireOwner] },
+    async (request, reply) => {
+      const raw = String(request.query.path || "").trim();
+      if (!raw) return reply.code(400).send({ error: "path is required" });
+
+      const ext = path.extname(raw).slice(1).toLowerCase();
+      const kind = VIEW_DOC_KINDS[ext];
+      if (!kind) return reply.code(400).send({ error: "not a supported document type" });
+
+      const found = await resolveViewablePath(raw, String(request.query.target || "").trim(), VIEW_DOC_MAX_BYTES[kind], "document");
+      if ("code" in found) return reply.code(found.code).send({ error: found.error });
+
+      reply.header("X-Content-Type-Options", "nosniff").header("Cache-Control", "private, no-store");
+      if (kind === "pdf" || kind === "doc") {
+        return reply
+          .header("Content-Type", kind === "pdf" ? "application/pdf" : "application/msword")
+          .header("Content-Disposition", `attachment; filename="${path.basename(found.real).replace(/[^\w.-]/g, "_")}"`)
+          .send(fs.readFileSync(found.real));
+      }
+      if (kind === "markdown" || kind === "text") {
+        return { kind, name: path.basename(found.real), text: fs.readFileSync(found.real, "utf8") };
+      }
+      try {
+        const mammoth = await import("mammoth");
+        const result = await mammoth.convertToHtml({ path: found.real });
+        return { kind: "docx", name: path.basename(found.real), html: result.value };
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return reply.code(422).send({ error: `could not read .docx: ${msg}` });
+      }
     }
   );
 

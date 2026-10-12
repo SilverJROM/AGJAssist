@@ -2731,14 +2731,21 @@ function rejoinWrappedUrls(text) {
 // token completes it with an image extension, so ordinary prose is never merged.
 function rejoinWrappedImagePaths(text) {
   const s = String(text);
-  if (!/\.(?:png|jpe?g|gif|webp|bmp|avif)\b/i.test(s)) return s;
+  if (!new RegExp(`(?:${_VIEW_EXT})\\b`, 'i').test(s)) return s;
   const lines = s.split('\n');
-  const endsMidPath = /(?:^|\s)(?:~|\.{1,2})?\/[\w.@+\/-]*$/;
-  const completesImage = /^\s*[\w.@+\/-]*\.(?:png|jpe?g|gif|webp|bmp|avif)(?![\w\/-])/i;
+  const tailPath = /(?:^|\s)((?:~|\.{1,2})?\/[\w.@+\/-]*)$/;
+  const headToken = /^\s*([\w.@+\/-]+)/;
+  const endsViewable = new RegExp(`\\.(?:${_VIEW_EXT})$`, 'i');
   const out = [];
   for (let i = 0; i < lines.length; i += 1) {
     let line = lines[i];
-    while (i + 1 < lines.length && endsMidPath.test(line) && completesImage.test(lines[i + 1])) {
+    while (i + 1 < lines.length) {
+      const tail = line.match(tailPath);
+      const head = lines[i + 1].match(headToken);
+      // Join only when the line ends mid-path (not on an already-complete file) and
+      // the joined token completes a viewable file — the wrap can fall anywhere,
+      // even between "name." and "md".
+      if (!tail || !head || endsViewable.test(tail[1]) || !endsViewable.test(tail[1] + head[1])) break;
       line += lines[i + 1].replace(/^\s+/, '');
       i += 1;
     }
@@ -2775,13 +2782,26 @@ function highlightQuery(str, query) {
   return out;
 }
 
-// An image file path in agent text (absolute, ~/, ./, or relative to the pane's
-// cwd) — tapping it opens the in-app image viewer instead of a new tab.
+// An image or document path in agent text (absolute, ~/, ./, or relative to the
+// pane's cwd) — tapping it opens the in-app viewer instead of a new tab.
 const _IMG_EXT = 'png|jpe?g|gif|webp|bmp|avif';
-const _IMG_PATH_RE = new RegExp(`(?<![\\w/.~-])((?:~/|\\.{1,2}/|/)?(?:[\\w.@+-]+/)*[\\w.@+-]+\\.(?:${_IMG_EXT}))(?![\\w/-])`, 'gi');
+const _DOC_EXT = 'pdf|md|markdown|docx?';
+const _VIEW_EXT = `${_IMG_EXT}|${_DOC_EXT}`;
+const _IMG_PATH_RE = new RegExp(`(?<![\\w/.~-])((?:~/|\\.{1,2}/|/)?(?:[\\w.@+-]+/)*[\\w.@+-]+\\.(?:${_VIEW_EXT}))(?![\\w/-])`, 'gi');
 const _IMG_URL_RE = new RegExp(`\\.(?:${_IMG_EXT})(?:[?#].*)?$`, 'i');
 
-// The friendly terminal sets this so relative image paths resolve against its pane.
+function viewKindFor(name) {
+  const ext = String(name || '').split(/[?#]/)[0].split('.').pop().toLowerCase();
+  if (new RegExp(`^(?:${_IMG_EXT})$`).test(ext)) return 'image';
+  if (ext === 'pdf') return 'pdf';
+  if (ext === 'md' || ext === 'markdown') return 'markdown';
+  if (ext === 'docx') return 'docx';
+  if (ext === 'doc') return 'doc';
+  return null;
+}
+const _VIEW_ICON = { image: '🖼', pdf: '📕', markdown: '📝', docx: '📄', doc: '📄' };
+
+// The friendly terminal sets this so relative paths resolve against its pane.
 let _imageViewerTarget = null;
 function openImageViewer(detail) {
   window.dispatchEvent(new CustomEvent('agj-open-image', {
@@ -2790,12 +2810,13 @@ function openImageViewer(detail) {
 }
 
 function imageLink(label, detail) {
-  return html`<a class="terminal-chat-link terminal-chat-imglink" href="#" title="View image"
-    onClick=${(e) => { e.preventDefault(); e.stopPropagation(); openImageViewer(detail); }}>🖼 ${label}</a>`;
+  const kind = viewKindFor(detail.path || detail.url) || 'image';
+  return html`<a class="terminal-chat-link terminal-chat-imglink" href="#" title=${kind === 'image' ? 'View image' : 'View document'}
+    onClick=${(e) => { e.preventDefault(); e.stopPropagation(); openImageViewer(detail); }}>${_VIEW_ICON[kind]} ${label}</a>`;
 }
 
 function linkifyImagePaths(s, query) {
-  if (!new RegExp(`\\.(?:${_IMG_EXT})`, 'i').test(s)) return highlightQuery(s, query);
+  if (!new RegExp(`\\.(?:${_VIEW_EXT})`, 'i').test(s)) return highlightQuery(s, query);
   const out = [];
   let last = 0;
   let m;
@@ -2828,6 +2849,240 @@ function linkify(text, query) {
   }
   if (last < s.length) out.push(linkifyImagePaths(s.slice(last), query));
   return out;
+}
+
+// Lazy-load a classic (UMD) script once; resolves with window[globalName].
+const _scriptLoads = {};
+function loadScriptGlobal(src, globalName) {
+  if (window[globalName]) return Promise.resolve(window[globalName]);
+  if (!_scriptLoads[src]) {
+    _scriptLoads[src] = new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = src;
+      el.async = true;
+      el.onload = () => (window[globalName] ? resolve(window[globalName]) : reject(new Error(`${globalName} failed to load`)));
+      el.onerror = () => { delete _scriptLoads[src]; reject(new Error(`Could not load ${globalName}`)); };
+      document.head.appendChild(el);
+    });
+  }
+  return _scriptLoads[src];
+}
+// Legacy pdf.js build: works in older iOS/Telegram webviews.
+const PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/';
+async function loadPdfJs() {
+  const lib = await loadScriptGlobal(PDFJS_BASE + 'pdf.min.js', 'pdfjsLib');
+  lib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js';
+  return lib;
+}
+// Markdown → HTML, and sanitize any HTML (md or .docx) before it touches the DOM.
+// Links open in a new tab so they never navigate the app away.
+async function renderSafeHtml({ markdown, html: rawHtml }) {
+  const [marked, purify] = await Promise.all([
+    markdown != null ? loadScriptGlobal('https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js', 'marked') : null,
+    loadScriptGlobal('https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js', 'DOMPurify'),
+  ]);
+  if (!purify._agjLinkHook) {
+    purify.addHook('afterSanitizeAttributes', (node) => {
+      if (node.tagName === 'A' && node.getAttribute('href')) {
+        node.setAttribute('target', '_blank');
+        node.setAttribute('rel', 'noopener noreferrer');
+      }
+    });
+    purify._agjLinkHook = true;
+  }
+  const source = markdown != null ? marked.parse(markdown, { gfm: true, breaks: false }) : rawHtml;
+  return purify.sanitize(source);
+}
+
+const DOC_ZOOM_MIN = 0.5;
+const DOC_ZOOM_MAX = 4;
+// Full-screen document viewer (PDF / Markdown / .docx; legacy .doc → download).
+// Zoom with −/+ or ctrl+wheel or pinch; scroll to move; ✕ / Esc to close.
+function DocViewer({ req, kind, onClose }) {
+  const dialogRef = useRef(null);
+  const stageRef = useRef(null);
+  const pagesRef = useRef(null);
+  const [status, setStatus] = useState('loading');
+  const [error, setError] = useState('');
+  const [safeHtml, setSafeHtml] = useState('');
+  const [pdf, setPdf] = useState(null);
+  const [pageCount, setPageCount] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [download, setDownload] = useState(null);
+  const pinch = useRef(null);
+  const label = req.path || req.url || '';
+  const name = label.split('/').pop();
+
+  useEffect(() => {
+    const dlg = dialogRef.current;
+    if (!dlg || dlg.open) return;
+    if (typeof dlg.showModal === 'function') {
+      try { dlg.showModal(); } catch { dlg.setAttribute('open', ''); }
+    } else {
+      dlg.setAttribute('open', '');
+    }
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // Fetch + prepare the document.
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = '';
+    let loadedPdf = null;
+    const qs = '?path=' + encodeURIComponent(req.path || '') + (req.target ? '&target=' + encodeURIComponent(req.target) : '');
+    const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/tmux/doc${qs}`, { headers });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        if (kind === 'pdf' || kind === 'doc') {
+          const blob = await res.blob();
+          if (cancelled) return;
+          objectUrl = URL.createObjectURL(blob);
+          setDownload({ url: objectUrl, name });
+          if (kind === 'doc') { setStatus('unsupported'); return; }
+          const [lib, data] = await Promise.all([loadPdfJs(), blob.arrayBuffer()]);
+          loadedPdf = await lib.getDocument({ data }).promise;
+          if (cancelled) { loadedPdf.destroy(); return; }
+          setPdf(loadedPdf);
+          setPageCount(loadedPdf.numPages);
+          setStatus('ready');
+          return;
+        }
+        const body = await res.json();
+        if (kind === 'markdown') {
+          objectUrl = URL.createObjectURL(new Blob([body.text], { type: 'text/markdown' }));
+          setDownload({ url: objectUrl, name });
+        }
+        const clean = await renderSafeHtml(kind === 'markdown' ? { markdown: body.text } : { html: body.html });
+        if (cancelled) return;
+        setSafeHtml(clean);
+        setStatus('ready');
+      } catch (err) {
+        if (!cancelled) { setError(err.message || 'Could not load document'); setStatus('error'); }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (loadedPdf) loadedPdf.destroy();
+    };
+  }, [req, kind]);
+
+  // Render PDF pages lazily (as they scroll into view) at fit-width × zoom.
+  useEffect(() => {
+    if (!pdf || !pagesRef.current || !stageRef.current) return undefined;
+    const host = pagesRef.current;
+    host.innerHTML = '';
+    const fitWidth = Math.max(200, stageRef.current.clientWidth - 24);
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    let cancelled = false;
+    const tasks = [];
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting || entry.target.dataset.rendered) continue;
+        entry.target.dataset.rendered = '1';
+        const n = Number(entry.target.dataset.page);
+        pdf.getPage(n).then((page) => {
+          if (cancelled) return;
+          const base = page.getViewport({ scale: 1 });
+          const scale = (fitWidth / base.width) * zoom;
+          const viewport = page.getViewport({ scale: scale * dpr });
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.floor(viewport.width);
+          canvas.height = Math.floor(viewport.height);
+          canvas.style.width = `${Math.floor(viewport.width / dpr)}px`;
+          canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
+          const task = page.render({ canvasContext: canvas.getContext('2d'), viewport });
+          tasks.push(task);
+          return task.promise.then(() => {
+            if (cancelled) return;
+            entry.target.replaceChildren(canvas);
+          });
+        }).catch(() => {});
+      }
+    }, { root: stageRef.current, rootMargin: '600px 0px' });
+    (async () => {
+      // Size placeholders from page 1 so the scrollbar is right before pages render.
+      const first = await pdf.getPage(1).catch(() => null);
+      if (!first) return;
+      if (cancelled) return;
+      const base = first.getViewport({ scale: 1 });
+      const w = Math.floor(fitWidth * zoom);
+      const h = Math.floor((base.height / base.width) * w);
+      for (let n = 1; n <= pdf.numPages; n += 1) {
+        const slot = document.createElement('div');
+        slot.className = 'doc-viewer-pdfpage';
+        slot.dataset.page = String(n);
+        slot.style.width = `${w}px`;
+        slot.style.minHeight = `${h}px`;
+        host.appendChild(slot);
+        observer.observe(slot);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+      for (const t of tasks) { try { t.cancel(); } catch { /* finished */ } }
+    };
+  }, [pdf, zoom]);
+
+  const clampZoom = (z) => Math.min(DOC_ZOOM_MAX, Math.max(DOC_ZOOM_MIN, Math.round(z * 100) / 100));
+  const zoomBy = (f) => setZoom((z) => clampZoom(z * f));
+  const onWheel = (e) => {
+    if (!e.ctrlKey && !e.metaKey) return; // plain wheel scrolls the document
+    e.preventDefault();
+    zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
+  };
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const onTouchStart = (e) => { if (e.touches.length === 2) pinch.current = { d: dist(e.touches), z: zoom }; };
+  const onTouchMove = (e) => {
+    if (e.touches.length !== 2 || !pinch.current) return;
+    e.preventDefault();
+    const scale = dist(e.touches) / (pinch.current.d || 1);
+    if (stageRef.current) stageRef.current.style.setProperty('--doc-pinch', String(Math.min(3, Math.max(0.33, scale))));
+    pinch.current.scale = scale;
+  };
+  const onTouchEnd = () => {
+    if (!pinch.current) return;
+    if (stageRef.current) stageRef.current.style.removeProperty('--doc-pinch');
+    if (pinch.current.scale) setZoom(clampZoom(pinch.current.z * pinch.current.scale));
+    pinch.current = null;
+  };
+
+  return html`
+    <dialog ref=${dialogRef} class="image-viewer doc-viewer" aria-label="Document viewer"
+      onCancel=${(e) => { e.preventDefault(); onClose(); }}>
+      <div class="image-viewer-bar">
+        <span class="image-viewer-name" title=${label}>${_VIEW_ICON[kind]} ${name}${pageCount ? html` · ${pageCount}p` : ''}</span>
+        ${download ? html`<a class="image-viewer-btn doc-viewer-dl" href=${download.url} download=${download.name} aria-label="Download">⤓</a>` : ''}
+        <button type="button" class="image-viewer-btn" aria-label="Zoom out" onClick=${() => zoomBy(1 / 1.25)}>−</button>
+        <span class="image-viewer-pct">${Math.round(zoom * 100)}%</span>
+        <button type="button" class="image-viewer-btn" aria-label="Zoom in" onClick=${() => zoomBy(1.25)}>+</button>
+        <button type="button" class="image-viewer-btn" aria-label="Reset zoom" onClick=${() => setZoom(1)}>Fit</button>
+        <button type="button" class="image-viewer-btn image-viewer-close" aria-label="Close" onClick=${onClose}>✕</button>
+      </div>
+      <div class="doc-viewer-stage" ref=${stageRef} onWheel=${onWheel}
+        onTouchStart=${onTouchStart} onTouchMove=${onTouchMove} onTouchEnd=${onTouchEnd} onTouchCancel=${onTouchEnd}>
+        ${status === 'loading' ? html`<div class="image-viewer-msg">Loading…</div>` : ''}
+        ${status === 'error' ? html`<div class="image-viewer-msg">⚠ ${error}<br /><small>${label}</small></div>` : ''}
+        ${status === 'unsupported' ? html`<div class="image-viewer-msg">Legacy Word (.doc) files can't be previewed here.<br />Use ⤓ to download it, or save it as .docx.<br /><small>${label}</small></div>` : ''}
+        ${kind === 'pdf'
+          ? html`<div class="doc-viewer-pdf" ref=${pagesRef}></div>`
+          : status === 'ready'
+            ? html`<article class="doc-viewer-page" style=${`font-size:${16 * zoom}px`} dangerouslySetInnerHTML=${{ __html: safeHtml }}></article>`
+            : ''}
+      </div>
+    </dialog>
+  `;
 }
 
 // Full-screen image viewer: pinch / wheel / buttons to zoom, drag to pan,
@@ -2874,7 +3129,7 @@ function ImageViewer() {
 
   useEffect(() => {
     setSrc(''); setError(''); setView({ scale: 1, x: 0, y: 0 });
-    if (!req) return undefined;
+    if (!req || viewKindFor(req.path || req.url) !== 'image') return undefined;
     if (req.url) { setSrc(req.url); return undefined; }
     let objectUrl = '';
     let cancelled = false;
@@ -2897,6 +3152,8 @@ function ImageViewer() {
   }, [req]);
 
   if (!req) return null;
+  const reqKind = viewKindFor(req.path || req.url);
+  if (reqKind && reqKind !== 'image') return html`<${DocViewer} req=${req} kind=${reqKind} onClose=${close} key=${req.path || req.url} />`;
 
   const clampScale = (s) => Math.min(IMAGE_VIEWER_MAX, Math.max(IMAGE_VIEWER_MIN, s));
   const zoomBy = (factor) => setView((v) => {
@@ -4361,6 +4618,11 @@ function CodeTab({ projectId, projectRoot }) {
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
 
   const openFile = useCallback(async (filePath) => {
+    // Images and documents open in the viewer instead of the code editor.
+    if (projectRoot && viewKindFor(filePath)) {
+      openImageViewer({ path: `${projectRoot.replace(/\/+$/, '')}/${filePath.replace(/^\/+/, '')}` });
+      return;
+    }
     const existingIdx = openTabs.findIndex(t => t.path === filePath);
     if (existingIdx >= 0) {
       setActiveTabIdx(existingIdx);
@@ -4375,7 +4637,7 @@ function CodeTab({ projectId, projectRoot }) {
     } catch (e) {
       alert(e.message);
     }
-  }, [openTabs, projectId]);
+  }, [openTabs, projectId, projectRoot]);
 
   const closeTab = useCallback((idx, force = false) => {
     const tab = openTabs[idx];

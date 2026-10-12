@@ -74,3 +74,78 @@ describe('GET /api/tmux/image', () => {
     expect(res.statusCode).toBe(404);
   });
 });
+
+// GET /api/tmux/doc — the terminal chat's tap-to-view for PDF / Markdown / Word files.
+describe('GET /api/tmux/doc', () => {
+  let app: FastifyInstance;
+  let dir: string;
+  const fixtures = path.resolve(__dirname, '../fixtures/docs');
+  const owner = { authorization: 'Bearer owner-token' };
+
+  beforeAll(async () => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agj-doc-'));
+    for (const f of ['sample.pdf', 'sample.md', 'sample.docx', 'legacy.doc']) {
+      fs.copyFileSync(path.join(fixtures, f), path.join(dir, f));
+    }
+    fs.writeFileSync(path.join(dir, 'notes.exe'), 'MZ');
+    fs.symlinkSync('/etc/hostname', path.join(dir, 'escape.md'));
+
+    app = Fastify({ logger: false });
+    const authService = {
+      verifyToken: (t: string) => (t.includes('owner')
+        ? { id: 1, role: 'owner', username: 'o' }
+        : t.includes('viewer') ? { id: 2, role: 'viewer', username: 'v' } : null),
+    } as unknown as AuthService;
+    const tmux = { paneCurrentPath: async (t: string) => (t === 'agent:0.0' ? dir : null) };
+    const noop = {} as never;
+    registerTmuxRoutes(app, authService, tmux as never, noop, noop, noop, noop);
+    await app.ready();
+  });
+
+  afterAll(async () => {
+    await app.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  const get = (query: string, headers = owner) =>
+    app.inject({ method: 'GET', url: `/api/tmux/doc?${query}`, headers });
+
+  it('serves a PDF as application/pdf bytes, never inline HTML', async () => {
+    const res = await get('path=' + encodeURIComponent(path.join(dir, 'sample.pdf')));
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toBe('application/pdf');
+    expect(res.headers['content-disposition']).toMatch(/^attachment;/);
+    expect(res.rawPayload.subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('returns Markdown as JSON text (relative to the pane cwd)', async () => {
+    const res = await get('path=sample.md&target=agent%3A0.0');
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toMatch(/^application\/json/);
+    const body = res.json();
+    expect(body.kind).toBe('markdown');
+    expect(body.text).toContain('# Viewer test');
+  });
+
+  it('converts .docx to HTML inside JSON', async () => {
+    const res = await get('path=' + encodeURIComponent(path.join(dir, 'sample.docx')));
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.kind).toBe('docx');
+    expect(body.html).toContain('<h1>Word viewer test</h1>');
+    expect(body.html).toContain('<strong>Bold run</strong>');
+  });
+
+  it('serves legacy .doc as a download', async () => {
+    const res = await get('path=' + encodeURIComponent(path.join(dir, 'legacy.doc')));
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toBe('application/msword');
+  });
+
+  it('refuses non-owners, unsupported types, escapes, and missing files', async () => {
+    expect((await get('path=' + encodeURIComponent(path.join(dir, 'sample.md')), { authorization: 'Bearer viewer-token' })).statusCode).toBe(403);
+    expect((await get('path=' + encodeURIComponent(path.join(dir, 'notes.exe')))).statusCode).toBe(400);
+    expect((await get('path=' + encodeURIComponent(path.join(dir, 'escape.md')))).statusCode).toBe(403);
+    expect((await get('path=' + encodeURIComponent(path.join(dir, 'gone.pdf')))).statusCode).toBe(404);
+  });
+});
