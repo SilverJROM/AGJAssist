@@ -4266,3 +4266,80 @@ body.tg-miniapp {
 .xmachines-view .ups-battery::before{ content:"battery "; color:var(--xm-faint); font-family:system-ui; font-size:10px; text-transform:uppercase; letter-spacing:.03em; }
 .xmachines-view .ups-runtime::before{ content:"runtime "; color:var(--xm-faint); font-family:system-ui; font-size:10px; text-transform:uppercase; letter-spacing:.03em; }
 .xmachines-view .ups-load::before{ content:"load "; color:var(--xm-faint); font-family:system-ui; font-size:10px; text-transform:uppercase; letter-spacing:.03em; }
+
+/* Terminal chat: tappable image paths + full-screen image viewer */
+.terminal-chat-imglink { cursor: zoom-in; }
+.image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.97);
+  color: #fff;
+}
+.image-viewer-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: rgba(0, 0, 0, 0.6);
+}
+.image-viewer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  opacity: 0.85;
+}
+.image-viewer-pct {
+  min-width: 44px;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+.image-viewer-btn {
+  min-width: 38px;
+  height: 38px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.image-viewer-btn:active { background: rgba(255, 255, 255, 0.2); }
+.image-viewer-close { margin-left: 4px; }
+.image-viewer-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.image-viewer-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform-origin: center center;
+  will-change: transform;
+  cursor: grab;
+  -webkit-user-drag: none;
+}
+.image-viewer-msg {
+  padding: 24px;
+  text-align: center;
+  font-size: 14px;
+  opacity: 0.85;
+  word-break: break-all;
+}

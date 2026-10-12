@@ -17,6 +17,18 @@ import {
   utcAttachStamp
 } from "../../tmux/tmux-image-helpers.js";
 
+// No SVG: it can carry script, and this is served from the app's own origin.
+const VIEW_IMAGE_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  bmp: "image/bmp",
+  avif: "image/avif",
+};
+const VIEW_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
+
 export function registerTmuxRoutes(
   app: FastifyInstance,
   authService: AuthService,
@@ -383,6 +395,61 @@ export function registerTmuxRoutes(
         const msg = error instanceof Error ? error.message : String(error);
         return reply.code(400).send({ error: msg });
       }
+    }
+  );
+
+  // Serve an image an agent mentioned in the terminal chat (absolute, ~/, or relative
+  // to the pane's cwd) so the owner can tap the path and view it. Image types only,
+  // and the resolved real path must stay under the home dir or /tmp.
+  app.get<{ Querystring: { path?: string; target?: string } }>(
+    "/api/tmux/image",
+    { preHandler: [authMiddleware, requireOwner] },
+    async (request, reply) => {
+      const fs = await import("node:fs");
+      const os = await import("node:os");
+      const pathMod = await import("node:path");
+      const raw = String(request.query.path || "").trim();
+      if (!raw) return reply.code(400).send({ error: "path is required" });
+
+      const ext = pathMod.extname(raw).slice(1).toLowerCase();
+      const contentType = VIEW_IMAGE_TYPES[ext];
+      if (!contentType) return reply.code(400).send({ error: "not a supported image type" });
+
+      let resolved: string;
+      if (raw.startsWith("~/")) {
+        resolved = pathMod.join(os.homedir(), raw.slice(2));
+      } else if (pathMod.isAbsolute(raw)) {
+        resolved = raw;
+      } else {
+        let base: string | null = null;
+        const target = String(request.query.target || "").trim();
+        if (target) {
+          try { base = await tmuxService.paneCurrentPath(target); } catch { base = null; }
+        }
+        resolved = pathMod.resolve(base || process.cwd(), raw);
+      }
+
+      let real: string;
+      try {
+        real = fs.realpathSync(resolved);
+      } catch {
+        return reply.code(404).send({ error: "image not found" });
+      }
+      const roots = [os.homedir(), "/tmp"].map((r) => {
+        try { return fs.realpathSync(r); } catch { return r; }
+      });
+      if (!roots.some((root) => real.startsWith(root + pathMod.sep))) {
+        return reply.code(403).send({ error: "Access denied" });
+      }
+      const stat = fs.statSync(real);
+      if (!stat.isFile()) return reply.code(404).send({ error: "image not found" });
+      if (stat.size > VIEW_IMAGE_MAX_BYTES) return reply.code(413).send({ error: "image exceeds 25MB limit" });
+
+      return reply
+        .header("Content-Type", contentType)
+        .header("X-Content-Type-Options", "nosniff")
+        .header("Cache-Control", "private, no-store")
+        .send(fs.readFileSync(real));
     }
   );
 

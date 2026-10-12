@@ -2726,6 +2726,27 @@ function rejoinWrappedUrls(text) {
   return out.join('\n');
 }
 
+// Same for an image path the terminal hard-wrapped (often with an indent on the
+// continuation). Joined only when the line ends mid-path and the next line's first
+// token completes it with an image extension, so ordinary prose is never merged.
+function rejoinWrappedImagePaths(text) {
+  const s = String(text);
+  if (!/\.(?:png|jpe?g|gif|webp|bmp|avif)\b/i.test(s)) return s;
+  const lines = s.split('\n');
+  const endsMidPath = /(?:^|\s)(?:~|\.{1,2})?\/[\w.@+\/-]*$/;
+  const completesImage = /^\s*[\w.@+\/-]*\.(?:png|jpe?g|gif|webp|bmp|avif)(?![\w\/-])/i;
+  const out = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    let line = lines[i];
+    while (i + 1 < lines.length && endsMidPath.test(line) && completesImage.test(lines[i + 1])) {
+      line += lines[i + 1].replace(/^\s+/, '');
+      i += 1;
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
 // Make http(s) URLs in agent output tappable (e.g. a `/login` auth link). Splits
 // text on a URL match and renders each URL as a safe new-tab link; everything
 // else stays plain text. Trailing punctuation is not swallowed into the link.
@@ -2754,22 +2775,189 @@ function highlightQuery(str, query) {
   return out;
 }
 
+// An image file path in agent text (absolute, ~/, ./, or relative to the pane's
+// cwd) — tapping it opens the in-app image viewer instead of a new tab.
+const _IMG_EXT = 'png|jpe?g|gif|webp|bmp|avif';
+const _IMG_PATH_RE = new RegExp(`(?<![\\w/.~-])((?:~/|\\.{1,2}/|/)?(?:[\\w.@+-]+/)*[\\w.@+-]+\\.(?:${_IMG_EXT}))(?![\\w/-])`, 'gi');
+const _IMG_URL_RE = new RegExp(`\\.(?:${_IMG_EXT})(?:[?#].*)?$`, 'i');
+
+// The friendly terminal sets this so relative image paths resolve against its pane.
+let _imageViewerTarget = null;
+function openImageViewer(detail) {
+  window.dispatchEvent(new CustomEvent('agj-open-image', {
+    detail: { ...detail, target: detail.target ?? _imageViewerTarget }
+  }));
+}
+
+function imageLink(label, detail) {
+  return html`<a class="terminal-chat-link terminal-chat-imglink" href="#" title="View image"
+    onClick=${(e) => { e.preventDefault(); e.stopPropagation(); openImageViewer(detail); }}>🖼 ${label}</a>`;
+}
+
+function linkifyImagePaths(s, query) {
+  if (!new RegExp(`\\.(?:${_IMG_EXT})`, 'i').test(s)) return highlightQuery(s, query);
+  const out = [];
+  let last = 0;
+  let m;
+  _IMG_PATH_RE.lastIndex = 0;
+  while ((m = _IMG_PATH_RE.exec(s)) !== null) {
+    if (m.index > last) out.push(highlightQuery(s.slice(last, m.index), query));
+    out.push(imageLink(m[0], { path: m[0] }));
+    last = m.index + m[0].length;
+  }
+  if (last === 0) return highlightQuery(s, query);
+  if (last < s.length) out.push(highlightQuery(s.slice(last), query));
+  return out;
+}
+
 function linkify(text, query) {
   const s0 = typeof text === 'string' ? text : String(text == null ? '' : text);
-  const s = rejoinWrappedUrls(s0);
-  if (!/https?:\/\//.test(s)) return highlightQuery(s, query);
+  const s = rejoinWrappedImagePaths(rejoinWrappedUrls(s0));
+  if (!/https?:\/\//.test(s)) return linkifyImagePaths(s, query);
   const out = [];
   let last = 0;
   let m;
   _URL_RE.lastIndex = 0;
   while ((m = _URL_RE.exec(s)) !== null) {
-    if (m.index > last) out.push(highlightQuery(s.slice(last, m.index), query));
+    if (m.index > last) out.push(linkifyImagePaths(s.slice(last, m.index), query));
     const url = m[0];
-    out.push(html`<a class="terminal-chat-link" href=${url} target="_blank" rel="noopener noreferrer">${url}</a>`);
+    out.push(_IMG_URL_RE.test(url)
+      ? imageLink(url, { url })
+      : html`<a class="terminal-chat-link" href=${url} target="_blank" rel="noopener noreferrer">${url}</a>`);
     last = m.index + url.length;
   }
-  if (last < s.length) out.push(highlightQuery(s.slice(last), query));
+  if (last < s.length) out.push(linkifyImagePaths(s.slice(last), query));
   return out;
+}
+
+// Full-screen image viewer: pinch / wheel / buttons to zoom, drag to pan,
+// double-tap to toggle zoom, ✕ / Esc / tap-outside to close.
+const IMAGE_VIEWER_MIN = 1;
+const IMAGE_VIEWER_MAX = 8;
+function ImageViewer() {
+  const [req, setReq] = useState(null);
+  const [src, setSrc] = useState('');
+  const [error, setError] = useState('');
+  const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
+  const pointers = useRef(new Map());
+  const gesture = useRef(null);
+  const moved = useRef(false);
+  const lastTap = useRef(0);
+
+  const close = useCallback(() => { setReq(null); }, []);
+
+  useEffect(() => {
+    const onOpen = (e) => setReq(e.detail || null);
+    window.addEventListener('agj-open-image', onOpen);
+    return () => window.removeEventListener('agj-open-image', onOpen);
+  }, []);
+
+  useEffect(() => {
+    if (!req) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [req, close]);
+
+  useEffect(() => {
+    setSrc(''); setError(''); setView({ scale: 1, x: 0, y: 0 });
+    if (!req) return undefined;
+    if (req.url) { setSrc(req.url); return undefined; }
+    let objectUrl = '';
+    let cancelled = false;
+    const qs = '?path=' + encodeURIComponent(req.path) + (req.target ? '&target=' + encodeURIComponent(req.target) : '');
+    fetch(`${API_BASE}/api/tmux/image${qs}`, { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+      })
+      .catch((err) => { if (!cancelled) setError(err.message || 'Could not load image'); });
+    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [req]);
+
+  if (!req) return null;
+
+  const clampScale = (s) => Math.min(IMAGE_VIEWER_MAX, Math.max(IMAGE_VIEWER_MIN, s));
+  const zoomBy = (factor) => setView((v) => {
+    const scale = clampScale(v.scale * factor);
+    return scale === 1 ? { scale, x: 0, y: 0 } : { ...v, scale };
+  });
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  const onPointerDown = (e) => {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    moved.current = false;
+    const pts = [...pointers.current.values()];
+    gesture.current = pts.length >= 2
+      ? { kind: 'pinch', startDist: dist(pts[0], pts[1]), startScale: view.scale }
+      : { kind: 'pan', startX: e.clientX, startY: e.clientY, origX: view.x, origY: view.y };
+  };
+  const onPointerMove = (e) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const g = gesture.current;
+    if (!g) return;
+    const pts = [...pointers.current.values()];
+    if (g.kind === 'pinch' && pts.length >= 2) {
+      moved.current = true;
+      const scale = clampScale(g.startScale * (dist(pts[0], pts[1]) / (g.startDist || 1)));
+      setView((v) => (scale === 1 ? { scale, x: 0, y: 0 } : { ...v, scale }));
+    } else if (g.kind === 'pan') {
+      const dx = e.clientX - g.startX;
+      const dy = e.clientY - g.startY;
+      if (Math.abs(dx) + Math.abs(dy) > 4) moved.current = true;
+      setView((v) => (v.scale > 1 ? { ...v, x: g.origX + dx, y: g.origY + dy } : v));
+    }
+  };
+  const onPointerUp = (e) => {
+    const wasTap = e.type === 'pointerup' && pointers.current.size === 1 && !moved.current;
+    pointers.current.delete(e.pointerId);
+    // Double-tap (or double-click) on the image toggles 1x ↔ 2.5x.
+    if (wasTap && e.target.classList?.contains('image-viewer-img')) {
+      const now = Date.now();
+      if (now - lastTap.current < 300) { onDoubleTap(); lastTap.current = 0; } else lastTap.current = now;
+    }
+    const pts = [...pointers.current.values()];
+    gesture.current = pts.length === 1
+      ? { kind: 'pan', startX: pts[0].x, startY: pts[0].y, origX: view.x, origY: view.y }
+      : null;
+  };
+  const onWheel = (e) => { e.preventDefault(); zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15); };
+  const onDoubleTap = () => setView((v) => (v.scale > 1 ? { scale: 1, x: 0, y: 0 } : { ...v, scale: 2.5 }));
+  // Tapping the dark backdrop (not the image, not after a drag) closes the viewer.
+  const onStageClick = (e) => { if (e.target === e.currentTarget && !moved.current) close(); };
+
+  const label = req.path || req.url || '';
+  return html`
+    <div class="image-viewer" role="dialog" aria-modal="true" aria-label="Image viewer">
+      <div class="image-viewer-bar">
+        <span class="image-viewer-name" title=${label}>${label.split('/').pop()}</span>
+        <button type="button" class="image-viewer-btn" aria-label="Zoom out" onClick=${() => zoomBy(1 / 1.5)}>−</button>
+        <span class="image-viewer-pct">${Math.round(view.scale * 100)}%</span>
+        <button type="button" class="image-viewer-btn" aria-label="Zoom in" onClick=${() => zoomBy(1.5)}>+</button>
+        <button type="button" class="image-viewer-btn" aria-label="Reset zoom" onClick=${() => setView({ scale: 1, x: 0, y: 0 })}>1:1</button>
+        <button type="button" class="image-viewer-btn image-viewer-close" aria-label="Close" onClick=${close}>✕</button>
+      </div>
+      <div class="image-viewer-stage" onClick=${onStageClick} onWheel=${onWheel}
+        onPointerDown=${onPointerDown} onPointerMove=${onPointerMove} onPointerUp=${onPointerUp} onPointerCancel=${onPointerUp}>
+        ${error
+          ? html`<div class="image-viewer-msg">⚠ ${error}<br /><small>${label}</small></div>`
+          : !src
+            ? html`<div class="image-viewer-msg">Loading…</div>`
+            : html`<img class="image-viewer-img" src=${src} alt=${label} draggable=${false}
+                onError=${() => setError('Could not load image')}
+                style=${`transform: translate(${view.x}px, ${view.y}px) scale(${view.scale})`} />`}
+      </div>
+    </div>
+  `;
 }
 
 // A monospace box-drawing table (│-delimited rows with content) is rendered in a
@@ -2884,6 +3072,11 @@ function FriendlyTerminalView({ target, sessionName, lineLimit, refreshTick, sho
   const [entries, setEntries] = useState([]);
   const [input, setInput] = useState('');
   const draftViewer = 'friendly-terminal';
+  // Relative image paths the agent mentions resolve against this pane's cwd.
+  useEffect(() => {
+    _imageViewerTarget = target || null;
+    return () => { if (_imageViewerTarget === target) _imageViewerTarget = null; };
+  }, [target]);
   const draftHydratedRef = useRef(false);
   // Persist draft on input change, but skip writes during initial hydration
   useEffect(() => {
@@ -8221,6 +8414,7 @@ function TgApp() {
       `)}
     </nav>
     <${SessionExpiredOverlay} />
+    <${ImageViewer} />
   `;
 }
 
@@ -8612,6 +8806,7 @@ function App() {
     <${Header} user=${user} />
     <main class="main">${content}</main>
     <${SessionExpiredOverlay} />
+    <${ImageViewer} />
   `;
 }
 
