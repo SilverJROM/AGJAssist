@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import Database from 'better-sqlite3';
+import jwt from 'jsonwebtoken';
 
 const ACCEPTANCE_IDS = ['E1', 'E2', 'E3', 'E4'] as const;
 type AcceptanceId = typeof ACCEPTANCE_IDS[number];
@@ -10,7 +11,11 @@ type Failure = { id: AcceptanceId; kind: 'assert'; message?: string };
 
 const REPORT_PATH = path.resolve(process.env.FENCE_REPORT_PATH || 'fence-report-v1.json');
 const APP_ORIGIN = process.env.FENCE_ORIGIN || 'http://localhost:3210';
-const OWNER_TOKEN = process.env.OWNER_TOKEN || 'REDACTED_TEST_JWT';
+const OWNER_TOKEN = process.env.OWNER_TOKEN || jwt.sign(
+  { sub: 1, sid: 'test-session-c0', tid: 1000000001 },
+  process.env.JWT_SECRET || 'agjassist-dev-secret-change-me',
+  { expiresIn: '24h' }
+);
 const AUTH_HEADERS = { authorization: `Bearer ${OWNER_TOKEN}` };
 const FENCE_STUB = process.env.FENCE_STUB || '';
 

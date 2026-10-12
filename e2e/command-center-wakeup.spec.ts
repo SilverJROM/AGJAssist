@@ -1,7 +1,12 @@
 import { test, expect } from '@playwright/test';
+import jwt from 'jsonwebtoken';
 
 const APP_ORIGIN = 'http://localhost:3210';
-const OWNER_TOKEN = process.env.OWNER_TOKEN || 'REDACTED_TEST_JWT';
+const OWNER_TOKEN = process.env.OWNER_TOKEN || jwt.sign(
+  { sub: 1, sid: 'test-session-c0', tid: 1000000001 },
+  process.env.JWT_SECRET || 'agjassist-dev-secret-change-me',
+  { expiresIn: '24h' }
+);
 
 test('command-center wakeup UI and API', async ({ page }) => {
   await page.addInitScript((token) => {

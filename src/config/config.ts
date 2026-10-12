@@ -90,6 +90,16 @@ export const MCP_TOKEN_TTL_DAYS_DEFAULT = 7;
 export const MCP_TOKEN_TTL_DAYS_MIN = 7;
 export const MCP_TOKEN_TTL_DAYS_MAX = 10;
 
+const DEV_JWT_SECRET = "agjassist-dev-secret-change-me";
+
+function resolveJwtSecret(): string {
+  const configured = process.env.JWT_SECRET?.trim() || "";
+  if (process.env.NODE_ENV === "production" && (configured === "" || configured === DEV_JWT_SECRET)) {
+    throw new Error("Missing required env var: JWT_SECRET (must be a non-default value when NODE_ENV is production)");
+  }
+  return configured || DEV_JWT_SECRET;
+}
+
 export function parseMcpTokenTtlDays(raw: string | undefined): number {
   if (raw == null || raw.trim() === "") return MCP_TOKEN_TTL_DAYS_DEFAULT;
   const trimmed = raw.trim();
@@ -160,7 +170,7 @@ export function loadConfig(): AppConfig {
     api: {
       port: optionalNumber("API_PORT", 3100),
       host: optional("API_HOST", "0.0.0.0"),
-      jwtSecret: optional("JWT_SECRET", "agjassist-dev-secret-change-me"),
+      jwtSecret: resolveJwtSecret(),
       sessionExpiryHours: optionalNumber("SESSION_EXPIRY_HOURS", 24)
     },
     db: {
